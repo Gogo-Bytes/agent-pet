@@ -10,6 +10,7 @@
     "@types/node": "^22.0.0",
     "@types/three": "^0.177.0",
     "electron": "^36.0.0",
+    "electron-vite": "^4.0.0",
     "typescript": "^5.8.0",
     "vitest": "^3.0.0"
   }

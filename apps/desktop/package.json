@@ -2,11 +2,16 @@
   "name": "@agent-pet/desktop",
   "private": true,
   "type": "module",
+  "main": "out/main/index.cjs",
   "dependencies": {
+    "@agent-pet/application": "workspace:*",
     "@agent-pet/adapter-core": "workspace:*",
-    "@agent-pet/domain": "workspace:*"
+    "@agent-pet/domain": "workspace:*",
+    "three": "^0.177.0"
   },
   "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
     "typecheck": "tsc --noEmit"
   }
 }

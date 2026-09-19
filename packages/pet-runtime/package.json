@@ -1,0 +1,13 @@
+{
+  "name": "@agent-pet/pet-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@agent-pet/domain": "workspace:*",
+
+    "three": "^0.177.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

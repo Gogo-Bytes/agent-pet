@@ -1,0 +1,11 @@
+{
+  "name": "@agent-pet/adapter-core",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@agent-pet/domain": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

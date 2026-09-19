@@ -176,6 +176,21 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@22.20.3)
 
+  packages/adapter-core:
+    dependencies:
+      '@agent-pet/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/application:
+    dependencies:
+      '@agent-pet/adapter-core':
+        specifier: workspace:*
+        version: link:../adapter-core
+      '@agent-pet/domain':
+        specifier: workspace:*
+        version: link:../domain
+
   packages/domain: {}
 
 packages:

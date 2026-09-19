@@ -1,14 +1,15 @@
 import {
   AmbientLight,
   Color,
-  IcosahedronGeometry,
-  Mesh,
-  MeshStandardMaterial,
+  DirectionalLight,
   PerspectiveCamera,
   Scene,
   WebGLRenderer,
 } from 'three';
 import type { SessionState } from '@agent-pet/domain';
+import { parseBundledPet, type LoadedPet, type PetMotion } from '@agent-pet/pet-runtime/model';
+import starterUrl from '@agent-pet/pet-runtime/assets/starter.glb?url';
+import { selectPetMotion } from './pet-motion.js';
 import { bubbleLabel, visibleBubbles } from './bubble-model.js';
 import './style.css';
 
@@ -35,15 +36,33 @@ const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new Scene();
 const camera = new PerspectiveCamera(35, 1, 0.1, 100);
-camera.position.set(0, 0.2, 4);
+camera.position.set(0, .4, 5.5);
+camera.lookAt(0, .2, 0);
 scene.add(new AmbientLight(new Color('#ffffff'), 2));
-
-// Placeholder geometry keeps the window and interaction loop testable before a GLB is selected.
-const pet = new Mesh(
-  new IcosahedronGeometry(1, 2),
-  new MeshStandardMaterial({ color: '#7c5cff', roughness: 0.65 }),
-);
-scene.add(pet);
+const light = new DirectionalLight('#ffffff', 3);
+light.position.set(3, 5, 4);
+scene.add(light);
+let pet: LoadedPet | undefined;
+let motion: PetMotion = 'idle';
+let destroyed = false;
+notice.textContent = '正在加载内置 GLB 宠物…';
+async function loadStarter(): Promise<void> {
+  try {
+    const response = await fetch(starterUrl);
+    if (!response.ok) throw new Error('Bundled model is unavailable');
+    const loaded = await parseBundledPet(await response.arrayBuffer(), {
+      idle: 'Idle', working: 'Work', success: 'Success', error: 'Error',
+    });
+    if (destroyed) { loaded.dispose(); return; }
+    pet = loaded;
+    scene.add(pet.root);
+    pet.setMotion(motion);
+    notice.textContent = '';
+  } catch {
+    if (!destroyed) notice.textContent = '内置宠物加载失败，请重新打开窗口。';
+  }
+}
+void loadStarter();
 
 function resize(): void {
   const { width, height } = canvas.getBoundingClientRect();
@@ -52,13 +71,20 @@ function resize(): void {
   camera.updateProjectionMatrix();
 }
 
-function render(): void {
-  pet.rotation.y += 0.006;
+let lastFrame = 0;
+let frame = 0;
+function render(now: number): void {
+  frame = requestAnimationFrame(render);
+  if (document.hidden) { lastFrame = now; return; }
+  if (now - lastFrame < 1000 / 30) return;
+  pet?.update((now - lastFrame) / 1000);
+  lastFrame = now;
   renderer.render(scene, camera);
-  requestAnimationFrame(render);
 }
 
 function renderBubbles(state: SessionState): void {
+  motion = selectPetMotion(state.bubbles);
+  pet?.setMotion(motion);
   bubbleLayer.replaceChildren();
   for (const bubble of visibleBubbles(state)) {
     const button = document.createElement('button');
@@ -114,6 +140,13 @@ const unsubscribe = window.pet.subscribeSnapshot(renderBubbles);
 void window.pet.requestSnapshot().catch(() => {
   notice.textContent = '无法获取 Session 状态，请重新打开窗口。';
 });
-window.addEventListener('beforeunload', unsubscribe);
+window.addEventListener('beforeunload', () => {
+  destroyed = true;
+  unsubscribe();
+  cancelAnimationFrame(frame);
+  pet?.dispose();
+  renderer.dispose();
+  window.removeEventListener('resize', resize);
+});
 resize();
-render();
+frame = requestAnimationFrame(render);

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import type { SessionRef } from '@agent-pet/adapter-core';
 import { createApplication } from '@agent-pet/application';
 import { join } from 'node:path';
@@ -6,6 +6,16 @@ import { createPetWindowOptions } from './window-options.js';
 
 let petWindow: BrowserWindow | undefined;
 const application = createApplication([]);
+application.subscribe((snapshot) => {
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.webContents.send('pet:snapshot', snapshot);
+  }
+});
+
+ipcMain.handle('pet:request-snapshot', (event) => {
+  assertTrustedRenderer(event);
+  event.sender.send('pet:snapshot', application.snapshot());
+});
 
 function assertTrustedRenderer(event: Electron.IpcMainInvokeEvent): void {
   if (!petWindow || event.sender !== petWindow.webContents ||
@@ -31,9 +41,7 @@ function parseSessionRef(value: unknown): SessionRef {
 
 ipcMain.handle('pet:acknowledge-and-open', async (event, value: unknown) => {
   assertTrustedRenderer(event);
-  const result = await application.acknowledgeAndOpen(parseSessionRef(value));
-  petWindow?.webContents.send('pet:snapshot', application.snapshot());
-  return result;
+  return application.acknowledgeAndOpen(parseSessionRef(value));
 });
 
 ipcMain.handle('pet:move-window-by', (event, delta: unknown) => {
@@ -72,15 +80,37 @@ function createPetWindow(): BrowserWindow {
   } else {
     void window.loadFile(join(__dirname, '../renderer/index.html'));
   }
-  window.webContents.once('did-finish-load', () => {
-    window.webContents.send('pet:snapshot', application.snapshot());
-  });
   window.once('ready-to-show', () => window.show());
   return window;
 }
 
 app.whenReady().then(() => {
   petWindow = createPetWindow();
+  let demoRun = 0;
+  function demo(status: 'working' | 'completed' | 'error'): void {
+    if (status === 'working' || demoRun === 0) demoRun++;
+    for (const provider of ['codex', 'pi', 'claude'] as const) {
+      application.observe({
+        provider,
+        sessionId: `demo-${provider}-${demoRun}`,
+        agentName: `模拟 · ${provider} · ${demoRun}`,
+        status,
+        observedAt: new Date().toISOString(),
+      });
+    }
+  }
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: 'Agent Pet', submenu: [
+      { label: '显示宠物', click: () => petWindow?.show() },
+      { label: '隐藏宠物', click: () => petWindow?.hide() },
+      { type: 'separator' }, { role: 'quit' },
+    ] },
+    ...(!app.isPackaged ? [{ label: '模拟 Session（开发专用）', submenu: [
+      { label: '新建三个工作 Session', click: () => demo('working') },
+      { label: '当前模拟任务完成', click: () => demo('completed') },
+      { label: '当前模拟任务出错', click: () => demo('error') },
+    ] }] : []),
+  ]));
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

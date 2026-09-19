@@ -60,3 +60,9 @@ body,
 .session-bubble--error-unread {
   border: 1px solid #ff6b78;
 }
+
+.bubble-layer[hidden] { display: none; }
+.bubble-layer { max-height: 45%; overflow-y: auto; }
+.bubble-toggle { position: absolute; bottom: 16px; left: 16px; cursor: pointer; }
+.pet-notice { position: absolute; bottom: 42px; left: 16px; right: 16px; color: white; background: #222; border-radius: 8px; font-size: 12px; }
+.pet-notice:empty { display: none; }

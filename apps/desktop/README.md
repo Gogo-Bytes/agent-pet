@@ -18,7 +18,18 @@ Unit tests, TypeScript checking and the production build pass. The renderer uses
 placeholder geometry, not a selected GLB. No real Agent adapters are connected;
 the initial session snapshot is empty.
 
-Desktop runtime verification is pending: the available agent-browser Electron
-launcher rejected the installed Electron bundle with
-`target does not have Electron framework evidence`. Build success does not
-verify preload execution, WebGL, IPC, dragging or macOS/Windows window behavior.
+The user confirmed that the macOS development window renders normally after a
+direct CLI launch. The agent-browser Electron launcher rejected this bundle;
+that launcher result does not indicate an Electron runtime failure. Windows
+behavior and the interaction scenarios below still require manual verification.
+
+## Development session simulation
+
+Use the application menu `模拟 Session（开发专用）` to create three working sessions
+and change the current simulated run to completed or error. All names are prefixed
+with `模拟`; this is not a real Agent integration and does not open Agent windows.
+
+Check that working bubbles survive clicks, completed/error bubbles disappear on
+click with an unsupported-opening notice, and hiding bubbles preserves the pet.
+Reloading the renderer requests the current in-memory snapshot. Restarting the
+application resets it. The simulation menu is excluded from packaged apps.

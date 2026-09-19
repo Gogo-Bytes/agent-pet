@@ -12,6 +12,9 @@ const petApi = {
   acknowledgeAndOpen(session: SessionRef): Promise<OpenSessionResult> {
     return ipcRenderer.invoke(channels.acknowledgeAndOpen, session);
   },
+  requestSnapshot(): Promise<void> {
+    return ipcRenderer.invoke('pet:request-snapshot');
+  },
   moveWindowBy(delta: { x: number; y: number }): Promise<void> {
     return ipcRenderer.invoke(channels.moveWindowBy, delta);
   },

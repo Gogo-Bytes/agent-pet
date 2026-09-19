@@ -78,7 +78,7 @@ export function acknowledgeBubble(
 ): SessionState {
   return {
     sessions: state.sessions,
-    bubbles: state.bubbles.filter((bubble) => bubble.sessionId !== sessionId),
+    bubbles: state.bubbles.filter((bubble) => bubble.sessionId !== sessionId || bubble.status === 'working'),
   };
 }
 

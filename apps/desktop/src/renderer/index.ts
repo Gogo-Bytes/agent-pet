@@ -19,7 +19,17 @@ const canvas = document.createElement('canvas');
 canvas.className = 'pet-canvas';
 const bubbleLayer = document.createElement('div');
 bubbleLayer.className = 'bubble-layer';
-app.append(canvas, bubbleLayer);
+const notice = document.createElement('p');
+notice.className = 'pet-notice';
+notice.setAttribute('role', 'status');
+const toggle = document.createElement('button');
+toggle.className = 'bubble-toggle';
+toggle.textContent = '隐藏气泡';
+toggle.addEventListener('click', () => {
+  bubbleLayer.hidden = !bubbleLayer.hidden;
+  toggle.textContent = bubbleLayer.hidden ? '显示气泡' : '隐藏气泡';
+});
+app.append(canvas, bubbleLayer, toggle, notice);
 
 const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -55,13 +65,22 @@ function renderBubbles(state: SessionState): void {
     button.className = `session-bubble session-bubble--${bubble.status}`;
     button.type = 'button';
     button.textContent = bubbleLabel(bubble);
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       const session = state.sessions[bubble.sessionId];
       if (!session) return;
-      void window.pet.acknowledgeAndOpen({
-        provider: session.provider,
-        sessionId: session.sessionId,
-      });
+      try {
+        const result = await window.pet.acknowledgeAndOpen({
+          provider: session.provider,
+          sessionId: session.sessionId,
+        });
+        const messages = {
+          success: '', unsupported: '此 Session 暂不支持打开窗口（模拟 Session 不连接真实 Agent）。',
+          'not-found': '找不到对应 Session。', 'permission-denied': '没有打开窗口的权限。',
+        };
+        notice.textContent = messages[result.status];
+      } catch {
+        notice.textContent = '打开窗口失败；已确认的气泡不会恢复。';
+      }
     });
     bubbleLayer.append(button);
   }
@@ -91,6 +110,10 @@ canvas.addEventListener('pointerup', stopDragging);
 canvas.addEventListener('pointercancel', stopDragging);
 
 window.addEventListener('resize', resize);
-window.pet.subscribeSnapshot(renderBubbles);
+const unsubscribe = window.pet.subscribeSnapshot(renderBubbles);
+void window.pet.requestSnapshot().catch(() => {
+  notice.textContent = '无法获取 Session 状态，请重新打开窗口。';
+});
+window.addEventListener('beforeunload', unsubscribe);
 resize();
 render();

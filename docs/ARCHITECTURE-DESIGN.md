@@ -1,5 +1,7 @@
 # Agent Pet Architecture Design
 
+> Agent 接入章节的早期 App Server / JSON-RPC 选型已被 [已运行 Session 接入计划](AGENT-INTEGRATION-PLAN.md) 修正。当前实现以被动观测为边界，不启动或恢复 Agent 来冒充监听已有会话。本文其余部分仍为架构设计，不能作为实现完成证明。
+
 ## 1. Architectural intent and product boundaries
 
 Agent Pet is a local, read-only desktop projection of configured coding-agent sessions. The business invariant is **one Pet, many independent Sessions, at most one visible bubble per Session**. A restarted agent run is a new Session; sessions are neither aggregated nor deduplicated. The product surfaces only `working`, `completed-unread`, and `error-unread`.

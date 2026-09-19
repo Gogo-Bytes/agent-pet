@@ -1,0 +1,12 @@
+{
+  "name": "@agent-pet/desktop",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@agent-pet/adapter-core": "workspace:*",
+    "@agent-pet/domain": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

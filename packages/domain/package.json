@@ -1,0 +1,8 @@
+{
+  "name": "@agent-pet/domain",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

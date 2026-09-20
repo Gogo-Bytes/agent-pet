@@ -14,10 +14,10 @@ export function layoutOverlay(anchor: Rect, area: Rect) {
   const bubbles = { x, y: onTop ? pet.y - height - 12 : pet.y + size + 12, width, height };
   const toolbar = { x: clamp(pet.x + (size - 116) / 2, area.x, area.x + area.width - 116),
     y: onTop ? pet.y + size + 6 : pet.y - 44, width: 116, height: 38 };
-  const left = Math.floor(Math.min(pet.x, bubbles.x, toolbar.x));
-  const top = Math.floor(Math.min(pet.y, bubbles.y, toolbar.y));
-  const right = Math.ceil(Math.max(pet.x + size, bubbles.x + width, toolbar.x + toolbar.width));
-  const bottom = Math.ceil(Math.max(pet.y + size, bubbles.y + height, toolbar.y + toolbar.height));
+  const left = Math.max(area.x, Math.floor(Math.min(pet.x, bubbles.x, toolbar.x)) - 6);
+  const top = Math.max(area.y, Math.floor(Math.min(pet.y, bubbles.y, toolbar.y)) - 6);
+  const right = Math.min(area.x + area.width, Math.ceil(Math.max(pet.x + size, bubbles.x + width, toolbar.x + toolbar.width)) + 6);
+  const bottom = Math.min(area.y + area.height, Math.ceil(Math.max(pet.y + size, bubbles.y + height, toolbar.y + toolbar.height)) + 6);
   const local = (r: Rect) => ({ ...r, x: r.x - left, y: r.y - top });
   return { anchor: pet, bounds: { x: left, y: top, width: right - left, height: bottom - top },
     pet: local(pet), bubbles: local(bubbles), toolbar: local(toolbar) };

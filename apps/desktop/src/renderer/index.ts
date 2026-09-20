@@ -23,6 +23,12 @@ bubbleLayer.className = 'bubble-layer';
 const notice = document.createElement('p');
 notice.className = 'pet-notice';
 notice.setAttribute('role', 'status');
+let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+function showNotice(message: string): void {
+  clearTimeout(noticeTimer);
+  notice.textContent = message;
+  noticeTimer = setTimeout(() => { notice.textContent = ''; }, 3500);
+}
 const toggle = document.createElement('button');
 toggle.className = 'bubble-toggle';
 toggle.type = 'button';
@@ -125,12 +131,12 @@ function renderBubbles(state: SessionState): void {
           sessionId: session.sessionId,
         });
         const messages = {
-          success: '', unsupported: '暂不支持定位此 Session 的原窗口。',
+          success: '', unsupported: '暂不支持跳转原会话',
           'not-found': '找不到对应 Session。', 'permission-denied': '没有打开窗口的权限。',
         };
-        notice.textContent = messages[result.status];
+        showNotice(messages[result.status]);
       } catch {
-        notice.textContent = '打开窗口失败；已确认的气泡不会恢复。';
+        showNotice('暂时无法打开原会话窗口');
       }
     });
     bubbleLayer.append(button);
@@ -187,6 +193,13 @@ resizeHandle.addEventListener('pointerup', stopResizing);
 resizeHandle.addEventListener('pointercancel', stopResizing);
 
 const unsubscribeLayout = window.pet.subscribeLayout(layout => {
+  const above = layout.bubbles.y < layout.pet.y;
+  bubbleLayer.style.justifyContent = above ? 'safe flex-end' : 'flex-start';
+  Object.assign(notice.style, {
+    left: `${layout.bubbles.x + 4}px`, width: `${layout.bubbles.width - 8}px`,
+    top: above ? 'auto' : `${layout.bubbles.y + 4}px`,
+    bottom: above ? `${layout.bounds.height - layout.bubbles.y - layout.bubbles.height + 4}px` : 'auto',
+  });
   for (const [element, rect] of [[canvas, layout.pet], [bubbleLayer, layout.bubbles], [toolbar, layout.toolbar]] as const) {
     Object.assign(element.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
   }
@@ -199,6 +212,7 @@ void window.pet.requestSnapshot().catch(() => {
 });
 window.addEventListener('beforeunload', () => {
   destroyed = true;
+  clearTimeout(noticeTimer);
   unsubscribe();
   unsubscribeLayout();
   cancelAnimationFrame(frame);

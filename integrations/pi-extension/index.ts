@@ -95,8 +95,8 @@ export default function agentPetPiExtension(pi: PiApi): void {
       processInstanceId,
       providerSessionId: currentSessionId,
       sentAt: new Date().toISOString(),
-      ...(sessionNameValue ? { sessionName: sessionNameValue } : {}),
-      ...(projectName ? { projectName } : {}),
+      ...(type === 'hello' && sessionNameValue ? { sessionName: sessionNameValue } : {}),
+      ...(type === 'hello' && projectName ? { projectName } : {}),
       ...fields,
     }) + '\n';
     if (socket && !socket.destroyed && socket.writable) {

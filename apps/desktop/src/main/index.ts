@@ -61,8 +61,8 @@ ipcMain.handle('pet:resize-window-by', (event, delta: unknown) => {
   const [width = 420, height = 420] = window.getSize();
   const { x, y } = delta as { x: number; y: number };
   window.setSize(
-    Math.max(240, Math.min(1200, Math.round(width + x))),
-    Math.max(240, Math.min(1200, Math.round(height + y))),
+    Math.max(80, Math.min(1200, Math.round(width + x))),
+    Math.max(80, Math.min(1200, Math.round(height + y))),
   );
 });
 

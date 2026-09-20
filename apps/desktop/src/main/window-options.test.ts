@@ -6,10 +6,10 @@ describe('pet window security and desktop behavior', () => {
     const options = createPetWindowOptions('/tmp/preload.mjs');
 
     expect(options).toMatchObject({
-      width: 420,
-      height: 420,
-      minWidth: 240,
-      minHeight: 240,
+      width: 140,
+      height: 140,
+      minWidth: 80,
+      minHeight: 80,
       transparent: true,
       frame: false,
       alwaysOnTop: true,

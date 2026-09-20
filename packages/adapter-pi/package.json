@@ -1,0 +1,13 @@
+{
+  "name": "@agent-pet/adapter-pi",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@agent-pet/adapter-core": "workspace:*",
+    "@agent-pet/domain": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./protocol": "./src/protocol.ts"
+  }
+}

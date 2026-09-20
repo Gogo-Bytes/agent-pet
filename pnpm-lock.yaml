@@ -209,6 +209,15 @@ importers:
         specifier: workspace:*
         version: link:../domain
 
+  packages/adapter-pi:
+    dependencies:
+      '@agent-pet/adapter-core':
+        specifier: workspace:*
+        version: link:../adapter-core
+      '@agent-pet/domain':
+        specifier: workspace:*
+        version: link:../domain
+
   packages/application:
     dependencies:
       '@agent-pet/adapter-core':

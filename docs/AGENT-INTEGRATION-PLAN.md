@@ -1,6 +1,6 @@
 # 已运行 Agent Session 接入计划
 
-状态：pi 的本机静态接口核实完成，I1a 已完成；进入 I1b 前仍需确定本机 bridge 传输与用户授权安装方式。Claude Code / Codex 官方全文与版本仍待核实。实施顺序：pi → Claude Code → Codex，后两项不越过各自证据门槛。尚未完成任何真实 Agent 运行时接入验收。
+状态：pi 的本机静态接口核实完成，I1a 与 I1b bridge/桌面生命周期接线已完成；进入 I1c 前仍需用户授权并实现/加载 pi 扩展。Claude Code / Codex 官方全文与版本仍待核实。实施顺序：pi → Claude Code → Codex，后两项不越过各自证据门槛。尚未完成任何真实 Agent 运行时接入验收。
 
 ## 1. 已确认边界
 
@@ -39,7 +39,7 @@
 
 - **I1a：可靠事件状态模型（已完成）**。运行身份由 Adapter 使用 `provider:processInstanceId:providerSessionId` 组合；领域层支持 revision/时间乱序保护、workId 工作周期、终态确认墓碑、名称更新，不安装扩展、不启动接收服务、不读取用户 Session。测试覆盖重复/乱序、确认后不复活和新工作周期。
 - **I1b：pi 扩展与本地 bridge（协议实现完成，桌面接线待下一小步）**。已实现最小元数据传输、schema/token 校验、seq 去重、状态归一化、Unix socket/Windows named pipe 监听抽象和资源关闭；未安装扩展、未改 pi 配置。固定验证对象为 pi 0.85.1 TUI；其它版本不自动宣称兼容。
-- **I1c：桌面接线与用户授权后的真实验证**。先把已配置 endpoint/token 的 Adapter 生命周期接入桌面，再由用户在闲置的已有 TUI 中显式加载扩展，实测多轮工作、取消、重试和重连；未验收前不进入 Claude Code。
+- **I1c：用户授权后的真实验证**。桌面已能通过显式 endpoint/token 启动 Adapter；下一步实现并由用户主动加载只读 pi 扩展，在闲置的已有 TUI 中实测多轮工作、取消、重试和重连；未验收前不进入 Claude Code。
 
 仅在 I0 确认扩展事件可用后实施：
 

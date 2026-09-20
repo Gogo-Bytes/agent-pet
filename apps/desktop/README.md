@@ -53,3 +53,18 @@ Manual check: the robot should replace the purple placeholder; changing simulate
 Session states should change motion, and acknowledging all terminal bubbles should
 return it to Idle. Missing optional clips fall back to Idle; missing required Idle
 is a loading error.
+
+## Explicit pi bridge development configuration
+
+The desktop process starts the pi Adapter only when both variables are present:
+
+```sh
+AGENT_PET_PI_ENDPOINT=/tmp/agent-pet-pi.sock \
+AGENT_PET_PI_TOKEN=replace-with-a-random-16-plus-character-token \
+pnpm --filter @agent-pet/desktop dev
+```
+
+Without both values no socket is opened. The current Adapter accepts messages but
+there is not yet a pi extension that emits them, so this configuration is a local
+integration seam for the next step, not a user installation instruction. The
+Adapter never starts or resumes pi and `openSession` remains unsupported.

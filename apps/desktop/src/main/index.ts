@@ -1,11 +1,16 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron';
-import type { SessionRef } from '@agent-pet/adapter-core';
+import type { AdapterHandle, SessionRef } from '@agent-pet/adapter-core';
+import { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import { createApplication } from '@agent-pet/application';
 import { join } from 'node:path';
 import { createPetWindowOptions } from './window-options.js';
+import { readPiBridgeConfig } from './pi-config.js';
 
 let petWindow: BrowserWindow | undefined;
-const application = createApplication([]);
+let piHandle: AdapterHandle | undefined;
+const piConfig = readPiBridgeConfig(process.env);
+const piAdapter = new PiBridgeAdapter();
+const application = createApplication(piConfig ? [piAdapter] : []);
 application.subscribe((snapshot) => {
   if (petWindow && !petWindow.isDestroyed()) {
     petWindow.webContents.send('pet:snapshot', snapshot);
@@ -84,7 +89,22 @@ function createPetWindow(): BrowserWindow {
   return window;
 }
 
+async function startConfiguredAdapters(): Promise<void> {
+  if (!piConfig) return;
+  try {
+    piHandle = await piAdapter.start(piConfig, {
+      publish: observation => application.observe(observation),
+      connectionChanged: state => {
+        if (state !== 'connected') console.info(`[pi adapter] ${state}`);
+      },
+    });
+  } catch (error) {
+    console.warn('[pi adapter] disabled:', error instanceof Error ? error.message : error);
+  }
+}
+
 app.whenReady().then(() => {
+  void startConfiguredAdapters();
   petWindow = createPetWindow();
   let demoRun = 0;
   function demo(status: 'working' | 'completed' | 'error'): void {
@@ -117,6 +137,10 @@ app.whenReady().then(() => {
       petWindow = createPetWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  void piHandle?.stop();
 });
 
 app.on('window-all-closed', () => {

@@ -8,6 +8,7 @@
     "@agent-pet/adapter-core": "workspace:*",
     "@agent-pet/domain": "workspace:*",
     "@agent-pet/pet-runtime": "workspace:*",
+    "@agent-pet/adapter-pi": "workspace:*",
     "three": "^0.177.0"
   },
   "scripts": {

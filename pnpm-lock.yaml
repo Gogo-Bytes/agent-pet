@@ -190,6 +190,9 @@ importers:
       '@agent-pet/adapter-core':
         specifier: workspace:*
         version: link:../../packages/adapter-core
+      '@agent-pet/adapter-pi':
+        specifier: workspace:*
+        version: link:../../packages/adapter-pi
       '@agent-pet/application':
         specifier: workspace:*
         version: link:../../packages/application

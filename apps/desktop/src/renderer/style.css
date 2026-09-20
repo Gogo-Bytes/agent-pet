@@ -65,31 +65,42 @@ html, body, #app {
 .session-bubble--error-unread strong::before { content: '!'; color: #c63240; }
 .pet-toolbar {
   position: absolute; display: flex; justify-content: center; align-items: center;
-  gap: 12px; border-radius: 24px; box-sizing: border-box; opacity: 0; transition: opacity 120ms;
+  gap: 14px; padding: 0 12px; border-radius: 24px; box-sizing: border-box;
+  color: #d8def1;
+  border: 1px solid rgb(194 204 233 / 18%);
+  background: linear-gradient(165deg, rgb(91 98 117 / 24%), rgb(23 27 36 / 12%) 55%), rgb(27 31 41 / 62%);
+  box-shadow: inset 0 1px 0 rgb(228 235 255 / 12%),
+    inset 0 -1px 0 rgb(10 14 22 / 16%), 0 2px 5px rgb(8 12 22 / 16%);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  opacity: 0; transition: opacity 160ms ease;
 }
 .pet-toolbar::after {
   content: ''; position: absolute; left: 50%; top: 10px; bottom: 10px;
-  width: 1px; background: rgb(60 75 100 / 13%); box-shadow: 1px 0 rgb(255 255 255 / 55%); pointer-events: none;
+  width: 1px; background: linear-gradient(transparent, rgb(208 217 241 / 18%), transparent);
+  pointer-events: none;
 }
 #app:hover .pet-toolbar, .pet-toolbar:focus-within { opacity: 1; }
 .pet-toolbar button {
   width: 30px; height: 30px; display: grid; place-items: center; padding: 5px;
-  border: 1px solid transparent; border-radius: 50%; color: var(--glass-ink);
-  background: transparent; cursor: pointer; transition: background-color 120ms;
+  flex-shrink: 0; border: 0; border-radius: 50%; color: inherit;
+  background: transparent; cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
 }
-.pet-toolbar button:hover { background: rgb(255 255 255 / 42%); border-color: rgb(255 255 255 / 60%); }
+.pet-toolbar button:hover { background: rgb(214 225 255 / 10%); color: #f1f4ff; }
+.pet-toolbar button:active { background: rgb(214 225 255 / 17%); }
+.pet-toolbar button:focus-visible { outline: 2px solid #c3cffa; outline-offset: -2px; }
 .session-bubble:focus-visible, .pet-toolbar button:focus-visible { outline: 2px solid #7462ba; outline-offset: -3px; }
-.bubble-toggle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pet-toolbar svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
 .pet-toolbar .resize-handle {
-  background: rgb(91 108 139 / 12%);
-  border-color: rgb(255 255 255 / 22%); box-shadow: none;
-  font: 700 19px system-ui; cursor: nwse-resize; touch-action: none;
+  cursor: nwse-resize; touch-action: none;
 }
 .pet-notice { position: absolute; margin: 0; padding: 12px 18px; box-sizing: border-box; border-radius: 24px; font-size: 12px; text-align: center; pointer-events: none; background-color: rgb(245 247 252 / 55%); }
 .pet-notice:empty { display: none; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   #app { --glass-fill: rgb(240 244 252 / 98%); }
   .session-bubble, .pet-toolbar, .pet-notice { backdrop-filter: none; }
+  .pet-toolbar { background: #262b36; border-color: #727e98; }
 }
 @media (prefers-reduced-motion: reduce) {
   .session-bubble, .pet-toolbar, .pet-toolbar button { transition: none; }

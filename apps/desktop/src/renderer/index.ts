@@ -69,7 +69,7 @@ updateBubbleToggleIcon();
 const resizeHandle = document.createElement('button');
 resizeHandle.className = 'resize-handle';
 resizeHandle.type = 'button';
-resizeHandle.textContent = '↘';
+resizeHandle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M4 4l6 6M16 20h4v-4m0 4-6-6"/></svg>';
 resizeHandle.title = '调整宠物窗口大小';
 resizeHandle.setAttribute('aria-label', '调整宠物窗口大小');
 const toolbar = document.createElement('div');

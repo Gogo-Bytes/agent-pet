@@ -69,6 +69,43 @@ describe('session bubble projection', () => {
     expect(acknowledgeBubble(completed, 'session-1').bubbles).toEqual([]);
   });
 
+  it('ignores duplicate or out-of-order revisions', () => {
+    const state = applyObservation(
+      applyObservation(createSessionState(), working({ revision: 2, status: 'completed' })),
+      working({ revision: 1, status: 'working' }),
+    );
+
+    expect(state.bubbles[0]?.status).toBe('completed-unread');
+  });
+
+  it('does not resurrect an acknowledged terminal event', () => {
+    const completed = applyObservation(
+      createSessionState(),
+      working({ status: 'completed', revision: 3, workId: 'work-1' }),
+    );
+    const acknowledged = acknowledgeBubble(completed, 'session-1');
+    const duplicate = applyObservation(
+      acknowledged,
+      working({ status: 'completed', revision: 3, workId: 'work-1' }),
+    );
+
+    expect(duplicate.bubbles).toEqual([]);
+  });
+
+  it('allows a new work cycle for the same process session', () => {
+    const first = applyObservation(
+      createSessionState(),
+      working({ status: 'completed', revision: 2, workId: 'work-1' }),
+    );
+    const acknowledged = acknowledgeBubble(first, 'session-1');
+    const next = applyObservation(
+      applyObservation(acknowledged, working({ revision: 3, workId: 'work-2' })),
+      working({ status: 'completed', revision: 4, workId: 'work-2' }),
+    );
+
+    expect(next.bubbles[0]?.status).toBe('completed-unread');
+  });
+
   it('uses a stable fallback when no display name is available', () => {
     const observation = working();
     delete observation.agentName;

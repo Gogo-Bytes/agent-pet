@@ -1,5 +1,17 @@
 import type { Provider, SessionObservation } from '@agent-pet/domain';
 
+export type SessionIdentity = {
+  provider: Provider;
+  processInstanceId: string;
+  providerSessionId: string;
+};
+
+export function createSessionId(identity: SessionIdentity): string {
+  return [identity.provider, identity.processInstanceId, identity.providerSessionId]
+    .map(encodeURIComponent)
+    .join(':');
+}
+
 export type SessionRef = {
   provider: Provider;
   sessionId: string;

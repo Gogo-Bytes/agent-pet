@@ -40,10 +40,12 @@ toggle.addEventListener('click', () => {
   updateBubbleToggleIcon();
 });
 updateBubbleToggleIcon();
-const resizeHandle = document.createElement('div');
+const resizeHandle = document.createElement('button');
 resizeHandle.className = 'resize-handle';
+resizeHandle.type = 'button';
+resizeHandle.textContent = '↘';
+resizeHandle.title = '调整宠物窗口大小';
 resizeHandle.setAttribute('aria-label', '调整宠物窗口大小');
-resizeHandle.setAttribute('role', 'slider');
 app.append(canvas, bubbleLayer, toggle, resizeHandle, notice);
 
 const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });

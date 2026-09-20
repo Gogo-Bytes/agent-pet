@@ -14,9 +14,28 @@ html, body, #app {
 .pet-canvas--dragging { cursor: grabbing; }
 .bubble-layer {
   position: absolute; display: flex; flex-direction: column; justify-content: safe flex-end;
-  gap: 8px; overflow-y: auto; scrollbar-width: thin; box-sizing: border-box; padding: 4px;
+  box-sizing: border-box; padding: 4px; pointer-events: none;
 }
 .bubble-layer[hidden] { display: none; }
+.bubble-deck {
+  position: relative; width: 100%; height: var(--stack-height, 80px); max-height: 100%;
+  flex-shrink: 0; pointer-events: auto;
+}
+.bubble-deck:not(.is-expanded) .session-bubble {
+  position: absolute; left: 0; bottom: 0; height: 62px;
+  z-index: var(--order); transform-origin: center bottom;
+  transform: translateY(calc(var(--depth) * -7px)) scale(calc(1 - var(--depth) * .045));
+}
+.bubble-layer[data-side='below'] .bubble-deck:not(.is-expanded) .session-bubble {
+  top: 0; bottom: auto; transform-origin: center top;
+  transform: translateY(calc(var(--depth) * 7px)) scale(calc(1 - var(--depth) * .045));
+}
+.bubble-deck:not(.is-expanded) .session-bubble[data-stacked-hidden='true'] { visibility: hidden; }
+.bubble-deck.is-expanded {
+  height: auto; overflow-y: auto; scrollbar-width: thin;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.bubble-deck.is-expanded .session-bubble { position: relative; transform: none; }
 
 /* Rim highlights supply depth even when the native desktop is not available
    to Chromium's backdrop filter. Filters never affect the text/icon layer. */

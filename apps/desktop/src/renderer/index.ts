@@ -20,6 +20,25 @@ const canvas = document.createElement('canvas');
 canvas.className = 'pet-canvas';
 const bubbleLayer = document.createElement('div');
 bubbleLayer.className = 'bubble-layer';
+const bubbleDeck = document.createElement('div');
+bubbleDeck.className = 'bubble-deck';
+bubbleDeck.setAttribute('role', 'group');
+bubbleDeck.setAttribute('aria-label', '会话通知，悬停或聚焦展开');
+bubbleLayer.append(bubbleDeck);
+function expandBubbles(expanded: boolean): void {
+  bubbleDeck.classList.toggle('is-expanded', expanded);
+  void window.pet.bubblesExpanded(expanded);
+}
+bubbleDeck.addEventListener('pointerenter', () => expandBubbles(true));
+bubbleDeck.addEventListener('pointerleave', () => {
+  if (!bubbleDeck.contains(document.activeElement)) expandBubbles(false);
+});
+bubbleDeck.addEventListener('focusin', () => expandBubbles(true));
+bubbleDeck.addEventListener('focusout', () => {
+  queueMicrotask(() => {
+    if (!bubbleDeck.contains(document.activeElement) && !bubbleDeck.matches(':hover')) expandBubbles(false);
+  });
+});
 const notice = document.createElement('p');
 notice.className = 'pet-notice';
 notice.setAttribute('role', 'status');
@@ -112,11 +131,18 @@ function render(now: number): void {
 function renderBubbles(state: SessionState): void {
   motion = selectPetMotion(state.bubbles);
   pet?.setMotion(motion);
-  bubbleLayer.replaceChildren();
-  for (const bubble of visibleBubbles(state)) {
+  bubbleDeck.replaceChildren();
+  const bubbles = [...visibleBubbles(state)].reverse();
+  bubbleDeck.style.setProperty('--stack-height', `${Math.min(3, bubbles.length) * 7 + 66}px`);
+  bubbleDeck.setAttribute('aria-label', `${bubbles.length} 个会话通知，悬停或聚焦展开`);
+  if (!bubbles.length) expandBubbles(false);
+  for (const [index, bubble] of bubbles.entries()) {
     const button = document.createElement('button');
     button.className = `session-bubble session-bubble--${bubble.status}`;
     button.type = 'button';
+    button.style.setProperty('--depth', String(Math.min(index, 2)));
+    button.style.setProperty('--order', String(bubbles.length - index));
+    button.dataset.stackedHidden = String(index > 2);
     const title = document.createElement('strong');
     title.textContent = bubble.name;
     const status = document.createElement('span');
@@ -139,7 +165,7 @@ function renderBubbles(state: SessionState): void {
         showNotice('暂时无法打开原会话窗口');
       }
     });
-    bubbleLayer.append(button);
+    bubbleDeck.append(button);
   }
 }
 
@@ -195,6 +221,7 @@ resizeHandle.addEventListener('pointercancel', stopResizing);
 const unsubscribeLayout = window.pet.subscribeLayout(layout => {
   const above = layout.bubbles.y < layout.pet.y;
   bubbleLayer.style.justifyContent = above ? 'safe flex-end' : 'flex-start';
+  bubbleLayer.dataset.side = above ? 'above' : 'below';
   Object.assign(notice.style, {
     left: `${layout.bubbles.x + 4}px`, width: `${layout.bubbles.width - 8}px`,
     top: above ? 'auto' : `${layout.bubbles.y + 4}px`,

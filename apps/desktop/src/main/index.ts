@@ -12,6 +12,12 @@ let anchor: Rect = { x: 100, y: 300, width: 140, height: 140 };
 let overlay: OverlayLayout;
 let interacting = false;
 let bubblesVisible = true;
+let bubblesExpanded = false;
+ipcMain.handle('pet:bubbles-expanded', (event, expanded: unknown) => {
+  assertTrustedRenderer(event);
+  if (typeof expanded !== 'boolean') throw new TypeError('Invalid expansion');
+  bubblesExpanded = expanded;
+});
 ipcMain.handle('pet:bubbles-visible', (event, visible: unknown) => {
   assertTrustedRenderer(event);
   if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility');
@@ -137,7 +143,10 @@ app.whenReady().then(() => {
     if (!petWindow || petWindow.isDestroyed() || !overlay) return;
     const point = screen.getCursorScreenPoint();
     const local = { x: point.x - overlay.bounds.x, y: point.y - overlay.bounds.y };
-    const regions = [overlay.pet, overlay.toolbar, ...(bubblesVisible && application.snapshot().bubbles.length ? [overlay.bubbles] : [])];
+    const bubbleHeight = Math.min(overlay.bubbles.height, bubblesExpanded ? overlay.bubbles.height : 88);
+    const bubbleHit = { ...overlay.bubbles, height: bubbleHeight,
+      y: overlay.bubbles.y < overlay.pet.y ? overlay.bubbles.y + overlay.bubbles.height - bubbleHeight : overlay.bubbles.y };
+    const regions = [overlay.pet, overlay.toolbar, ...(bubblesVisible && application.snapshot().bubbles.length ? [bubbleHit] : [])];
     const hit = interacting || regions.some(r => local.x >= r.x && local.y >= r.y && local.x <= r.x + r.width && local.y <= r.y + r.height);
     petWindow.setIgnoreMouseEvents(!hit, { forward: true });
   }, 50);

@@ -46,10 +46,11 @@ export class PiBridgeSession {
         ...(message.sessionName !== undefined ? { sessionName: message.sessionName } : {}),
         ...(message.projectName !== undefined ? { projectName: message.projectName } : {}),
         status: message.status,
+        ...(message.workId !== undefined ? { workId: message.workId } : {}),
       };
       this.connected = true;
       this.options.connectionChanged?.('connected');
-      this.publish(message.status, message.sentAt);
+      this.publish(message.status, message.sentAt, message.workId);
       return;
     }
 

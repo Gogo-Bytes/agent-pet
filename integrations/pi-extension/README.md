@@ -34,6 +34,19 @@ permissions of pi; inspect and trust this source before loading it. Busy
 streaming/compaction sessions may reject `/reload`, and events before loading
 are intentionally not reconstructed.
 
+## Reconnection
+
+Each socket connection starts with a fresh `hello` containing the current working
+or idle baseline and work identity. Connection failures retry from 250 ms up to
+5 seconds; retries and sockets do not keep pi alive. Pending socket writes are
+bounded; there is no historical event queue. Work that finishes while disconnected
+is not replayed as a new unread notification. Shutdown cancels retries. This
+behavior is covered using real sockets and synthetic pi callbacks, not a live TUI.
+Only TUI mode enables observation.
+
+Still pending: real `/reload` identity continuity, multiple real pi processes,
+retry-period cancellation, connection health UI and Windows pipe security checks.
+
 `session_shutdown` is connection cleanup, not task completion. The desktop side
 keeps `openSession` unsupported until the original terminal window can be
 reliably located.

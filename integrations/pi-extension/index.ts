@@ -20,7 +20,6 @@ type PiApi = {
 
 type BridgeStatus = 'working' | 'completed' | 'error' | 'idle' | 'offline';
 
-const MAX_PENDING = 32;
 const processInstanceId = randomBytes(12).toString('hex');
 
 function sessionName(ctx: PiContext): string | undefined {
@@ -52,7 +51,10 @@ export default function agentPetPiExtension(pi: PiApi): void {
 
   let socket: net.Socket | undefined;
   let connecting = false;
-  let pending: string[] = [];
+  let active = false;
+  let currentStatus: BridgeStatus = 'idle';
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let retryDelay = 250;
   let seq = 0;
   let workCounter = 0;
   let providerSessionId: string | undefined;
@@ -61,53 +63,63 @@ export default function agentPetPiExtension(pi: PiApi): void {
   let workId: string | undefined;
   let lastTerminalStatus: BridgeStatus | undefined;
 
+  function wire(type: string, fields: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      type, schemaVersion: 1, token: configuredToken, seq: ++seq,
+      processInstanceId, providerSessionId, sentAt: new Date().toISOString(),
+      ...fields,
+    }) + '\n';
+  }
+
   function connect(): void {
-    if (socket || connecting) return;
+    if (!active || socket || connecting) return;
+    clearTimeout(retry);
     connecting = true;
     const next = net.createConnection(configuredEndpoint, () => {
+      if (!active || socket !== next) { next.destroy(); return; }
       connecting = false;
-      const current = socket;
-      if (!current) return;
-      for (const message of pending.splice(0)) current.write(message);
+      retryDelay = 250;
+      // Reconnect is a current-state baseline, not historical notification replay.
+      next.write(wire('hello', {
+        status: currentStatus === 'working' ? 'working' : 'idle',
+        ...(sessionNameValue ? { sessionName: sessionNameValue } : {}),
+        ...(projectName ? { projectName } : {}),
+        ...(workId ? { workId } : {}),
+      }));
     });
     socket = next;
-    next.on('error', () => {
-      pending = [];
-      socket = undefined;
-      connecting = false;
-    });
+    next.setTimeout(5000, () => { if (connecting) next.destroy(); });
+    next.unref();
+    next.on('error', () => next.destroy());
     next.on('close', () => {
+      if (socket !== next) return;
       socket = undefined;
       connecting = false;
+      if (active) {
+        retry = setTimeout(connect, retryDelay);
+        retry.unref();
+        retryDelay = Math.min(5000, retryDelay * 2);
+      }
     });
   }
 
-  function send(type: string, ctx: PiContext, fields: Record<string, unknown> = {}): void {
-    const currentSessionId = providerSessionId ?? ctx.sessionManager.getSessionId() ?? 'ephemeral';
-    providerSessionId = currentSessionId;
-    sessionNameValue ??= sessionName(ctx);
-    projectName ??= basename(ctx.cwd);
-    const message = JSON.stringify({
-      type,
-      schemaVersion: 1,
-      token: configuredToken,
-      seq: ++seq,
-      processInstanceId,
-      providerSessionId: currentSessionId,
-      sentAt: new Date().toISOString(),
-      ...(type === 'hello' && sessionNameValue ? { sessionName: sessionNameValue } : {}),
-      ...(type === 'hello' && projectName ? { projectName } : {}),
-      ...fields,
-    }) + '\n';
-    if (socket && !socket.destroyed && socket.writable) {
-      socket.write(message);
-      return;
+  function send(type: string, _ctx: PiContext, fields: Record<string, unknown> = {}): void {
+    if (!active) return;
+    if (typeof fields.status === 'string') currentStatus = fields.status as BridgeStatus;
+    if (socket && !connecting && !socket.destroyed && socket.writable) {
+      if (socket.writableLength > 64 * 1024) { socket.destroy(); return; }
+      socket.write(wire(type, type === 'hello' ? {
+        ...(sessionNameValue ? { sessionName: sessionNameValue } : {}),
+        ...(projectName ? { projectName } : {}), ...fields,
+      } : fields));
+    } else {
+      connect();
     }
-    if (pending.length < MAX_PENDING) pending.push(message);
-    connect();
   }
 
   pi.on('session_start', (_event, ctx) => {
+    if (ctx.mode !== 'tui') return;
+    active = true;
     providerSessionId = ctx.sessionManager.getSessionId() ?? 'ephemeral';
     sessionNameValue = sessionName(ctx);
     projectName = basename(ctx.cwd);
@@ -142,8 +154,10 @@ export default function agentPetPiExtension(pi: PiApi): void {
 
   pi.on('session_shutdown', (_event, ctx) => {
     send('lifecycle', ctx, { status: 'offline' });
-    socket?.end();
+    active = false;
+    clearTimeout(retry);
+    socket?.destroy();
     socket = undefined;
-    pending = [];
+    connecting = false;
   });
 }

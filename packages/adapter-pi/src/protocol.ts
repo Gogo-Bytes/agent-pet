@@ -15,6 +15,7 @@ type Common = {
 export type PiBridgeMessage =
   | (Common & {
       type: 'hello';
+      workId?: string;
       status: PiBridgeStatus;
       sessionName?: string;
       projectName?: string;
@@ -33,7 +34,7 @@ const commonFields = new Set([
 ]);
 const statuses = new Set<PiBridgeStatus>(['working', 'completed', 'error', 'idle', 'offline']);
 const fieldsByType: Record<PiBridgeMessage['type'], readonly string[]> = {
-  hello: ['status', 'sessionName', 'projectName'],
+  hello: ['status', 'sessionName', 'projectName', 'workId'],
   lifecycle: ['status', 'workId'],
   session_info_changed: ['sessionName'],
   heartbeat: [],

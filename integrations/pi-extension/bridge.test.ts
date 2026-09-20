@@ -33,6 +33,20 @@ it('projects actual extension messages over a socket into a working then complet
     handlers.get('agent_settled')!({}, ctx);
     await vi.waitFor(() => expect(app.snapshot().bubbles[0]?.status).toBe('completed-unread'));
     expect(app.snapshot().bubbles[0]?.name).toBe('Test session');
+    const id = app.snapshot().bubbles[0]!.sessionId;
+    await app.acknowledgeAndOpen({ provider: 'pi', sessionId: id });
+    handlers.get('session_info_changed')!({ name: 'Renamed' }, ctx);
+    await vi.waitFor(() => expect(app.snapshot().sessions[id]?.name).toBe('Renamed'));
+    expect(app.snapshot().bubbles).toHaveLength(0);
+    handlers.get('session_info_changed')!({ name: undefined }, ctx);
+    await vi.waitFor(() => expect(app.snapshot().sessions[id]?.name).toBe('project'));
+    expect(app.snapshot().bubbles).toHaveLength(0);
+    handlers.get('agent_start')!({}, ctx);
+    await vi.waitFor(() => expect(app.snapshot().bubbles[0]?.status).toBe('working'));
+    handlers.get('message_end')!({ message: { role: 'assistant', stopReason: 'aborted' } }, ctx);
+    handlers.get('agent_settled')!({}, ctx);
+    await vi.waitFor(() => expect(app.snapshot().sessions[id]?.status).toBe('idle'));
+    expect(app.snapshot().bubbles).toHaveLength(0);
   } finally {
     handlers.get('session_shutdown')?.({}, ctx);
     await handle.stop();

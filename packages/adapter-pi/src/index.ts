@@ -27,6 +27,7 @@ export class PiBridgeSession {
     sessionName?: string;
     projectName?: string;
     status: SessionObservation['status'];
+    workId?: string;
   };
 
   constructor(private readonly options: BridgeSessionOptions) {}
@@ -59,13 +60,16 @@ export class PiBridgeSession {
     ) return;
 
     if (message.type === 'session_info_changed') {
+      const { sessionName: _previousName, ...context } = this.context;
       this.context = {
-        ...this.context,
+        ...context,
         ...(message.sessionName !== undefined ? { sessionName: message.sessionName } : {}),
       };
-      this.publish(this.context.status, message.sentAt);
+      this.publish(this.context.status, message.sentAt, this.context.workId);
     } else if (message.type === 'lifecycle') {
-      this.context = { ...this.context, status: message.status };
+      const { workId: _previousWork, ...context } = this.context;
+      this.context = { ...context, status: message.status,
+        ...(message.workId !== undefined ? { workId: message.workId } : {}) };
       this.publish(message.status, message.sentAt, message.workId);
     }
   }

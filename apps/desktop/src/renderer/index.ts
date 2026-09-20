@@ -25,11 +25,21 @@ notice.className = 'pet-notice';
 notice.setAttribute('role', 'status');
 const toggle = document.createElement('button');
 toggle.className = 'bubble-toggle';
-toggle.textContent = '隐藏气泡';
+toggle.type = 'button';
+toggle.title = '隐藏气泡';
+function updateBubbleToggleIcon(): void {
+  const hidden = bubbleLayer.hidden;
+  toggle.setAttribute('aria-label', hidden ? '显示气泡' : '隐藏气泡');
+  toggle.title = hidden ? '显示气泡' : '隐藏气泡';
+  toggle.innerHTML = hidden
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 4.2A11.7 11.7 0 0 1 12 4c5 0 8.5 4 9.5 6a11.8 11.8 0 0 1-3.2 3.8M6.2 6.2C4.5 7.3 3.3 8.8 2.5 10c1 2 4.5 6 9.5 6 1 0 2-.2 2.9-.5"/></svg>'
+    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z"/><circle cx="12" cy="12" r="2.5"/></svg>';
+}
 toggle.addEventListener('click', () => {
   bubbleLayer.hidden = !bubbleLayer.hidden;
-  toggle.textContent = bubbleLayer.hidden ? '显示气泡' : '隐藏气泡';
+  updateBubbleToggleIcon();
 });
+updateBubbleToggleIcon();
 const resizeHandle = document.createElement('div');
 resizeHandle.className = 'resize-handle';
 resizeHandle.setAttribute('aria-label', '调整宠物窗口大小');

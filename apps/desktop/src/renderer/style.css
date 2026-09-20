@@ -26,6 +26,26 @@ body,
   cursor: grabbing;
 }
 
+.resize-handle {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 22px;
+  height: 22px;
+  border-right: 3px solid rgb(255 255 255 / 80%);
+  border-bottom: 3px solid rgb(255 255 255 / 80%);
+  border-radius: 0 0 5px 0;
+  opacity: 0;
+  cursor: nwse-resize;
+  transition: opacity 120ms ease;
+  pointer-events: auto;
+}
+
+#app:hover .resize-handle,
+.resize-handle:hover {
+  opacity: 1;
+}
+
 .bubble-layer {
   position: absolute;
   inset: 12px 12px auto;

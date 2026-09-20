@@ -49,6 +49,23 @@ ipcMain.handle('pet:acknowledge-and-open', async (event, value: unknown) => {
   return application.acknowledgeAndOpen(parseSessionRef(value));
 });
 
+ipcMain.handle('pet:resize-window-by', (event, delta: unknown) => {
+  assertTrustedRenderer(event);
+  if (!delta || typeof delta !== 'object' ||
+      typeof (delta as { x?: unknown }).x !== 'number' ||
+      typeof (delta as { y?: unknown }).y !== 'number') {
+    throw new TypeError('Invalid window resize');
+  }
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) throw new Error('Pet window is unavailable');
+  const [width = 420, height = 420] = window.getSize();
+  const { x, y } = delta as { x: number; y: number };
+  window.setSize(
+    Math.max(240, Math.min(1200, Math.round(width + x))),
+    Math.max(240, Math.min(1200, Math.round(height + y))),
+  );
+});
+
 ipcMain.handle('pet:move-window-by', (event, delta: unknown) => {
   assertTrustedRenderer(event);
 

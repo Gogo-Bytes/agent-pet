@@ -5,6 +5,7 @@ import type { SessionState } from '@agent-pet/domain';
 const channels = {
   acknowledgeAndOpen: 'pet:acknowledge-and-open',
   moveWindowBy: 'pet:move-window-by',
+  resizeWindowBy: 'pet:resize-window-by',
   snapshot: 'pet:snapshot',
 } as const;
 
@@ -17,6 +18,9 @@ const petApi = {
   },
   moveWindowBy(delta: { x: number; y: number }): Promise<void> {
     return ipcRenderer.invoke(channels.moveWindowBy, delta);
+  },
+  resizeWindowBy(delta: { x: number; y: number }): Promise<void> {
+    return ipcRenderer.invoke(channels.resizeWindowBy, delta);
   },
   subscribeSnapshot(listener: (snapshot: SessionState) => void): () => void {
     const handler = (_event: Electron.IpcRendererEvent, snapshot: SessionState) => {

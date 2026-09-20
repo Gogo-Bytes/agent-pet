@@ -30,13 +30,17 @@ toggle.addEventListener('click', () => {
   bubbleLayer.hidden = !bubbleLayer.hidden;
   toggle.textContent = bubbleLayer.hidden ? '显示气泡' : '隐藏气泡';
 });
-app.append(canvas, bubbleLayer, toggle, notice);
+const resizeHandle = document.createElement('div');
+resizeHandle.className = 'resize-handle';
+resizeHandle.setAttribute('aria-label', '调整宠物窗口大小');
+resizeHandle.setAttribute('role', 'slider');
+app.append(canvas, bubbleLayer, toggle, resizeHandle, notice);
 
 const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new Scene();
 const camera = new PerspectiveCamera(35, 1, 0.1, 100);
-camera.position.set(0, .4, 5.5);
+camera.position.set(0, .4, 4.2);
 camera.lookAt(0, .2, 0);
 scene.add(new AmbientLight(new Color('#ffffff'), 2));
 const light = new DirectionalLight('#ffffff', 3);
@@ -55,6 +59,7 @@ async function loadStarter(): Promise<void> {
     });
     if (destroyed) { loaded.dispose(); return; }
     pet = loaded;
+    pet.root.scale.setScalar(1.1);
     scene.add(pet.root);
     pet.setMotion(motion);
     notice.textContent = '';
@@ -113,6 +118,7 @@ function renderBubbles(state: SessionState): void {
 }
 
 let dragging = false;
+let resizing = false;
 let lastPointer = { x: 0, y: 0 };
 canvas.addEventListener('pointerdown', (event) => {
   dragging = true;
@@ -134,6 +140,26 @@ function stopDragging(event: PointerEvent): void {
 }
 canvas.addEventListener('pointerup', stopDragging);
 canvas.addEventListener('pointercancel', stopDragging);
+resizeHandle.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  resizing = true;
+  lastPointer = { x: event.screenX, y: event.screenY };
+  resizeHandle.setPointerCapture(event.pointerId);
+});
+resizeHandle.addEventListener('pointermove', (event) => {
+  if (!resizing) return;
+  const delta = { x: event.screenX - lastPointer.x, y: event.screenY - lastPointer.y };
+  lastPointer = { x: event.screenX, y: event.screenY };
+  void window.pet.resizeWindowBy(delta);
+});
+function stopResizing(event: PointerEvent): void {
+  if (!resizing) return;
+  resizing = false;
+  resizeHandle.releasePointerCapture(event.pointerId);
+}
+resizeHandle.addEventListener('pointerup', stopResizing);
+resizeHandle.addEventListener('pointercancel', stopResizing);
 
 window.addEventListener('resize', resize);
 const unsubscribe = window.pet.subscribeSnapshot(renderBubbles);

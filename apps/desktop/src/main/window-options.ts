@@ -4,8 +4,8 @@ export function createPetWindowOptions(
   preloadPath: string,
 ): BrowserWindowConstructorOptions {
   return {
-    width: 720,
-    height: 720,
+    width: 420,
+    height: 420,
     minWidth: 240,
     minHeight: 240,
     show: false,

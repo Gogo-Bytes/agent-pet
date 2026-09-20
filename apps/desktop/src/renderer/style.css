@@ -1,21 +1,80 @@
-html, body, #app { width:100%; height:100%; margin:0; overflow:hidden; background:transparent; font-family:system-ui,sans-serif; }
-#app { position:relative; }
-.pet-canvas { position:absolute; width:140px; height:140px; cursor:grab; touch-action:none; }
-.pet-canvas--dragging { cursor:grabbing; }
-.bubble-layer { position:absolute; display:flex; flex-direction:column; justify-content:safe flex-end; gap:8px; overflow-y:auto; scrollbar-width:thin; box-sizing:border-box; padding:4px; }
-.bubble-layer[hidden] { display:none; }
-.session-bubble { flex-shrink:0; width:100%; min-height:62px; border:1px solid rgb(255 255 255 / 70%); border-radius:34px; padding:11px 22px; text-align:left; color:#505467; background:rgb(255 249 224 / 94%); box-shadow:0 3px 10px rgb(40 35 15 / 10%); cursor:pointer; }
-.session-bubble strong { display:block; font-size:14px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.session-bubble span { display:block; font-size:12px; color:#81828b; margin-top:3px; }
-.session-bubble strong::before { content:'●'; color:#9286ce; margin-right:7px; }
-.session-bubble--completed-unread strong::before { content:'✓'; color:#359b70; }
-.session-bubble--error-unread strong::before { content:'!'; color:#dd4545; }
-.pet-toolbar { position:absolute; display:flex; justify-content:center; align-items:center; gap:12px; border-radius:24px; box-sizing:border-box; border:1px solid rgb(255 255 255 / 75%); background:rgb(255 249 224 / 95%); opacity:0; transition:opacity 120ms; }
-#app:hover .pet-toolbar, .pet-toolbar:focus-within { opacity:1; }
-.pet-toolbar button { width:30px; height:30px; display:grid; place-items:center; padding:5px; border:0; border-radius:50%; color:#525970; background:transparent; cursor:pointer; }
-.pet-toolbar button:hover { background:rgb(100 90 140 / 15%); }
-.pet-toolbar button:focus-visible { outline:2px solid #7462ba; }
-.bubble-toggle svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.pet-toolbar .resize-handle { background:#ddd4bc; font:700 19px system-ui; cursor:nwse-resize; touch-action:none; }
-.pet-notice { position:absolute; top:0; left:4px; right:4px; padding:8px; color:#505467; background:#fff9e0; border-radius:16px; font-size:12px; pointer-events:none; }
-.pet-notice:empty { display:none; }
+html, body, #app {
+  width: 100%; height: 100%; margin: 0; overflow: hidden;
+  background: transparent; font-family: system-ui, sans-serif;
+}
+#app {
+  position: relative;
+  --glass-ink: #303b51;
+  --glass-fill: rgb(245 248 255 / 36%);
+  --glass-shadow: inset 0 1px 1px rgb(255 255 255 / 95%),
+    inset 1px 0 1px rgb(255 255 255 / 55%),
+    inset 0 -1px 1px rgb(255 255 255 / 48%),
+    inset -1px 0 2px rgb(40 55 85 / 12%),
+    inset 0 0 12px rgb(255 255 255 / 18%),
+    0 2px 4px rgb(25 35 60 / 12%);
+}
+.pet-canvas { position: absolute; width: 140px; height: 140px; cursor: grab; touch-action: none; }
+.pet-canvas--dragging { cursor: grabbing; }
+.bubble-layer {
+  position: absolute; display: flex; flex-direction: column; justify-content: safe flex-end;
+  gap: 8px; overflow-y: auto; scrollbar-width: thin; box-sizing: border-box; padding: 4px;
+}
+.bubble-layer[hidden] { display: none; }
+
+/* Rim highlights supply depth even when the native desktop is not available
+   to Chromium's backdrop filter. Filters never affect the text/icon layer. */
+.session-bubble, .pet-toolbar, .pet-notice {
+  color: var(--glass-ink);
+  border: 1px solid rgb(255 255 255 / 58%);
+  background: linear-gradient(155deg, rgb(255 255 255 / 48%), rgb(255 255 255 / 8%) 46%, rgb(220 231 250 / 16%)), var(--glass-fill);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+.session-bubble {
+  position: relative; flex-shrink: 0; width: 100%; min-height: 62px;
+  border-radius: 34px; padding: 11px 22px; text-align: left; cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.session-bubble:hover { background-color: rgb(255 255 255 / 24%); border-color: rgb(255 255 255 / 90%); }
+.session-bubble:active { background-color: rgb(214 225 245 / 24%); }
+.session-bubble strong {
+  display: block; font-size: 14px; font-weight: 600; letter-spacing: .01em;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgb(255 255 255 / 65%);
+}
+.session-bubble span { display: block; font-size: 12px; color: #535e73; margin-top: 3px; text-shadow: 0 1px 2px rgb(255 255 255 / 60%); }
+.session-bubble strong::before { content: '●'; color: #6553b0; margin-right: 7px; }
+.session-bubble--completed-unread strong::before { content: '✓'; color: #177c53; }
+.session-bubble--error-unread strong::before { content: '!'; color: #c63240; }
+.pet-toolbar {
+  position: absolute; display: flex; justify-content: center; align-items: center;
+  gap: 12px; border-radius: 24px; box-sizing: border-box; opacity: 0; transition: opacity 120ms;
+}
+.pet-toolbar::after {
+  content: ''; position: absolute; left: 50%; top: 10px; bottom: 10px;
+  width: 1px; background: rgb(60 75 100 / 13%); box-shadow: 1px 0 rgb(255 255 255 / 55%); pointer-events: none;
+}
+#app:hover .pet-toolbar, .pet-toolbar:focus-within { opacity: 1; }
+.pet-toolbar button {
+  width: 30px; height: 30px; display: grid; place-items: center; padding: 5px;
+  border: 1px solid transparent; border-radius: 50%; color: var(--glass-ink);
+  background: transparent; cursor: pointer; transition: background-color 120ms;
+}
+.pet-toolbar button:hover { background: rgb(255 255 255 / 42%); border-color: rgb(255 255 255 / 60%); }
+.session-bubble:focus-visible, .pet-toolbar button:focus-visible { outline: 2px solid #7462ba; outline-offset: -3px; }
+.bubble-toggle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.pet-toolbar .resize-handle {
+  background: linear-gradient(145deg, rgb(255 255 255 / 60%), rgb(180 195 220 / 28%));
+  border-color: rgb(255 255 255 / 65%); box-shadow: inset 0 1px 1px white, 0 1px 2px rgb(35 50 75 / 14%);
+  font: 700 19px system-ui; cursor: nwse-resize; touch-action: none;
+}
+.pet-notice { position: absolute; top: 0; left: 4px; right: 4px; padding: 8px; border-radius: 16px; font-size: 12px; pointer-events: none; }
+.pet-notice:empty { display: none; }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  #app { --glass-fill: rgb(240 244 252 / 98%); }
+  .session-bubble, .pet-toolbar, .pet-notice { backdrop-filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-bubble, .pet-toolbar, .pet-toolbar button { transition: none; }
+}

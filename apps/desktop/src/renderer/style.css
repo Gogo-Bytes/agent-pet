@@ -1,134 +1,21 @@
-html,
-body,
-#app {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-  background: transparent;
-  font-family: system-ui, sans-serif;
-}
-
-#app {
-  position: relative;
-}
-
-.pet-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  cursor: grab;
-  touch-action: none;
-}
-
-.pet-canvas--dragging {
-  cursor: grabbing;
-}
-
-.resize-handle {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: rgb(255 255 255 / 95%);
-  background: rgb(20 20 30 / 86%);
-  font: 700 17px/1 system-ui, sans-serif;
-  cursor: nwse-resize;
-  opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease;
-  pointer-events: auto;
-}
-
-#app:hover .resize-handle,
-.resize-handle:hover {
-  opacity: 1;
-}
-
-.resize-handle:hover {
-  background: rgb(75 65 130 / 96%);
-}
-
-.bubble-layer {
-  position: absolute;
-  inset: 12px 12px auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.session-bubble {
-  max-width: 240px;
-  border: 0;
-  border-radius: 999px;
-  padding: 8px 12px;
-  color: #fff;
-  background: rgb(20 20 30 / 86%);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
-  cursor: pointer;
-  font: 600 12px/1.2 system-ui, sans-serif;
-  pointer-events: auto;
-}
-
-.session-bubble--working {
-  border: 1px solid #8a7cff;
-}
-
-.session-bubble--completed-unread {
-  border: 1px solid #48d597;
-}
-
-.session-bubble--error-unread {
-  border: 1px solid #ff6b78;
-}
-
-.bubble-layer[hidden] { display: none; }
-.bubble-layer { max-height: 45%; overflow-y: auto; }
-.bubble-toggle {
-  position: absolute;
-  right: 30px;
-  bottom: 8px;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  padding: 3px;
-  border: 0;
-  border-radius: 50%;
-  color: rgb(255 255 255 / 90%);
-  background: rgb(20 20 30 / 72%);
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease, background 120ms ease;
-}
-
-.bubble-toggle svg {
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-#app:hover .bubble-toggle,
-.bubble-toggle:hover {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.bubble-toggle:hover {
-  background: rgb(20 20 30 / 92%);
-}
-.pet-notice { position: absolute; bottom: 42px; left: 16px; right: 16px; color: white; background: #222; border-radius: 8px; font-size: 12px; }
-.pet-notice:empty { display: none; }
+html, body, #app { width:100%; height:100%; margin:0; overflow:hidden; background:transparent; font-family:system-ui,sans-serif; }
+#app { position:relative; }
+.pet-canvas { position:absolute; width:140px; height:140px; cursor:grab; touch-action:none; }
+.pet-canvas--dragging { cursor:grabbing; }
+.bubble-layer { position:absolute; display:flex; flex-direction:column; justify-content:safe flex-end; gap:8px; overflow-y:auto; scrollbar-width:thin; box-sizing:border-box; padding:4px; }
+.bubble-layer[hidden] { display:none; }
+.session-bubble { flex-shrink:0; width:100%; min-height:62px; border:1px solid rgb(255 255 255 / 70%); border-radius:34px; padding:11px 22px; text-align:left; color:#505467; background:rgb(255 249 224 / 94%); box-shadow:0 3px 10px rgb(40 35 15 / 10%); cursor:pointer; }
+.session-bubble strong { display:block; font-size:14px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.session-bubble span { display:block; font-size:12px; color:#81828b; margin-top:3px; }
+.session-bubble strong::before { content:'●'; color:#9286ce; margin-right:7px; }
+.session-bubble--completed-unread strong::before { content:'✓'; color:#359b70; }
+.session-bubble--error-unread strong::before { content:'!'; color:#dd4545; }
+.pet-toolbar { position:absolute; display:flex; justify-content:center; align-items:center; gap:12px; border-radius:24px; box-sizing:border-box; border:1px solid rgb(255 255 255 / 75%); background:rgb(255 249 224 / 95%); opacity:0; transition:opacity 120ms; }
+#app:hover .pet-toolbar, .pet-toolbar:focus-within { opacity:1; }
+.pet-toolbar button { width:30px; height:30px; display:grid; place-items:center; padding:5px; border:0; border-radius:50%; color:#525970; background:transparent; cursor:pointer; }
+.pet-toolbar button:hover { background:rgb(100 90 140 / 15%); }
+.pet-toolbar button:focus-visible { outline:2px solid #7462ba; }
+.bubble-toggle svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.pet-toolbar .resize-handle { background:#ddd4bc; font:700 19px system-ui; cursor:nwse-resize; touch-action:none; }
+.pet-notice { position:absolute; top:0; left:4px; right:4px; padding:8px; color:#505467; background:#fff9e0; border-radius:16px; font-size:12px; pointer-events:none; }
+.pet-notice:empty { display:none; }

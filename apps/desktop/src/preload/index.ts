@@ -9,7 +9,15 @@ const channels = {
   snapshot: 'pet:snapshot',
 } as const;
 
+import type { OverlayLayout } from '../main/overlay-layout.js';
 const petApi = {
+  bubblesVisible(visible: boolean): Promise<void> { return ipcRenderer.invoke('pet:bubbles-visible', visible); },
+  interaction(active: boolean): Promise<void> { return ipcRenderer.invoke('pet:interaction', active); },
+  subscribeLayout(listener: (layout: OverlayLayout) => void): () => void {
+    const handler = (_event: Electron.IpcRendererEvent, layout: OverlayLayout) => listener(layout);
+    ipcRenderer.on('pet:layout', handler);
+    return () => { ipcRenderer.removeListener('pet:layout', handler); };
+  },
   acknowledgeAndOpen(session: SessionRef): Promise<OpenSessionResult> {
     return ipcRenderer.invoke(channels.acknowledgeAndOpen, session);
   },

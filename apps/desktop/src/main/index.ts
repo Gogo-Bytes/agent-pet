@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron';
 import type { AdapterHandle, SessionRef } from '@agent-pet/adapter-core';
 import { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import { createApplication } from '@agent-pet/application';
@@ -6,7 +6,30 @@ import { join } from 'node:path';
 import { createPetWindowOptions } from './window-options.js';
 import { readPiBridgeConfig } from './pi-config.js';
 
+import { layoutOverlay, type Rect, type OverlayLayout } from './overlay-layout.js';
 let petWindow: BrowserWindow | undefined;
+let anchor: Rect = { x: 100, y: 300, width: 140, height: 140 };
+let overlay: OverlayLayout;
+let interacting = false;
+let bubblesVisible = true;
+ipcMain.handle('pet:bubbles-visible', (event, visible: unknown) => {
+  assertTrustedRenderer(event);
+  if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility');
+  bubblesVisible = visible;
+});
+function updateOverlay(): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const area = screen.getDisplayMatching(anchor).workArea;
+  overlay = layoutOverlay(anchor, area);
+  anchor = overlay.anchor;
+  petWindow.setBounds(overlay.bounds);
+  petWindow.webContents.send('pet:layout', overlay);
+}
+ipcMain.handle('pet:interaction', (event, active: unknown) => {
+  assertTrustedRenderer(event);
+  if (typeof active !== 'boolean') throw new TypeError('Invalid interaction');
+  interacting = active;
+});
 let piHandle: AdapterHandle | undefined;
 const piConfig = readPiBridgeConfig(process.env);
 const piAdapter = new PiBridgeAdapter();
@@ -20,6 +43,7 @@ application.subscribe((snapshot) => {
 ipcMain.handle('pet:request-snapshot', (event) => {
   assertTrustedRenderer(event);
   event.sender.send('pet:snapshot', application.snapshot());
+  updateOverlay();
 });
 
 function assertTrustedRenderer(event: Electron.IpcMainInvokeEvent): void {
@@ -49,45 +73,25 @@ ipcMain.handle('pet:acknowledge-and-open', async (event, value: unknown) => {
   return application.acknowledgeAndOpen(parseSessionRef(value));
 });
 
-ipcMain.handle('pet:resize-window-by', (event, delta: unknown) => {
+function deltaValue(value: unknown): { x: number; y: number } {
+  if (!value || typeof value !== 'object' || !('x' in value) || !('y' in value) ||
+      typeof value.x !== 'number' || typeof value.y !== 'number' ||
+      !Number.isFinite(value.x) || !Number.isFinite(value.y)) throw new TypeError('Invalid delta');
+  return { x: value.x, y: value.y };
+}
+ipcMain.handle('pet:resize-window-by', (event, value: unknown) => {
   assertTrustedRenderer(event);
-  if (!delta || typeof delta !== 'object' ||
-      typeof (delta as { x?: unknown }).x !== 'number' ||
-      typeof (delta as { y?: unknown }).y !== 'number') {
-    throw new TypeError('Invalid window resize');
-  }
-  const window = BrowserWindow.fromWebContents(event.sender);
-  if (!window) throw new Error('Pet window is unavailable');
-  const [width = 420, height = 420] = window.getSize();
-  const { x, y } = delta as { x: number; y: number };
-  window.setSize(
-    Math.max(80, Math.min(1200, Math.round(width + x))),
-    Math.max(80, Math.min(1200, Math.round(height + y))),
-  );
+  const delta = deltaValue(value);
+  anchor.width = Math.max(80, Math.min(600, anchor.width + Math.round((delta.x + delta.y) / 2)));
+  anchor.height = anchor.width;
+  updateOverlay();
 });
-
-ipcMain.handle('pet:move-window-by', (event, delta: unknown) => {
+ipcMain.handle('pet:move-window-by', (event, value: unknown) => {
   assertTrustedRenderer(event);
-
-  if (
-    !delta ||
-    typeof delta !== 'object' ||
-    typeof (delta as { x?: unknown }).x !== 'number' ||
-    typeof (delta as { y?: unknown }).y !== 'number' ||
-    !Number.isFinite((delta as { x: number }).x) ||
-    !Number.isFinite((delta as { y: number }).y)
-  ) {
-    throw new TypeError('Invalid window movement');
-  }
-
-  const window = BrowserWindow.fromWebContents(event.sender);
-  if (!window) {
-    throw new Error('Pet window is unavailable');
-  }
-
-  const [x = 0, y = 0] = window.getPosition();
-  const { x: deltaX, y: deltaY } = delta as { x: number; y: number };
-  window.setPosition(Math.round(x + deltaX), Math.round(y + deltaY));
+  const delta = deltaValue(value);
+  anchor.x += Math.round(delta.x);
+  anchor.y += Math.round(delta.y);
+  updateOverlay();
 });
 
 function createPetWindow(): BrowserWindow {
@@ -95,6 +99,9 @@ function createPetWindow(): BrowserWindow {
     createPetWindowOptions(join(__dirname, '../preload/index.cjs')),
   );
 
+  window.setAlwaysOnTop(true, 'screen-saver');
+  if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  window.setResizable(false);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   if (process.env.ELECTRON_RENDERER_URL && !app.isPackaged) {
@@ -123,6 +130,19 @@ async function startConfiguredAdapters(): Promise<void> {
 app.whenReady().then(() => {
   void startConfiguredAdapters();
   petWindow = createPetWindow();
+  updateOverlay();
+  screen.on('display-removed', updateOverlay);
+  screen.on('display-metrics-changed', updateOverlay);
+  const hitTimer = setInterval(() => {
+    if (!petWindow || petWindow.isDestroyed() || !overlay) return;
+    const point = screen.getCursorScreenPoint();
+    const local = { x: point.x - overlay.bounds.x, y: point.y - overlay.bounds.y };
+    const regions = [overlay.pet, overlay.toolbar, ...(bubblesVisible && application.snapshot().bubbles.length ? [overlay.bubbles] : [])];
+    const hit = interacting || regions.some(r => local.x >= r.x && local.y >= r.y && local.x <= r.x + r.width && local.y <= r.y + r.height);
+    petWindow.setIgnoreMouseEvents(!hit, { forward: true });
+  }, 50);
+  hitTimer.unref();
+  app.once('will-quit', () => clearInterval(hitTimer));
   let demoRun = 0;
   function demo(status: 'working' | 'completed' | 'error'): void {
     if (status === 'working' || demoRun === 0) demoRun++;

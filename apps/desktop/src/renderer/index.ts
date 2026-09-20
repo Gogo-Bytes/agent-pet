@@ -10,7 +10,7 @@ import type { SessionState } from '@agent-pet/domain';
 import { parseBundledPet, type LoadedPet, type PetMotion } from '@agent-pet/pet-runtime/model';
 import starterUrl from '@agent-pet/pet-runtime/assets/starter.glb?url';
 import { selectPetMotion } from './pet-motion.js';
-import { bubbleLabel, visibleBubbles } from './bubble-model.js';
+import { visibleBubbles } from './bubble-model.js';
 import './style.css';
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -37,6 +37,7 @@ function updateBubbleToggleIcon(): void {
 }
 toggle.addEventListener('click', () => {
   bubbleLayer.hidden = !bubbleLayer.hidden;
+  void window.pet.bubblesVisible(!bubbleLayer.hidden);
   updateBubbleToggleIcon();
 });
 updateBubbleToggleIcon();
@@ -46,7 +47,10 @@ resizeHandle.type = 'button';
 resizeHandle.textContent = '↘';
 resizeHandle.title = '调整宠物窗口大小';
 resizeHandle.setAttribute('aria-label', '调整宠物窗口大小');
-app.append(canvas, bubbleLayer, toggle, resizeHandle, notice);
+const toolbar = document.createElement('div');
+toolbar.className = 'pet-toolbar';
+toolbar.append(toggle, resizeHandle);
+app.append(canvas, bubbleLayer, toolbar, notice);
 
 const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -107,7 +111,11 @@ function renderBubbles(state: SessionState): void {
     const button = document.createElement('button');
     button.className = `session-bubble session-bubble--${bubble.status}`;
     button.type = 'button';
-    button.textContent = bubbleLabel(bubble);
+    const title = document.createElement('strong');
+    title.textContent = bubble.name;
+    const status = document.createElement('span');
+    status.textContent = { working: '正在工作', 'completed-unread': '已完成', 'error-unread': '发生错误' }[bubble.status];
+    button.append(title, status);
     button.addEventListener('click', async () => {
       const session = state.sessions[bubble.sessionId];
       if (!session) return;
@@ -117,7 +125,7 @@ function renderBubbles(state: SessionState): void {
           sessionId: session.sessionId,
         });
         const messages = {
-          success: '', unsupported: '此 Session 暂不支持打开窗口（模拟 Session 不连接真实 Agent）。',
+          success: '', unsupported: '暂不支持定位此 Session 的原窗口。',
           'not-found': '找不到对应 Session。', 'permission-denied': '没有打开窗口的权限。',
         };
         notice.textContent = messages[result.status];
@@ -133,7 +141,9 @@ let dragging = false;
 let resizing = false;
 let lastPointer = { x: 0, y: 0 };
 canvas.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
   dragging = true;
+  void window.pet.interaction(true);
   lastPointer = { x: event.screenX, y: event.screenY };
   canvas.setPointerCapture(event.pointerId);
   canvas.classList.add('pet-canvas--dragging');
@@ -147,6 +157,7 @@ canvas.addEventListener('pointermove', (event) => {
 function stopDragging(event: PointerEvent): void {
   if (!dragging) return;
   dragging = false;
+  void window.pet.interaction(false);
   canvas.releasePointerCapture(event.pointerId);
   canvas.classList.remove('pet-canvas--dragging');
 }
@@ -156,6 +167,7 @@ resizeHandle.addEventListener('pointerdown', (event) => {
   event.preventDefault();
   event.stopPropagation();
   resizing = true;
+  void window.pet.interaction(true);
   lastPointer = { x: event.screenX, y: event.screenY };
   resizeHandle.setPointerCapture(event.pointerId);
 });
@@ -168,11 +180,18 @@ resizeHandle.addEventListener('pointermove', (event) => {
 function stopResizing(event: PointerEvent): void {
   if (!resizing) return;
   resizing = false;
+  void window.pet.interaction(false);
   resizeHandle.releasePointerCapture(event.pointerId);
 }
 resizeHandle.addEventListener('pointerup', stopResizing);
 resizeHandle.addEventListener('pointercancel', stopResizing);
 
+const unsubscribeLayout = window.pet.subscribeLayout(layout => {
+  for (const [element, rect] of [[canvas, layout.pet], [bubbleLayer, layout.bubbles], [toolbar, layout.toolbar]] as const) {
+    Object.assign(element.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+  }
+  resize();
+});
 window.addEventListener('resize', resize);
 const unsubscribe = window.pet.subscribeSnapshot(renderBubbles);
 void window.pet.requestSnapshot().catch(() => {
@@ -181,6 +200,7 @@ void window.pet.requestSnapshot().catch(() => {
 window.addEventListener('beforeunload', () => {
   destroyed = true;
   unsubscribe();
+  unsubscribeLayout();
   cancelAnimationFrame(frame);
   pet?.dispose();
   renderer.dispose();

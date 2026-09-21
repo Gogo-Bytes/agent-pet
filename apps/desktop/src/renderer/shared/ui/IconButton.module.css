@@ -1,0 +1,12 @@
+.button {
+  width: 30px; height: 30px; display: grid; place-items: center; padding: 5px;
+  flex-shrink: 0; border: 0; border-radius: 50%; color: inherit;
+  background: transparent; cursor: pointer;
+  transition: background-color var(--duration-feedback) ease;
+}
+.button:hover:not(:disabled) { background: rgb(214 225 255 / 16%); }
+.button:active:not(:disabled) { background: rgb(214 225 255 / 24%); }
+.button:focus-visible { outline: 2px solid #c3cffa; outline-offset: -2px; }
+.button:disabled { opacity: .45; cursor: default; }
+.button svg { width: 19px; height: 19px; stroke-width: 1.65; }
+@media (prefers-reduced-motion: reduce) { .button { transition: none; } }

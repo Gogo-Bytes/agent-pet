@@ -1,0 +1,44 @@
+.layer {
+  position: absolute; display: flex; flex-direction: column; justify-content: safe flex-end;
+  box-sizing: border-box; padding: 4px; pointer-events: none; overflow: hidden;
+}
+.layer[hidden] { display: none; }
+.deck {
+  position: relative; width: 100%; height: var(--stack-height, 80px); max-height: 100%;
+  flex-shrink: 0; pointer-events: auto;
+}
+.deck:not(.expanded) .bubble {
+  position: absolute; left: 0; bottom: 0; height: 62px;
+  z-index: var(--order); transform-origin: center bottom;
+  transform: translateY(calc(var(--depth) * -7px)) scale(calc(1 - var(--depth) * .045));
+}
+.layer[data-side='below'] .deck:not(.expanded) .bubble {
+  top: 0; bottom: auto; transform-origin: center top;
+  transform: translateY(calc(var(--depth) * 7px)) scale(calc(1 - var(--depth) * .045));
+}
+.deck:not(.expanded) .bubble[data-stacked-hidden='true'] { visibility: hidden; }
+.deck.expanded {
+  height: auto; overflow-y: auto; scrollbar-width: thin;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.deck.expanded .bubble { position: relative; transform: none; }
+
+.bubble {
+  position: relative; flex-shrink: 0; width: 100%; min-height: 62px;
+  border-radius: var(--radius-surface); padding: 11px 22px; text-align: left; cursor: pointer;
+  transition: background-color var(--duration-feedback) ease, border-color var(--duration-feedback) ease;
+}
+.bubble:hover { background-color: var(--glass-fill-hover); border-color: rgb(255 255 255 / 90%); }
+.bubble:active { background-color: var(--glass-fill-active); }
+.bubble strong {
+  display: block; font-size: 14px; font-weight: 600; letter-spacing: .01em;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgb(255 255 255 / 65%);
+}
+.bubble span { display: block; font-size: 12px; color: var(--glass-muted); margin-top: 3px; text-shadow: 0 1px 2px rgb(255 255 255 / 60%); }
+.bubble strong::before { content: '●'; color: #6553b0; margin-right: 7px; }
+.bubble[data-status='completed-unread'] strong::before { content: '✓'; color: #177c53; }
+.bubble[data-status='error-unread'] strong::before { content: '!'; color: #c63240; }
+
+.bubble:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+@media (prefers-reduced-motion: reduce) { .bubble { transition: none; } }

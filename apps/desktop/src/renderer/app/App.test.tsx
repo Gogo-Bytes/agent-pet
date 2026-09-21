@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import '../test-support/dom-platform.js';
 import { Children, StrictMode, isValidElement, useEffect, type ReactNode } from 'react';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -117,15 +118,6 @@ describe('App session interactions', () => {
     const { bridge, container, unmount } = await mount();
     const canvas = container.querySelector('canvas')!;
     const resize = screen.getByRole('button', { name: '调整宠物窗口大小' });
-    // jsdom has no native pointer capture; only that platform API is substituted.
-    for (const element of [container.querySelector('.pet-canvas')!, resize]) {
-      const captured = new Set<number>();
-      Object.assign(element, {
-        setPointerCapture: (id: number) => captured.add(id),
-        hasPointerCapture: (id: number) => captured.has(id),
-        releasePointerCapture: (id: number) => captured.delete(id),
-      });
-    }
     await user.pointer([
       { keys: '[MouseLeft>]', target: canvas, coords: { screenX: 100, screenY: 200 } },
       { target: canvas, coords: { screenX: 112, screenY: 195 } },
@@ -231,6 +223,8 @@ describe('App lifecycle and notices', () => {
     expect(screen.getByRole('status').textContent).toBe('');
     await user.click(button);
     unmount();
+    // Motion may leave its final scheduler tick; it must not retain a loop.
+    act(() => vi.advanceTimersByTime(20));
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -283,6 +277,8 @@ describe('App lifecycle and notices', () => {
     await user.click(screen.getAllByRole('button')[0]!);
     unmount();
     await act(async () => resolve({ status: 'unsupported' }));
+    // Motion may leave its final scheduler tick; it must not retain a loop.
+    act(() => vi.advanceTimersByTime(20));
     expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -1,0 +1,2 @@
+.surface { position: absolute; width: 140px; height: 140px; cursor: grab; touch-action: none; }
+.dragging { cursor: grabbing; }

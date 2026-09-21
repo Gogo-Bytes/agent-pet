@@ -2,7 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App.js';
 import { createPetStore } from './app/bridge/pet-store.js';
-import './style.css';
+import './shared/styles/tokens.css';
+import './shared/styles/globals.css';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Renderer root is missing');

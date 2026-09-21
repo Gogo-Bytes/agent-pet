@@ -12,17 +12,20 @@ let petWindow: BrowserWindow | undefined;
 let anchor: Rect = { x: 100, y: 300, width: 140, height: 140 };
 let overlay: OverlayLayout;
 let interacting = false;
-let bubblesVisible = true;
+// Renderer reports committed presentation, not the user visibility preference.
+let bubblesVisible = false;
 let bubblesExpanded = false;
 ipcMain.handle('pet:bubbles-expanded', (event, expanded: unknown) => {
   assertTrustedRenderer(event);
   if (typeof expanded !== 'boolean') throw new TypeError('Invalid expansion');
   bubblesExpanded = expanded;
+  updateHitPolicy();
 });
 ipcMain.handle('pet:bubbles-visible', (event, visible: unknown) => {
   assertTrustedRenderer(event);
   if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility');
   bubblesVisible = visible;
+  updateHitPolicy();
 });
 function updateOverlay(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
@@ -31,11 +34,13 @@ function updateOverlay(): void {
   anchor = overlay.anchor;
   petWindow.setBounds(overlay.bounds);
   petWindow.webContents.send('pet:layout', overlay);
+  updateHitPolicy();
 }
 ipcMain.handle('pet:interaction', (event, active: unknown) => {
   assertTrustedRenderer(event);
   if (typeof active !== 'boolean') throw new TypeError('Invalid interaction');
   interacting = active;
+  updateHitPolicy();
 });
 let piHandle: AdapterHandle | undefined;
 const piConfig = readPiBridgeConfig(process.env);
@@ -101,6 +106,18 @@ ipcMain.handle('pet:move-window-by', (event, value: unknown) => {
   updateOverlay();
 });
 
+function updateHitPolicy(): void {
+  if (!petWindow || petWindow.isDestroyed() || !overlay) return;
+  const point = screen.getCursorScreenPoint();
+  const local = { x: point.x - overlay.bounds.x, y: point.y - overlay.bounds.y };
+  const bubbleHeight = Math.min(overlay.bubbles.height, bubblesExpanded ? overlay.bubbles.height : 88);
+  const bubbleHit = { ...overlay.bubbles, height: bubbleHeight,
+    y: overlay.bubbles.y < overlay.pet.y ? overlay.bubbles.y + overlay.bubbles.height - bubbleHeight : overlay.bubbles.y };
+  const regions = [overlay.pet, overlay.toolbar, ...(bubblesVisible ? [bubbleHit] : [])];
+  const hit = interacting || regions.some(r => local.x >= r.x && local.y >= r.y && local.x <= r.x + r.width && local.y <= r.y + r.height);
+  petWindow.setIgnoreMouseEvents(!hit, { forward: true });
+}
+
 function createPetWindow(): BrowserWindow {
   const window = new BrowserWindow(
     createPetWindowOptions(join(__dirname, '../preload/index.cjs')),
@@ -110,6 +127,12 @@ function createPetWindow(): BrowserWindow {
   if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   window.setResizable(false);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const resetPresentation = () => {
+    interacting = false; bubblesVisible = false; bubblesExpanded = false;
+    updateHitPolicy();
+  };
+  window.webContents.on('did-start-loading', resetPresentation);
+  window.webContents.on('render-process-gone', resetPresentation);
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   if (process.env.ELECTRON_RENDERER_URL && !app.isPackaged) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);
@@ -140,17 +163,7 @@ app.whenReady().then(() => {
   updateOverlay();
   screen.on('display-removed', updateOverlay);
   screen.on('display-metrics-changed', updateOverlay);
-  const hitTimer = setInterval(() => {
-    if (!petWindow || petWindow.isDestroyed() || !overlay) return;
-    const point = screen.getCursorScreenPoint();
-    const local = { x: point.x - overlay.bounds.x, y: point.y - overlay.bounds.y };
-    const bubbleHeight = Math.min(overlay.bubbles.height, bubblesExpanded ? overlay.bubbles.height : 88);
-    const bubbleHit = { ...overlay.bubbles, height: bubbleHeight,
-      y: overlay.bubbles.y < overlay.pet.y ? overlay.bubbles.y + overlay.bubbles.height - bubbleHeight : overlay.bubbles.y };
-    const regions = [overlay.pet, overlay.toolbar, ...(bubblesVisible && application.snapshot().bubbles.length ? [bubbleHit] : [])];
-    const hit = interacting || regions.some(r => local.x >= r.x && local.y >= r.y && local.x <= r.x + r.width && local.y <= r.y + r.height);
-    petWindow.setIgnoreMouseEvents(!hit, { forward: true });
-  }, 50);
+  const hitTimer = setInterval(updateHitPolicy, 50);
   hitTimer.unref();
   app.once('will-quit', () => clearInterval(hitTimer));
   let demoRun = 0;

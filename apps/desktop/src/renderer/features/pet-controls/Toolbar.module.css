@@ -1,0 +1,14 @@
+.toolbar {
+  position: absolute; display: flex; justify-content: center; align-items: center;
+  gap: 14px; padding: 0 12px; border-radius: var(--radius-control); box-sizing: border-box;
+  color: var(--control-ink); border-color: rgb(194 204 233 / 38%);
+  background: var(--control-fill); opacity: 0;
+  transition: opacity var(--duration-feedback) ease;
+}
+.toolbar::after {
+  content: ''; position: absolute; left: 50%; top: 10px; bottom: 10px;
+  width: 1px; background: rgb(208 217 241 / 25%); pointer-events: none;
+}
+:global(#app):hover .toolbar, .toolbar:focus-within { opacity: 1; }
+.resize { cursor: nwse-resize; touch-action: none; }
+@media (prefers-reduced-motion: reduce) { .toolbar { transition: none; } }

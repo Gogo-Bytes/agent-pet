@@ -6,6 +6,7 @@ import type { PetStore } from '../../app/bridge/pet-store.js';
 import { rectStyle } from '../../shared/rect-style.js';
 import { useWindowGesture } from '../../shared/use-window-gesture.js';
 import { selectPetMotion } from '../../pet-motion.js';
+import styles from './PetCanvas.module.css';
 import { PetModel } from './PetModel.js';
 
 function subscribeVisibility(listener: () => void) {
@@ -34,7 +35,7 @@ export function PetCanvas({ store, rect, onNotice }: {
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
   // Canvas adds its own sizing divs. Keep Main's absolute pixel region and the
   // native pointer handlers on this outer surface, never on a Three mesh.
-  return <div className={`pet-canvas${drag.active ? ' pet-canvas--dragging' : ''}`}
+  return <div className={`pet-canvas ${styles.surface}${drag.active ? ` pet-canvas--dragging ${styles.dragging}` : ''}`}
     style={rectStyle(rect)} {...drag.handlers}>
     <PetErrorBoundary onNotice={onNotice}>
       <Canvas flat dpr={[1, 2]} gl={{ alpha: true, antialias: true }}

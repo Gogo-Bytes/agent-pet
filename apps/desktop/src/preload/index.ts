@@ -12,6 +12,8 @@ const channels = {
 import type { OverlayLayout } from '../shared/overlay-layout.js';
 const petApi = {
   bubblesExpanded(expanded: boolean): Promise<void> { return ipcRenderer.invoke('pet:bubbles-expanded', expanded); },
+  // Actual committed bubble presence. Main retains the region until DOM removal,
+  // and the renderer waits for true acknowledgement before revealing content.
   bubblesVisible(visible: boolean): Promise<void> { return ipcRenderer.invoke('pet:bubbles-visible', visible); },
   interaction(active: boolean): Promise<void> { return ipcRenderer.invoke('pet:interaction', active); },
   subscribeLayout(listener: (layout: OverlayLayout) => void): () => void {

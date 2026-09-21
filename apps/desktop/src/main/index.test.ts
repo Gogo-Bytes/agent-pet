@@ -119,6 +119,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     pointAt(layout.toolbar); expectHit(true);
     pointAt(layout.bubbles); expectHit(false); // no session bubbles
     native.publish!(piObservation({ status: 'completed' }));
+    invoke('pet:bubbles-visible', true); // renderer has prepared presentation
     const bottomStrip = { ...layout.bubbles, y: layout.bubbles.y + layout.bubbles.height - 40, height: 20 };
     const topStrip = { ...layout.bubbles, height: 20 };
     pointAt(bottomStrip); expectHit(true);
@@ -128,7 +129,9 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     pointAt(layout.pet); expectHit(true); // hiding bubbles does not hide pet
     invoke('pet:bubbles-visible', true);
     await invoke('pet:acknowledge-and-open', { provider: 'pi', sessionId: 'pi:baseline:working' });
-    pointAt(bottomStrip); expectHit(false);
+    pointAt(bottomStrip); expectHit(true); // snapshot removal alone must not drop visible DOM
+    invoke('pet:bubbles-visible', false); // renderer committed removal
+    expectHit(false);
     invoke('pet:interaction', true); expectHit(true);
     invoke('pet:interaction', false); expectHit(false);
   });
@@ -138,9 +141,39 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     const layout = latestLayout();
     expect(layout.bubbles.y).toBeGreaterThan(layout.pet.y);
     native.publish!(piObservation());
+    invoke('pet:bubbles-visible', true);
     pointAt({ ...layout.bubbles, height: 20 }); expectHit(true);
     pointAt({ ...layout.bubbles, y: layout.bubbles.y + 100, height: 20 }); expectHit(false);
     invoke('pet:bubbles-expanded', true); expectHit(true);
+  });
+
+  it('installs hit policy synchronously before control IPC returns, without waiting for the 50ms poll', () => {
+    const layout = latestLayout();
+    pointAt({ ...layout.bubbles, height: 20 });
+    invoke('pet:bubbles-visible', true);
+    expect(native.window.setIgnoreMouseEvents).toHaveBeenLastCalledWith(true, { forward: true });
+    invoke('pet:bubbles-expanded', true);
+    expect(native.window.setIgnoreMouseEvents).toHaveBeenLastCalledWith(false, { forward: true });
+    invoke('pet:bubbles-visible', false);
+    expect(native.window.setIgnoreMouseEvents).toHaveBeenLastCalledWith(true, { forward: true });
+    invoke('pet:interaction', true);
+    expect(native.window.setIgnoreMouseEvents).toHaveBeenLastCalledWith(false, { forward: true });
+    invoke('pet:interaction', false);
+    expect(native.window.setIgnoreMouseEvents).toHaveBeenLastCalledWith(true, { forward: true });
+  });
+
+  it.each(['did-start-loading', 'render-process-gone'])('resets stale presentation and interaction on %s without relying on React cleanup', event => {
+    const layout = latestLayout();
+    pointAt({ ...layout.bubbles, height: 20 });
+    invoke('pet:bubbles-visible', true);
+    invoke('pet:bubbles-expanded', true);
+    invoke('pet:interaction', true);
+    const listener = native.webContents.on.mock.calls.find(([name]) => name === event)?.[1];
+    expect(listener).toBeTypeOf('function');
+    listener();
+    expect(native.window.setIgnoreMouseEvents).toHaveBeenLastCalledWith(true, { forward: true });
+    invoke('pet:bubbles-visible', true);
+    expectHit(false); // expansion was reset too
   });
 
   it('rejects foreign senders/subframes and malformed control payloads without changing layout', () => {
@@ -148,6 +181,9 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     for (const event of [{ sender: {}, senderFrame: native.webContents.mainFrame },
       { sender: native.webContents, senderFrame: {} }]) {
       expect(() => invoke('pet:move-window-by', { x: 1, y: 1 }, event)).toThrow('Untrusted renderer');
+      for (const channel of ['pet:bubbles-visible', 'pet:bubbles-expanded', 'pet:interaction']) {
+        expect(() => invoke(channel, true, event)).toThrow('Untrusted renderer');
+      }
     }
     for (const channel of ['pet:move-window-by', 'pet:resize-window-by']) {
       for (const value of [null, { x: NaN, y: 0 }, { x: 0, y: Infinity }, { x: '1', y: 0 }]) {

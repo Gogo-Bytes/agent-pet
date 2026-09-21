@@ -1,0 +1,13 @@
+.portal { position: fixed; pointer-events: none; z-index: 10; display: grid; place-items: center; }
+/* Radix supplies semantics/dismissal/hover. Override ONLY Popper placement:
+   OS windows cannot be escaped by a portal. All painted content stays in pet. */
+.portal :global([data-radix-popper-content-wrapper]) {
+  position: absolute !important; inset: 4px !important; transform: none !important;
+  min-width: 0 !important; display: grid; place-items: center; pointer-events: none;
+}
+.content {
+  box-sizing: border-box; max-width: 100%; padding: 5px; border: 1px solid #77849e;
+  border-radius: 8px; background: #262b36; color: #f4f6ff;
+  font: 12px/1.4 system-ui, sans-serif; text-align: center; overflow-wrap: anywhere;
+  pointer-events: none;
+}

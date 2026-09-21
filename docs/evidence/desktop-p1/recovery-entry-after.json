@@ -1,0 +1,94 @@
+{
+  "before": {
+    "displays": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 1800,
+        "height": 1169
+      }
+    ],
+    "dockVisible": true,
+    "images": [
+      {
+        "empty": false,
+        "size": {
+          "width": 16,
+          "height": 16
+        },
+        "bytes": 98
+      }
+    ],
+    "trays": [
+      {
+        "destroyed": false,
+        "bounds": {
+          "x": 0,
+          "y": 1169,
+          "width": 32,
+          "height": 22
+        }
+      }
+    ],
+    "windows": [
+      {
+        "title": "Agent Pet · 管理",
+        "visible": true,
+        "url": "file:///Users/gan/Desktop/%F0%9F%A5%B7/agent-pet/apps/desktop/out/renderer/management.html"
+      },
+      {
+        "title": "Agent Pet",
+        "visible": true,
+        "url": "file:///Users/gan/Desktop/%F0%9F%A5%B7/agent-pet/apps/desktop/out/renderer/index.html"
+      }
+    ]
+  },
+  "after": {
+    "displays": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 1800,
+        "height": 1169
+      }
+    ],
+    "dockVisible": true,
+    "images": [
+      {
+        "empty": false,
+        "size": {
+          "width": 16,
+          "height": 16
+        },
+        "bytes": 98
+      }
+    ],
+    "trays": [
+      {
+        "destroyed": false,
+        "bounds": {
+          "x": 0,
+          "y": 1169,
+          "width": 32,
+          "height": 22
+        }
+      }
+    ],
+    "windows": [
+      {
+        "title": "Agent Pet · 管理",
+        "visible": false,
+        "url": "file:///Users/gan/Desktop/%F0%9F%A5%B7/agent-pet/apps/desktop/out/renderer/management.html"
+      },
+      {
+        "title": "Agent Pet",
+        "visible": true,
+        "url": "file:///Users/gan/Desktop/%F0%9F%A5%B7/agent-pet/apps/desktop/out/renderer/index.html"
+      }
+    ]
+  },
+  "reopenedViaActivate": true,
+  "petAllWorkspaces": true,
+  "passed": true,
+  "limit": "native visibility metadata only, not screen pixel visibility or OS clicks"
+}

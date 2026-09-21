@@ -132,7 +132,10 @@ function startPrimaryInstance(): void {
     );
 
     window.setAlwaysOnTop(true, 'screen-saver');
-    if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // The pet must not transform the whole management app into a Dock-less UI element.
+if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, {
+  visibleOnFullScreen: true, skipTransformProcessType: true,
+});
     window.setResizable(false);
     const resetPresentation = () => {
       interacting = false; bubblesVisible = false; bubblesExpanded = false;

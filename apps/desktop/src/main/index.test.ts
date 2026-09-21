@@ -249,6 +249,11 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
   function managementEvent() {
     return { sender: native.management!.webContents, senderFrame: native.management!.webContents.mainFrame };
   }
+  it.runIf(process.platform === 'darwin')('keeps all-workspaces pet setup from changing the entire app into a Dock-less UI element', () => {
+    expect(native.window.setVisibleOnAllWorkspaces).toHaveBeenCalledWith(true, {
+      visibleOnFullScreen: true, skipTransformProcessType: true,
+    });
+  });
   it('creates distinct sandboxed entries and denies cross-window, subframe and navigated-frame capabilities', () => {
     expect(native.management).toBeDefined();
     expect(native.management!.webContents).not.toBe(native.webContents);

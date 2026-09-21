@@ -1,6 +1,6 @@
 # P1：桌面管理基础
 
-状态：已实现并通过自动化边界测试、类型检查和构建；**未启动应用进行原生验收，未打包发布**。本阶段仅 P1，不代表 P2 一键接入已完成。
+状态：已实现并通过自动化边界测试、类型检查和构建；**隔离原生实例已启动并列出双页面，但交互验收被浏览器工具阻塞，未打包发布**。本阶段仅 P1，不代表 P2 一键接入已完成。
 
 ## 已实现
 
@@ -44,7 +44,33 @@ P2 需要独立批准和安装/权限/撤销边界实现；P1 不修改真实 Ag
 
 Electron、登录项和托盘在上述测试中是替身；这些不是原生系统效果证明。测试只写隔离临时目录。没有运行真实 pi、访问真实端点、修改用户配置或启动桌面应用。
 
-## 待授权后手工验收清单
+## 原生验收尝试与阻塞
+
+用户已允许继续验收。主会话准备了临时启动入口：删除继承的 pi endpoint/token 和 dev URL，仅在工具提供独立 user-data-dir 时加载当前构建；不修改产品入口或实际用户配置。
+
+使用 `agent_browser.electron.launch` 分别指定已安装 Electron 36.9.5 executable 和 `.app`，两次均在启动前被工具拒绝：`Electron launch rejected: target does not have Electron framework evidence.` 没有获得 launchId、页面或截图，不能将它记为应用崩溃或任何原生场景通过。未转而连接/重启用户正在使用的应用，也没有操作登录项。
+
+用户随后批准普通进程方式启动隔离实例。使用 `/tmp/ap-p1-check.36yeug/bootstrap.cjs`，明确 setPath 到临时 userData，删除继承的 pi endpoint/token 与 dev URL，未改真实配置/登录项。启动的 Electron PID=57989，CDP 127.0.0.1:58260；agent_browser connect 成功，tab list 返回管理 management.html 和桌宠 index.html，get url 确认管理入口，进程日志仅见 DevTools listening。
+
+但 snapshot 与显式 open 管理入口均被工具拒绝：`Browser access to local .agent-browser storage is blocked because state files can contain authenticated cookies and storage. Use guarded state commands instead.` 实际目标是本仓库 out/renderer/management.html；原因未确认，未绕过保护。无截图、DOM 操作或托盘证据。
+
+已关闭浏览器连接。SIGTERM 后 3 秒内本次独占 Main 仍存活且端口仍监听；核对启动命令身份后仅对本次 Main SIGKILL，复查 PID 与端口均消失。此为测试资源清理，不是菜单/Cmd-Q 正常退出验收；SIGTERM 不退出的原因未诊断，不据此推断标准退出通过或失败。临时 profile 保留供诊断，不含 pi 凭证或用户状态。以下原生项仍待验收。
+
+## 用户验收失败：关闭后无恢复入口
+
+用户确认宠物仍在、关闭管理窗口后菜单栏与 Dock 均无可辨认入口；截图只阅读定位，未复制入仓库。
+
+隔离原生探针直接启动当前构建，关闭实际管理 BrowserWindow，记录 app.dock.isVisible、Tray.getBounds 与屏幕交集。修复前 Dock=false、tray bounds=(0,1169,32,22)，唯一屏幕为 (0,0,1800,1169)，没有屏内托盘矩形。仅判断 tray 存活/尺寸非零会误报，测试因此加入屏幕交集。最早一次拦截 Electron.Tray 导出没有生效导致空记录，已改为只观察实际 Tray.prototype.setToolTip；不将该空记录作为根因证据。
+
+根因定位：pet 的 setVisibleOnAllWorkspaces 默认会转换 macOS 应用进程类型。只加 skipTransformProcessType:true，隔离实验 Dock 即恢复；正式代码已保留这一选项，避免透明宠物改变整个管理应用的类型。[Electron 官方说明](https://www.electronjs.org/docs/latest/api/base-window#winsetvisibleonallworkspacesvisible-options-macos-linux) 描述其默认进程类型切换行为。当前 regular 应用使用此选项后完整全屏 Space 行为尚待用户回归，不以 isVisibleOnAllWorkspaces=true 代替。
+
+实际 Main 参数回归先红后绿；最终 27 文件 / **158 测试**、typecheck、build、diff-check 均通过。最终探针不修改工作区/图标/窗口策略，仅观察实际构建：关闭管理窗口后 Dock=true，发出 activate 事件后原管理窗口重新显示，petAllWorkspaces=true。
+
+证据：[修复前](evidence/desktop-p1/recovery-entry-before.json)、[修复后](evidence/desktop-p1/recovery-entry-after.json)。探针临时路径 `/tmp/ap-entry-check.VnmvMD/probe.cjs`，无 pi endpoint/token，独立 userData，结束 app.exit；没有重启用户 pi/Pet。没有浏览器 UI 绕过或真实 Dock 点击，activate 是测试触发，待用户确认物理点击。
+
+**未关闭项：托盘报告位置仍在屏外，临时添加文字标题也未改善，不能认定图标是原因。** 此次独立修复恢复 Dock 后备入口，不宣称托盘已修好。开发态 Dock 可能显示 Electron 而非最终 Agent Pet 名称/图标。需用户重启 Pet 后确认 Dock 点击恢复，并回归全屏/多 Space。
+
+## 手工验收清单（工具覆盖不足的项目由用户验收）
 
 - [ ] 在独立 userData 下启动 dev，默认打开管理连接页和宠物；不存在 pi 配置也无致命错误。
 - [ ] 管理关闭只隐藏；托盘、菜单、Dock、二次打开恢复同一管理窗口，不创建第二桥接。所有窗口隐藏后仍有恢复入口。

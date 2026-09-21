@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import { createApplication } from '@agent-pet/application';
 import type { OpenSessionResult, SessionRef } from '@agent-pet/adapter-core';
 import type { SessionObservation, SessionState } from '@agent-pet/domain';
-import type { OverlayLayout } from '../../main/overlay-layout.js';
+import type { OverlayLayout } from '../../shared/overlay-layout.js';
 import { baselineLayout } from './pi-fixtures.js';
 
 type Options = {

@@ -4,11 +4,14 @@
   "type": "module",
   "main": "out/main/index.cjs",
   "dependencies": {
-    "@agent-pet/application": "workspace:*",
     "@agent-pet/adapter-core": "workspace:*",
+    "@agent-pet/adapter-pi": "workspace:*",
+    "@agent-pet/application": "workspace:*",
     "@agent-pet/domain": "workspace:*",
     "@agent-pet/pet-runtime": "workspace:*",
-    "@agent-pet/adapter-pi": "workspace:*",
+    "lucide-react": "1.47.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "three": "^0.177.0"
   },
   "scripts": {

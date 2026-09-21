@@ -1,6 +1,6 @@
 import { createApplication } from '@agent-pet/application';
 import type { SessionState } from '@agent-pet/domain';
-import type { OverlayLayout } from '../../main/overlay-layout.js';
+import type { OverlayLayout } from '../../shared/overlay-layout.js';
 import { baselineLayout, piBaselineObservations } from './pi-fixtures.js';
 
 // Dev-only page: exercises the real Renderer without connecting to a user's pi socket.
@@ -37,5 +37,5 @@ window.pet = {
   interaction: async () => {}, moveWindowBy: async () => {}, resizeWindowBy: async () => {},
 };
 window.addEventListener('beforeunload', unsubscribe, { once: true });
-await import('../index.js');
+await import('../main.js');
 document.body.style.background = params.get('theme') === 'dark' ? '#111827' : '#f1f5f9';

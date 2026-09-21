@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionObservation } from '@agent-pet/domain';
-import type { OverlayLayout, Rect } from './overlay-layout.js';
+import type { OverlayLayout, Rect } from '../shared/overlay-layout.js';
 import { piObservation } from '../renderer/test-support/pi-fixtures.js';
 
 const native = vi.hoisted(() => {

@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { createPetWindowOptions } from './window-options.js';
 import { readPiBridgeConfig } from './pi-config.js';
 
-import { layoutOverlay, type Rect, type OverlayLayout } from './overlay-layout.js';
+import { layoutOverlay } from './overlay-layout.js';
+import type { Rect, OverlayLayout } from '../shared/overlay-layout.js';
 let petWindow: BrowserWindow | undefined;
 let anchor: Rect = { x: 100, y: 300, width: 140, height: 140 };
 let overlay: OverlayLayout;

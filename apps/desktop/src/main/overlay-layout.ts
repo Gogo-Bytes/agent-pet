@@ -1,7 +1,7 @@
-export type Rect = { x: number; y: number; width: number; height: number };
+import type { OverlayLayout, Rect } from '../shared/overlay-layout.js';
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
-export function layoutOverlay(anchor: Rect, area: Rect) {
+export function layoutOverlay(anchor: Rect, area: Rect): OverlayLayout {
   const size = Math.min(Math.max(80, anchor.width), 600, area.width, area.height - 60);
   const pet = { x: clamp(anchor.x, area.x, area.x + area.width - size),
     y: clamp(anchor.y, area.y + 50, area.y + area.height - size - 50), width: size, height: size };
@@ -22,4 +22,3 @@ export function layoutOverlay(anchor: Rect, area: Rect) {
   return { anchor: pet, bounds: { x: left, y: top, width: right - left, height: bottom - top },
     pet: local(pet), bubbles: local(bubbles), toolbar: local(toolbar) };
 }
-export type OverlayLayout = ReturnType<typeof layoutOverlay>;

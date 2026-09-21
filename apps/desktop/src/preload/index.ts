@@ -9,7 +9,7 @@ const channels = {
   snapshot: 'pet:snapshot',
 } as const;
 
-import type { OverlayLayout } from '../main/overlay-layout.js';
+import type { OverlayLayout } from '../shared/overlay-layout.js';
 const petApi = {
   bubblesExpanded(expanded: boolean): Promise<void> { return ipcRenderer.invoke('pet:bubbles-expanded', expanded); },
   bubblesVisible(visible: boolean): Promise<void> { return ipcRenderer.invoke('pet:bubbles-visible', visible); },

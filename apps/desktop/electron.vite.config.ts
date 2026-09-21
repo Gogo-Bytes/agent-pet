@@ -1,4 +1,5 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   main: {
@@ -8,5 +9,5 @@ export default defineConfig({
   preload: {
     build: { rollupOptions: { output: { format: 'cjs', entryFileNames: 'index.cjs' } } },
   },
-  renderer: {},
+  renderer: { plugins: [react()] },
 });

@@ -1,0 +1,39 @@
+diff --git a/dist/react-three-fiber.cjs.dev.js b/dist/react-three-fiber.cjs.dev.js
+index fcb4530f19e96bec08edadcf0448f1fbcbf38ff5..09c75f6ab3f6d4811cbe6c026a1bdb05e965ebd0 100644
+--- a/dist/react-three-fiber.cjs.dev.js
++++ b/dist/react-three-fiber.cjs.dev.js
+@@ -138,7 +138,7 @@ function CanvasImpl({
+           })
+         }));
+       }
+-      run();
++      run().catch(setError);
+     }
+   });
+   React__namespace.useEffect(() => {
+diff --git a/dist/react-three-fiber.cjs.prod.js b/dist/react-three-fiber.cjs.prod.js
+index b3dc28ceb75553527fa1c578a29033c71e8343dd..f18a726a2b3a6a5ac73070d50d44ad5116ea4c66 100644
+--- a/dist/react-three-fiber.cjs.prod.js
++++ b/dist/react-three-fiber.cjs.prod.js
+@@ -138,7 +138,7 @@ function CanvasImpl({
+           })
+         }));
+       }
+-      run();
++      run().catch(setError);
+     }
+   });
+   React__namespace.useEffect(() => {
+diff --git a/dist/react-three-fiber.esm.js b/dist/react-three-fiber.esm.js
+index d9d27a033ede66187a71840bc371769466037baf..b81f8429c8915e30803850377215b640e044c980 100644
+--- a/dist/react-three-fiber.esm.js
++++ b/dist/react-three-fiber.esm.js
+@@ -111,7 +111,7 @@ function CanvasImpl({
+           })
+         }));
+       }
+-      run();
++      run().catch(setError);
+     }
+   });
+   React.useEffect(() => {

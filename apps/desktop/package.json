@@ -9,6 +9,8 @@
     "@agent-pet/application": "workspace:*",
     "@agent-pet/domain": "workspace:*",
     "@agent-pet/pet-runtime": "workspace:*",
+    "@react-three/drei": "10.7.8",
+    "@react-three/fiber": "9.7.0",
     "lucide-react": "1.47.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",

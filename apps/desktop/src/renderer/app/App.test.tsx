@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { StrictMode } from 'react';
+import { Children, StrictMode, isValidElement, useEffect, type ReactNode } from 'react';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { configure, getConfig } from '@testing-library/dom';
@@ -9,11 +9,19 @@ import { App } from './App.js';
 import { createPetStore } from './bridge/pet-store.js';
 import { createPetBridgeDouble } from '../test-support/pet-bridge-double.js';
 import { baselineLayout, piBaselineObservations, piObservation } from '../test-support/pi-fixtures.js';
-import { createPetScene } from '../features/pet/pet-scene.js';
+import { PetModel } from '../features/pet/PetModel.js';
 
-vi.mock('../features/pet/pet-scene.js', () => ({ createPetScene: vi.fn(() => vi.fn()) }));
+// Only the WebGL boundary is substituted; PetCanvas, native DOM gestures,
+// Suspense/error isolation and the Application/bridge remain real.
+vi.mock('@react-three/fiber', () => ({
+  Canvas: ({ children, frameloop }: { children: ReactNode; frameloop: string }) => <div data-frameloop={frameloop}>
+    <canvas />{Children.toArray(children).filter(child => isValidElement(child) && typeof child.type !== 'string')}
+  </div>,
+}));
+vi.mock('@react-three/drei', () => ({ Bounds: ({ children }: { children: ReactNode }) => children }));
+vi.mock('../features/pet/PetModel.js', () => ({ PetModel: vi.fn(() => null) }));
 const asyncWrapper = getConfig().asyncWrapper;
-afterEach(() => { cleanup(); configure({ asyncWrapper }); vi.useRealTimers(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); configure({ asyncWrapper }); vi.useRealTimers(); vi.clearAllMocks(); vi.restoreAllMocks(); vi.mocked(PetModel).mockImplementation(() => <></>); });
 function timerUser() {
   vi.useFakeTimers();
   // RTL's default asyncWrapper advances zero-time timers only for Jest. With
@@ -24,6 +32,11 @@ function timerUser() {
     return result!;
   } });
   return userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+}
+
+function ReadyNotice({ onReady }: { onReady: (message: string) => void }) {
+  useEffect(() => { onReady(''); }, [onReady]);
+  return null;
 }
 
 async function mount(options: Parameters<typeof createPetBridgeDouble>[0] = {}) {
@@ -105,7 +118,7 @@ describe('App session interactions', () => {
     const canvas = container.querySelector('canvas')!;
     const resize = screen.getByRole('button', { name: '调整宠物窗口大小' });
     // jsdom has no native pointer capture; only that platform API is substituted.
-    for (const element of [canvas, resize]) {
+    for (const element of [container.querySelector('.pet-canvas')!, resize]) {
       const captured = new Set<number>();
       Object.assign(element, {
         setPointerCapture: (id: number) => captured.add(id),
@@ -120,7 +133,7 @@ describe('App session interactions', () => {
     ]);
     expect(bridge.api.moveWindowBy).toHaveBeenLastCalledWith({ x: 12, y: -5 });
     expect(bridge.api.interaction).toHaveBeenLastCalledWith(false);
-    expect(canvas.classList.contains('pet-canvas--dragging')).toBe(false);
+    expect(container.querySelector('.pet-canvas--dragging')).toBeNull();
     await user.pointer([
       { keys: '[MouseLeft>]', target: resize, coords: { screenX: 112, screenY: 195 } },
       { target: resize, coords: { screenX: 125, screenY: 207 } },
@@ -131,33 +144,75 @@ describe('App session interactions', () => {
     expect(bridge.api.interaction).toHaveBeenLastCalledWith(false);
   });
 
-  it('applies Main layout without recreating the scene', async () => {
+  it('applies Main layout without replacing the canvas', async () => {
     const { bridge, container } = await mount();
-    const sceneCount = vi.mocked(createPetScene).mock.calls.length;
+    const originalCanvas = container.querySelector('canvas');
     const layout = baselineLayout('top-left', 80);
     act(() => bridge.publishLayout(layout));
-    const canvas = container.querySelector('canvas')!;
-    expect(canvas.style.width).toBe('80px');
-    expect(canvas.style.left).toBe(`${layout.pet.x}px`);
+    const surface = container.querySelector<HTMLElement>('.pet-canvas')!;
+    expect(surface.style.width).toBe('80px');
+    expect(surface.style.left).toBe(`${layout.pet.x}px`);
     expect(container.querySelector('.bubble-layer')?.getAttribute('data-side')).toBe('below');
-    expect(createPetScene).toHaveBeenCalledTimes(sceneCount);
+    expect(container.querySelector('canvas')).toBe(originalCanvas);
   });
 });
 
 describe('App lifecycle and notices', () => {
-  it('subscribes before the initial request, keeps one StrictMode listener pair, and cleans up every scene', async () => {
+  it('keeps bubbles and controls usable while the local GLB suspends, then clears loading notice', async () => {
+    let resolve!: () => void;
+    let loaded = false;
+    const pending = new Promise<void>(done => { resolve = () => { loaded = true; done(); }; });
+    vi.mocked(PetModel).mockImplementation(({ onReady }) => {
+      if (!loaded) throw pending;
+      return <ReadyNotice onReady={onReady} />;
+    });
+    const { container } = await mount({ observations: [piObservation()] });
+    expect(screen.getByRole('status').textContent).toContain('正在加载');
+    expect(screen.getByRole('button', { name: '隐藏气泡' })).toBeTruthy();
+    expect(screen.getByRole('group')).toBeTruthy();
+    expect(container.querySelectorAll('canvas')).toHaveLength(1);
+    await act(async () => { resolve(); await pending; });
+    expect(screen.getByRole('status').textContent).toBe('');
+  });
+
+  it('isolates model load errors without removing working bubbles or the toolbar', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(PetModel).mockImplementation(() => { throw Error('GLB unavailable'); });
+    const user = userEvent.setup();
+    await mount({ observations: [piObservation({ agentName: '继续工作' })] });
+    expect(screen.getByRole('status').textContent).toBe('内置宠物加载失败，请重新打开窗口。');
+    await user.click(screen.getByRole('button', { name: '继续工作 正在工作' }));
+    expect(screen.getByRole('button', { name: '继续工作 正在工作' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '隐藏气泡' }));
+    expect(screen.getByRole('button', { name: '显示气泡' })).toBeTruthy();
+  });
+
+  it('selects never while hidden and always on resume, retaining one visibility subscription through StrictMode', async () => {
+    let hidden = false;
+    vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
+    const add = vi.spyOn(document, 'addEventListener');
+    const remove = vi.spyOn(document, 'removeEventListener');
+    const { container, unmount } = await mount();
+    const loop = () => container.querySelector('[data-frameloop]')?.getAttribute('data-frameloop');
+    expect(loop()).toBe('always');
+    act(() => { hidden = true; document.dispatchEvent(new Event('visibilitychange')); });
+    expect(loop()).toBe('never');
+    act(() => { hidden = false; document.dispatchEvent(new Event('visibilitychange')); });
+    expect(loop()).toBe('always');
+    const count = (calls: typeof add.mock.calls) => calls.filter(([event]) => event === 'visibilitychange').length;
+    expect(count(add.mock.calls) - count(remove.mock.calls)).toBe(1);
+    unmount();
+    expect(count(add.mock.calls)).toBe(count(remove.mock.calls));
+  });
+
+  it('subscribes before the initial request, keeps one StrictMode listener pair, and cleans up on unmount', async () => {
     const { bridge, unmount, container } = await mount();
     expect(bridge.api.requestSnapshot).toHaveBeenCalledTimes(1);
     expect(bridge.api.subscribeSnapshot.mock.invocationCallOrder[0]).toBeLessThan(bridge.api.requestSnapshot.mock.invocationCallOrder[0]!);
     expect(bridge.api.subscribeLayout.mock.invocationCallOrder[0]).toBeLessThan(bridge.api.requestSnapshot.mock.invocationCallOrder[0]!);
     expect(bridge.listenerCounts()).toEqual({ snapshot: 1, layout: 1 });
     expect(container.querySelectorAll('canvas')).toHaveLength(1);
-    const scenes = vi.mocked(createPetScene).mock.results;
-    expect(scenes).toHaveLength(2);
-    expect(scenes[0]!.value).toHaveBeenCalledTimes(1);
-    expect(scenes[1]!.value).not.toHaveBeenCalled();
     unmount();
-    expect(scenes[1]!.value).toHaveBeenCalledTimes(1);
     expect(bridge.listenerCounts()).toEqual({ snapshot: 0, layout: 0 });
   });
 

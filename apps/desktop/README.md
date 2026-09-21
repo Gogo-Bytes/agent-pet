@@ -37,17 +37,28 @@ application resets it. The simulation menu is excluded from packaged apps.
 ## Bundled 3D pet
 
 The GLB fixture and its source generator are documented in
-`../../packages/pet-runtime/assets/README.md`. Runtime tests parse the actual
-asset and advance its animation tracks; the build emits the GLB as a local asset.
+`../../packages/pet-runtime/assets/README.md`. Renderer tests parse the actual
+asset and advance Drei-managed animation tracks; the build emits the GLB as a
+local asset.
 This trusted fixture path is not user import validation.
 
 The prototype animation priority is working > unread error > unread completed >
 idle, independent of bubble order. Hiding bubbles does not change activity.
 The model uses Work, Error, Success and Idle clips respectively; the precise
-multi-session animation policy remains a product-tuning choice. The renderer
-caps rendering at 30 FPS and DPR 2, pauses rendering when the document is hidden,
-and disposes model/GPU resources on unload. Actual CPU/GPU budgets and Windows
-behavior still need measurements.
+multi-session animation policy remains a product-tuning choice. R3F Canvas owns
+the single render loop (display cadence, DPR capped at 2),
+pausing it while the document is hidden. Drei useGLTF loads the bundled local URL;
+useAnimations owns the instance mixer. Cloned transforms are instance-owned,
+while geometry/materials remain cache-owned and are not disposed on remount.
+Bounds frames the complete bundled animation envelope, including the success
+jump, inside Main's unchanged pixel region. Actual CPU/GPU budgets and Windows
+behavior still need measurements; this is not a power-efficiency claim.
+
+For controlled WebGL checks, the dev-only `/test-support/visual.html` accepts
+`motion=idle|working|success|error`, `size=80|140|300|600`, the existing
+`theme=dark`, and `position=top-left|bottom-right`. It never connects to a user
+socket and does not simulate native movement. See `../../docs/RENDERER-R2-R3F.md`
+for lifecycle, dependency and validation evidence.
 
 Manual check: the robot should replace the purple placeholder; changing simulated
 Session states should change motion, and acknowledging all terminal bubbles should

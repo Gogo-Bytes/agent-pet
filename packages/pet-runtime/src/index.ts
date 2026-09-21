@@ -1,6 +1,6 @@
-import { Group, Scene } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { DisplayStatus } from '@agent-pet/domain';
+
+export type PetMotion = 'idle' | 'working' | 'success' | 'error';
 
 export type PetAnimations = {
   idle?: string;
@@ -68,20 +68,4 @@ export function animationForStatus(
     case 'completed-unread':
       return animations.success || animations.attention || animations.idle || '';
   }
-}
-
-export function createPetScene(): { scene: Scene; petRoot: Group } {
-  const scene = new Scene();
-  const petRoot = new Group();
-  scene.add(petRoot);
-  return { scene, petRoot };
-}
-
-export async function loadPetModel(modelUrl: string): Promise<Group> {
-  if (!modelUrl.toLowerCase().endsWith('.glb') || modelUrl.includes('://')) {
-    throw new Error('Only local GLB models are supported');
-  }
-
-  const gltf = await new GLTFLoader().loadAsync(modelUrl);
-  return gltf.scene;
 }

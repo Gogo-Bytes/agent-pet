@@ -1,5 +1,5 @@
 import type { SessionBubble } from '@agent-pet/domain';
-import type { PetMotion } from '@agent-pet/pet-runtime/model';
+import type { PetMotion } from '@agent-pet/pet-runtime';
 
 // Prototype arbitration policy; unread notifications remain visible independently.
 export function selectPetMotion(bubbles: readonly SessionBubble[]): PetMotion {

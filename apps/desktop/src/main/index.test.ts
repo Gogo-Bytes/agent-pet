@@ -1,21 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { SessionObservation } from '@agent-pet/domain';
 import type { OverlayLayout, Rect } from '../shared/overlay-layout.js';
 import { piObservation } from '../renderer/test-support/pi-fixtures.js';
 
 const native = vi.hoisted(() => {
-  const frame = {};
+  const frame = { url: '' };
   const webContents = { mainFrame: frame, send: vi.fn(), setWindowOpenHandler: vi.fn(), on: vi.fn() };
   const window = {
     webContents, setBounds: vi.fn(), isDestroyed: () => false,
     setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
     loadFile: vi.fn(), loadURL: vi.fn(), once: vi.fn(), show: vi.fn(), hide: vi.fn(),
-    setIgnoreMouseEvents: vi.fn(),
+    setIgnoreMouseEvents: vi.fn(), on: vi.fn(), focus: vi.fn(), isMinimized: () => false, restore: vi.fn(),
   };
   return {
     handlers: new Map<string, (event: unknown, value?: unknown) => unknown>(),
-    appEvents: new Map<string, () => void>(),
+    appEvents: new Map<string, (event?: { preventDefault(): void }) => void>(),
+    path: '', lock: true, quit: vi.fn(), stop: vi.fn(), start: vi.fn(), loginSet: vi.fn(), loginGet: vi.fn(() => ({ openAtLogin: false })),
+    management: undefined as typeof window | undefined,
+    tray: { setContextMenu: vi.fn(), setToolTip: vi.fn(), on: vi.fn(), destroy: vi.fn() },
     window, webContents, options: vi.fn(), isPackaged: true,
     area: { x: 0, y: 25, width: 1440, height: 875 }, cursor: { x: 0, y: 0 },
     publish: undefined as ((value: SessionObservation) => void) | undefined,
@@ -23,16 +29,31 @@ const native = vi.hoisted(() => {
 });
 vi.mock('electron', () => ({
   app: {
+    requestSingleInstanceLock: () => native.lock, getPath: () => native.path,
+    getLoginItemSettings: native.loginGet, setLoginItemSettings: native.loginSet,
     whenReady: () => Promise.resolve(), get isPackaged() { return native.isPackaged; },
-    on: (name: string, callback: () => void) => native.appEvents.set(name, callback),
-    once: (name: string, callback: () => void) => native.appEvents.set(name, callback), quit: vi.fn(),
+    on: (name: string, callback: (event?: { preventDefault(): void }) => void) => native.appEvents.set(name, callback),
+    once: (name: string, callback: (event?: { preventDefault(): void }) => void) => native.appEvents.set(name, callback), quit: native.quit,
   },
   BrowserWindow: class {
-    constructor(options: unknown) { native.options(options); return native.window; }
+    constructor(options: unknown) {
+      native.options(options);
+      const management = String((options as { title?: string }).title) === 'Agent Pet';
+      const target = management ? { ...native.window,
+        webContents: { ...native.webContents, mainFrame: { url: '' }, send: vi.fn(), on: vi.fn(), setWindowOpenHandler: vi.fn() },
+        on: vi.fn(), once: vi.fn(), show: vi.fn(), hide: vi.fn(), focus: vi.fn(), loadFile: vi.fn(), loadURL: vi.fn(),
+      } : native.window;
+      target.loadFile.mockImplementation((file: string) => { target.webContents.mainFrame.url = pathToFileURL(file).href; });
+      target.loadURL.mockImplementation((url: string) => { target.webContents.mainFrame.url = url; });
+      if (management) native.management = target;
+      return target;
+    }
     static getAllWindows() { return [native.window]; }
   },
   ipcMain: { handle: (channel: string, handler: (event: unknown, value?: unknown) => unknown) => native.handlers.set(channel, handler) },
-  Menu: { buildFromTemplate: vi.fn(), setApplicationMenu: vi.fn() },
+  nativeImage: { createFromBitmap: () => ({ setTemplateImage: vi.fn() }) },
+  Tray: class { constructor() { return native.tray; } },
+  Menu: { buildFromTemplate: vi.fn(template => template), setApplicationMenu: vi.fn() },
   screen: {
     getDisplayMatching: () => ({ workArea: native.area }),
     getCursorScreenPoint: () => native.cursor, on: vi.fn(),
@@ -43,8 +64,8 @@ vi.mock('@agent-pet/adapter-pi', () => ({ PiBridgeAdapter: class {
   readonly provider = 'pi';
   async openSession() { return { status: 'unsupported' }; }
   async start(_config: unknown, sink: { publish(value: SessionObservation): void }) {
-    native.publish = sink.publish;
-    return { stop: vi.fn() };
+    await native.start(); native.publish = sink.publish;
+    return { stop: native.stop };
   }
 } }));
 
@@ -72,12 +93,15 @@ function expectHit(hit: boolean) {
 beforeEach(async () => {
   vi.resetModules(); vi.clearAllMocks(); vi.useFakeTimers();
   native.handlers.clear(); native.appEvents.clear(); native.publish = undefined;
-  native.isPackaged = true;
+  native.isPackaged = true; native.lock = true;
+  native.path = mkdtempSync(join(tmpdir(), 'pet-p1-main-'));
+  native.stop.mockResolvedValue(undefined); native.start.mockResolvedValue(undefined);
+  native.loginGet.mockReturnValue({ openAtLogin: false });
   native.area = { x: 0, y: 25, width: 1440, height: 875 };
   native.cursor = { x: 0, y: 0 };
   await import('./index.js');
 });
-afterEach(() => { native.appEvents.get('will-quit')?.(); vi.useRealTimers(); vi.unstubAllEnvs(); });
+afterEach(() => { native.appEvents.get('will-quit')?.(); vi.useRealTimers(); vi.unstubAllEnvs(); rmSync(native.path, { recursive: true, force: true }); });
 
 describe('Main public IPC layout/hit baseline (mock Electron, not native acceptance)', () => {
   it.each(['packaged', 'development'])('allows only exact entry reload in %s, not other navigation', async mode => {
@@ -218,5 +242,138 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
       expect(() => invoke(channel, 'true')).toThrow(TypeError);
     }
     expect(latestLayout()).toBe(layout);
+  });
+});
+
+describe('P1 actual Main entry with isolated Electron boundary', () => {
+  function managementEvent() {
+    return { sender: native.management!.webContents, senderFrame: native.management!.webContents.mainFrame };
+  }
+  it('creates distinct sandboxed entries and denies cross-window, subframe and navigated-frame capabilities', () => {
+    expect(native.management).toBeDefined();
+    expect(native.management!.webContents).not.toBe(native.webContents);
+    expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ title: 'Agent Pet', webPreferences: expect.objectContaining({ sandbox: true, contextIsolation: true, nodeIntegration: false }) }));
+    for (const channel of ['pet:request-snapshot', 'pet:interaction', 'pet:resize-window-by']) {
+      expect(() => invoke(channel, true, managementEvent())).toThrow('Untrusted renderer');
+    }
+    for (const channel of ['management:get-state', 'management:update-preferences', 'management:set-login']) {
+      expect(() => invoke(channel, true)).toThrow('Untrusted renderer');
+      expect(() => invoke(channel, true, { sender: native.management!.webContents, senderFrame: {} })).toThrow('Untrusted renderer');
+    }
+    const saved = native.management!.webContents.mainFrame.url;
+    native.management!.webContents.mainFrame.url = 'file:///tmp/hostile.html';
+    expect(() => invoke('management:get-state', undefined, managementEvent())).toThrow('Untrusted renderer');
+    native.management!.webContents.mainFrame.url = saved;
+    const read = invoke('management:get-state', undefined, managementEvent());
+    expect(JSON.stringify(read)).not.toMatch(/token|endpoint|test-only/);
+    for (const name of ['will-navigate', 'will-redirect', 'will-frame-navigate']) {
+      const handler = native.management!.webContents.on.mock.calls.find(([event]) => event === name)![1];
+      const preventDefault = vi.fn();
+      handler({ url: saved, preventDefault }); expect(preventDefault).not.toHaveBeenCalled();
+      handler({ url: native.webContents.mainFrame.url, preventDefault }); expect(preventDefault).toHaveBeenCalledOnce();
+    }
+    expect(native.management!.webContents.setWindowOpenHandler.mock.calls[0]![0]()).toEqual({ action: 'deny' });
+  });
+  it('close hides, activate/second instance/tray reopens, and visibility and toolbar size persist together', () => {
+    const close = native.management!.on.mock.calls.find(([event]) => event === 'close')![1];
+    const preventDefault = vi.fn();
+    close({ preventDefault });
+    expect(preventDefault).toHaveBeenCalledOnce(); expect(native.management!.hide).toHaveBeenCalledOnce();
+    expect(native.stop).not.toHaveBeenCalled(); expect(native.quit).not.toHaveBeenCalled();
+    native.appEvents.get('activate')!(); native.appEvents.get('second-instance')!();
+    native.tray.on.mock.calls.find(([event]) => event === 'click')![1]();
+    expect(native.management!.focus).toHaveBeenCalledTimes(3);
+    expect(native.options).toHaveBeenCalledTimes(2);
+    expect(native.start).toHaveBeenCalledOnce();
+    invoke('management:update-preferences', { petVisible: false, petSize: 220 }, managementEvent());
+    expect(native.window.hide).toHaveBeenCalled(); expect(latestLayout().pet.width).toBe(220);
+    native.window.show.mockClear(); native.window.hide.mockClear();
+    invoke('pet:resize-window-by', { x: 10, y: 10 });
+    expect(native.window.show).not.toHaveBeenCalled(); expect(native.window.hide).not.toHaveBeenCalled();
+    const saved = JSON.parse(readFileSync(join(native.path, 'preferences.json'), 'utf8'));
+    expect(saved).toEqual({ schemaVersion: 1, petVisible: false, petSize: 230 });
+    invoke('management:update-preferences', { petVisible: true }, managementEvent());
+    expect(native.window.show).toHaveBeenCalled();
+    native.appEvents.get('window-all-closed')!(); expect(native.quit).not.toHaveBeenCalled();
+  });
+  it('does not reshow management when closed before ready-to-show', () => {
+    const window = native.management!;
+    window.on.mock.calls.find(([event]) => event === 'close')![1]({ preventDefault: vi.fn() });
+    window.show.mockClear();
+    window.once.mock.calls.find(([event]) => event === 'ready-to-show')![1]();
+    expect(window.show).not.toHaveBeenCalled();
+    native.appEvents.get('activate')!();
+    expect(window.show).toHaveBeenCalledOnce();
+  });
+  it('rejects invalid management patches without native effects', () => {
+    expect(() => invoke('management:update-preferences', { path: '/tmp/no' }, managementEvent())).toThrow(TypeError);
+    expect(() => invoke('management:set-login', 'yes', managementEvent())).toThrow(TypeError);
+    expect(native.loginSet).not.toHaveBeenCalled();
+  });
+  it('never registers login items at startup; dev refuses opt-in without calling OS login APIs', async () => {
+    expect(native.loginSet).not.toHaveBeenCalled();
+    native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks(); native.isPackaged = false;
+    await import('./index.js');
+    const result = invoke('management:set-login', true, managementEvent());
+    expect(result).toMatchObject({ login: { supported: false, enabled: false, error: expect.any(String) } });
+    expect(native.loginSet).not.toHaveBeenCalled(); expect(native.loginGet).not.toHaveBeenCalled();
+  });
+  it.runIf(process.platform === 'darwin')('verifies packaged macOS opt-in and reports OS failures truthfully', () => {
+    native.loginGet.mockReturnValue({ openAtLogin: true });
+    expect(invoke('management:set-login', true, managementEvent())).toMatchObject({ login: { supported: true, enabled: true, error: null } });
+    expect(native.loginSet).toHaveBeenCalledWith({ openAtLogin: true });
+    native.loginGet.mockReturnValue({ openAtLogin: false });
+    expect(invoke('management:set-login', true, managementEvent())).toMatchObject({ login: { enabled: false, error: expect.any(String) } });
+    native.loginSet.mockImplementationOnce(() => { throw new Error('OS denied'); });
+    expect(invoke('management:set-login', true, managementEvent())).toMatchObject({ login: { enabled: false, error: expect.any(String) } });
+  });
+  it('explicit quit awaits Adapter stop once and allows real window closure only while quitting', async () => {
+    let finish!: () => void;
+    native.stop.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+    const event = { preventDefault: vi.fn() };
+    native.appEvents.get('before-quit')!(event);
+    native.appEvents.get('before-quit')!(event);
+    await Promise.resolve();
+    expect(native.stop).toHaveBeenCalledOnce(); expect(native.quit).not.toHaveBeenCalled();
+    const close = native.management!.on.mock.calls.find(([event]) => event === 'close')![1];
+    const preventDefault = vi.fn(); close({ preventDefault }); expect(preventDefault).not.toHaveBeenCalled();
+    finish(); for (let i = 0; i < 8; i++) await Promise.resolve();
+    expect(native.tray.destroy).toHaveBeenCalledOnce(); expect(native.quit).toHaveBeenCalledOnce();
+    event.preventDefault.mockClear(); native.appEvents.get('before-quit')!(event);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+  it('restores hidden pet and size from disk; ready-to-show cannot override hidden preference', async () => {
+    native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks();
+    writeFileSync(join(native.path, 'preferences.json'), JSON.stringify({ schemaVersion: 1, petVisible: false, petSize: 260 }));
+    await import('./index.js');
+    expect(latestLayout().pet.width).toBe(260);
+    native.window.once.mock.calls.find(([event]) => event === 'ready-to-show')![1]();
+    expect(native.window.show).not.toHaveBeenCalled(); expect(native.window.hide).toHaveBeenCalled();
+    expect(invoke('management:get-state', undefined, managementEvent())).toMatchObject({ preferences: { petVisible: false, petSize: 260 } });
+  });
+  it('failed toolbar persistence retains geometry and opens management with the error', () => {
+    mkdirSync(join(native.path, 'preferences.json'));
+    const width = latestLayout().pet.width;
+    invoke('pet:resize-window-by', { x: 20, y: 20 });
+    expect(latestLayout().pet.width).toBe(width);
+    expect(native.management!.focus).toHaveBeenCalled();
+    expect(invoke('management:get-state', undefined, managementEvent())).toMatchObject({ preferenceError: expect.stringContaining('未应用') });
+  });
+  it('quit during Adapter startup waits for its handle, then stops it rather than leaking a late listener', async () => {
+    native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks();
+    let started!: () => void;
+    native.start.mockReturnValueOnce(new Promise<void>(resolve => { started = resolve; }));
+    await import('./index.js');
+    native.appEvents.get('before-quit')!({ preventDefault: vi.fn() });
+    await Promise.resolve(); expect(native.stop).not.toHaveBeenCalled(); expect(native.quit).not.toHaveBeenCalled();
+    started(); for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(native.stop).toHaveBeenCalledOnce(); expect(native.quit).toHaveBeenCalledOnce();
+  });
+  it('a losing single instance exits before creating windows, Adapter, preferences or IPC', async () => {
+    native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks(); native.handlers.clear();
+    native.lock = false;
+    await import('./index.js');
+    expect(native.quit).toHaveBeenCalledOnce(); expect(native.options).not.toHaveBeenCalled();
+    expect(native.start).not.toHaveBeenCalled(); expect(native.handlers.size).toBe(0);
   });
 });

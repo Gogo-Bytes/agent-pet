@@ -1,0 +1,7 @@
+interface:
+  display_name: "Engineering Team Orchestrator"
+  short_description: "Resolve internal roles and configured capabilities"
+  default_prompt: "Use $orchestrate-engineering-team to decide whether specialist context adds value, resolve the appropriate canonical role and configured capabilities, and coordinate through host-native subagents."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "orchestrate-engineering-team": {
+      "source": "HandsomeGanzige/orchestrate-engineering-team",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/orchestrate-engineering-team/SKILL.md",
+      "computedHash": "0e42e06c9a1ac0e2335890c703a3d1dee53f639418f90caf8447c4dee9fe6150"
+    }
+  }
+}

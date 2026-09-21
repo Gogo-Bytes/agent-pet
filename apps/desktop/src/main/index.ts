@@ -3,6 +3,7 @@ import type { AdapterHandle, SessionRef } from '@agent-pet/adapter-core';
 import { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import { createApplication } from '@agent-pet/application';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createPetWindowOptions } from './window-options.js';
 import { readPiBridgeConfig } from './pi-config.js';
 
@@ -133,11 +134,18 @@ function createPetWindow(): BrowserWindow {
   };
   window.webContents.on('did-start-loading', resetPresentation);
   window.webContents.on('render-process-gone', resetPresentation);
-  window.webContents.on('will-navigate', (event) => event.preventDefault());
-  if (process.env.ELECTRON_RENDERER_URL && !app.isPackaged) {
-    void window.loadURL(process.env.ELECTRON_RENDERER_URL);
+  const rendererFile = join(__dirname, '../renderer/index.html');
+  const developmentUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
+  const rendererUrl = developmentUrl ? new URL(developmentUrl).href : pathToFileURL(rendererFile).href;
+  // Page-initiated reloads (including Vite full reload) must reach the same
+  // trusted entry. Other paths/origins remain blocked, not merely same-origin.
+  window.webContents.on('will-navigate', (event) => {
+    if (event.url !== rendererUrl) event.preventDefault();
+  });
+  if (developmentUrl) {
+    void window.loadURL(rendererUrl);
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'));
+    void window.loadFile(rendererFile);
   }
   window.once('ready-to-show', () => window.show());
   return window;

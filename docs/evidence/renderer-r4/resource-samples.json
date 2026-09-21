@@ -1,0 +1,54 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 4625130690273066000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://localhost:5174/",
+  "result": [
+    {
+      "canvasCount": 1,
+      "dpr": 2,
+      "elapsedMs": 2000.600000023842,
+      "frameSubscribers": 2,
+      "frames": 240,
+      "geometry": 1,
+      "programs": 1,
+      "rootCount": 1,
+      "textures": 0,
+      "timeOrigin": 1789978896815.7
+    },
+    {
+      "canvasCount": 1,
+      "dpr": 2,
+      "elapsedMs": 2001.399999976158,
+      "frameSubscribers": 2,
+      "frames": 240,
+      "geometry": 1,
+      "programs": 1,
+      "rootCount": 1,
+      "textures": 0,
+      "timeOrigin": 1789979141278.2
+    },
+    {
+      "canvasCount": 1,
+      "dpr": 2,
+      "elapsedMs": 2001.5999999642372,
+      "frameSubscribers": 2,
+      "frames": 240,
+      "geometry": 1,
+      "programs": 1,
+      "rootCount": 1,
+      "textures": 0,
+      "timeOrigin": 1789979182192
+    }
+  ]
+}

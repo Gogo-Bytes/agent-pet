@@ -24,5 +24,9 @@ installation flow; this package does not create or write pi configuration.
 `openSession()` intentionally returns `unsupported` until a reliable mapping to
 the original terminal window exists.
 
-The current implementation is protocol/adapter code only. It is not yet wired
-to the desktop process and no pi extension is bundled or installed.
+The desktop Main wires this Adapter when explicit endpoint/token configuration
+is valid; see `../../apps/desktop/README.md`. The opt-in extension source is
+`../../integrations/pi-extension/index.ts`, with loading instructions in its
+README. It is not automatically installed or loaded. Real extension callbacks →
+isolated socket → Application and reconnect are covered by integration tests;
+these are not live pi TUI or Windows acceptance.

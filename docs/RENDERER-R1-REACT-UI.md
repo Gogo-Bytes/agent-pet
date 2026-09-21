@@ -1,5 +1,7 @@
 # Renderer R1：React 接管二维 UI
 
+> 历史阶段记录：下文的代码路径、CSS 保护、测量与待验收状态均对应该阶段，未改写为 R4 新证据。当前状态见 [R4 验收库存](RENDERER-R4-ACCEPTANCE.md)；用户在 R3 已明确丢弃旧未提交 CSS，当前已提交 CSS Modules/tokens 为权威。
+
 ## 边界与当前结论
 
 基于 R0 `7b5f1e4`。本阶段只有 React UI、桥接订阅、既有 Three 场景的生命周期包装、renderer-safe 布局类型、构建/类型配置及测试。**自动化、受控浏览器及 Electron 页面加载冒烟通过；R1 原生交互和真实 pi → UI 验收尚未完成。** 未开始 R2/R3，没有 R3F、Drei、Motion、手势库、设计改版或其它 Agent 接入。没有修改 pi 配置、重启 pi、升级 Electron、提交或推送。

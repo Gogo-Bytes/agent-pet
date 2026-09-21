@@ -1,5 +1,7 @@
 # Agent Pet 项目实施计划
 
+> 历史初始规划，包含尚未实现的目标目录/能力，不是当前实现清单。产品术语与只读范围以 [CONTEXT.md](CONTEXT.md) 为准；Renderer 后续决策见 [迁移计划](docs/RENDERER-MIGRATION-PLAN.md)，当前验收边界见 [R4 库存](docs/RENDERER-R4-ACCEPTANCE.md)。已落地的是 React + R3F/Drei Renderer 与显式 opt-in pi 扩展/Adapter；本文旧的 UI、loader、Agent 接入顺序描述不应覆盖后续已批准决策。
+
 ## 1. 项目目标
 
 构建一个 Electron 桌面应用：显示 3D 宠物，并根据 Codex、pi、Claude Code 等 Agent session 状态触发动画。宠物支持拖拽、缩放、置顶、点击穿透切换和自定义 GLB 资产。

@@ -1,0 +1,245 @@
+{
+  "method": "Real Electron preload/Main IPC layout assertions, not physical pointer input",
+  "workArea": {
+    "x": 0,
+    "y": 40,
+    "width": 1800,
+    "height": 1129
+  },
+  "results": [
+    {
+      "anchor": {
+        "height": 80,
+        "width": 80,
+        "x": 0,
+        "y": 90
+      },
+      "bounds": {
+        "height": 352,
+        "width": 306,
+        "x": 0,
+        "y": 40
+      },
+      "corner": "top-left",
+      "dpr": 2,
+      "inside": true,
+      "size": 80
+    },
+    {
+      "anchor": {
+        "height": 140,
+        "width": 140,
+        "x": 1660,
+        "y": 90
+      },
+      "bounds": {
+        "height": 412,
+        "width": 306,
+        "x": 1494,
+        "y": 40
+      },
+      "corner": "top-right",
+      "dpr": 2,
+      "inside": true,
+      "size": 140
+    },
+    {
+      "anchor": {
+        "height": 300,
+        "width": 300,
+        "x": 0,
+        "y": 819
+      },
+      "bounds": {
+        "height": 572,
+        "width": 306,
+        "x": 0,
+        "y": 597
+      },
+      "corner": "bottom-left",
+      "dpr": 2,
+      "inside": true,
+      "size": 300
+    },
+    {
+      "anchor": {
+        "height": 140,
+        "width": 140,
+        "x": 1660,
+        "y": 979
+      },
+      "bounds": {
+        "height": 412,
+        "width": 306,
+        "x": 1494,
+        "y": 757
+      },
+      "corner": "bottom-right",
+      "dpr": 2,
+      "inside": true,
+      "size": 140
+    },
+    {
+      "anchor": {
+        "height": 80,
+        "width": 80,
+        "x": 1720,
+        "y": 90
+      },
+      "bounds": {
+        "height": 352,
+        "width": 306,
+        "x": 1494,
+        "y": 40
+      },
+      "corner": "top-right",
+      "dpr": 2,
+      "inside": true,
+      "size": 80
+    },
+    {
+      "anchor": {
+        "height": 80,
+        "width": 80,
+        "x": 0,
+        "y": 1039
+      },
+      "bounds": {
+        "height": 352,
+        "width": 306,
+        "x": 0,
+        "y": 817
+      },
+      "corner": "bottom-left",
+      "dpr": 2,
+      "inside": true,
+      "size": 80
+    },
+    {
+      "anchor": {
+        "height": 80,
+        "width": 80,
+        "x": 1720,
+        "y": 1039
+      },
+      "bounds": {
+        "height": 352,
+        "width": 306,
+        "x": 1494,
+        "y": 817
+      },
+      "corner": "bottom-right",
+      "dpr": 2,
+      "inside": true,
+      "size": 80
+    },
+    {
+      "anchor": {
+        "height": 140,
+        "width": 140,
+        "x": 0,
+        "y": 90
+      },
+      "bounds": {
+        "height": 412,
+        "width": 306,
+        "x": 0,
+        "y": 40
+      },
+      "corner": "top-left",
+      "dpr": 2,
+      "inside": true,
+      "size": 140
+    },
+    {
+      "anchor": {
+        "height": 140,
+        "width": 140,
+        "x": 0,
+        "y": 979
+      },
+      "bounds": {
+        "height": 412,
+        "width": 306,
+        "x": 0,
+        "y": 757
+      },
+      "corner": "bottom-left",
+      "dpr": 2,
+      "inside": true,
+      "size": 140
+    },
+    {
+      "anchor": {
+        "height": 300,
+        "width": 300,
+        "x": 0,
+        "y": 90
+      },
+      "bounds": {
+        "height": 572,
+        "width": 306,
+        "x": 0,
+        "y": 40
+      },
+      "corner": "top-left",
+      "dpr": 2,
+      "inside": true,
+      "size": 300
+    },
+    {
+      "anchor": {
+        "height": 300,
+        "width": 300,
+        "x": 1500,
+        "y": 90
+      },
+      "bounds": {
+        "height": 572,
+        "width": 306,
+        "x": 1494,
+        "y": 40
+      },
+      "corner": "top-right",
+      "dpr": 2,
+      "inside": true,
+      "size": 300
+    },
+    {
+      "anchor": {
+        "height": 300,
+        "width": 300,
+        "x": 1500,
+        "y": 819
+      },
+      "bounds": {
+        "height": 572,
+        "width": 306,
+        "x": 1494,
+        "y": 597
+      },
+      "corner": "bottom-right",
+      "dpr": 2,
+      "inside": true,
+      "size": 300
+    },
+    {
+      "anchor": {
+        "height": 600,
+        "width": 600,
+        "x": 1200,
+        "y": 519
+      },
+      "bounds": {
+        "height": 872,
+        "width": 606,
+        "x": 1194,
+        "y": 297
+      },
+      "corner": "bottom-right",
+      "dpr": 2,
+      "inside": true,
+      "size": 600
+    }
+  ]
+}

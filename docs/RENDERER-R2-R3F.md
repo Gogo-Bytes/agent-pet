@@ -1,5 +1,7 @@
 # Renderer R2：R3F / Drei 接管 3D
 
+> 历史阶段记录：下文的代码路径、CSS 保护、测量与待验收状态均对应该阶段，未改写为 R4 新证据。当前状态见 [R4 验收库存](RENDERER-R4-ACCEPTANCE.md)；用户在 R3 已明确丢弃旧未提交 CSS，当前已提交 CSS Modules/tokens 为权威。
+
 ## 范围与结论
 
 基于 R1 `660d0ec49c3c9306e33ad204a59004c93dd2e5e3`。仅 R2：Canvas、Drei GLB/动画/取景、相关依赖/测试/文档；不改 Main/preload、pi 配置/协议、Electron、R3 手势/Motion/Radix。本阶段仅本地提交，不推送；没有重启用户进程。

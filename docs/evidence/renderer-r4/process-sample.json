@@ -1,0 +1,30 @@
+{
+  "method": "Process CPU-time delta divided by wall time, percent of one logical core; GPU Helper CPU is NOT hardware GPU utilization; RSS is not a leak verdict",
+  "seconds": 3.041,
+  "samples": [
+    {
+      "pid": 17603,
+      "process": "Electron",
+      "cpuPercentOneCore": 0.66,
+      "rssKiB": 154192
+    },
+    {
+      "pid": 17604,
+      "process": "Electron Helper (GPU)",
+      "cpuPercentOneCore": 5.59,
+      "rssKiB": 111232
+    },
+    {
+      "pid": 17605,
+      "process": "Electron Helper",
+      "cpuPercentOneCore": 0.0,
+      "rssKiB": 57280
+    },
+    {
+      "pid": 17606,
+      "process": "Electron Helper (Renderer)",
+      "cpuPercentOneCore": 3.95,
+      "rssKiB": 224272
+    }
+  ]
+}

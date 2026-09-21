@@ -1,0 +1,44 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 4625130690273066000
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://localhost:5174/",
+  "result": {
+    "canvases": 1,
+    "currentTimeOrigin": 1789979182192,
+    "events": [
+      {
+        "canvases": 1,
+        "children": 4,
+        "event": "initial",
+        "timeOrigin": 1789978858965.6
+      },
+      {
+        "children": 0,
+        "event": "beforeunload",
+        "timeOrigin": 1789978858965.6
+      },
+      {
+        "children": 0,
+        "event": "pagehide",
+        "timeOrigin": 1789978858965.6
+      },
+      {
+        "children": 0,
+        "event": "unload",
+        "timeOrigin": 1789978858965.6
+      }
+    ],
+    "toolbarButtons": 2
+  }
+}

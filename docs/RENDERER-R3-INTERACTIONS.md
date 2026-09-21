@@ -1,5 +1,7 @@
 # Renderer R3：生态交互与统一样式
 
+> 历史阶段记录：下文的代码路径、CSS 保护、测量与待验收状态均对应该阶段，未改写为 R4 新证据。当前状态见 [R4 验收库存](RENDERER-R4-ACCEPTANCE.md)；用户在 R3 已明确丢弃旧未提交 CSS，当前已提交 CSS Modules/tokens 为权威。
+
 ## 范围与证据边界
 
 基于 R2 `744267a58a664f7856d32cba74179f7a18fcb512`，仅实现 R3。未改 pi 配置/token/协议、Application 未读规则、3D mixer、Electron 版本；未擅自重启用户进程；本阶段仅本地提交，不推送。

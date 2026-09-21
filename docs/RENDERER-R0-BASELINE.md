@@ -1,5 +1,7 @@
 # Renderer R0：迁移回归基线
 
+> 历史阶段记录：下文的代码路径、CSS 保护、测量与待验收状态均对应该阶段，未改写为 R4 新证据。当前状态见 [R4 验收库存](RENDERER-R4-ACCEPTANCE.md)；用户在 R3 已明确丢弃旧未提交 CSS，当前已提交 CSS Modules/tokens 为权威。
+
 ## 范围与证据状态
 
 基于 `main` 的 `4c61d33a7f35fab23fdc16bd48972ea682cfe438` 和开始 R0 时的工作区，而非仅基于 Git HEAD 的 CSS。

@@ -12,16 +12,23 @@ Main and sandboxed preload are bundled as CommonJS (`out/main/index.cjs`,
 `out/preload/index.cjs`). Workspace runtime dependencies are bundled into main;
 the application does not require Node to execute workspace TypeScript.
 
-## Current verification boundary
+## Renderer entrypoint and verification boundary
 
-Unit tests, TypeScript checking and the production build pass. The renderer loads
-the bundled project-authored `starter.glb` robot with embedded animations. No real
-Agent adapters are connected; the initial session snapshot is empty.
+`src/renderer/index.html` loads `src/renderer/main.tsx`: one React root, R3F/Drei
+Canvas, and feature CSS Modules with shared tokens. The former imperative
+`index.ts`, scene wrapper and `style.css` have been removed. Main remains the
+window-layout and hit-policy authority; Application owns Session/unread state.
 
-The user confirmed that the macOS development window renders normally after a
-direct CLI launch. The agent-browser Electron launcher rejected this bundle;
-that launcher result does not indicate an Electron runtime failure. Windows
-behavior and the interaction scenarios below still require manual verification.
+The renderer loads the bundled project-authored `starter.glb` robot with embedded
+animations. The opt-in pi Adapter is wired to Main; without valid configuration
+or development simulation, the initial Session snapshot is empty. No other Agent
+is connected. Tests exercise the actual pi extension over isolated local sockets,
+not a running pi TUI.
+
+See `../../docs/RENDERER-R4-ACCEPTANCE.md` for current automated checks, historical
+user/native evidence and pending acceptance. Windows, hardware GPU/power and the
+full native-window matrix remain unverified; a build or DOM test is not native
+acceptance.
 
 ## Development session simulation
 
@@ -58,16 +65,18 @@ For controlled WebGL checks, the dev-only `/test-support/visual.html` accepts
 `motion=idle|working|success|error`, `size=80|140|300|600`, the existing
 `theme=dark`, and `position=top-left|bottom-right`. It never connects to a user
 socket and does not simulate native movement. See `../../docs/RENDERER-R2-R3F.md`
-for lifecycle, dependency and validation evidence.
+for historical R2 lifecycle/dependency evidence and `../../patches/README.md` for
+the pinned Fiber initialization-error patch and its removal gate.
 
-Manual check: the robot should replace the purple placeholder; changing simulated
-Session states should change motion, and acknowledging all terminal bubbles should
+Manual check: changing simulated Session states should change motion, and
+acknowledging all terminal bubbles should
 return it to Idle. Missing optional clips fall back to Idle; missing required Idle
 is a loading error.
 
 ## Explicit pi bridge development configuration
 
-The desktop process starts the pi Adapter only when both variables are present:
+The desktop process starts the pi Adapter only with a nonempty endpoint and a
+16–256 character token (both trimmed):
 
 ```sh
 AGENT_PET_PI_ENDPOINT=/tmp/agent-pet-pi.sock \
@@ -75,7 +84,9 @@ AGENT_PET_PI_TOKEN=replace-with-a-random-16-plus-character-token \
 pnpm --filter @agent-pet/desktop dev
 ```
 
-Without both values no socket is opened. The current Adapter accepts messages but
-there is not yet a pi extension that emits them, so this configuration is a local
-integration seam for the next step, not a user installation instruction. The
-Adapter never starts or resumes pi and `openSession` remains unsupported.
+Without valid configuration no socket is opened. The read-only extension lives in
+`../../integrations/pi-extension/index.ts`; its README documents explicit user
+loading with the same endpoint/token. Nothing installs it or edits pi settings
+automatically. Do not run these commands or reload an active pi session on the
+user's behalf. The Adapter never starts or resumes pi and `openSession` remains
+unsupported.

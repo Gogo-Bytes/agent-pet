@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathToFileURL } from 'node:url';
 import type { SessionObservation } from '@agent-pet/domain';
 import type { OverlayLayout, Rect } from '../shared/overlay-layout.js';
 import { piObservation } from '../renderer/test-support/pi-fixtures.js';
@@ -15,14 +16,14 @@ const native = vi.hoisted(() => {
   return {
     handlers: new Map<string, (event: unknown, value?: unknown) => unknown>(),
     appEvents: new Map<string, () => void>(),
-    window, webContents, options: vi.fn(),
+    window, webContents, options: vi.fn(), isPackaged: true,
     area: { x: 0, y: 25, width: 1440, height: 875 }, cursor: { x: 0, y: 0 },
     publish: undefined as ((value: SessionObservation) => void) | undefined,
   };
 });
 vi.mock('electron', () => ({
   app: {
-    whenReady: () => Promise.resolve(), isPackaged: true,
+    whenReady: () => Promise.resolve(), get isPackaged() { return native.isPackaged; },
     on: (name: string, callback: () => void) => native.appEvents.set(name, callback),
     once: (name: string, callback: () => void) => native.appEvents.set(name, callback), quit: vi.fn(),
   },
@@ -71,13 +72,36 @@ function expectHit(hit: boolean) {
 beforeEach(async () => {
   vi.resetModules(); vi.clearAllMocks(); vi.useFakeTimers();
   native.handlers.clear(); native.appEvents.clear(); native.publish = undefined;
+  native.isPackaged = true;
   native.area = { x: 0, y: 25, width: 1440, height: 875 };
   native.cursor = { x: 0, y: 0 };
   await import('./index.js');
 });
-afterEach(() => { native.appEvents.get('will-quit')?.(); vi.useRealTimers(); });
+afterEach(() => { native.appEvents.get('will-quit')?.(); vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 describe('Main public IPC layout/hit baseline (mock Electron, not native acceptance)', () => {
+  it.each(['packaged', 'development'])('allows only exact entry reload in %s, not other navigation', async mode => {
+    if (mode === 'development') {
+      native.appEvents.get('will-quit')?.();
+      vi.resetModules(); vi.clearAllMocks();
+      native.isPackaged = false;
+      vi.stubEnv('ELECTRON_RENDERER_URL', 'http://localhost:5174');
+      await import('./index.js');
+    }
+    const entry = mode === 'development' ? 'http://localhost:5174/'
+      : pathToFileURL(native.window.loadFile.mock.calls[0]![0]).href;
+    const handler = native.webContents.on.mock.calls.find(([name]) => name === 'will-navigate')![1];
+    const preventDefault = vi.fn();
+    handler({ url: entry, preventDefault });
+    expect(preventDefault).not.toHaveBeenCalled();
+    for (const url of [entry + '?other=1', entry + '#other', entry + '/other',
+      'https://example.com/', 'file:///tmp/not-renderer.html', 'javascript:alert(1)', 'about:blank']) {
+      preventDefault.mockClear();
+      handler({ url, preventDefault });
+      expect(preventDefault).toHaveBeenCalledOnce();
+    }
+  });
+
   it('starts at 140 and clamps square resizing to 80..600', () => {
     expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ width: 140, height: 140, minWidth: 80, minHeight: 80 }));
     expect(latestLayout().anchor).toEqual({ x: 100, y: 300, width: 140, height: 140 });

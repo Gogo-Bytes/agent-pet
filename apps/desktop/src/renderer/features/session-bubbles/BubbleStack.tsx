@@ -4,7 +4,6 @@ import type { SessionState } from '@agent-pet/domain';
 import type { SessionRef } from '@agent-pet/adapter-core';
 import type { OverlayLayout } from '../../../shared/overlay-layout.js';
 import type { PetBridge } from '../../app/bridge/pet-store.js';
-import { visibleBubbles } from '../../bubble-model.js';
 import { rectStyle } from '../../shared/rect-style.js';
 
 import { motion, type MotionStyle } from 'motion/react';
@@ -20,7 +19,7 @@ export function BubbleStack({ bridge, state, layout, hidden, onOpen }: {
   const [expanded, setExpanded] = useState(false);
   const hovered = useRef(false);
   const deck = useRef<HTMLDivElement>(null);
-  const bubbles = [...visibleBubbles(state)].reverse();
+  const bubbles = [...state.bubbles].reverse();
   const present = !hidden && bubbles.length > 0;
   const wantExpanded = present && expanded;
   const [ack, setAck] = useState({ present: false, expanded: false });

@@ -15,6 +15,8 @@
 #define CHAIN_MAX 64
 #define READ_MAX (256 * 1024)
 #define HANDLE_MAX 256
+#define DESCRIPTOR_MAX 256
+#define WRAPPER_MAX 4096
 #define BASE_FLAGS (O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
 typedef struct { int fd; char name[256]; struct stat identity; } segment;
 typedef struct state state;
@@ -23,13 +25,14 @@ typedef struct cap {
   struct cap *next;
   struct cap *parent;
   napi_ref parent_ref, lease_ref;
-  int fd, kind; /* 1 directory, 2 regular reader, 3 writer lease */
+  int fd, kind, active; /* 1 directory, 2 regular reader, 3 writer lease */
   char name[256];
   struct stat identity;
   segment *chain;
   size_t depth;
 } cap;
-struct state { cap *head; size_t count; };
+/* Per environment, not process-wide. Failed closes retain their descriptor charge. */
+struct state { cap *head; size_t active, descriptors, wrappers; };
 static const napi_type_tag cap_tag = {0x678ae4a17da23094ULL, 0x93ead6cf18fe309aULL};
 
 static napi_value error(napi_env env, const char *code) {
@@ -91,14 +94,28 @@ static int bound(cap *c) {
   }
   return 1;
 }
-static int release(napi_env env, cap *c) {
+static int close_owned(cap *c, int fd) {
+  /* Never retry: the number may already have been reused. On error retain a
+     conservative budget charge until teardown, since release is uncertain. */
+  if (close(fd)) return 1;
+  if (c->state) c->state->descriptors--;
+  return 0;
+}
+static int release_descriptors(cap *c) {
   int failed=0;
-  if (c->chain) { for (size_t i=0; i<c->depth; i++) if (close(c->chain[i].fd)) failed=1; free(c->chain); c->chain=NULL; c->depth=0; }
-  else if (c->fd >= 0 && close(c->fd)) failed=1;
-  c->fd = -1;
-  if (c->lease_ref) { napi_delete_reference(env, c->lease_ref); c->lease_ref=NULL; }
-  /* Never retry a close on a potentially reused fd. Explicit callers get uncertainty.
-     parent_ref lives until finalization: closed descendants cannot dereference a freed parent. */
+  if (c->chain) {
+    /* c->fd aliases the final chain entry; close/count it only here. */
+    for (size_t i=0; i<c->depth; i++) if (close_owned(c,c->chain[i].fd)) failed=1;
+    free(c->chain); c->chain=NULL; c->depth=0;
+  } else if (c->fd>=0) failed=close_owned(c,c->fd);
+  c->fd=-1;
+  if (c->active) { if (c->state) c->state->active--; c->active=0; }
+  return failed;
+}
+static int release(napi_env env, cap *c) {
+  int failed=release_descriptors(c);
+  if (c->lease_ref) { napi_delete_reference(env,c->lease_ref); c->lease_ref=NULL; }
+  /* parent_ref lives until finalization: closed descendants cannot dereference a freed parent. */
   return failed;
 }
 static void finalize(napi_env env, void *data, void *hint) {
@@ -108,7 +125,7 @@ static void finalize(napi_env env, void *data, void *hint) {
   if (c->state) {
     cap **p=&c->state->head;
     while (*p && *p!=c) p=&(*p)->next;
-    if (*p) { *p=c->next; c->state->count--; }
+    if (*p) { *p=c->next; c->state->wrappers--; }
   }
   free(c);
 }
@@ -116,19 +133,33 @@ static void cleanup(void *data) {
   state *s=data;
   /* Process/environment teardown is the only implicit lease release. No JS GC lease release. */
   for (cap *c=s->head;c;c=c->next) {
-    if (c->chain) { for (size_t i=0;i<c->depth;i++) close(c->chain[i].fd); free(c->chain); c->chain=NULL; c->depth=0; }
-    else if (c->fd>=0) close(c->fd);
-    c->fd=-1; c->state=NULL;
+    release_descriptors(c); c->state=NULL;
   }
   free(s);
 }
+static cap *allocate(napi_env env, int kind) {
+  state *s;
+  if (napi_get_instance_data(env,(void **)&s)!=napi_ok) { error(env,"native-api"); return NULL; }
+  if (s->active>=HANDLE_MAX) { error(env,"handle-limit"); return NULL; }
+  if (s->wrappers>=WRAPPER_MAX) { error(env,"wrapper-limit"); return NULL; }
+  cap *c=calloc(1,sizeof(*c));
+  if (!c) { error(env,"native-memory"); return NULL; }
+  c->fd=-1; c->kind=kind; c->active=1; c->state=s;
+  c->next=s->head; s->head=c; s->active++; s->wrappers++;
+  return c;
+}
+static int open_owned(napi_env env, cap *c, int parent, const char *name, int flags) {
+  if (c->state->descriptors>=DESCRIPTOR_MAX) { error(env,"descriptor-limit"); return -1; }
+  int fd=parent<0?open(name,flags):openat(parent,name,flags);
+  if (fd<0) { error(env,"native-open"); return -1; }
+  c->state->descriptors++;
+  return fd;
+}
 static napi_value wrap(napi_env env, cap *c, napi_value parent) {
-  state *s; napi_value value;
-  if (napi_get_instance_data(env,(void **)&s)!=napi_ok || s->count>=HANDLE_MAX) { finalize(env,c,NULL); return error(env,"handle-limit"); }
+  napi_value value;
   if (napi_create_object(env,&value)!=napi_ok || napi_type_tag_object(env,value,&cap_tag)!=napi_ok ||
       (parent && napi_create_reference(env,parent,1,&c->parent_ref)!=napi_ok)) { finalize(env,c,NULL); return error(env,"native-api"); }
   if (napi_wrap(env,value,c,finalize,NULL,NULL)!=napi_ok) { finalize(env,c,NULL); return error(env,"native-api"); }
-  c->state=s; c->next=s->head; s->head=c; s->count++;
   if (c->kind==3 && napi_create_reference(env,value,1,&c->lease_ref)!=napi_ok) {
     release(env,c); return error(env,"native-api");
   }
@@ -139,18 +170,18 @@ static napi_value open_root(napi_env env, napi_callback_info info) {
   if (!args(env,info,1,argv) || !string_arg(env,argv[0],path,sizeof(path),0)) return NULL;
   size_t length=strlen(path);
   if (path[0]!='/' || (length>1 && path[length-1]=='/') || strstr(path,"//")) return error(env,"invalid-argument");
-  cap *c=calloc(1,sizeof(*c)); if (!c) return error(env,"native-memory");
-  c->fd=-1; c->kind=1; c->chain=calloc(CHAIN_MAX,sizeof(segment));
-  if (!c->chain) { free(c); return error(env,"native-memory"); }
-  int fd=open("/",BASE_FLAGS|O_DIRECTORY);
-  if (fd<0) { finalize(env,c,NULL); return error(env,"native-open"); }
+  cap *c=allocate(env,1); if (!c) return NULL;
+  c->chain=calloc(CHAIN_MAX,sizeof(segment));
+  if (!c->chain) { finalize(env,c,NULL); return error(env,"native-memory"); }
+  int fd=open_owned(env,c,-1,"/",BASE_FLAGS|O_DIRECTORY);
+  if (fd<0) { finalize(env,c,NULL); return NULL; }
   c->chain[0].fd=fd; c->depth=1;
   if (fstat(fd,&c->chain[0].identity)) { finalize(env,c,NULL); return error(env,"native-stat"); }
   char *save=NULL;
   for (char *part=strtok_r(path+1,"/",&save);part;part=strtok_r(NULL,"/",&save)) {
     if (!strcmp(part,".") || !strcmp(part,"..") || strlen(part)>255 || c->depth>=CHAIN_MAX) { finalize(env,c,NULL); return error(env,"invalid-argument"); }
-    fd=openat(c->chain[c->depth-1].fd,part,BASE_FLAGS|O_DIRECTORY);
-    if (fd<0) { finalize(env,c,NULL); return error(env,"native-open"); }
+    fd=open_owned(env,c,c->chain[c->depth-1].fd,part,BASE_FLAGS|O_DIRECTORY);
+    if (fd<0) { finalize(env,c,NULL); return NULL; }
     segment *seg=&c->chain[c->depth++]; seg->fd=fd; strcpy(seg->name,part);
     if (fstat(fd,&seg->identity)) { finalize(env,c,NULL); return error(env,"native-stat"); }
   }
@@ -169,12 +200,12 @@ static napi_value open_child(napi_env env, napi_callback_info info, int kind) {
   if (p->kind!=1 || !bound(p)) return error(env,"path-changed");
   if (kind==3) strcpy(name,"writer.lock");
   else if (!string_arg(env,argv[1],name,sizeof(name),1)) return NULL;
-  cap *c=calloc(1,sizeof(*c)); if (!c) return error(env,"native-memory");
-  c->fd=-1; c->kind=kind; c->parent=p; strcpy(c->name,name);
+  cap *c=allocate(env,kind); if (!c) return NULL;
+  c->parent=p; strcpy(c->name,name);
   /* Lease creation is intentionally excluded: caller must provision one stable, reviewed inode.
      Never recreate a missing lock on contention, restart or close. */
-  c->fd=openat(p->fd,name,BASE_FLAGS|(kind==1?O_DIRECTORY:0));
-  if (c->fd<0) { finalize(env,c,NULL); return error(env,"native-open"); }
+  c->fd=open_owned(env,c,p->fd,name,BASE_FLAGS|(kind==1?O_DIRECTORY:0));
+  if (c->fd<0) { finalize(env,c,NULL); return NULL; }
   if (fstat(c->fd,&c->identity) || (kind!=1 && !private_file(&c->identity)) ||
       (kind==1 && (!S_ISDIR(c->identity.st_mode) || c->identity.st_uid!=getuid() || (c->identity.st_mode&07777)!=0700)) ||
       (kind==3 && c->identity.st_size!=0) || !bound(c)) { finalize(env,c,NULL); return error(env,"unsafe-object"); }

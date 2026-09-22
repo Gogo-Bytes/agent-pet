@@ -8,6 +8,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, chmodSync, renameSync,
 import ts from 'typescript';
 import { spawnSync, fork } from 'node:child_process';
 import { once } from 'node:events';
+import { Worker } from 'node:worker_threads';
 const here = dirname(fileURLToPath(import.meta.url));
 const n = createRequire(import.meta.url)('./out/managed-darwin.node');
 const childPath = join(here, 'lease-child.mjs');
@@ -39,6 +40,16 @@ function contender(path) {
   const r = spawnSync(process.execPath, [childPath, path, 'attempt'], { timeout: 3000, maxBuffer: 4096, encoding: 'utf8' });
   assert.equal(r.error, undefined); assert.equal(r.status, 0, r.stderr); return r.stdout.trim();
 }
+for (const scenario of ['historical', 'descriptors', 'failed-opens', 'wrappers', 'lease', 'ordinary-gc']) {
+  test(`isolated native resource accounting: ${scenario}`, { timeout }, () => {
+    const r = spawnSync(process.execPath, ['--expose-gc', join(here, 'resource-child.mjs'), scenario],
+      { timeout: 5000, maxBuffer: 8192, encoding: 'utf8' });
+    assert.equal(r.error, undefined);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    console.log(r.stdout.trim());
+  });
+}
+
 test('actual native no-ACL APFS fixture, exact identities and fresh descriptor evidence', { timeout }, t => {
   const f = fixture(t), e = n.inspect(f.root), st = statSync(f.path, { bigint: true });
   assert.equal(e.filesystem, 'apfs'); assert.ok(e.mountFlags & 0x1000);
@@ -156,3 +167,28 @@ test('live unresponsive writer never stolen; SIGKILL releases lock but preserves
   const exit = once(child, 'exit'); child.kill('SIGKILL'); await exit;
   assert.equal(contender(f.path), 'acquired'); assert.ok(existsSync(join(f.path, 'owner'))); assert.equal(output, 0);
 });
+for (const termination of ['normal', 'terminate']) {
+  test(`Worker ${termination} environment teardown releases lease while host lives, without removing owner`, { timeout }, async t => {
+    const f = fixture(t); f.file('writer.lock', ''); mkdirSync(join(f.path, 'owner'), { mode: 0o700 });
+    const identity = statSync(join(f.path, 'writer.lock'), { bigint: true });
+    const worker = new Worker(new URL('./lease-worker.mjs', import.meta.url), {
+      workerData: f.path, stdout: true, stderr: true,
+    });
+    let output = 0;
+    for (const stream of [worker.stdout, worker.stderr]) stream.on('data', chunk => {
+      output += chunk.length; if (output > 4096) void worker.terminate();
+    });
+    t.after(() => worker.terminate());
+    const exit = once(worker, 'exit');
+    const [ready] = await Promise.race([once(worker, 'message'), exit.then(() => { throw new Error('worker exited before ready'); })]);
+    assert.equal(ready.state, 'held-root-closed');
+    assert.equal(contender(f.path), 'busy');
+    if (termination === 'normal') worker.postMessage('exit'); else await worker.terminate();
+    const [code] = await exit;
+    assert.equal(code, termination === 'normal' ? 0 : 1);
+    assert.equal(contender(f.path), 'acquired');
+    assert.equal(statSync(join(f.path, 'writer.lock'), { bigint: true }).ino, identity.ino);
+    assert.ok(existsSync(join(f.path, 'owner'))); assert.equal(output, 0);
+    assert.ok(n.inspect(f.root), 'host native environment remains usable');
+  });
+}

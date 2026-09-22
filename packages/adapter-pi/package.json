@@ -8,6 +8,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./protocol": "./src/protocol.ts"
+    "./protocol": "./src/protocol.ts",
+    "./managed": "./src/managed/index.ts"
   }
 }

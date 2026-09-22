@@ -24,6 +24,8 @@ export type PiBridgeMessage =
   | (Common & { type: 'session_info_changed'; sessionName?: string })
   | (Common & { type: 'heartbeat' });
 
+export type PiSessionMessage = PiBridgeMessage extends infer M ? M extends PiBridgeMessage ? Omit<M, 'token'> : never : never;
+
 export type ParseResult =
   | { ok: true; value: PiBridgeMessage }
   | { ok: false; reason: string };
@@ -41,6 +43,15 @@ const fieldsByType: Record<PiBridgeMessage['type'], readonly string[]> = {
 };
 
 export function parsePiBridgeMessage(input: unknown): ParseResult {
+  return parseMessage(input, true) as ParseResult;
+}
+
+/** Token-free payload validation for an already authenticated managed connection. */
+export function parsePiSessionMessage(input: unknown): { ok: true; value: PiSessionMessage } | { ok: false; reason: string } {
+  return parseMessage(input, false) as { ok: true; value: PiSessionMessage } | { ok: false; reason: string };
+}
+
+function parseMessage(input: unknown, withToken: boolean): ParseResult {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return { ok: false, reason: 'message-must-be-object' };
   }
@@ -50,11 +61,12 @@ export function parsePiBridgeMessage(input: unknown): ParseResult {
   }
   const type = value.type as PiBridgeMessage['type'];
   const allowed = new Set([...commonFields, ...fieldsByType[type]]);
+  if (!withToken) allowed.delete('token');
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) return { ok: false, reason: `unknown-field:${key}` };
   }
   if (value.schemaVersion !== 1) return { ok: false, reason: 'unsupported-schema-version' };
-  if (typeof value.token !== 'string' || value.token.length < 16 || value.token.length > 256) {
+  if (withToken && (typeof value.token !== 'string' || value.token.length < 16 || value.token.length > 256)) {
     return { ok: false, reason: 'invalid-token' };
   }
   if (typeof value.seq !== 'number' || !Number.isSafeInteger(value.seq) || value.seq < 1) {

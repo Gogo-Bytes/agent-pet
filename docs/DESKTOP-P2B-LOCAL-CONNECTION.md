@@ -6,6 +6,8 @@
 
 **P2b.2 的已验证 ACL/本地挂载/恢复后端及原生证据，是进入 P2c 的强制前置条件，不是发布脚注。** 此处不提供开启开关。内部文件可被同 uid 代码深层导入，并不构成同 uid 沙箱。
 
+后续 [P2b.2a 原生文件系统切片](DESKTOP-P2B2-FILESYSTEM-POLICY.md) 新增独立的 macOS ACL/挂载检查、descriptor-rooted 读取和现有 inode writer lease 原语；**尚未接入本页机制，不包含恢复，不代表 P2b.2 完成**。本页 P2b.1 行为、生产阻断及最终耐久性边界不变。
+
 ## 1. 已冻结的机制边界
 
 - 仅私有 Unix domain socket；无 TCP、TLS、证书、helper 或 Agent 控制。

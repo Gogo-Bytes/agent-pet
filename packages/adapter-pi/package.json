@@ -2,6 +2,10 @@
   "name": "@agent-pet/adapter-pi",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build:native:darwin": "node native/managed-darwin/build.mjs",
+    "test:native:darwin": "node --test --test-timeout=15000 native/managed-darwin/native-check.mjs"
+  },
   "dependencies": {
     "@agent-pet/adapter-core": "workspace:*",
     "@agent-pet/domain": "workspace:*"

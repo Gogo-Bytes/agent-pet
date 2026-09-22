@@ -40,7 +40,7 @@ The separate `@agent-pet/adapter-pi/managed` entry exports
 activity**. There is no production activation switch, Main wiring, installation
 control, extension deployment, or fallback to the development bridge.
 
-Internal `src/managed/` modules are exercised only against synthetic private
+The P2b.1 service/store/client modules are exercised only against synthetic private
 roots with a test-only ACL/mount policy. They implement per-target credentials,
 authoritative pending/enabled/revoked state, durable publication, recovery
 barriers, strict pre-session auth/ack, discovery, bounded real UDS transport and
@@ -60,3 +60,24 @@ unresolved, not disguised as safe owned cleanup. See
 Tests: `pnpm exec vitest run packages/adapter-pi/src/managed`. These use temporary
 filesystem targets/UDS only and include a deliberately killed test subprocess.
 No real pi installation, configuration or process is used.
+
+### P2b.2a native primitives (not integrated; not P2b.2 completion)
+
+Internal `native/managed-darwin/` and `src/managed/{native-darwin,darwin-policy}.ts`
+add a dependency-free C Node-API inspection/rooted-read/existing-inode writer-lease
+slice with real temporary APFS/ACL/lock/crash tests. There is no production export,
+Main wiring, native publication backend or recovery API. P2b.1 pathname mutations
+are unchanged, not newly secured by these primitives. Recovery consequences have
+not received owner approval; cross-user, Electron/packaging, namespace, durability
+and consent gates remain mandatory. See [the exact boundaries and evidence](../../docs/DESKTOP-P2B2-FILESYSTEM-POLICY.md).
+
+Explicit developer-only commands (existing Darwin compiler/SDK/matching installed
+Node headers required; no downloads or runtime compilation):
+
+```sh
+pnpm --filter @agent-pet/adapter-pi build:native:darwin
+pnpm --filter @agent-pet/adapter-pi test:native:darwin
+```
+
+The native suite is separate from `pnpm test`; generated binaries stay in ignored
+`out/`. The test-only ACL fixture writer is not a shipped product helper.

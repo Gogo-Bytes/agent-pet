@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Cat, Cable, Settings } from 'lucide-react';
 import type { ManagementState } from '../../shared/preferences.js';
 
@@ -7,18 +7,53 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Window[
   const [state, setState] = useState<ManagementState | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sizeDraft, setSizeDraft] = useState<number | null>(null);
+  const [sizeSaving, setSizeSaving] = useState(false);
+  const pendingSize = useRef<number | null>(null);
+  const sizeRunning = useRef(false);
+  const mounted = useRef(false);
+  const pushRevision = useRef(0);
   useEffect(() => {
+    mounted.current = true;
     let active = true;
     let pushed = false;
-    const off = bridge.subscribe(value => { pushed = true; if (active) setState(value); });
+    const off = bridge.subscribe(value => { pushed = true; if (active) { pushRevision.current++; setState(value); } });
     void bridge.getState().then(value => { if (active && !pushed) setState(value); }, () => { if (active) setError('无法读取应用设置，请重试。'); });
-    return () => { active = false; off(); };
+    return () => { active = false; mounted.current = false; pendingSize.current = null; off(); };
   }, [bridge]);
   async function change(action: () => Promise<ManagementState>) {
+    if (sizeRunning.current) return;
     setBusy(true); setError('');
-    try { setState(await action()); }
+    const revision = pushRevision.current;
+    try { const confirmed = await action(); if (mounted.current && pushRevision.current === revision) setState(confirmed); }
     catch { setError('操作失败，未确认更改。请重试。'); }
     finally { setBusy(false); }
+  }
+  async function resize(petSize: number) {
+    if (busy && !sizeRunning.current) return;
+    setSizeDraft(petSize);
+    pendingSize.current = petSize;
+    if (sizeRunning.current) return;
+    sizeRunning.current = true;
+    setSizeSaving(true); setBusy(true); setError('');
+    try {
+      // Keep the native range enabled; at most one write and one latest intent exist.
+      while (mounted.current && pendingSize.current !== null) {
+        const next = pendingSize.current;
+        pendingSize.current = null;
+        const revision = pushRevision.current;
+        const confirmed = await bridge.updatePreferences({ petSize: next });
+        if (!mounted.current) return;
+        if (pushRevision.current === revision) setState(confirmed);
+        if (confirmed.preferenceError) { pendingSize.current = null; break; }
+      }
+    } catch {
+      pendingSize.current = null;
+      if (mounted.current) setError('操作失败，未确认更改。请重试。');
+    } finally {
+      sizeRunning.current = false;
+      if (mounted.current) { setSizeDraft(null); setSizeSaving(false); setBusy(false); }
+    }
   }
   return <div className="management-shell">
     <aside><h1>Agent Pet</h1><nav aria-label="管理导航">
@@ -40,10 +75,11 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Window[
       </>}
       {page === '宠物' && <>
         <section><h3>当前宠物 · starter.glb</h3><p>沿用应用内置模型。当前没有其他形象或模型导入功能。</p><p className="muted">直接在桌面查看宠物；管理窗口不运行第二个 3D 预览。</p></section>
-        <section><h3>显示与尺寸</h3>{state ? <fieldset disabled={busy}>
-          <label className="toggle"><input type="checkbox" checked={state.preferences.petVisible} onChange={event => { void change(() => bridge.updatePreferences({ petVisible: event.target.checked })); }} />显示宠物</label>
-          <label className="size-label">宠物大小 <output>{state.preferences.petSize} DIP</output>
-            <input aria-label="宠物大小" type="range" min="80" max="600" step="1" value={state.preferences.petSize} onChange={event => { const petSize = Number(event.target.value); void change(() => bridge.updatePreferences({ petSize })); }} />
+        <section><h3>显示与尺寸</h3>{state ? <fieldset>
+          <label className="toggle"><input type="checkbox" disabled={busy} checked={state.preferences.petVisible} onChange={event => { void change(() => bridge.updatePreferences({ petVisible: event.target.checked })); }} />显示宠物</label>
+          <label className="size-label">宠物大小 <output>{sizeDraft ?? state.preferences.petSize} DIP</output>
+            <input aria-label="宠物大小" type="range" min="80" max="600" step="1" disabled={busy && !sizeSaving} value={sizeDraft ?? state.preferences.petSize} onChange={event => { void resize(Number(event.target.value)); }} />
+            {sizeSaving && <span role="status">正在保存尺寸…</span>}
           </label><p className="muted">与宠物工具栏缩放同步保存；较小屏幕会按可用空间限制实际尺寸。</p>
         </fieldset> : <p>正在读取偏好…</p>}</section>
       </>}

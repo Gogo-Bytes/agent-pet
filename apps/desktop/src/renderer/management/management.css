@@ -26,3 +26,7 @@ fieldset { padding: 0; border: 0; margin: 0; min-width: 0; }
 .size-label output { float: right; }
 input[type=range] { display: block; width: 100%; margin: 16px 0; }
 @media (max-width: 660px) { .management-shell { grid-template-columns: 1fr; } aside { padding: 14px; } h1 { margin-bottom: 10px; } nav { grid-template-columns: repeat(3, 1fr); } .sidebar-note { display: none; } main { padding: 20px; } }
+
+.preflight-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.preflight-candidate { display: flex; gap: 8px; margin: 12px 0; overflow-wrap: anywhere; }
+.preflight-path { overflow-wrap: anywhere; }

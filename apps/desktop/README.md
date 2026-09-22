@@ -30,6 +30,35 @@ user/native evidence and pending acceptance. Windows, hardware GPU/power and the
 full native-window matrix remain unverified; a build or DOM test is not native
 acceptance.
 
+## pi detection and read-only preflight (P2a)
+
+The management connection page now offers explicit detect/rescan, a Main-owned
+installation-package directory picker, a separate configuration-directory picker,
+and an explicit **inspect selected target** action. Selecting a directory alone
+does not read its settings. The default `~/.pi/agent` is only a candidate, not a
+claim about the active terminal's configuration. Nothing is installed or changed.
+
+Detection probes at most 32 GUI PATH entries plus three fixed bin locations;
+it never runs pi, wrappers or shell profiles, scans processes/sessions, or calls
+pi's package resolver. Only standard `@earendil-works/pi-coding-agent` **0.85.1**
+package metadata is recognized as verified; other versions remain unverified.
+This is metadata identification, not signature validation or proof of a running
+Agent. Manual installation selection expects the package directory containing
+`package.json`, not the agentDir.
+
+Read-only inspection reports root-entry/manifest and same-name conflicts, unsafe
+paths/files and bounded-read failures. Existing ignore files and nonempty or
+unsupported settings extension/package rules are **unknown**, not approximately
+parsed into a green result. No raw settings or errors cross the narrow management
+IPC. Cancelled or stale requests cannot replace a newer target.
+
+There is no installer, credential storage, connection server or online claim on
+this page. Existing opt-in development pi behavior below is unchanged. See
+`../../docs/DESKTOP-P2A-PREFLIGHT.md` for exact budgets, automated evidence and
+remaining native picker, ACL, filesystem-race and release gaps. Native dialogs
+have not been accepted through mocks. The accepted P1 Dock recovery remains;
+the separate top menu-bar issue is still open.
+
 ## Development session simulation
 
 Use the application menu `模拟 Session（开发专用）` to create three working sessions

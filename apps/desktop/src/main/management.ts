@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
 import { join } from 'node:path';
 import { PreferenceStore } from './preferences.js';
+import { PiPreflight } from './pi-preflight.js';
 import { assertWindowSender, loadTrustedEntry } from './window-trust.js';
 import type { ManagementState, PreferencePatch, Preferences } from '../shared/preferences.js';
 
@@ -12,6 +13,16 @@ export function createManagement(options: {
   const preferences = new PreferenceStore(join(app.getPath('userData'), 'preferences.json'));
   let window: BrowserWindow | undefined;
   let windowRequested = false;
+  const preflight = new PiPreflight({ home: app.getPath('home'), guiPath: process.env.PATH ?? '',
+    async pick(kind) {
+      if (!window || window.isDestroyed() || quitting) return null;
+      const result = await dialog.showOpenDialog(window, {
+        title: kind === 'installation' ? '选择 pi 安装包目录（包含 package.json）' : '选择 pi 配置目录（agentDir，不是项目或 sessions 目录）',
+        properties: ['openDirectory', 'dontAddToRecent'],
+      });
+      return result.canceled ? null : result.filePaths[0] ?? null;
+    },
+  });
   let tray: Tray;
   let quitting = false;
   let stopped = false;
@@ -107,6 +118,24 @@ export function createManagement(options: {
     }
     return publish();
   });
+  const preflightHandlers = {
+    'management:pi-state': () => preflight.snapshot(),
+    'management:pi-detect': () => preflight.detect(),
+    'management:pi-choose-installation': () => preflight.choose('installation'),
+    'management:pi-choose-target': () => preflight.choose('target'),
+    'management:pi-default-target': () => preflight.useDefaultTarget(),
+    'management:pi-inspect': () => preflight.inspect(),
+  };
+  for (const [channel, handle] of Object.entries(preflightHandlers)) ipcMain.handle(channel, (event, ...args: unknown[]) => {
+    assertWindowSender(window, event);
+    if (quitting || args.length) throw new Error('Invalid preflight request');
+    return handle();
+  });
+  ipcMain.handle('management:pi-select-installation', (event, ...args: unknown[]) => {
+    assertWindowSender(window, event);
+    if (quitting || args.length !== 1) throw new Error('Invalid preflight request');
+    return preflight.selectInstallation(args[0]);
+  });
   app.on('activate', open);
   app.on('second-instance', open);
   app.on('window-all-closed', () => { /* Tray remains the recovery entry on all platforms. */ });
@@ -115,6 +144,7 @@ export function createManagement(options: {
     event.preventDefault();
     if (quitting) return;
     quitting = true;
+    preflight.close();
     void options.stop().catch(() => { console.warn('Adapter shutdown failed'); }).finally(() => {
       stopped = true; tray.destroy();
       // Let native cancellation of the first before-quit unwind before retrying.

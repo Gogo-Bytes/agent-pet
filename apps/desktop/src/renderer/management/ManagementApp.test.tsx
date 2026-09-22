@@ -2,6 +2,8 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { initialPreflight, preflightBridge } from './test-preflight.js';
+import type { PreflightState } from '../../shared/pi-preflight.js';
 import { ManagementApp } from './ManagementApp.js';
 import { defaultPreferences, type ManagementState, type PreferencePatch } from '../../shared/preferences.js';
 
@@ -11,6 +13,7 @@ function createBridge(supported = false) {
   let listener: ((state: ManagementState) => void) | undefined;
   const off = vi.fn(() => { listener = undefined; });
   const bridge = {
+    piPreflight: preflightBridge(),
     getState: vi.fn(async () => state),
     updatePreferences: vi.fn(async (patch: PreferencePatch) => { state = { ...state, preferences: { ...state.preferences, ...patch } }; return state; }),
     setLogin: vi.fn(async (enabled: boolean) => { state = { ...state, login: { ...state.login, enabled } }; return state; }),
@@ -20,15 +23,34 @@ function createBridge(supported = false) {
 }
 
 describe('ManagementApp real DOM controls', () => {
-  it('opens on honest P1 connection information with no unavailable actions or second Canvas', async () => {
+  it('opens on honest P2a connection information with no installation actions or second Canvas', async () => {
     const { bridge } = createBridge();
     const view = render(<ManagementApp bridge={bridge} />);
     await act(async () => {});
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Agent 连接');
-    expect(screen.getByText('一键接入尚未实现 · P2 计划')).toBeTruthy();
-    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Agent 连接', '宠物', '设置']);
+    expect(screen.getByText('P2a · 检测与只读预检')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '安装' })).toBeNull();
+    expect(bridge.piPreflight.detect).not.toHaveBeenCalled(); expect(bridge.piPreflight.inspect).not.toHaveBeenCalled();
     expect(view.container.querySelector('canvas')).toBeNull();
     expect(bridge.updatePreferences).not.toHaveBeenCalled(); expect(bridge.setLogin).not.toHaveBeenCalled();
+  });
+  it.each(['detect', 'inspect'] as const)('retains pending %s completion across page navigation', async operation => {
+    const { bridge } = createBridge();
+    let finish!: (state: PreflightState) => void;
+    bridge.piPreflight[operation].mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const user = userEvent.setup();
+    render(<ManagementApp bridge={bridge} />);
+    await act(async () => {});
+    await user.click(screen.getByRole('button', { name: operation === 'detect' ? '检测 / 重新扫描' : '检查所选目标（只读）' }));
+    await user.click(screen.getByRole('button', { name: '宠物' }));
+    expect(screen.queryByRole('region', { name: 'pi 只读预检' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Agent 连接' }));
+    expect(screen.getByText('正在处理只读请求…')).toBeTruthy();
+    await act(async () => finish({ ...initialPreflight, revision: 1, scan: 'complete',
+      inspection: { target: initialPreflight.target, findings: ['existing-extension'] } }));
+    expect(screen.getByText('已有 agent-pet.ts；所有权未知，不能覆盖或认定已安装。')).toBeTruthy();
+    expect(screen.queryByText('正在处理只读请求…')).toBeNull();
+    expect(bridge.piPreflight[operation]).toHaveBeenCalledOnce();
   });
   it('navigates by keyboard, persists visibility/size from DOM events and receives toolbar/tray changes', async () => {
     const user = userEvent.setup();

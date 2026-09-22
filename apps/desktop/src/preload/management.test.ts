@@ -13,9 +13,19 @@ describe('management preload capability boundary', () => {
     await import('./management.js');
     expect(native.expose).toHaveBeenCalledExactlyOnceWith('management', expect.any(Object));
     const api = native.expose.mock.calls[0]![1] as Window['management'];
-    expect(Object.keys(api).sort()).toEqual(['getState', 'setLogin', 'subscribe', 'updatePreferences']);
+    expect(Object.keys(api).sort()).toEqual(['getState', 'piPreflight', 'setLogin', 'subscribe', 'updatePreferences']);
     await api.getState(); await api.updatePreferences({ petSize: 200 }); await api.setLogin(true);
     expect(native.invoke.mock.calls).toEqual([['management:get-state'], ['management:update-preferences', { petSize: 200 }], ['management:set-login', true]]);
+    expect(Object.keys(api.piPreflight).sort()).toEqual(['chooseInstallation', 'chooseTarget', 'detect', 'getState', 'inspect', 'selectInstallation', 'useDefaultTarget']);
+    native.invoke.mockClear();
+    await api.piPreflight.getState(); await api.piPreflight.detect(); await api.piPreflight.chooseInstallation();
+    await api.piPreflight.selectInstallation('opaque-id'); await api.piPreflight.chooseTarget();
+    await api.piPreflight.useDefaultTarget(); await api.piPreflight.inspect();
+    expect(native.invoke.mock.calls).toEqual([
+      ['management:pi-state'], ['management:pi-detect'], ['management:pi-choose-installation'],
+      ['management:pi-select-installation', 'opaque-id'], ['management:pi-choose-target'],
+      ['management:pi-default-target'], ['management:pi-inspect'],
+    ]);
     const callback = vi.fn(); const off = api.subscribe(callback);
     const state = { preferences: defaultPreferences, preferenceError: null, login: { supported: false, enabled: false, error: null } };
     events.emit('management:state', { secretEvent: true }, state);

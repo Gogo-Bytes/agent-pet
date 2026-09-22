@@ -20,6 +20,7 @@ const native = vi.hoisted(() => {
     handlers: new Map<string, (event: unknown, value?: unknown) => unknown>(),
     appEvents: new Map<string, (event?: { preventDefault(): void }) => void>(),
     path: '', lock: true, quit: vi.fn(), stop: vi.fn(), start: vi.fn(), loginSet: vi.fn(), loginGet: vi.fn(() => ({ openAtLogin: false })),
+    pick: vi.fn(async () => ({ canceled: true, filePaths: [] as string[] })),
     management: undefined as typeof window | undefined,
     tray: { setContextMenu: vi.fn(), setToolTip: vi.fn(), on: vi.fn(), destroy: vi.fn() },
     window, webContents, options: vi.fn(), isPackaged: true,
@@ -35,6 +36,7 @@ vi.mock('electron', () => ({
     on: (name: string, callback: (event?: { preventDefault(): void }) => void) => native.appEvents.set(name, callback),
     once: (name: string, callback: (event?: { preventDefault(): void }) => void) => native.appEvents.set(name, callback), quit: native.quit,
   },
+  dialog: { showOpenDialog: native.pick },
   BrowserWindow: class {
     constructor(options: unknown) {
       native.options(options);
@@ -104,6 +106,29 @@ beforeEach(async () => {
 afterEach(() => { native.appEvents.get('will-quit')?.(); vi.useRealTimers(); vi.unstubAllEnvs(); rmSync(native.path, { recursive: true, force: true }); });
 
 describe('Main public IPC layout/hit baseline (mock Electron, not native acceptance)', () => {
+  it('restricts every preflight capability to the management main frame, rejects path payloads and owns pickers', async () => {
+    const management = native.management!;
+    const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
+    const channels = ['state', 'detect', 'choose-installation', 'choose-target', 'default-target', 'inspect', 'select-installation'];
+    for (const action of channels) {
+      const handler = native.handlers.get(`management:pi-${action}`)!;
+      for (const event of [
+        { sender: native.webContents, senderFrame: native.webContents.mainFrame },
+        { sender: management.webContents, senderFrame: { url: management.webContents.mainFrame.url } },
+        { sender: management.webContents, senderFrame: null },
+      ]) expect(() => handler(event)).toThrow('Untrusted renderer');
+      const original = management.webContents.mainFrame.url;
+      management.webContents.mainFrame.url = 'https://untrusted.invalid/';
+      expect(() => handler(trusted)).toThrow('Untrusted renderer');
+      management.webContents.mainFrame.url = original;
+      expect(() => handler(trusted, '/arbitrary/path')).toThrow();
+    }
+    const snapshot = native.handlers.get('management:pi-state')!(trusted) as { target: { path: string } };
+    expect(snapshot.target.path).toBe(join(native.path, '.pi/agent'));
+    const cancelled = await native.handlers.get('management:pi-choose-target')!(trusted) as { notice: string; target: unknown };
+    expect(cancelled.notice).toBe('cancelled'); expect(cancelled.target).toEqual(snapshot.target);
+    expect(native.pick).toHaveBeenCalledWith(management, expect.objectContaining({ properties: ['openDirectory', 'dontAddToRecent'] }));
+  });
   it.each(['packaged', 'development'])('allows only exact entry reload in %s, not other navigation', async mode => {
     if (mode === 'development') {
       native.appEvents.get('will-quit')?.();

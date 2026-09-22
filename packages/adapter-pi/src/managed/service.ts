@@ -7,6 +7,8 @@ import { AuthStore } from './auth-store.js';
 import { fail, missing, sanitized } from './errors.js';
 import { Bucket, Frames, frameBudget, lowerLimits, sendFrame, type Limits } from './frames.js';
 import { PrivateFiles, type FaultHook, type OwnedFile } from './private-files.js';
+import { NodeFilesPort } from './node-files-port.js';
+import type { FileReceipt } from './files-port.js';
 import { sameIdentity, type FilesystemPolicy, type Roots } from './path-policy.js';
 import { ackFor, opaqueId, parseAuth, parseEvent, PROTOCOL, type AuthHello } from './protocol.js';
 import { DISCOVERY_BYTES, endpoint, type Discovery } from './discovery.js';
@@ -33,8 +35,9 @@ export async function openManagedCore(options: CoreOptions): Promise<ManagedCore
     await files.directory(scope.roots.runtimeRoot, 'ownership');
     const claim = await files.createDirectory(join(scope.roots.storageRoot, 'owner'), 'ownership');
     // A failed open deliberately retains the durable claim. Never guess whether IO committed.
-    const store = await AuthStore.open(files, options.initialize);
-    return new ManagedCore(files, claim, store, options.publish, lowerLimits(options.limits));
+    const storage = new NodeFilesPort(files);
+    const store = await AuthStore.open(storage, options.initialize);
+    return new ManagedCore(files, storage, claim, store, options.publish, lowerLimits(options.limits));
   } catch (error) { throw sanitized(error); }
 }
 
@@ -48,14 +51,14 @@ export class ManagedCore {
   private unauthenticated = 0;
   private instance: OwnedFile | undefined;
   private socketIdentity: OwnedFile | undefined;
-  private discovery: OwnedFile | undefined;
+  private discovery: FileReceipt | undefined;
   private stopping: Promise<void> | undefined;
   private starting: Promise<Discovery> | undefined;
   private stopped = false;
   private failed = false;
   private listening = false;
   private ready = false;
-  constructor(private readonly files: PrivateFiles, private readonly claim: OwnedFile,
+  constructor(private readonly files: PrivateFiles, private readonly storage: NodeFilesPort, private readonly claim: OwnedFile,
     readonly store: AuthStore, private readonly publish: (observation: SessionObservation) => void,
     private readonly limits: Limits) {
     this.global = frameBudget(limits);
@@ -96,7 +99,7 @@ export class ManagedCore {
       const discovery: Discovery = { schema: 1, protocolVersion: PROTOCOL, authSetId: this.store.snapshot().authSetId,
         generation: this.generation, instance: instanceId, credentialLayout: 1 };
       // Stable discovery from a crash is not silently adopted or overwritten.
-      this.discovery = await this.files.publish(join(this.files.scope.roots.storageRoot, 'discovery.json'), discovery, DISCOVERY_BYTES, 'discovery-write');
+      this.discovery = await this.storage.publish(join(this.files.scope.roots.storageRoot, 'discovery.json'), discovery, DISCOVERY_BYTES, 'discovery-write');
       this.ready = !this.stopped && !this.store.poisoned; return discovery;
     } catch (error) { this.failed = true; this.ready = false; this.destroyPeers(); throw sanitized(error); }
   }
@@ -161,7 +164,7 @@ export class ManagedCore {
     // Durable preexisting recovery barrier MUST survive uncertain outcomes, including ordinary stop.
     if (this.store.poisoned || this.failed) fail('outcome-uncertain');
     try {
-      if (this.discovery) await this.files.remove(this.discovery);
+      if (this.discovery) await this.storage.remove(this.discovery);
       if (this.instance) await this.files.remove(this.instance, true);
       await this.files.remove(this.claim, true);
     } catch (error) { this.failed = true; throw sanitized(error); }

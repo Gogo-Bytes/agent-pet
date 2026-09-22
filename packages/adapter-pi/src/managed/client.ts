@@ -2,6 +2,7 @@ import net from 'node:net';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { PrivateFiles } from './private-files.js';
+import { NodeFilesPort } from './node-files-port.js';
 import { sameIdentity, type FilesystemPolicy, type Roots } from './path-policy.js';
 import { CREDENTIAL_BYTES, credentialPath, parseCredential, parseRegistry, STORE_BYTES } from './auth-store.js';
 import { endpoint, readDiscovery } from './discovery.js';
@@ -17,14 +18,15 @@ export async function connectManagedCore(options: ClientOptions & { policy: File
   try {
     const scope = await options.policy.openRoots(options.roots);
     const files = new PrivateFiles(scope);
+    const storage = new NodeFilesPort(files);
     if (!validId(options.authSetId) || !validId(options.targetId)) fail('unauthorized');
     const limits = lowerLimits(options.limits);
-    const { discovery } = await readDiscovery(files, options.authSetId);
-    const { value } = await files.read(join(scope.roots.storageRoot, 'authorization.json'), STORE_BYTES, 'authority-read');
+    const { discovery } = await readDiscovery(storage, options.authSetId);
+    const { value } = await storage.read(join(scope.roots.storageRoot, 'authorization.json'), STORE_BYTES, 'authority-read');
     const registry = parseRegistry(value);
     const target = registry.targets.find(t => t.targetId === options.targetId);
     if (registry.authSetId !== options.authSetId || !target || target.state !== 'enabled') fail('unauthorized');
-    const credentialFile = await files.read(credentialPath(scope.roots.storageRoot, target.targetId, target.epoch), CREDENTIAL_BYTES, 'credential-read');
+    const credentialFile = await storage.read(credentialPath(scope.roots.storageRoot, target.targetId, target.epoch), CREDENTIAL_BYTES, 'credential-read');
     const credential = parseCredential(credentialFile.value, options.authSetId, options.targetId);
     if (credential.epoch !== target.epoch || createHash('sha256').update(Buffer.from(credential.token, 'hex')).digest('hex') !== target.digest) fail('unauthorized');
     const path = endpoint(scope.roots.runtimeRoot, discovery.instance);

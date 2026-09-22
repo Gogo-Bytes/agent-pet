@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Cat, Cable, Settings } from 'lucide-react';
+import { Box, Button, Callout, Card, Checkbox, Flex, Grid, Heading, TabNav, Text, Theme } from '@radix-ui/themes';
 import type { ManagementState } from '../../shared/preferences.js';
 import { PiPreflightPanel } from './PiPreflightPanel.js';
 import { PetSizeControl } from './PetSizeControl.js';
@@ -36,39 +37,77 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Window[
     // Main publishes even failed writes before replying; still stop failed commit queues.
     return confirmed.preferenceError;
   }
-  return <div className="management-shell">
-    <aside><h1>Agent Pet</h1><nav aria-label="管理导航">
-      {([['Agent 连接', Cable], ['宠物', Cat], ['设置', Settings]] as const).map(([name, Icon]) =>
-        <button key={name} aria-current={page === name ? 'page' : undefined} onClick={() => setPage(name)}><Icon size={19} aria-hidden="true" />{name}</button>)}
-    </nav><p className="sidebar-note">macOS 预览版 · P2a</p></aside>
-    <main><h2>{page}</h2>
-      <p className="muted">关闭此窗口后，宠物与已配置的开发桥接继续运行。可从菜单栏重新打开；退出请使用“退出 Agent Pet”。</p>
-      {error && <p role="alert">{error}</p>}
-      {!state && error && <button disabled={busy || sizeSaving} onClick={() => { void change(() => bridge.getState()); }}>重新读取设置</button>}
-      {page !== '宠物' && state?.preferenceError && <p role="alert">{state.preferenceError}</p>}
-      {/* Retain in-flight preflight ownership while another page is presented. */}
-      <div hidden={page !== 'Agent 连接'}>
-        <section><h3>让宠物关注你的工作</h3><p>只读观察 Session 名称和状态，不读取对话正文，也不控制 Agent。</p></section>
-        <PiPreflightPanel api={bridge.piPreflight} />
-        <section><h3>其他 Agent</h3><p>Codex 和 Claude Code 接入尚不支持。</p></section>
-      </div>
-      <div hidden={page !== '宠物'}>
-        <section><h3>当前宠物 · starter.glb</h3><p>沿用应用内置模型。当前没有其他形象或模型导入功能。</p><p className="muted">直接在桌面查看宠物；管理窗口不运行第二个 3D 预览。</p></section>
-        <section><h3>显示与尺寸</h3>{state ? <fieldset>
-          <label className="toggle"><input type="checkbox" disabled={busy || sizeSaving} checked={state.preferences.petVisible} onChange={event => { void change(() => bridge.updatePreferences({ petVisible: event.target.checked })); }} />显示宠物</label>
-          <PetSizeControl confirmedSize={state.preferences.petSize} preferenceError={state.preferenceError}
-            disabled={busy} visible={page === '宠物'} save={resize} onSavingChange={setSizeSaving} />
-        </fieldset> : <p>正在读取偏好…</p>}</section>
-      </div>
-      {page === '设置' && <>
-        <section><h3>启动</h3>{state ? <>
-          <label className="toggle"><input type="checkbox" disabled={busy || sizeSaving || !state.login.supported} checked={state.login.enabled} onChange={event => { void change(() => bridge.setLogin(event.target.checked)); }} />登录时启动 Agent Pet</label>
-          <p>默认关闭，不会在启动应用时自动注册登录项。</p>
-          {!state.login.supported && <p className="muted">仅打包后的 macOS 应用支持。开发模式不会将 Electron 加入登录项。</p>}
-          {state.login.error && <p role="alert">{state.login.error}</p>}
-        </> : <p>正在读取设置…</p>}</section>
-        <section><h3>关于与数据</h3><p>P2a 只读预检，非一键接入或正式发布验收。</p><p>偏好仅保存宠物显隐与大小。Session 未读状态不会跨重启保存。登录项以系统实际状态为准。</p><p>所有窗口隐藏后，仍可通过菜单栏、Dock 或重新打开应用找回管理窗口。</p></section>
-      </>}
-    </main>
-  </div>;
+  return <Theme appearance="light" accentColor="indigo" grayColor="slate" radius="large">
+    <Grid className="management-shell">
+      <Box asChild p="4" className="management-sidebar"><aside>
+        <Heading as="h1" size="5" mb="5">Agent Pet</Heading>
+        <TabNav.Root aria-label="管理导航" className="management-navigation">
+          {([['Agent 连接', Cable], ['宠物', Cat], ['设置', Settings]] as const).map(([name, Icon]) =>
+            <TabNav.Link key={name} active={page === name} asChild>
+              <button type="button" aria-label={name} onClick={() => setPage(name)}>
+                <Flex as="span" align="center" gap="2"><Icon size={19} aria-hidden="true" />{name}</Flex>
+              </button>
+            </TabNav.Link>)}
+        </TabNav.Root>
+        <Text as="p" color="gray" size="2" mt="5" className="sidebar-note">macOS 预览版 · P2a</Text>
+      </aside></Box>
+      <Box asChild p={{ initial: '4', sm: '6' }} className="management-main"><main>
+        <Heading as="h2" size="6" mb="3">{page}</Heading>
+        <Text as="p" color="gray" size="2" mb="4">关闭此窗口后，宠物与已配置的开发桥接继续运行。可从菜单栏重新打开；退出请使用“退出 Agent Pet”。</Text>
+        {error && <Callout.Root role="alert" color="red" mb="3"><Callout.Text>{error}</Callout.Text></Callout.Root>}
+        {!state && error && <Button disabled={busy || sizeSaving} onClick={() => { void change(() => bridge.getState()); }}>重新读取设置</Button>}
+        {page !== '宠物' && state?.preferenceError && <Callout.Root role="alert" color="red" mb="3"><Callout.Text>{state.preferenceError}</Callout.Text></Callout.Root>}
+        {/* Plain hidden/inert boundaries cannot be overridden by Themes layout display rules.
+            Keep connection and pet request owners mounted across navigation. */}
+        <div hidden={page !== 'Agent 连接'} inert={page !== 'Agent 连接'}>
+          <Flex direction="column" gap="4">
+            <Card asChild size="3"><section>
+              <Heading as="h3" size="4" mb="3">让宠物关注你的工作</Heading>
+              <Text as="p">只读观察 Session 名称和状态，不读取对话正文，也不控制 Agent。</Text>
+            </section></Card>
+            <PiPreflightPanel api={bridge.piPreflight} />
+            <Card asChild size="3"><section><Heading as="h3" size="4" mb="3">其他 Agent</Heading><Text as="p">Codex 和 Claude Code 接入尚不支持。</Text></section></Card>
+          </Flex>
+        </div>
+        <div hidden={page !== '宠物'} inert={page !== '宠物'}>
+          <Flex direction="column" gap="4">
+            <Card asChild size="3"><section>
+              <Heading as="h3" size="4" mb="3">当前宠物 · starter.glb</Heading>
+              <Text as="p" mb="3">沿用应用内置模型。当前没有其他形象或模型导入功能。</Text>
+              <Text as="p" color="gray" size="2">直接在桌面查看宠物；管理窗口不运行第二个 3D 预览。</Text>
+            </section></Card>
+            <Card asChild size="3"><section>
+              <Heading as="h3" size="4" mb="3">显示与尺寸</Heading>
+              {state ? <Box>
+                <Text as="label"><Flex as="span" align="center" gap="2">
+                  <Checkbox disabled={busy || sizeSaving} checked={state.preferences.petVisible} onCheckedChange={checked => { void change(() => bridge.updatePreferences({ petVisible: checked === true })); }} />显示宠物
+                </Flex></Text>
+                <PetSizeControl confirmedSize={state.preferences.petSize} preferenceError={state.preferenceError}
+                  disabled={busy} visible={page === '宠物'} save={resize} onSavingChange={setSizeSaving} />
+              </Box> : <Text as="p">正在读取偏好…</Text>}
+            </section></Card>
+          </Flex>
+        </div>
+        {page === '设置' && <Flex direction="column" gap="4">
+          <Card asChild size="3"><section>
+            <Heading as="h3" size="4" mb="3">启动</Heading>
+            {state ? <>
+              <Text as="label"><Flex as="span" align="center" gap="2">
+                <Checkbox disabled={busy || sizeSaving || !state.login.supported} checked={state.login.enabled} onCheckedChange={checked => { void change(() => bridge.setLogin(checked === true)); }} />登录时启动 Agent Pet
+              </Flex></Text>
+              <Text as="p" mt="3">默认关闭，不会在启动应用时自动注册登录项。</Text>
+              {!state.login.supported && <Text as="p" color="gray" size="2" mt="3">仅打包后的 macOS 应用支持。开发模式不会将 Electron 加入登录项。</Text>}
+              {state.login.error && <Callout.Root role="alert" color="red" mt="3"><Callout.Text>{state.login.error}</Callout.Text></Callout.Root>}
+            </> : <Text as="p">正在读取设置…</Text>}
+          </section></Card>
+          <Card asChild size="3"><section>
+            <Heading as="h3" size="4" mb="3">关于与数据</Heading>
+            <Text as="p" mb="3">P2a 只读预检，非一键接入或正式发布验收。</Text>
+            <Text as="p" mb="3">偏好仅保存宠物显隐与大小。Session 未读状态不会跨重启保存。登录项以系统实际状态为准。</Text>
+            <Text as="p">所有窗口隐藏后，仍可通过菜单栏、Dock 或重新打开应用找回管理窗口。</Text>
+          </section></Card>
+        </Flex>}
+      </main></Box>
+    </Grid>
+  </Theme>;
 }

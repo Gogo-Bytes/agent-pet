@@ -1,40 +1,17 @@
-* { box-sizing: border-box; }
-body { margin: 0; background: #f5f7fa; color: var(--glass-ink); font: 15px/1.65 system-ui, sans-serif; }
-button, input { font: inherit; accent-color: var(--focus); }
-button { cursor: pointer; }
-button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-.management-shell { display: grid; grid-template-columns: 190px minmax(0, 1fr); min-height: 100vh; }
-aside { padding: 26px 18px; background: #e9eef6; border-right: 1px solid #d4dce9; }
-h1 { font-size: 21px; margin: 0 0 30px; }
-nav { display: grid; gap: 8px; }
-nav button { display: flex; align-items: center; gap: 12px; border: 0; border-radius: 10px; padding: 12px; background: transparent; color: var(--glass-ink); text-align: left; }
-nav button:hover { background: var(--glass-fill-hover); }
-nav button[aria-current] { background: #fff; box-shadow: 0 2px 8px #25304712; font-weight: 600; }
-main { padding: 26px 32px; max-width: 950px; }
-h2 { margin: 0 0 12px; font-size: 26px; }
-h3 { margin: 0 0 12px; font-size: 18px; }
-section { background: #fff; border: 1px solid #d4dce9; border-radius: 14px; padding: 22px; margin: 20px 0; }
-p { margin: 10px 0; }
-.muted, .sidebar-note { color: var(--glass-muted); font-size: 13px; }
-.sidebar-note { margin-top: 30px; }
-.badge { display: inline-block; background: #eef0fa; border-radius: 6px; padding: 3px 9px; font-size: 13px; }
-[role=alert] { color: #8e261e; background: #fff0ed; padding: 12px; border-radius: 8px; }
-fieldset { padding: 0; border: 0; margin: 0; min-width: 0; }
-.toggle { display: flex; gap: 10px; align-items: center; }
-.toggle input { width: 18px; height: 18px; }
-.size-control { margin-top: 22px; }
-.size-label { display: flex; justify-content: space-between; gap: 12px; }
-.size-label output { font-variant-numeric: tabular-nums; }
-.size-slider { position: relative; display: flex; align-items: center; width: 100%; height: 32px; margin: 12px 0; touch-action: none; user-select: none; }
-.size-track { position: relative; flex: 1; height: 6px; border-radius: 999px; background: #d4dce9; overflow: hidden; }
-.size-range { position: absolute; height: 100%; background: var(--focus); }
-.size-thumb { display: block; width: 20px; height: 20px; border: 2px solid var(--focus); border-radius: 50%; background: #fff; }
-.size-thumb:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-.size-slider[data-disabled] { opacity: 0.5; }
-.size-status { height: 48px; overflow: auto; font-size: 13px; padding: 2px 0; }
-.size-status[role=alert] { padding: 2px 0; background: transparent; border-radius: 0; }
-@media (max-width: 660px) { .management-shell { grid-template-columns: 1fr; } aside { padding: 14px; } h1 { margin-bottom: 10px; } nav { grid-template-columns: repeat(3, 1fr); } .sidebar-note { display: none; } main { padding: 20px; } }
-
-.preflight-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.preflight-candidate { display: flex; gap: 8px; margin: 12px 0; overflow-wrap: anywhere; }
-.preflight-path { overflow-wrap: anywhere; }
+body { margin: 0; }
+.management-shell { grid-template-columns: 190px minmax(0, 1fr); min-height: 100vh; }
+.management-sidebar { background: var(--gray-2); border-right: 1px solid var(--gray-5); }
+.management-navigation { flex-direction: column; }
+.management-main { min-width: 0; width: 100%; max-width: 950px; overflow-wrap: anywhere; }
+/* Hidden page owners remain mounted. Never let a component display rule expose them. */
+.management-shell [hidden] { display: none !important; }
+.size-value { font-variant-numeric: tabular-nums; }
+/* Stable gesture/status slots only; Themes owns track, thumb, focus and disabled visuals. */
+.size-slider { width: 100%; height: 32px; }
+.size-status { height: 48px; overflow: auto; display: block; }
+.preflight-candidate, .preflight-path { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 660px) {
+  .management-shell { grid-template-columns: minmax(0, 1fr); }
+  .management-navigation { flex-direction: row; flex-wrap: wrap; }
+  .sidebar-note { display: none; }
+}

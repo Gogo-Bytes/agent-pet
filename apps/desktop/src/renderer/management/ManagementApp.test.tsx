@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -62,6 +62,88 @@ function createBridge(supported = false) {
 }
 
 describe('ManagementApp real DOM controls', () => {
+  it('uses actual Themes components on every management surface and retains inaccessible page owners', async () => {
+    const { bridge } = createBridge();
+    bridge.piPreflight.getState.mockResolvedValue({ ...initialPreflight, installations: [
+      { id: 'candidate', path: '/synthetic/pi', compatibility: 'unverified', version: null },
+    ] });
+    const user = userEvent.setup();
+    const view = render(<ManagementApp bridge={bridge} />);
+    await act(async () => {});
+    expect(view.container.querySelectorAll('.radix-themes')).toHaveLength(1);
+    expect(screen.getByRole('navigation', { name: '管理导航' }).classList.contains('rt-TabNavRoot')).toBe(true);
+    for (const name of ['Agent 连接', '宠物', '设置']) {
+      expect(screen.getByRole('button', { name }).classList.contains('rt-TabNavLink')).toBe(true);
+    }
+    expect(screen.getByRole('button', { name: 'Agent 连接' }).getAttribute('aria-current')).toBe('page');
+    for (const name of ['检测 / 重新扫描', '选择安装包目录', '选择配置目录', '使用默认候选', '检查所选目标（只读）']) {
+      expect(screen.getByRole('button', { name }).classList.contains('rt-Button')).toBe(true);
+    }
+    const connection = screen.getByRole('region', { name: 'pi 只读预检' });
+    expect(connection.classList.contains('rt-Card')).toBe(true);
+    expect(screen.getByRole('radiogroup', { name: '安装身份（不决定配置目录）' }).classList.contains('rt-RadioGroupRoot')).toBe(true);
+    expect(screen.getByRole('radio').classList.contains('rt-BaseRadioRoot')).toBe(true);
+    expect(screen.getByText('P2a · 检测与只读预检').classList.contains('rt-Badge')).toBe(true);
+    const pet = screen.getByRole('slider', { hidden: true });
+    expect(pet.closest('[hidden]')?.hasAttribute('inert')).toBe(true);
+    expect(screen.queryByRole('slider')).toBeNull();
+    screen.getByRole('button', { name: 'Agent 连接' }).focus();
+    await user.keyboard('{ArrowDown}');
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '宠物' })));
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Agent 连接');
+    await user.keyboard(' ');
+    expect(screen.getByRole('slider', { name: '宠物大小' })).toBe(pet);
+    expect(pet.classList.contains('rt-SliderThumb')).toBe(true);
+    expect(screen.getByRole('checkbox', { name: '显示宠物' }).classList.contains('rt-CheckboxRoot')).toBe(true);
+    expect(screen.queryByRole('region', { name: 'pi 只读预检' })).toBeNull();
+    expect(connection.isConnected).toBe(true);
+    expect(connection.closest('[hidden]')?.hasAttribute('inert')).toBe(true);
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.queryByRole('button', { name: '检测 / 重新扫描' })).toBeNull();
+    // Tab from the last navigation item skips all controls in the hidden connection page.
+    screen.getByRole('button', { name: '设置' }).focus();
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: '显示宠物' }));
+    await user.click(screen.getByRole('button', { name: '设置' }));
+    expect(screen.getByRole('checkbox', { name: '登录时启动 Agent Pet' }).classList.contains('rt-CheckboxRoot')).toBe(true);
+    expect(screen.queryByRole('slider')).toBeNull();
+    expect(pet.isConnected).toBe(true);
+    for (const heading of within(view.container).getAllByRole('heading', { hidden: true })) {
+      expect(heading.classList.contains('rt-Heading')).toBe(true);
+    }
+    for (const paragraph of view.container.querySelectorAll('p')) {
+      expect(paragraph.classList.contains('rt-Text')).toBe(true);
+    }
+    await user.click(screen.getByRole('button', { name: 'Agent 连接' }));
+    expect(screen.getByRole('region', { name: 'pi 只读预检' })).toBe(connection);
+    expect(bridge.piPreflight.getState).toHaveBeenCalledOnce();
+    const css = readFileSync('apps/desktop/src/renderer/management/management.css', 'utf8');
+    expect(css).toContain('.management-shell [hidden] { display: none !important; }');
+    expect(css).not.toMatch(/size-track|size-thumb|size-range|button:|input:/);
+    const entry = readFileSync('apps/desktop/src/renderer/management/main.tsx', 'utf8');
+    expect(entry).toContain("import '@radix-ui/themes/styles.css'");
+    expect(entry).not.toContain('tokens.css');
+    expect(readFileSync('apps/desktop/src/renderer/main.tsx', 'utf8')).not.toContain('@radix-ui/themes');
+  });
+  it('uses Themes retry/error feedback without a duplicate retry while the request completes', async () => {
+    const { bridge } = createBridge();
+    bridge.getState.mockRejectedValueOnce(new Error('IPC'));
+    let finish!: (state: ManagementState) => void;
+    bridge.getState.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const user = userEvent.setup();
+    render(<ManagementApp bridge={bridge} />);
+    await act(async () => {});
+    expect(screen.getByRole('alert').classList.contains('rt-CalloutRoot')).toBe(true);
+    const retry = screen.getByRole('button', { name: '重新读取设置' });
+    expect(retry.classList.contains('rt-Button')).toBe(true);
+    await user.click(retry);
+    // Retrying clears the old error; no duplicate retry is offered during the request.
+    expect(screen.queryByRole('button', { name: '重新读取设置' })).toBeNull();
+    await act(async () => finish(saved(140)));
+    expect(screen.queryByRole('alert')).toBeNull();
+    await user.click(screen.getByRole('button', { name: '宠物' }));
+    expectSize(140);
+  });
   it('opens on honest P2a connection information with no installation actions or second Canvas', async () => {
     const { bridge } = createBridge();
     const view = render(<ManagementApp bridge={bridge} />);
@@ -100,13 +182,13 @@ describe('ManagementApp real DOM controls', () => {
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('宠物');
     await user.click(screen.getByRole('checkbox', { name: '显示宠物' }));
     expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petVisible: false });
-    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
     startDrag(240); release();
     await act(async () => {});
     expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petSize: 240 });
     act(() => push({ preferences: { ...defaultPreferences, petSize: 280 }, preferenceError: null, login: { supported: false, enabled: false, error: null } }));
     expectSize(280);
-    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('true');
     view.unmount(); expect(off).toHaveBeenCalledOnce();
   });
   it('previews real pointer moves without IPC and saves only on release without remount or geometry changes', async () => {
@@ -129,6 +211,8 @@ describe('ManagementApp real DOM controls', () => {
     expect(slider.hasAttribute('data-disabled')).toBe(false);
     expect(document.querySelector('.size-status')!).toBe(status);
     expect(status.textContent).toBe('正在保存尺寸…');
+    expect(status.classList.contains('rt-Text')).toBe(true);
+    expect(screen.getByRole('checkbox', { name: '显示宠物' }).hasAttribute('disabled')).toBe(true);
     expect(root.parentElement!.childElementCount).toBe(children);
     await act(async () => finish(saved(280)));
     expectSize(280);
@@ -136,9 +220,10 @@ describe('ManagementApp real DOM controls', () => {
     expect(document.querySelector('.size-status')!).toBe(status);
     expect(root.parentElement!.childElementCount).toBe(children);
     expect(screen.getByText('已确认尺寸：280 DIP')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: '显示宠物' }).hasAttribute('disabled')).toBe(false);
     // jsdom has no layout: assert the explicit CSS geometry contract, not fake pixel rendering.
     const css = readFileSync('apps/desktop/src/renderer/management/management.css', 'utf8');
-    expect(css).toMatch(/\.size-status \{ height: 48px; overflow: auto;/);
+    expect(css).toMatch(/\.size-status \{ height: 48px; overflow: auto; display: block;/);
     expect(css).toMatch(/\.size-slider \{[^}]*width: 100%; height: 32px;/);
   });
   it.each(['success', 'failure', 'rejection'] as const)('keeps a newer unreleased draft when an older save ends in %s', async outcome => {
@@ -268,7 +353,9 @@ describe('ManagementApp real DOM controls', () => {
     await act(async () => { fireEvent[event](slider, { pointerId: 1 }); });
     expectSize(140);
     expect(bridge.updatePreferences).not.toHaveBeenCalled();
-    const next = screen.getByRole('slider');
+    const next = screen.getByRole('slider', { name: '宠物大小' });
+    expect(next.getAttribute('aria-describedby')).toBe('pet-size-help');
+    expect(next.getAttribute('aria-valuetext')).toBe('预览 140 DIP');
     expect(next).not.toBe(slider);
     expect(document.activeElement).toBe(next);
     const { root } = geometry(next);
@@ -343,7 +430,9 @@ describe('ManagementApp real DOM controls', () => {
     }
     expect(slider.getAttribute('aria-valuemin')).toBe('80');
     expect(slider.getAttribute('aria-valuemax')).toBe('600');
+    expect(screen.getByRole('slider', { name: '宠物大小' })).toBe(slider);
     expect(slider.getAttribute('aria-describedby')).toBe('pet-size-help');
+    expect(slider.getAttribute('aria-valuetext')).toBe('预览 599 DIP');
   });
   it('retains committed saves across navigation but cancels an unreleased draft without stealing focus', async () => {
     const { bridge } = createBridge();
@@ -376,7 +465,7 @@ describe('ManagementApp real DOM controls', () => {
     const { bridge } = createBridge();
     render(<ManagementApp bridge={bridge} />);
     await userEvent.setup().click(screen.getByRole('button', { name: '设置' }));
-    expect((screen.getByRole('checkbox', { name: '登录时启动 Agent Pet' }) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByRole('checkbox', { name: '登录时启动 Agent Pet' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByText(/开发模式不会将 Electron/)).toBeTruthy();
     expect(bridge.setLogin).not.toHaveBeenCalled();
   });
@@ -388,7 +477,7 @@ describe('ManagementApp real DOM controls', () => {
     await user.click(screen.getByRole('checkbox', { name: '登录时启动 Agent Pet' }));
     expect(bridge.setLogin).toHaveBeenCalledExactlyOnceWith(true);
     expect(screen.getByRole('alert').textContent).toBe('系统未应用登录项更改');
-    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
   });
   it('reports persistence errors, keeps confirmed values and handles rejected IPC without optimistic success', async () => {
     const { bridge } = createBridge();
@@ -397,10 +486,10 @@ describe('ManagementApp real DOM controls', () => {
     await user.click(screen.getByRole('button', { name: '宠物' }));
     await user.click(screen.getByRole('checkbox'));
     expect(screen.getByRole('alert').textContent).toContain('未应用更改');
-    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('true');
     bridge.updatePreferences.mockRejectedValueOnce(new Error('IPC unavailable'));
     await user.click(screen.getByRole('checkbox'));
     expect(screen.getByText('操作失败，未确认更改。请重试。')).toBeTruthy();
-    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('true');
   });
 });

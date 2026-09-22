@@ -30,6 +30,22 @@ user/native evidence and pending acceptance. Windows, hardware GPU/power and the
 full native-window matrix remain unverified; a build or DOM test is not native
 acceptance.
 
+## Management UI components
+
+The separate `management.html` / `management/main.tsx` entry imports
+`@radix-ui/themes/styles.css`; `ManagementApp` owns its root `Theme`. All management
+pages use pinned `@radix-ui/themes@3.3.0` components for navigation, buttons,
+checkboxes, candidate radios, size slider, cards, feedback, typography and layout.
+The transparent pet renderer and its controls do not load this theme or stylesheet.
+
+Connection and pet pages remain mounted behind hidden/inert boundaries so pending
+requests survive navigation. The size slider still previews locally and saves only
+on release (or keyboard commit), preserving P1 cancellation and stale-reply safety.
+See `../../docs/MANAGEMENT-UI-COMPONENTS.md` for the full before/after inventory,
+Themes thumb accessibility adaptation, keyboard behavior, automated evidence and
+outstanding browser/native checks. No Main/preload capabilities or P2a consent
+boundaries changed; this restyle is not native or release acceptance.
+
 ## pi detection and read-only preflight (P2a)
 
 The management connection page now offers explicit detect/rescan, a Main-owned

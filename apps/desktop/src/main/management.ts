@@ -116,7 +116,10 @@ export function createManagement(options: {
     if (quitting) return;
     quitting = true;
     void options.stop().catch(() => { console.warn('Adapter shutdown failed'); }).finally(() => {
-      stopped = true; tray.destroy(); app.quit();
+      stopped = true; tray.destroy();
+      // Let native cancellation of the first before-quit unwind before retrying.
+      // A microtask retry can leave a windowless process holding the instance lock.
+      setImmediate(() => app.quit());
     });
   });
   options.applyPreferences(preferences.snapshot());

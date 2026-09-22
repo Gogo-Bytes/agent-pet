@@ -343,7 +343,11 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     const close = native.management!.on.mock.calls.find(([event]) => event === 'close')![1];
     const preventDefault = vi.fn(); close({ preventDefault }); expect(preventDefault).not.toHaveBeenCalled();
     finish(); for (let i = 0; i < 8; i++) await Promise.resolve();
-    expect(native.tray.destroy).toHaveBeenCalledOnce(); expect(native.quit).toHaveBeenCalledOnce();
+    expect(native.tray.destroy).toHaveBeenCalledOnce();
+    // Native before-quit cancellation must unwind before initiating another quit.
+    expect(native.quit).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(0);
+    expect(native.quit).toHaveBeenCalledOnce();
     event.preventDefault.mockClear(); native.appEvents.get('before-quit')!(event);
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
@@ -372,7 +376,9 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     native.appEvents.get('before-quit')!({ preventDefault: vi.fn() });
     await Promise.resolve(); expect(native.stop).not.toHaveBeenCalled(); expect(native.quit).not.toHaveBeenCalled();
     started(); for (let i = 0; i < 12; i++) await Promise.resolve();
-    expect(native.stop).toHaveBeenCalledOnce(); expect(native.quit).toHaveBeenCalledOnce();
+    expect(native.stop).toHaveBeenCalledOnce(); expect(native.quit).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(0);
+    expect(native.quit).toHaveBeenCalledOnce();
   });
   it('a losing single instance exits before creating windows, Adapter, preferences or IPC', async () => {
     native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks(); native.handlers.clear();

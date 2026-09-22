@@ -70,6 +70,16 @@ Electron、登录项和托盘在上述测试中是替身；这些不是原生系
 
 **未关闭项：托盘报告位置仍在屏外，临时添加文字标题也未改善，不能认定图标是原因。** 此次独立修复恢复 Dock 后备入口，不宣称托盘已修好。开发态 Dock 可能显示 Electron 而非最终 Agent Pet 名称/图标。需用户重启 Pet 后确认 Dock 点击恢复，并回归全屏/多 Space。
 
+## 启动后立即退出：退出残留导致单实例锁仍被占用
+
+用户按 Ctrl+C 重启后，新启动立即退出。只读检查发现旧项目 Electron 孤儿 Main（父进程为 1），没有结束该用户进程。用 `/tmp/ap-restart.MB32Ay/probe.py` 在独立 userData 重现：首实例 ready → SIGINT → 等待 3 秒仍存活 → 同 profile 的第二实例退出 0 且未 ready。没有 pi endpoint/token，无真实用户配置。
+
+临时生命周期日志确认首实例进入 before-quit、执行清理后的 app.quit、再次 before-quit、window-all-closed，但没有 will-quit/quit；因此不归因于 adapter 清理未完成。只把二次 app.quit 调用安排到 setImmediate 就恢复退出。正式修复在 management.ts 的 finally 中延后重试，让首次 native 退出取消展开完成，仍等待 Adapter 清理，不提前 releaseSingleInstanceLock 或强退规避。
+
+两项退出/延迟 startup 回归先红后绿，全量 27 文件/158 项、typecheck、build、diff-check 通过。移除临时 app.quit 替换及日志后再跑真实构建：首实例收到 SIGINT 正常退出 0，第二实例 ready；见 [restart-after.json](evidence/desktop-p1/restart-after.json)。抛弃式测试的第二实例由测试自身清理；未杀用户 pi 或用户残留 Pet。实际 pnpm 父子链、真实桥接启动/退出与用户残留清理仍需确认，不将模拟 SIGINT 写成真实终端全流程验收。
+
+这也解释了前述隔离验收中 SIGTERM 后残留的相同风险，但该历史场景未在此次单独复跑。新代码不会修复已在内存中运行的旧版；需要用户正常退出或授权针对性清理旧 Pet 后重启。
+
 ## 手工验收清单（工具覆盖不足的项目由用户验收）
 
 - [ ] 在独立 userData 下启动 dev，默认打开管理连接页和宠物；不存在 pi 配置也无致命错误。

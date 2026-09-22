@@ -1,0 +1,377 @@
+{
+  "scope": "installed DefaultPackageManager.resolve discovery only; no extension loading",
+  "node": "v22.22.3",
+  "platform": "darwin",
+  "arch": "arm64",
+  "package": {
+    "name": "@earendil-works/pi-coding-agent",
+    "version": "0.85.1"
+  },
+  "hashes": {
+    "package.json": "f1738e4b42203e5f22bcb513f13fb2fb224f1e98d1f129ff042f87048665a94c",
+    "dist/core/package-manager.js": "26aa8adf255f7b1ebf9b00732d2e9a1648e38b76a10eedcd443131e3708b6e88",
+    "dist/config.js": "53098afc9f4bfa2a3720e6971561291b3850e78e9a22e482ffb4584bd4f123f8",
+    "dist/core/pi-manifest.js": "2ae94bb81155fc66766a5643f21ec38e808177ec5f2271e77c82013971ae5c03",
+    "dist/utils/paths.js": "09046a2443dfb6434e4c5c62656fb73edc33e776dc6cc35b785ef1dbf8483c93"
+  },
+  "safety": {
+    "syntheticHome": true,
+    "explicitAgentDirAndCwd": true,
+    "emptyPackageLists": true,
+    "projectTrusted": false,
+    "nodePermissions": true,
+    "childAndWorkersDenied": true,
+    "packageWritesDenied": true,
+    "realSettingsReadDenied": true,
+    "blockedSideEffectAttempts": []
+  },
+  "results": [
+    {
+      "id": "standalone",
+      "passed": true,
+      "files": [
+        "agent-pet.ts"
+      ],
+      "overrides": [],
+      "manifest": null,
+      "ignore": null,
+      "expected": [
+        [
+          "agent-pet.ts",
+          true
+        ]
+      ],
+      "actual": [
+        [
+          "agent-pet.ts",
+          true
+        ]
+      ],
+      "resources": [
+        {
+          "path": "cases/standalone/agent/extensions/agent-pet.ts",
+          "enabled": true,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/standalone/agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "root-index",
+      "passed": true,
+      "files": [
+        "agent-pet.ts",
+        "index.ts"
+      ],
+      "overrides": [],
+      "manifest": null,
+      "ignore": null,
+      "expected": [
+        [
+          "index.ts",
+          true
+        ]
+      ],
+      "actual": [
+        [
+          "index.ts",
+          true
+        ]
+      ],
+      "resources": [
+        {
+          "path": "cases/root-index/agent/extensions/index.ts",
+          "enabled": true,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/root-index/agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "root-manifest",
+      "passed": true,
+      "files": [
+        "agent-pet.ts",
+        "entry.js"
+      ],
+      "overrides": [],
+      "manifest": {
+        "pi": {
+          "extensions": [
+            "entry.js"
+          ]
+        }
+      },
+      "ignore": null,
+      "expected": [
+        [
+          "entry.js",
+          true
+        ]
+      ],
+      "actual": [
+        [
+          "entry.js",
+          true
+        ]
+      ],
+      "resources": [
+        {
+          "path": "cases/root-manifest/agent/extensions/entry.js",
+          "enabled": true,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/root-manifest/agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ignore-gitignore",
+      "passed": true,
+      "files": [
+        "agent-pet.ts"
+      ],
+      "overrides": [],
+      "manifest": null,
+      "ignore": ".gitignore",
+      "expected": [],
+      "actual": [],
+      "resources": []
+    },
+    {
+      "id": "ignore-ignore",
+      "passed": true,
+      "files": [
+        "agent-pet.ts"
+      ],
+      "overrides": [],
+      "manifest": null,
+      "ignore": ".ignore",
+      "expected": [],
+      "actual": [],
+      "resources": []
+    },
+    {
+      "id": "ignore-fdignore",
+      "passed": true,
+      "files": [
+        "agent-pet.ts"
+      ],
+      "overrides": [],
+      "manifest": null,
+      "ignore": ".fdignore",
+      "expected": [],
+      "actual": [],
+      "resources": []
+    },
+    {
+      "id": "glob-exclusion",
+      "passed": true,
+      "files": [
+        "agent-pet.ts"
+      ],
+      "overrides": [
+        "!extensions/*.ts"
+      ],
+      "manifest": null,
+      "ignore": null,
+      "expected": [
+        [
+          "agent-pet.ts",
+          false
+        ]
+      ],
+      "actual": [
+        [
+          "agent-pet.ts",
+          false
+        ]
+      ],
+      "resources": [
+        {
+          "path": "cases/glob-exclusion/agent/extensions/agent-pet.ts",
+          "enabled": false,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/glob-exclusion/agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "exact-exclusion",
+      "passed": true,
+      "files": [
+        "agent-pet.ts"
+      ],
+      "overrides": [
+        "-extensions/agent-pet.ts"
+      ],
+      "manifest": null,
+      "ignore": null,
+      "expected": [
+        [
+          "agent-pet.ts",
+          false
+        ]
+      ],
+      "actual": [
+        [
+          "agent-pet.ts",
+          false
+        ]
+      ],
+      "resources": [
+        {
+          "path": "cases/exact-exclusion/agent/extensions/agent-pet.ts",
+          "enabled": false,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/exact-exclusion/agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "non-js-backups",
+      "passed": true,
+      "files": [
+        "agent-pet.ts",
+        "agent-pet.ts.tmp",
+        "agent-pet.ts.bak",
+        "agent-pet.js~",
+        ".agent-pet.ts"
+      ],
+      "overrides": [],
+      "manifest": null,
+      "ignore": null,
+      "expected": [
+        [
+          "agent-pet.ts",
+          true
+        ]
+      ],
+      "actual": [
+        [
+          "agent-pet.ts",
+          true
+        ]
+      ],
+      "resources": [
+        {
+          "path": "cases/non-js-backups/agent/extensions/agent-pet.ts",
+          "enabled": true,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/non-js-backups/agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "duplicate-files",
+      "passed": true,
+      "files": [
+        "agent-pet.ts",
+        "agent-pet-old.ts"
+      ],
+      "overrides": [],
+      "manifest": null,
+      "ignore": null,
+      "expected": [
+        [
+          "agent-pet-old.ts",
+          true
+        ],
+        [
+          "agent-pet.ts",
+          true
+        ]
+      ],
+      "actual": [
+        [
+          "agent-pet-old.ts",
+          true
+        ],
+        [
+          "agent-pet.ts",
+          true
+        ]
+      ],
+      "resources": [
+        {
+          "path": "cases/duplicate-files/agent/extensions/agent-pet-old.ts",
+          "enabled": true,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/duplicate-files/agent"
+          }
+        },
+        {
+          "path": "cases/duplicate-files/agent/extensions/agent-pet.ts",
+          "enabled": true,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/duplicate-files/agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "custom-agent-dir",
+      "passed": true,
+      "files": [
+        "agent-pet.ts"
+      ],
+      "overrides": [],
+      "manifest": null,
+      "ignore": null,
+      "expected": [
+        [
+          "agent-pet.ts",
+          true
+        ]
+      ],
+      "actual": [
+        [
+          "agent-pet.ts",
+          true
+        ]
+      ],
+      "resources": [
+        {
+          "path": "cases/custom-agent-dir/chosen-profile/extensions/agent-pet.ts",
+          "enabled": true,
+          "metadata": {
+            "source": "auto",
+            "scope": "user",
+            "origin": "top-level",
+            "baseDir": "cases/custom-agent-dir/chosen-profile"
+          }
+        }
+      ]
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,52 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "explicit private directory mode",
+      "passed": true
+    },
+    {
+      "name": "private file read and mode",
+      "passed": true
+    },
+    {
+      "name": "exclusive create refuses existing file",
+      "passed": true
+    },
+    {
+      "name": "leaf symlink refused by nofollow",
+      "passed": true
+    },
+    {
+      "name": "hardlinks refused",
+      "passed": true
+    },
+    {
+      "name": "wide file permissions refused",
+      "passed": true
+    },
+    {
+      "name": "wide parent permissions refused",
+      "passed": true
+    },
+    {
+      "name": "rename publishes whole new content; old fd remains old",
+      "passed": true
+    },
+    {
+      "name": "oversize file refused",
+      "passed": true
+    },
+    {
+      "name": "path byte length differs from character length",
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "No cross-user ACL test",
+    "No hostile parent replacement race test",
+    "No crash/fsync durability test",
+    "No existing user config touched",
+    "This tests a candidate guard, not production code"
+  ]
+}

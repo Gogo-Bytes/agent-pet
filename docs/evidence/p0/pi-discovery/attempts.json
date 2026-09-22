@@ -1,0 +1,20 @@
+{
+  "attempts": [
+    {
+      "id": 1,
+      "result": "failed",
+      "phase": "harness preflight before installed package import",
+      "command": "cd /tmp/ap-pi-discovery.<temporary> && env -i HOME=\"$PWD/home\" TMPDIR=\"$PWD/tmp\" PI_CODING_AGENT_DIR=\"$PWD/env-agent\" PI_CODING_AGENT_SESSION_DIR=\"$PWD/sessions\" PI_PACKAGE_DIR=<installed-package> PI_OFFLINE=1 PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 <node> --permission --allow-fs-read=\"$PWD\" --allow-fs-read=<installed-package> --allow-fs-write=\"$PWD\" probe.mjs",
+      "output": "AssertionError [ERR_ASSERTION]: assert(root.startsWith('/tmp/ap-pi-discovery.')); Node.js v22.22.3; exit 1",
+      "cause": "macOS process.cwd() canonicalized /tmp to /private/tmp",
+      "correction": "Accept /tmp or /private/tmp mktemp names in guard; use cd -P and canonical PWD for environment and permissions. Discovery implementation unchanged."
+    },
+    {
+      "id": 2,
+      "result": "passed",
+      "command": "sh /tmp/ap-pi-discovery.<temporary>/run.sh <installed-package> <node>",
+      "output": "{\"passed\":true,\"cases\":11,\"failures\":[]}",
+      "exitCode": 0
+    }
+  ]
+}

@@ -14,6 +14,20 @@ const ANCESTOR_ONLY = 0x40000001; // readonly, snapshot
 const u32 = (n: number) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff;
 function reject(reason: string): never { throw new Error(reason); }
 
+/** Operation-local policy gate. Native descriptor checks remain authoritative; this helper only
+ * requires every evidence sample to describe one fresh APFS volume before a mutator is called. */
+type MutationEvidence = { root: DarwinEvidence; parent: DarwinEvidence; target?: DarwinEvidence };
+function assertFreshMutationEvidence(sample: MutationEvidence, uid: number): void {
+  acceptDarwinEvidence(sample.root, 'directory', uid);
+  acceptDarwinEvidence(sample.parent, 'directory', uid);
+  if (sample.target) acceptDarwinEvidence(sample.target, 'file', uid);
+  for (const value of [sample.parent, sample.target].filter((v): v is DarwinEvidence => !!v)) {
+    if (value.dev !== sample.root.dev || value.fsid0 !== sample.root.fsid0 || value.fsid1 !== sample.root.fsid1) {
+      reject('mutation-volume-mismatch');
+    }
+  }
+}
+
 /** Conservative access-policy acceptance, NOT a general effective-rights or principal resolver.
  * Callers must bind this evidence to the operation; no cached verified boolean is returned.
  * Shared sticky ancestors are intentionally unsupported in this slice.

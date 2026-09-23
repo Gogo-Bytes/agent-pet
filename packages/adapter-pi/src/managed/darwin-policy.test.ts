@@ -35,6 +35,14 @@ describe('darwin-policy (synthetic evidence)', () => {
       expect(() => acceptDarwinEvidence(e, 'file', 501)).toThrow('unsupported-mount');
     }
   });
+  it('rejects malformed mutation identities before any same-volume operation', () => {
+    for (const e of [{ ...fixture(), dev: -1n }, { ...fixture(), fsid0: -1 },
+      { ...fixture(), fsid1: Number.NaN }, { ...fixture(), ino: -1n }]) {
+      expect(() => acceptDarwinEvidence(e, 'file', 501)).toThrow();
+    }
+    expect(() => acceptDarwinEvidence({ ...fixture(), dev: 9n }, 'file', 501)).not.toThrow();
+    expect(() => acceptDarwinEvidence({ ...fixture(), fsid0: 9 }, 'file', 501)).not.toThrow();
+  });
   it('accepts deny-delete ancestor and recognized inherited denies', () => {
     const e = fixture(); e.mode = 0o040755; e.acl.entries = [entry(2, 16n, 0x70)];
     expect(() => acceptDarwinEvidence(e, 'ancestor', 501)).not.toThrow();

@@ -2,21 +2,34 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, chmodSync, renameSync,
   symlinkSync, linkSync, unlinkSync, statSync, existsSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
-import { spawnSync, fork } from 'node:child_process';
+import { spawnSync, spawn, fork } from 'node:child_process';
 import { once } from 'node:events';
 import { Worker } from 'node:worker_threads';
 const here = dirname(fileURLToPath(import.meta.url));
 const n = createRequire(import.meta.url)('./out/managed-darwin.node');
 const childPath = join(here, 'lease-child.mjs');
+const transactionChildPath = join(here, 'transaction-child.mjs');
 const timeout = 10_000;
+// Open stop condition: this fixture has no deterministic native fault injection. Create/open/write/fsync/
+// rename/parent-sync/F_FULLFSYNC failures are not claimed covered; uncertainty paths are tested only by
+// naturally induced collision, substitution, bounds, and lease failures.
 // Exercise the actual TS policy against native evidence, without adding a runtime dependency.
 const policySource = readFileSync(join(here, '../../src/managed/darwin-policy.ts'), 'utf8');
 const policyJs = ts.transpileModule(policySource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
-const { acceptDarwinEvidence } = await import(`data:text/javascript;base64,${Buffer.from(policyJs).toString('base64')}`);
+const policyModuleUrl = `data:text/javascript;base64,${Buffer.from(policyJs).toString('base64')}`;
+const { acceptDarwinEvidence } = await import(policyModuleUrl);
+const nativeSource = readFileSync(join(here, '../../src/managed/native-darwin.ts'), 'utf8');
+const nativeJs = ts.transpileModule(nativeSource.replace('./darwin-policy.js', policyModuleUrl), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
+}).outputText;
+const adapterModulePath = join(here, '.b2-adapter-test.mjs');
+writeFileSync(adapterModulePath, nativeJs);
+const { loadDarwinWritePrimitives } = await import(pathToFileURL(adapterModulePath));
+rmSync(adapterModulePath, { force: true });
 function fixture(t) {
   const path = mkdtempSync('/private/tmp/agent-pet-p2b2-'); chmodSync(path, 0o700);
   const handles = [], aclPaths = new Set();
@@ -31,6 +44,27 @@ function fixture(t) {
     trackInherited(entry) { aclPaths.add(entry); }, file(name, value = 'synthetic') {
     writeFileSync(join(path, name), value, { mode: 0o600 }); return join(path, name);
   } };
+}
+function transactionFixture(t) {
+  const path = mkdtempSync(join(here, '.b2-fixture-')); chmodSync(path, 0o700);
+  const handles = [], aclPaths = new Set();
+  t.after(() => {
+    for (const entry of aclPaths) repoAcl(entry, false);
+    for (const h of handles.reverse()) n.close(h);
+    rmSync(path, { recursive: true, force: true });
+  });
+  const keep = h => { handles.push(h); return h; };
+  return { path, keep, root: keep(n.openRoot(path)), acl(entry, enabled) {
+    repoAcl(entry, enabled); if (enabled) aclPaths.add(entry); else aclPaths.delete(entry);
+  } };
+}
+const aclUser = spawnSync('/usr/bin/id', ['-un'], { encoding: 'utf8' }).stdout.trim();
+function repoAcl(path, enabled) {
+  assert.ok(path.startsWith(join(here, '.b2-fixture-')));
+  assert.equal(statSync(path).uid, process.getuid());
+  const spec = `user:${aclUser} allow write`;
+  const r = spawnSync('/bin/chmod', [enabled ? '+a' : '-a', spec, path], { timeout: 3000, maxBuffer: 4096, encoding: 'utf8' });
+  assert.equal(r.error, undefined); assert.equal(r.status, 0, r.stderr);
 }
 function acl(path, mode) {
   const r = spawnSync(join(here, 'out/fixture-acl'), [path, mode], { timeout: 3000, maxBuffer: 4096, encoding: 'utf8' });
@@ -134,6 +168,168 @@ test('stable writer inode: same-process + cross-channel independent process cont
   assert.throws(() => n.acquireWriter(second), { code: 'ownership-busy' }); assert.equal(contender(f.path), 'busy');
   n.close(lease); assert.equal(contender(f.path), 'acquired');
   const after = statSync(join(f.path, 'writer.lock'), { bigint: true }); assert.equal(after.ino, before.ino); assert.equal(after.nlink, 1n);
+});
+test('policy-gated adapter retains root evidence for every child transaction capability', { timeout }, t => {
+  const f = transactionFixture(t); const adapter = loadDarwinWritePrimitives();
+  const root = f.keep(adapter.openRoot(f.path));
+  const lease = f.keep(adapter.initializeWriter(root));
+  const initial = f.keep(adapter.createDirectory(root, 'private', lease));
+  const dir = f.keep(adapter.openDirectory(root, 'private'));
+  /* A descendant directory is root-bound but is not the canonical bootstrap
+     capability. Both adapter and native entry points must reject it. */
+  assert.throws(() => adapter.initializeWriter(dir), /path-changed/);
+  assert.throws(() => n.initializeWriter(f.keep(n.openDirectory(f.root, 'private'))), { code: 'path-changed' });
+  assert.equal(existsSync(join(f.path, 'private', 'writer.lock')), false);
+  /* The directory is reopened through the adapter to prove child handles use
+     retained root evidence rather than raw addon ancestor lookup or pathname
+     fallback. */
+  adapter.removeDirectoryChecked(dir, lease);
+  const created = f.keep(adapter.createDirectory(root, 'private', lease));
+  const tx = f.keep(adapter.beginWrite(created, 'pending', 'payload', 256, lease));
+  adapter.write(tx, Buffer.from('adapter-first')); adapter.publishNew(tx);
+  const first = f.keep(adapter.openFile(created, 'payload'));
+  const replacement = f.keep(adapter.beginWrite(created, 'pending-2', 'payload', 256, lease));
+  adapter.write(replacement, Buffer.from('adapter-second')); adapter.publishReplace(replacement, first);
+  const current = f.keep(adapter.openFile(created, 'payload'));
+  adapter.removeChecked(current, lease);
+  const empty = f.keep(adapter.openDirectory(root, 'private'));
+  adapter.removeDirectoryChecked(empty, lease);
+  assert.equal(existsSync(join(f.path, 'private')), false);
+});
+
+test('initializeWriter freshly validates canonical root and its ancestors', { timeout }, async t => {
+  for (const changed of ['root', 'ancestor']) {
+    await t.test(changed, t => {
+      const f = transactionFixture(t); const adapter = loadDarwinWritePrimitives();
+      const rootPath = join(f.path, 'root'); mkdirSync(rootPath, { mode: 0o700 });
+      const root = f.keep(adapter.openRoot(rootPath));
+      const changedPath = changed === 'root' ? rootPath : f.path;
+      f.acl(changedPath, true);
+      assert.throws(() => adapter.initializeWriter(root), /unsupported-acl/);
+      assert.equal(existsSync(join(rootPath, 'writer.lock')), false);
+      f.acl(changedPath, false);
+      f.keep(adapter.initializeWriter(root));
+    });
+  }
+});
+
+for (const operation of ['createDirectory', 'beginWrite', 'write', 'publishNew', 'publishReplace', 'removeChecked', 'removeDirectoryChecked']) {
+  test(`${operation} freshly rejects changed ancestor/root/parent/lease ACLs`, { timeout }, async t => {
+    for (const changed of ['ancestor', 'root', 'intermediate', 'parent', 'lease']) {
+      await t.test(changed, t => {
+        // All ACL edits are confined to disposable repo-local fixtures. The existing
+        // C fixture helper only accepts /private/tmp, whose sticky ancestor is unsupported.
+        const f = transactionFixture(t); const adapter = loadDarwinWritePrimitives();
+        const rootPath = join(f.path, 'root'); mkdirSync(rootPath, { mode: 0o700 });
+        const root = f.keep(adapter.openRoot(rootPath));
+        const lease = f.keep(adapter.initializeWriter(root));
+        const intermediate = f.keep(adapter.createDirectory(root, 'intermediate', lease));
+        const parent = f.keep(adapter.createDirectory(intermediate, 'parent', lease));
+        const parentPath = join(rootPath, 'intermediate', 'parent');
+        writeFileSync(join(parentPath, 'payload'), 'old', { mode: 0o600 });
+        const expected = f.keep(adapter.openFile(parent, 'payload'));
+        const empty = f.keep(adapter.createDirectory(parent, 'empty', lease));
+        const tx = f.keep(adapter.beginWrite(parent, 'pending', operation === 'publishReplace' ? 'payload' : 'new', 256, lease));
+        adapter.write(tx, Buffer.from('new'));
+        const paths = { ancestor: f.path, root: rootPath, intermediate: join(rootPath, 'intermediate'),
+          parent: parentPath, lease: join(rootPath, 'writer.lock') };
+        const actions = {
+          createDirectory: () => f.keep(adapter.createDirectory(parent, 'blocked-directory', lease)),
+          beginWrite: () => f.keep(adapter.beginWrite(parent, 'blocked-pending', 'blocked-final', 256, lease)),
+          write: () => adapter.write(tx, Buffer.from('append')),
+          publishNew: () => adapter.publishNew(tx),
+          publishReplace: () => adapter.publishReplace(tx, expected),
+          removeChecked: () => adapter.removeChecked(expected, lease),
+          removeDirectoryChecked: () => adapter.removeDirectoryChecked(empty, lease),
+        };
+        const before = statSync(paths[changed], { bigint: true });
+        f.acl(paths[changed], true);
+        const after = statSync(paths[changed], { bigint: true });
+        assert.equal(after.ino, before.ino); assert.equal(after.mode, before.mode);
+        assert.throws(actions[operation], /unsupported-acl/);
+        // Rejection occurs before any bytes or namespace entries change.
+        assert.equal(readFileSync(join(parentPath, 'pending'), 'utf8'), 'new');
+        assert.equal(readFileSync(join(parentPath, 'payload'), 'utf8'), 'old');
+        assert.equal(existsSync(join(parentPath, 'empty')), true);
+        for (const name of ['new', 'blocked-directory', 'blocked-pending', 'blocked-final']) {
+          assert.equal(existsSync(join(parentPath, name)), false);
+        }
+        f.acl(paths[changed], false);
+        assert.doesNotThrow(actions[operation]);
+      });
+    }
+  });
+}
+
+test('beginWrite rejects non-finite maximums before conversion', { timeout }, t => {
+  const f = transactionFixture(t); const lease = f.keep(n.initializeWriter(f.root));
+  const dir = f.keep(n.createDirectory(f.root, 'finite', lease));
+  for (const max of [NaN, Infinity, -Infinity]) assert.throws(() => n.beginWrite(dir, `pending-${String(max)}`, 'payload', max, lease), { code: 'invalid-argument' });
+});
+
+test('dormant bootstrap and descriptor-rooted write transaction preserve v1 behavior', { timeout }, t => {
+  const f = transactionFixture(t);
+  mkdirSync(join(f.path, 'descendant'), { mode: 0o700 });
+  const descendant = f.keep(n.openDirectory(f.root, 'descendant'));
+  assert.throws(() => n.initializeWriter(descendant), { code: 'path-changed' });
+  n.close(descendant); rmSync(join(f.path, 'descendant'), { recursive: true });
+  const lease = f.keep(n.initializeWriter(f.root));
+  const lock = statSync(join(f.path, 'writer.lock'), { bigint: true });
+  assert.equal(lock.nlink, 1n); assert.equal(lock.size, 0n); assert.equal(lock.mode & 0o7777n, 0o600n);
+  assert.throws(() => n.initializeWriter(f.root));
+  const dir = f.keep(n.createDirectory(f.root, 'private', lease));
+  const tx = f.keep(n.beginWrite(dir, 'pending', 'payload', 256, lease));
+  n.write(tx, Buffer.from('first')); assert.equal(n.inspect(tx).size, 5n);
+  n.publishNew(tx); const first = f.keep(n.openFile(dir, 'payload'));
+  assert.equal(n.readBounded(first, 256).bytes.toString(), 'first');
+  const replacement = f.keep(n.beginWrite(dir, 'pending-2', 'payload', 256, lease));
+  n.write(replacement, Buffer.from('second')); n.publishReplace(replacement, first);
+  assert.throws(() => n.inspect(first), { code: 'path-changed' });
+  const current = f.keep(n.openFile(dir, 'payload'));
+  assert.equal(n.readBounded(current, 256).bytes.toString(), 'second');
+  n.removeChecked(current, lease); assert.equal(existsSync(join(f.path, 'private', 'payload')), false);
+  const emptyDir = f.keep(n.openDirectory(f.root, 'private'));
+  n.removeDirectoryChecked(emptyDir, lease); assert.equal(existsSync(join(f.path, 'private')), false);
+  const again = f.keep(n.createDirectory(f.root, 'again', lease));
+  assert.throws(() => n.createDirectory(f.root, 'again', lease), { code: 'native-mkdir' });
+  const initial = f.keep(n.beginWrite(again, 'pending-0', 'payload', 256, lease)); n.write(initial, Buffer.from('kept')); n.publishNew(initial);
+  const blocked = f.keep(n.beginWrite(again, 'pending-3', 'payload', 256, lease));
+  assert.throws(() => n.publishNew(blocked), { code: 'destination-exists' });
+  assert.equal(statSync(join(f.path, 'writer.lock'), { bigint: true }).ino, lock.ino);
+});
+test('concurrent initializers have one winner and preserve the winner inode', { timeout }, async t => {
+  const f = transactionFixture(t);
+  const children = [spawn(process.execPath, [transactionChildPath, f.path], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] }),
+    spawn(process.execPath, [transactionChildPath, f.path], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] })];
+  const outcomes = children.map(child => new Promise(resolve => {
+    child.on('message', message => {
+      if (child.exitCode === null) child.kill('SIGTERM');
+      child.once('exit', () => resolve(message));
+    });
+    child.on('error', error => resolve({ state: 'failed', code: error.message }));
+  }));
+  const result = await Promise.all(outcomes);
+  assert.equal(result.filter(value => value.state === 'initialized').length, 1);
+  assert.equal(result.filter(value => value.state === 'failed').length, 1);
+  assert.equal(statSync(join(f.path, 'writer.lock'), { bigint: true }).nlink, 1n);
+});
+test('bootstrap rejects nonempty roots and preserves preexisting lock inode', { timeout }, t => {
+  const f = transactionFixture(t); writeFileSync(join(f.path, 'unexpected'), 'x', { mode: 0o600 });
+  assert.throws(() => n.initializeWriter(f.root)); assert.equal(existsSync(join(f.path, 'writer.lock')), false);
+  rmSync(join(f.path, 'unexpected'));
+  const lockPath = join(f.path, 'writer.lock'); writeFileSync(lockPath, '', { mode: 0o600 }); const before = statSync(lockPath, { bigint: true });
+  assert.throws(() => n.initializeWriter(f.root)); const after = statSync(lockPath, { bigint: true });
+  assert.equal(after.ino, before.ino); assert.equal(after.nlink, 1n);
+});
+test('bootstrap rejects unsafe writer.lock entries without cleanup or replacement', { timeout }, t => {
+  for (const kind of ['symlink', 'fifo', 'hardlink', 'mode']) {
+    const f = transactionFixture(t); const lockPath = join(f.path, 'writer.lock');
+    if (kind === 'symlink') symlinkSync('/private/tmp', lockPath);
+    else if (kind === 'fifo') assert.equal(spawnSync('/usr/bin/mkfifo', [lockPath]).status, 0);
+    else { writeFileSync(lockPath, '', { mode: 0o600 }); if (kind === 'hardlink') linkSync(lockPath, join(f.path, 'other')); else chmodSync(lockPath, 0o640); }
+    const before = statSync(lockPath, { bigint: true }); assert.throws(() => n.initializeWriter(f.root));
+    const after = statSync(lockPath, { bigint: true }); assert.equal(after.ino, before.ino);
+  }
 });
 test('failed lease acquisition preserves unsafe inode; closing root never releases a live lease', { timeout }, t => {
   const f = fixture(t); const path = f.file('writer.lock', 'not-empty');

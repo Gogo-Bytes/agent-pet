@@ -4,10 +4,13 @@
 #include <sys/mount.h>
 #include <sys/file.h>
 #include <sys/acl.h>
+#include <sys/attr.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdint.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -18,6 +21,8 @@
 #define DESCRIPTOR_MAX 256
 #define WRAPPER_MAX 4096
 #define BASE_FLAGS (O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+#define WRITE_MAX READ_MAX
+#define ENUM_MAX 256
 typedef struct { int fd; char name[256]; struct stat identity; } segment;
 typedef struct state state;
 typedef struct cap {
@@ -25,15 +30,19 @@ typedef struct cap {
   struct cap *next;
   struct cap *parent;
   napi_ref parent_ref, lease_ref;
-  int fd, kind, active; /* 1 directory, 2 regular reader, 3 writer lease */
-  char name[256];
+  int fd, kind, active; /* 1 directory, 2 regular reader, 3 writer lease, 4 write transaction */
+  int stale, published, poisoned;
+  char name[256], final_name[256];
+  uint64_t max_bytes, written;
   struct stat identity;
   segment *chain;
   size_t depth;
+  struct cap *lease;
 } cap;
 /* Per environment, not process-wide. Failed closes retain their descriptor charge. */
 struct state { cap *head; size_t active, descriptors, wrappers; };
 static const napi_type_tag cap_tag = {0x678ae4a17da23094ULL, 0x93ead6cf18fe309aULL};
+static napi_value evidence(napi_env env, int fd);
 
 static napi_value error(napi_env env, const char *code) {
   napi_throw_error(env, code, code); /* Never leak a pathname or native error string. */
@@ -80,6 +89,7 @@ static cap *get(napi_env env, napi_value value, int closed_ok) {
   if (napi_check_object_type_tag(env, value, &cap_tag, &tagged) != napi_ok || !tagged ||
       napi_unwrap(env, value, (void **)&c) != napi_ok || !c) { error(env, "invalid-handle"); return NULL; }
   if (!closed_ok && c->fd < 0) { error(env, "closed-handle"); return NULL; }
+  if (!closed_ok && c->poisoned) { error(env, "uncertain-handle"); return NULL; }
   return c;
 }
 static int bound(cap *c) {
@@ -150,7 +160,9 @@ static cap *allocate(napi_env env, int kind) {
 }
 static int open_owned(napi_env env, cap *c, int parent, const char *name, int flags) {
   if (c->state->descriptors>=DESCRIPTOR_MAX) { error(env,"descriptor-limit"); return -1; }
-  int fd=parent<0?open(name,flags):openat(parent,name,flags);
+  int fd;
+  if (flags&O_CREAT) fd=parent<0?open(name,flags,0600):openat(parent,name,flags,0600);
+  else fd=parent<0?open(name,flags):openat(parent,name,flags);
   if (fd<0) { error(env,"native-open"); return -1; }
   c->state->descriptors++;
   return fd;
@@ -192,6 +204,55 @@ static napi_value open_root(napi_env env, napi_callback_info info) {
 static int private_file(const struct stat *st) {
   return S_ISREG(st->st_mode) && st->st_uid==getuid() && (st->st_mode&07777)==0600 && st->st_nlink==1 && st->st_size>=0 && st->st_size<=READ_MAX;
 }
+static int volume(int a, int b) {
+  struct stat sa, sb; struct statfs fa, fb;
+  if (fstat(a,&sa) || fstat(b,&sb) || fstatfs(a,&fa) || fstatfs(b,&fb)) return 0;
+  return sa.st_dev==sb.st_dev && !memcmp(&fa.f_fsid,&fb.f_fsid,sizeof(fa.f_fsid)) &&
+    !strcmp(fa.f_fstypename,"apfs") && !strcmp(fb.f_fstypename,"apfs") &&
+    (fa.f_flags&MNT_LOCAL) && (fb.f_flags&MNT_LOCAL) && !(fa.f_flags&MNT_IGNORE_OWNERSHIP) &&
+    !(fb.f_flags&MNT_IGNORE_OWNERSHIP);
+}
+static cap *root_cap(cap *c) {
+  while (c && c->parent) c=c->parent;
+  return c && c->kind==1 ? c : NULL;
+}
+static int same_root(cap *a, cap *b) {
+  cap *ra=root_cap(a), *rb=root_cap(b);
+  return ra && rb && ra->kind==1 && rb->kind==1 && bound(ra) && bound(rb) &&
+    ra->identity.st_dev==rb->identity.st_dev && ra->identity.st_ino==rb->identity.st_ino;
+}
+static int sync_parent_and_lock(cap *parent, cap *lease) {
+  if (!parent || !lease || !bound(parent) || !bound(lease) || fsync(parent->fd)) return 0;
+  if (!bound(parent) || !bound(lease) || fcntl(lease->fd,F_FULLFSYNC,0)) return 0;
+  return bound(parent) && bound(lease);
+}
+static int empty_directory(int fd) {
+  int dupfd=dup(fd); if (dupfd<0) return 0;
+  DIR *dir=fdopendir(dupfd); if (!dir) { close(dupfd); return 0; }
+  size_t count=0; int ok=1; struct dirent *entry;
+  errno=0;
+  while ((entry=readdir(dir))) {
+    if (!strcmp(entry->d_name,".") || !strcmp(entry->d_name,"..")) continue;
+    if (++count>ENUM_MAX) { ok=0; break; }
+    ok=0;
+  }
+  if (errno) ok=0;
+  if (closedir(dir)) ok=0;
+  return ok;
+}
+static int safe_dir_stat(int fd, struct stat *st) {
+  return !fstat(fd,st) && S_ISDIR(st->st_mode) && st->st_uid==getuid() &&
+    (st->st_mode&07777)==0700 && st->st_nlink>=2;
+}
+static int safe_lock_stat(int fd, struct stat *st) {
+  return !fstat(fd,st) && S_ISREG(st->st_mode) && st->st_uid==getuid() &&
+    (st->st_mode&07777)==0600 && st->st_nlink==1 && st->st_size==0;
+}
+static int fresh_bound(cap *c) {
+  struct stat st;
+  return c && bound(c) && !fstat(c->fd,&st) &&
+    (c->kind==1 ? safe_dir_stat(c->fd,&st) : (c->kind==2 ? private_file(&st) : 1));
+}
 static napi_value open_child(napi_env env, napi_callback_info info, int kind) {
   napi_value argv[3]; char name[256];
   size_t argc=kind==3?1:2;
@@ -216,6 +277,193 @@ static napi_value open_child(napi_env env, napi_callback_info info, int kind) {
 static napi_value open_dir(napi_env e,napi_callback_info i) { return open_child(e,i,1); }
 static napi_value open_file(napi_env e,napi_callback_info i) { return open_child(e,i,2); }
 static napi_value acquire(napi_env e,napi_callback_info i) { return open_child(e,i,3); }
+static napi_value uncertain_created(napi_env env, cap *c) {
+  finalize(env,c,NULL);
+  bool pending=false; napi_is_exception_pending(env,&pending);
+  if (pending) { napi_value ignored; napi_get_and_clear_last_exception(env,&ignored); }
+  return error(env,"ownership-uncertain");
+}
+static napi_value initialize_writer(napi_env env, napi_callback_info info) {
+  napi_value argv[2]; if (!args(env,info,1,argv)) return NULL;
+  cap *root=get(env,argv[0],0);
+  /* Bootstrap is valid only for the canonical openRoot capability, never a
+     descendant directory whose parent chain merely happens to reach a root. */
+  if (!root || root->kind!=1 || root->parent || !root->chain || !root->depth ||
+      root->fd!=root->chain[root->depth-1].fd || !fresh_bound(root)) return error(env,"path-changed");
+  if (!volume(root->fd,root->fd)) return error(env,"unsupported-mount");
+  for (size_t i=0; i<root->depth; i++) if (!evidence(env,root->chain[i].fd)) return NULL;
+  if (!empty_directory(root->fd)) return error(env,"unsafe-root");
+  cap *c=allocate(env,3); if (!c) return NULL;
+  c->parent=root; strcpy(c->name,"writer.lock");
+  c->fd=open_owned(env,c,root->fd,c->name,O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC);
+  if (c->fd<0) { finalize(env,c,NULL); return NULL; }
+  struct stat lock;
+  /* Never remove this inode: every post-create failure is an uncertainty barrier. */
+  if (!safe_lock_stat(c->fd,&lock) || !volume(root->fd,c->fd)) {
+    finalize(env,c,NULL); return error(env,"ownership-uncertain");
+  }
+  if (!evidence(env,c->fd)) return uncertain_created(env,c);
+  c->identity=lock;
+  if (flock(c->fd,LOCK_EX|LOCK_NB) || !bound(c)) {
+    finalize(env,c,NULL); return error(env,"ownership-uncertain");
+  }
+  /* The directory entry is durable before success is reported. Never remove the
+     inode if either barrier fails; the caller must treat ownership as uncertain. */
+  if (!sync_parent_and_lock(root,c)) {
+    finalize(env,c,NULL); return error(env,"ownership-uncertain");
+  }
+  napi_value value=wrap(env,c,argv[0]);
+  if (!value) {
+    bool pending=false; napi_is_exception_pending(env,&pending);
+    if (pending) { napi_value ignored; napi_get_and_clear_last_exception(env,&ignored); }
+    return error(env,"ownership-uncertain");
+  }
+  return value;
+}
+static int valid_lease(cap *parent, cap *lease) {
+  struct stat st; cap *root=root_cap(parent);
+  return root && lease && lease->kind==3 && lease->fd>=0 && !lease->stale && !lease->poisoned && bound(lease) &&
+    safe_lock_stat(lease->fd,&st) && same_root(parent,lease) && volume(root->fd,parent->fd) &&
+    volume(parent->fd,lease->fd);
+}
+static napi_value create_directory(napi_env env, napi_callback_info info) {
+  napi_value argv[4]; char name[256];
+  if (!args(env,info,3,argv)) return NULL;
+  cap *parent=get(env,argv[0],0), *lease=get(env,argv[2],0);
+  if (!parent || !lease || parent->kind!=1 || !string_arg(env,argv[1],name,sizeof(name),1) ||
+      !strcmp(name,"writer.lock") || !fresh_bound(parent) || !valid_lease(parent,lease)) return error(env,"path-changed");
+  cap *c=allocate(env,1); if (!c) return NULL;
+  c->parent=parent; strcpy(c->name,name);
+  if (mkdirat(parent->fd,name,0700)) {
+    int failure=errno;
+    finalize(env,c,NULL);
+    /* EEXIST, missing/invalid parents and permission/type rejection are
+       known no-op outcomes. EINTR and I/O-style failures are not retryable:
+       the namespace mutation may have completed before the error returned. */
+    if (failure==EEXIST || failure==ENOENT || failure==EACCES || failure==EPERM ||
+        failure==ENOTDIR || failure==ELOOP || failure==ENAMETOOLONG || failure==EINVAL)
+      return error(env,"native-mkdir");
+    lease->poisoned=1;
+    return error(env,"mkdir-uncertain");
+  }
+  c->fd=open_owned(env,c,parent->fd,name,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+  if (c->fd<0) { lease->poisoned=1; finalize(env,c,NULL); return error(env,"mkdir-uncertain"); }
+  if (!safe_dir_stat(c->fd,&c->identity) || !volume(parent->fd,c->fd) || !bound(c)) {
+    lease->poisoned=1; finalize(env,c,NULL); return error(env,"mkdir-uncertain");
+  }
+  if (!sync_parent_and_lock(parent,lease)) { lease->poisoned=1; finalize(env,c,NULL); return error(env,"sync-uncertain"); }
+  return wrap(env,c,argv[0]);
+}
+static int tx_ready(cap *tx) {
+  struct stat st;
+  return tx && tx->kind==4 && !tx->published && !tx->poisoned && tx->fd>=0 && tx->parent && tx->parent->kind==1 &&
+    fresh_bound(tx->parent) && valid_lease(tx->parent,tx->lease) && bound(tx) &&
+    !fstat(tx->fd,&st) && private_file(&st) && st.st_size==(off_t)tx->written &&
+    tx->written<=tx->max_bytes && volume(tx->parent->fd,tx->fd) &&
+    volume(root_cap(tx->parent)->fd,tx->fd);
+}
+static napi_value begin_write(napi_env env, napi_callback_info info) {
+  napi_value argv[6]; char temporary[256], final_name[256]; double max_number;
+  if (!args(env,info,5,argv)) return NULL;
+  cap *parent=get(env,argv[0],0), *lease=get(env,argv[4],0);
+  if (!parent || !lease || parent->kind!=1 || !string_arg(env,argv[1],temporary,sizeof(temporary),1) ||
+      !string_arg(env,argv[2],final_name,sizeof(final_name),1) ||
+      napi_get_value_double(env,argv[3],&max_number)!=napi_ok || !isfinite(max_number) || max_number<1 ||
+      max_number>WRITE_MAX || max_number!=(uint32_t)max_number || !strcmp(temporary,"writer.lock") ||
+      !strcmp(final_name,"writer.lock") || !fresh_bound(parent) || !valid_lease(parent,lease)) return error(env,"invalid-argument");
+  cap *c=allocate(env,4); if (!c) return NULL;
+  c->parent=parent; c->lease=lease; strcpy(c->name,temporary); strcpy(c->final_name,final_name);
+  c->max_bytes=(uint64_t)max_number;
+  c->fd=open_owned(env,c,parent->fd,temporary,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC);
+  if (c->fd<0) { finalize(env,c,NULL); return NULL; }
+  if (fstat(c->fd,&c->identity) || !private_file(&c->identity) || !volume(parent->fd,c->fd) || !bound(c)) {
+    finalize(env,c,NULL); return error(env,"unsafe-object");
+  }
+  napi_value value=wrap(env,c,argv[0]);
+  if (!value) return NULL;
+  if (napi_create_reference(env,argv[4],1,&c->lease_ref)!=napi_ok) { release(env,c); return error(env,"native-api"); }
+  return value;
+}
+static napi_value write_transaction(napi_env env, napi_callback_info info) {
+  napi_value argv[3]; bool is_buffer=false; void *data=NULL; size_t length=0;
+  if (!args(env,info,2,argv)) return NULL;
+  cap *tx=get(env,argv[0],0);
+  if (!tx || !tx_ready(tx) || napi_is_buffer(env,argv[1],&is_buffer)!=napi_ok || !is_buffer ||
+      napi_get_buffer_info(env,argv[1],&data,&length)!=napi_ok || length>tx->max_bytes-tx->written)
+    return error(env,"invalid-argument");
+  size_t offset=0;
+  while (offset<length) {
+    ssize_t n=write(tx->fd,(unsigned char *)data+offset,length-offset);
+    if (n<0) { if (errno==EINTR) continue; if (offset) tx->poisoned=1; return error(env,offset?"write-uncertain":"native-write"); }
+    if (!n) { tx->poisoned=1; return error(env,"write-uncertain"); }
+    offset+=(size_t)n; tx->written+=(uint64_t)n;
+  }
+  struct stat after;
+  if (!bound(tx) || fstat(tx->fd,&after) || !private_file(&after) || after.st_size!=(off_t)tx->written) {
+    tx->poisoned=1; return error(env,"write-uncertain");
+  }
+  napi_value out; N(napi_get_undefined(env,&out)); return out;
+}
+static int checked_expected(cap *tx, cap *expected) {
+  struct stat current, destination;
+  return expected && expected->kind==2 && expected->parent==tx->parent && !expected->stale &&
+    bound(expected) && private_file(&expected->identity) && !fstat(expected->fd,&current) &&
+    unchanged(&current,&expected->identity) && !fstatat(tx->parent->fd,expected->name,&destination,AT_SYMLINK_NOFOLLOW) &&
+    unchanged(&destination,&expected->identity) && volume(tx->parent->fd,expected->fd);
+}
+static napi_value publish(napi_env env, napi_callback_info info, int replace) {
+  napi_value argv[3]; if (!args(env,info,replace?2:1,argv)) return NULL;
+  cap *tx=get(env,argv[0],0); if (!tx || !tx_ready(tx)) return error(env,"path-changed");
+  cap *expected=replace?get(env,argv[1],0):NULL;
+  if (replace && (!expected || !checked_expected(tx,expected) || strcmp(tx->final_name,expected->name))) return error(env,"stale-handle");
+  if (!replace && !fresh_bound(tx->parent)) return error(env,"path-changed");
+  if (fsync(tx->fd)) { tx->poisoned=1; return error(env,"write-not-durable"); }
+  int flags=replace?0:RENAME_EXCL;
+  if (renameatx_np(tx->parent->fd,tx->name,tx->parent->fd,tx->final_name,flags)) {
+    if (errno!=EEXIST) tx->poisoned=1;
+    return error(env,errno==EEXIST?"destination-exists":"publication-uncertain");
+  }
+  tx->published=1; strcpy(tx->name,tx->final_name);
+  if (fstatat(tx->parent->fd,tx->name,&tx->identity,AT_SYMLINK_NOFOLLOW) || !S_ISREG(tx->identity.st_mode)) {
+    tx->poisoned=1; return error(env,"publication-uncertain");
+  }
+  if (expected) expected->stale=1;
+  if (fsync(tx->parent->fd)) { tx->poisoned=1; return error(env,"publication-uncertain"); }
+  if (fcntl(tx->lease->fd,F_FULLFSYNC,0)) { tx->poisoned=1; return error(env,"publication-uncertain"); }
+  return argv[0];
+}
+static napi_value publish_new(napi_env env,napi_callback_info info) { return publish(env,info,0); }
+static napi_value publish_replace(napi_env env,napi_callback_info info) { return publish(env,info,1); }
+static napi_value remove_checked(napi_env env,napi_callback_info info,int directory) {
+  napi_value argv[3]; if (!args(env,info,2,argv)) return NULL;
+  cap *expected=get(env,argv[0],0), *lease=get(env,argv[1],0);
+  if (!expected || !lease || expected->kind!=(directory?1:2) || (!directory && !strcmp(expected->name,"writer.lock")) || !expected->parent ||
+      !fresh_bound(expected->parent) || !valid_lease(expected->parent,lease) || !bound(expected) || expected->stale)
+    return error(env,"stale-handle");
+  if (directory && !empty_directory(expected->fd)) return error(env,"directory-not-empty");
+  struct stat current,destination;
+  if (fstat(expected->fd,&current) || !unchanged(&current,&expected->identity) ||
+      fstatat(expected->parent->fd,expected->name,&destination,AT_SYMLINK_NOFOLLOW) ||
+      !unchanged(&destination,&expected->identity) || !volume(expected->parent->fd,expected->fd))
+    return error(env,"stale-handle");
+  if (unlinkat(expected->parent->fd,expected->name,directory?AT_REMOVEDIR:0)) {
+    int failure=errno;
+    /* These errors are known no-op outcomes after the identity check. Other
+       failures are ambiguous: do not retry or attempt rollback. */
+    if (failure==ENOENT) return error(env,"remove-missing");
+    if (failure==EACCES || failure==EPERM || failure==ENOTDIR || failure==ELOOP ||
+        failure==ENAMETOOLONG || failure==EINVAL || (!directory && failure==EISDIR) ||
+        (directory && (failure==ENOTEMPTY || failure==EEXIST)))
+      return error(env,"remove-failed");
+    expected->poisoned=1; lease->poisoned=1;
+    return error(env,"remove-uncertain");
+  }
+  expected->stale=1;
+  if (!sync_parent_and_lock(expected->parent,lease)) { expected->poisoned=1; lease->poisoned=1; return error(env,"remove-uncertain"); }
+  napi_value out; N(napi_get_undefined(env,&out)); return out;
+}
+static napi_value remove_file_checked(napi_env env,napi_callback_info info) { return remove_checked(env,info,0); }
+static napi_value remove_directory_checked(napi_env env,napi_callback_info info) { return remove_checked(env,info,1); }
 
 static int flag_mask(void *object, uint32_t *out) {
   acl_flagset_t set;
@@ -355,11 +603,17 @@ static napi_value init(napi_env env,napi_value exports) {
   const napi_property_descriptor properties[]={
     {"openRoot",0,open_root,0,0,0,napi_default,0}, {"openDirectory",0,open_dir,0,0,0,napi_default,0},
     {"openFile",0,open_file,0,0,0,napi_default,0}, {"acquireWriter",0,acquire,0,0,0,napi_default,0},
+    {"initializeWriter",0,initialize_writer,0,0,0,napi_default,0},
+    {"createDirectory",0,create_directory,0,0,0,napi_default,0},
+    {"beginWrite",0,begin_write,0,0,0,napi_default,0}, {"write",0,write_transaction,0,0,0,napi_default,0},
+    {"publishNew",0,publish_new,0,0,0,napi_default,0}, {"publishReplace",0,publish_replace,0,0,0,napi_default,0},
+    {"removeChecked",0,remove_file_checked,0,0,0,napi_default,0},
+    {"removeDirectoryChecked",0,remove_directory_checked,0,0,0,napi_default,0},
     {"inspect",0,inspect,0,0,0,napi_default,0}, {"ancestors",0,ancestors,0,0,0,napi_default,0},
     {"readBounded",0,read_bounded,0,0,0,napi_default,0}, {"close",0,close_cap,0,0,0,napi_default,0}
   };
   N(napi_define_properties(env,exports,sizeof(properties)/sizeof(properties[0]),properties));
-  SET(exports,"version",number(env,1)); SET(exports,"napi",number(env,8));
+  SET(exports,"version",number(env,1)); SET(exports,"napi",number(env,8)); SET(exports,"writeVersion",number(env,1));
   return exports;
 }
 NAPI_MODULE(NODE_GYP_MODULE_NAME,init)

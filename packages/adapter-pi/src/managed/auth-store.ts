@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { join } from 'node:path';
 import { fail, sanitized } from './errors.js';
 import { exact, opaqueId, positive, validId, validToken, type AuthHello } from './protocol.js';
+import { readValue } from './files-port.js';
 import type { FilesPort, FileReceipt } from './files-port.js';
 
 export type Authorization = 'pending' | 'enabled' | 'revoked';
@@ -37,7 +38,7 @@ export function parseRegistry(value: unknown): Registry {
 /** Single writer owned by the service's durable exclusive claim. Not a consent/install API. */
 export class AuthStore {
   private registry!: Registry;
-  private authority!: FileReceipt;
+  private authority: FileReceipt | undefined;
   private tokens = new Map<string, Credential>();
   private denied = new Set<string>();
   private fences = new Map<string, number>();
@@ -56,12 +57,21 @@ export class AuthStore {
       store.authority = await files.publish(join(root, 'authorization.json'), store.registry, STORE_BYTES, 'authority-write');
     } else {
       const result = await files.read(join(root, 'authorization.json'), STORE_BYTES, 'authority-read');
-      store.registry = parseRegistry(result.value); store.authority = result.owned;
-      for (const target of store.registry.targets) if (target.state === 'enabled') {
-        const { value } = await files.read(credentialPath(root, target.targetId, target.epoch), CREDENTIAL_BYTES, 'credential-read');
-        const credential = parseCredential(value, store.registry.authSetId, target.targetId);
-        if (credential.epoch !== target.epoch || digest(credential.token) !== target.digest) fail('store-corrupt');
-        store.tokens.set(target.targetId, credential);
+      try {
+        store.registry = parseRegistry(result.value);
+        // The authority receipt is retained for checked replacement; ordinary credential
+        // reads are parsed through the consuming helper and retain no capability.
+        store.authority = result.owned;
+        for (const target of store.registry.targets) if (target.state === 'enabled') {
+          const credential = await readValue(files, credentialPath(root, target.targetId, target.epoch), CREDENTIAL_BYTES, 'credential-read', value =>
+            parseCredential(value, store.registry.authSetId, target.targetId));
+          if (credential.epoch !== target.epoch || digest(credential.token) !== target.digest) fail('store-corrupt');
+          store.tokens.set(target.targetId, credential);
+        }
+      } catch (error) {
+        try { files.release(result.owned); }
+        catch (releaseError) { throw releaseError; }
+        throw error;
       }
     }
     return store;
@@ -102,19 +112,41 @@ export class AuthStore {
     if (this.registry.revision >= Number.MAX_SAFE_INTEGER) fail('limit-exceeded');
     const next: Registry = { ...this.registry, revision: this.registry.revision + 1,
       targets: [...this.registry.targets.filter(t => t.targetId !== target.targetId), target] };
-    const authority = await this.files.publish(join(this.files.storageRoot, 'authorization.json'), next, STORE_BYTES, 'authority-write', this.authority);
-    this.registry = next; this.authority = authority;
+    const previous = this.authority;
+    try {
+      const authority = await this.files.publish(join(this.files.storageRoot, 'authorization.json'), next, STORE_BYTES, 'authority-write', previous);
+      this.registry = next; this.authority = authority;
+    } catch (error) {
+      // A failed checked replacement consumes its old receipt; the queue poison
+      // barrier prevents any later mutation from attempting to reuse it.
+      this.authority = undefined;
+      throw error;
+    }
   }
   private async credential(targetId: string, epoch: number): Promise<Credential> {
     const credential: Credential = { schema: 1, authSetId: this.registry.authSetId, targetId, epoch, token: randomBytes(32).toString('hex') };
-    await this.files.publish(credentialPath(this.files.storageRoot, targetId, epoch), credential, CREDENTIAL_BYTES, 'credential-write');
+    const receipt = await this.files.publish(credentialPath(this.files.storageRoot, targetId, epoch), credential, CREDENTIAL_BYTES, 'credential-write');
+    // Credential publication is not retained by AuthStore; settle its receipt now.
+    this.files.release(receipt);
     return credential;
   }
   private async cleanupCredential(targetId: string, epoch: number, expectedDigest: string): Promise<void> {
-    const result = await this.files.read(credentialPath(this.files.storageRoot, targetId, epoch), CREDENTIAL_BYTES, 'credential-read');
-    const credential = parseCredential(result.value, this.registry.authSetId, targetId);
-    if (credential.epoch !== epoch || digest(credential.token) !== expectedDigest) fail('store-corrupt');
-    await this.files.remove(result.owned);
+    const receipt = await this.files.read(credentialPath(this.files.storageRoot, targetId, epoch), CREDENTIAL_BYTES, 'credential-read');
+    let credential: Credential;
+    try { credential = parseCredential(receipt.value, this.registry.authSetId, targetId); }
+    catch (error) {
+      try { this.files.release(receipt.owned); }
+      catch (releaseError) { throw releaseError; }
+      throw error;
+    }
+    if (credential.epoch !== epoch || digest(credential.token) !== expectedDigest) {
+      try { this.files.release(receipt.owned); }
+      catch (releaseError) { throw releaseError; }
+      fail('store-corrupt');
+    }
+    // remove consumes the receipt before attempting cleanup; its failure must not
+    // be replaced by a second release of an already-settled capability.
+    await this.files.remove(receipt.owned);
   }
   prepareTarget(): Promise<Omit<Target, 'digest'>> {
     return this.enqueue(async () => {
@@ -130,8 +162,8 @@ export class AuthStore {
     return this.enqueue(async () => {
       const target = this.expected(targetId, epoch, revision);
       if (target.state !== 'pending' || this.denied.has(targetId)) fail('stale-operation');
-      const { value } = await this.files.read(credentialPath(this.files.storageRoot, targetId, epoch), CREDENTIAL_BYTES, 'credential-read');
-      const credential = parseCredential(value, this.registry.authSetId, targetId);
+      const credential = await readValue(this.files, credentialPath(this.files.storageRoot, targetId, epoch), CREDENTIAL_BYTES, 'credential-read', value =>
+        parseCredential(value, this.registry.authSetId, targetId));
       if (credential.epoch !== epoch || digest(credential.token) !== target.digest) fail('store-corrupt');
       if ((this.fences.get(targetId) ?? 0) !== fence) fail('stale-operation');
       await this.commit({ ...target, state: 'enabled' });
@@ -172,6 +204,14 @@ export class AuthStore {
       validToken(auth.token) && timingSafeEqual(Buffer.from(auth.token, 'hex'), Buffer.from(credential.token, 'hex'));
   }
   async close(): Promise<void> {
-    this.closed = true; this.tokens.clear(); this.onDeny(); await this.queue;
+    this.closed = true; this.tokens.clear(); this.onDeny();
+    let failure: unknown; let failed = false;
+    try { await this.queue; }
+    catch (error) { failure = error; failed = true; }
+    if (this.authority) {
+      try { this.files.release(this.authority); this.authority = undefined; }
+      catch (error) { if (!failed) { failure = error; failed = true; } }
+    }
+    if (failed) throw failure;
   }
 }

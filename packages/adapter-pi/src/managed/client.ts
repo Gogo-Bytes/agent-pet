@@ -6,6 +6,7 @@ import { NodeFilesPort } from './node-files-port.js';
 import { sameIdentity, type FilesystemPolicy, type Roots } from './path-policy.js';
 import { CREDENTIAL_BYTES, credentialPath, parseCredential, parseRegistry, STORE_BYTES } from './auth-store.js';
 import { endpoint, readDiscovery } from './discovery.js';
+import { readValue } from './files-port.js';
 import { fail, sanitized } from './errors.js';
 import { Frames, frameBudget, lowerLimits, sendFrame, type Limits } from './frames.js';
 import { matchesAck, parseEvent, PROTOCOL, validId, type AuthHello, type ManagedSessionEvent } from './protocol.js';
@@ -21,13 +22,12 @@ export async function connectManagedCore(options: ClientOptions & { policy: File
     const storage = new NodeFilesPort(files);
     if (!validId(options.authSetId) || !validId(options.targetId)) fail('unauthorized');
     const limits = lowerLimits(options.limits);
-    const { discovery } = await readDiscovery(storage, options.authSetId);
-    const { value } = await storage.read(join(scope.roots.storageRoot, 'authorization.json'), STORE_BYTES, 'authority-read');
-    const registry = parseRegistry(value);
+    const discovery = await readDiscovery(storage, options.authSetId);
+    const registry = await readValue(storage, join(scope.roots.storageRoot, 'authorization.json'), STORE_BYTES, 'authority-read', parseRegistry);
     const target = registry.targets.find(t => t.targetId === options.targetId);
     if (registry.authSetId !== options.authSetId || !target || target.state !== 'enabled') fail('unauthorized');
-    const credentialFile = await storage.read(credentialPath(scope.roots.storageRoot, target.targetId, target.epoch), CREDENTIAL_BYTES, 'credential-read');
-    const credential = parseCredential(credentialFile.value, options.authSetId, options.targetId);
+    const credential = await readValue(storage, credentialPath(scope.roots.storageRoot, target.targetId, target.epoch), CREDENTIAL_BYTES, 'credential-read', value =>
+      parseCredential(value, options.authSetId, options.targetId));
     if (credential.epoch !== target.epoch || createHash('sha256').update(Buffer.from(credential.token, 'hex')).digest('hex') !== target.digest) fail('unauthorized');
     const path = endpoint(scope.roots.runtimeRoot, discovery.instance);
     const checkedSocket = await files.socket(path, 'socket-connect'); // MUST precede even the first token byte.

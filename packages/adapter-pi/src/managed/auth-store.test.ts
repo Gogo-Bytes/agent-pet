@@ -16,7 +16,7 @@ for (const action of ['enable', 'revoke', 'rotate'] as const) for (const boundar
     const revision = f.service.store.snapshot().revision; armed = true;
     const operation = action === 'enable' ? f.service.store.enableTarget(target.targetId, 1, revision) :
       action === 'revoke' ? f.service.store.revokeTarget(target.targetId, 1, revision) : f.service.store.rotateTarget(target.targetId, 1, revision);
-    await expect(operation).rejects.toThrow(boundary === 'directory-sync' ? 'outcome-uncertain' : 'durability-failed');
+    await expect(operation).rejects.toThrow(boundary === 'file-sync' || boundary === 'directory-sync' ? 'outcome-uncertain' : 'durability-failed');
     if (peer) await peer.closed;
     expect(f.service.store.snapshot().blocked).toBe(true);
     expect(f.service.store.authenticate(a.auth)).toBe(false);

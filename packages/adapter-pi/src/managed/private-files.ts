@@ -1,15 +1,26 @@
 import { constants, type Stats } from 'node:fs';
-import { lstat, open, mkdir, link, rename, unlink, rmdir } from 'node:fs/promises';
+import { lstat, open, mkdir, link, rename, unlink, rmdir, type FileHandle } from 'node:fs/promises';
 import { dirname, join, parse, relative, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fail, missing, sanitized } from './errors.js';
 import { sameIdentity, validatePath, type Identity, type Operation, type PolicyScope } from './path-policy.js';
 
-export type Boundary = 'read-open' | 'read-complete' | 'create' | 'write' | 'file-sync' | 'publish' | 'directory-sync' | 'cleanup';
+export type Boundary = 'read-open' | 'read-complete' | 'create' | 'write' | 'file-sync' | 'publish' | 'directory-sync' | 'cleanup' | 'transaction-close';
 /** Internal deterministic fault seam, not native ACL/mount evidence. */
 export type FaultHook = (boundary: Boundary, operation: Operation) => void | Promise<void>;
 export type OwnedFile = { path: string; identity: Stats };
 const sameFile = (a: Stats, b: Stats): boolean => sameIdentity(a, b) && a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs && a.nlink === b.nlink;
+
+export type PrivateTransactionState = 'Prepared' | 'Writing' | 'Published' | 'Aborted' | 'MutationUncertain' | 'CloseUncertain';
+export interface PrivateWriteTransaction {
+  readonly state: PrivateTransactionState;
+  write(value: unknown): Promise<void>;
+  publishNew(): Promise<OwnedFile>;
+  publishReplace(previous: OwnedFile): Promise<OwnedFile>;
+  abort(): Promise<void>;
+  close(): Promise<void>;
+}
+
 export class PrivateFiles {
   constructor(readonly scope: PolicyScope, private readonly fault: FaultHook = () => {}) {
     validatePath(scope.roots.storageRoot); validatePath(scope.roots.runtimeRoot);
@@ -19,6 +30,10 @@ export class PrivateFiles {
     validatePath(path);
     if (![this.scope.roots.storageRoot, this.scope.roots.runtimeRoot].some(root => path === root ||
       (!relative(root, path).startsWith(`..${sep}`) && relative(root, path) !== '..' && !relative(root, path).startsWith(sep)))) fail('unsupported-path');
+  }
+  private async closeHandle(file: FileHandle, operation: Operation): Promise<void> {
+    try { await this.fault('transaction-close', operation); await file.close(); }
+    catch { fail('outcome-uncertain'); }
   }
   async directory(path: string, operation: Operation): Promise<Stats> {
     this.contained(path);
@@ -77,7 +92,7 @@ export class PrivateFiles {
         if (length > max || length !== start.size || !sameFile(start, end) || !sameFile(end, leaf) ||
           start.size !== end.size || start.mtimeMs !== end.mtimeMs || start.ctimeMs !== end.ctimeMs) fail('path-changed');
         return { value: JSON.parse(buffer.subarray(0, length).toString('utf8')) as unknown, owned: { path, identity: end } };
-      } finally { await file.close(); }
+      } finally { await this.closeHandle(file, operation); }
     } catch (error) { throw sanitized(error, 'store-corrupt'); }
   }
   async syncDirectory(path: string, operation: Operation): Promise<void> {
@@ -86,7 +101,7 @@ export class PrivateFiles {
     try {
       if (!sameIdentity(before, await file.stat())) fail('path-changed');
       await this.fault('directory-sync', operation); await file.sync();
-    } finally { await file.close(); }
+    } finally { await this.closeHandle(file, operation); }
   }
   async createDirectory(path: string, operation: Operation): Promise<OwnedFile> {
     await this.directory(dirname(path), operation);
@@ -98,37 +113,94 @@ export class PrivateFiles {
     await this.syncDirectory(dirname(path), operation);
     return { path, identity };
   }
-  async publish(path: string, value: unknown, max: number, operation: Operation, previous?: OwnedFile): Promise<OwnedFile> {
-    const bytes = Buffer.from(JSON.stringify(value));
-    if (bytes.length > max) fail('limit-exceeded');
-    let published = false;
-    try {
-      await this.directory(dirname(path), operation);
-      const temporary = join(dirname(path), `.write-${randomBytes(16).toString('hex')}`);
-      await this.fault('create', operation);
-      const file = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-      try {
-        this.checkFile(await file.stat(), max);
-        await this.fault('write', operation); await file.writeFile(bytes);
-        await this.fault('file-sync', operation); await file.sync();
-      } finally { await file.close(); }
+  async beginWrite(path: string, max: number, operation: Operation): Promise<PrivateWriteTransaction> {
+    if (!Number.isSafeInteger(max) || max < 1) fail('limit-exceeded');
+    await this.directory(dirname(path), operation);
+    const temporary = join(dirname(path), `.write-${randomBytes(16).toString('hex')}`);
+    try { await this.fault('create', operation); }
+    catch (error) { throw sanitized(error, 'durability-failed'); }
+    let file: FileHandle;
+    try { file = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }
+    catch (error) { throw sanitized(error, 'durability-failed'); }
+    try { this.checkFile(await file.stat(), max); }
+    catch (error) { await this.closeHandle(file, operation); throw error; }
+    let state: PrivateTransactionState = 'Prepared';
+    let closed = false;
+    let closeUncertain = false;
+    const close = async (): Promise<void> => {
+      if (closeUncertain) fail('outcome-uncertain');
+      if (closed) return;
+      try { await this.closeHandle(file, operation); }
+      catch (error) { closeUncertain = true; state = 'CloseUncertain'; throw error; }
+      closed = true;
+    };
+    const ensureWriting = () => {
+      if (state !== 'Writing') fail(state === 'MutationUncertain' || state === 'CloseUncertain' ? 'outcome-uncertain' : 'unavailable');
+    };
+    const publish = async (previous?: OwnedFile): Promise<OwnedFile> => {
+      ensureWriting();
+      await close();
       await this.inspect(temporary, max, operation);
       await this.directory(dirname(path), operation);
-      if (previous) {
-        if (previous.path !== path || !sameFile(previous.identity, await this.inspect(path, max, operation))) fail('path-changed');
+      if (previous && (previous.path !== path || !sameFile(previous.identity, await this.inspect(path, max, operation)))) fail('path-changed');
+      try {
+        // The hook is before the namespace mutation, so this is a known no-op.
+        try { await this.fault('publish', operation); }
+        catch (error) { throw sanitized(error, 'durability-failed'); }
+        if (previous) await rename(temporary, path);
+        else { await link(temporary, path); await unlink(temporary); }
+        state = 'Published';
+        await this.syncDirectory(dirname(path), operation);
+        return { path, identity: await this.inspect(path, max, operation) };
+      } catch (error) {
+        const code = error instanceof Error && 'code' in error ? (error as { code?: string }).code : undefined;
+        // The hook runs before the namespace operation; EEXIST is the known no-op
+        // result of no-clobber publication. All later failures may have mutated.
+        if (code === 'durability-failed' || code === 'EEXIST') { state = 'Writing'; throw sanitized(error, 'durability-failed'); }
+        state = 'MutationUncertain';
+        throw sanitized(error, 'outcome-uncertain');
       }
-      await this.fault('publish', operation);
-      if (previous) { await rename(temporary, path); published = true; }
-      else {
-        // Hard-link publication is atomic no-clobber; remove temporary link before admitting readers.
-        await link(temporary, path); published = true; await unlink(temporary);
-      }
-      await this.syncDirectory(dirname(path), operation);
-      return { path, identity: await this.inspect(path, max, operation) };
+    };
+    return {
+      get state() { return state; },
+      write: async (value: unknown): Promise<void> => {
+        if (state !== 'Prepared') fail(state === 'MutationUncertain' || state === 'CloseUncertain' ? 'outcome-uncertain' : 'unavailable');
+        let bytes: Buffer;
+        try { bytes = Buffer.from(JSON.stringify(value)); }
+        catch (error) { throw sanitized(error, 'durability-failed'); }
+        if (bytes.length > max) fail('limit-exceeded');
+        try {
+          // This hook is before writeFile and is therefore a known no-op failure.
+          await this.fault('write', operation);
+        } catch (error) { throw sanitized(error, 'durability-failed'); }
+        try {
+          await file.writeFile(bytes);
+          await this.fault('file-sync', operation); await file.sync(); state = 'Writing';
+        } catch (error) { state = 'MutationUncertain'; throw sanitized(error, 'durability-failed'); }
+      },
+      publishNew: () => publish(),
+      publishReplace: (previous: OwnedFile) => publish(previous),
+      abort: async (): Promise<void> => {
+        if (state === 'Aborted') return;
+        if (state === 'Published' || state === 'MutationUncertain' || state === 'CloseUncertain') fail('outcome-uncertain');
+        await close();
+        try { await unlink(temporary); await this.syncDirectory(dirname(path), 'cleanup'); state = 'Aborted'; }
+        catch (error) { if (missing(error)) { state = 'Aborted'; return; } state = 'MutationUncertain'; throw sanitized(error, 'outcome-uncertain'); }
+      },
+      close,
+    };
+  }
+  async publish(path: string, value: unknown, max: number, operation: Operation, previous?: OwnedFile): Promise<OwnedFile> {
+    const transaction = await this.beginWrite(path, max, operation);
+    try {
+      await transaction.write(value);
+      const result = previous ? await transaction.publishReplace(previous) : await transaction.publishNew();
+      await transaction.close();
+      return result;
     } catch (error) {
-      if (published) fail('outcome-uncertain');
-      throw sanitized(error, 'durability-failed');
-    }
+      try { await transaction.abort(); } catch (abortError) { throw abortError; }
+      throw error;
+    } finally { await transaction.close(); }
   }
   async remove(owned: OwnedFile, directory = false): Promise<void> {
     try {

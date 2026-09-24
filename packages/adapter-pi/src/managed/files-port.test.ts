@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { join } from 'node:path';
 import { AuthStore, CREDENTIAL_BYTES, credentialPath, parseCredential } from './auth-store.js';
 import { DISCOVERY_BYTES, readDiscovery, type Discovery } from './discovery.js';
-import { readValue, type FileReceipt, type FilesPort, type FilesReader, type WriteTransaction } from './files-port.js';
+import { readValue, type FileReceipt, type FilesPort, type FilesReader, type OwnerClaim, type WriteTransaction } from './files-port.js';
 
 /** Consumer fixture only: no filesystem or native security claims. */
 class MemoryFiles implements FilesPort {
@@ -11,6 +11,9 @@ class MemoryFiles implements FilesPort {
   private receipts = new WeakMap<FileReceipt, string>();
   readonly releasedPaths: string[] = [];
   async createDirectory(): Promise<void> {}
+  async acquireOwner(): Promise<OwnerClaim> { return { path: `${this.storageRoot}/owner`, removed: true, async remove() {}, async close() {} }; }
+  async drain(): Promise<void> {}
+  async close(): Promise<void> {}
   release(owned: FileReceipt): void { this.releasedPaths.push(this.receipts.get(owned) ?? 'unknown'); }
   set(path: string, value: unknown): void {
     const entry = this.entries.get(path);

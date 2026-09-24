@@ -1,9 +1,12 @@
 import { expect, test } from 'vitest';
+import { access, mkdir, rename, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { SessionObservation } from '@agent-pet/domain';
 import { createManagedPiService, connectManagedPiClient } from './index.js';
 import { openManagedCore } from './service.js';
 import { connectManagedCore } from './client.js';
 import { opaqueId } from './protocol.js';
+import { fail } from './errors.js';
 import { admitted, authentication, baseline, cleanups, enabled, fixture, lifecycle, opened, raw, wire } from './test-helpers.js';
 
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));
@@ -115,6 +118,31 @@ test('bounded stop destroys idle and unauthenticated peers and is idempotent', a
   await Promise.all([first, idle.closed, pending.closed]);
   expect(f.service.connectionsSnapshot()).toEqual({});
   await expect(f.service.start()).rejects.toThrow('unavailable');
+});
+
+test('store close failure still tears down the listener and preserves the durable claim', async () => {
+  const f = await opened(); const target = await enabled(f.service); const a = await authentication(f, target.targetId);
+  const peer = await admitted(a.auth, a.path);
+  const originalClose = f.service.store.close.bind(f.service.store);
+  f.service.store.close = async () => fail('durability-failed');
+  await expect(f.service.stop()).rejects.toThrow('durability-failed');
+  await peer.closed;
+  await access(join(f.roots.storageRoot, 'owner'));
+  await expect(f.service.start()).rejects.toThrow('unavailable');
+  f.service.store.close = originalClose;
+});
+
+test('unknown owner children and substituted claims are never removed during final release', async () => {
+  const first = await opened();
+  await mkdir(join(first.roots.storageRoot, 'owner', 'unknown'), { mode: 0o700 });
+  await expect(first.service.stop()).rejects.toThrow();
+  await access(join(first.roots.storageRoot, 'owner', 'unknown'));
+
+  const second = await opened();
+  const owner = join(second.roots.storageRoot, 'owner'); const backup = join(second.roots.storageRoot, 'owner-backup');
+  await rename(owner, backup); await mkdir(owner, { mode: 0o700 }); await writeFile(join(owner, 'foreign'), 'x', { mode: 0o600 });
+  await expect(second.service.stop()).rejects.toThrow('path-changed');
+  await access(join(owner, 'foreign')); await access(backup);
 });
 test('initialization is explicit and exclusive writer claim is never stolen', async () => {
   const f = await fixture();

@@ -3,6 +3,7 @@ import { lstat, open, mkdir, link, rename, unlink, rmdir, type FileHandle } from
 import { dirname, join, parse, relative, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fail, missing, sanitized } from './errors.js';
+import type { OwnerClaim } from './files-port.js';
 import { sameIdentity, validatePath, type Identity, type Operation, type PolicyScope } from './path-policy.js';
 
 export type Boundary = 'read-open' | 'read-complete' | 'create' | 'write' | 'file-sync' | 'publish' | 'directory-sync' | 'cleanup' | 'transaction-close';
@@ -108,10 +109,14 @@ export class PrivateFiles {
     await this.fault('create', operation);
     try { await mkdir(path, { mode: 0o700 }); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') fail('ownership-busy'); throw sanitized(error); }
-    const identity = await this.directory(path, operation);
-    await this.syncDirectory(path, operation);
-    await this.syncDirectory(dirname(path), operation);
-    return { path, identity };
+    // mkdir has completed, so every later validation or sync failure leaves the
+    // namespace outcome uncertain even when the failure is otherwise ordinary.
+    try {
+      const identity = await this.directory(path, operation);
+      await this.syncDirectory(path, operation);
+      await this.syncDirectory(dirname(path), operation);
+      return { path, identity };
+    } catch { fail('outcome-uncertain'); }
   }
   async beginWrite(path: string, max: number, operation: Operation): Promise<PrivateWriteTransaction> {
     if (!Number.isSafeInteger(max) || max < 1) fail('limit-exceeded');
@@ -184,8 +189,11 @@ export class PrivateFiles {
         if (state === 'Aborted') return;
         if (state === 'Published' || state === 'MutationUncertain' || state === 'CloseUncertain') fail('outcome-uncertain');
         await close();
+        // Once unlink is attempted, even ENOENT leaves the temporary inode's
+        // outcome unknown. Parent sync failures are equally uncertain; never
+        // turn either case into a clean Aborted state.
         try { await unlink(temporary); await this.syncDirectory(dirname(path), 'cleanup'); state = 'Aborted'; }
-        catch (error) { if (missing(error)) { state = 'Aborted'; return; } state = 'MutationUncertain'; throw sanitized(error, 'outcome-uncertain'); }
+        catch { state = 'MutationUncertain'; fail('outcome-uncertain'); }
       },
       close,
     };
@@ -202,16 +210,52 @@ export class PrivateFiles {
       throw error;
     } finally { await transaction.close(); }
   }
-  async remove(owned: OwnedFile, directory = false): Promise<void> {
+  async acquireOwner(): Promise<OwnerClaim> {
+    const owned = await this.createDirectory(join(this.scope.roots.storageRoot, 'owner'), 'ownership');
+    let removed = false;
+    let removal: Promise<void> | undefined;
+    let disposal: Promise<void> | undefined;
+    return {
+      path: owned.path,
+      get removed() { return removed; },
+      remove: () => removal ??= this.remove(owned, true, false, () => { removed = true; }),
+      close: () => disposal ??= (async () => {
+        if (!removed) fail('unavailable');
+        // Node has no retained claim fd or writer lease. D3 must release those
+        // here only after drain; failed close is terminal, never retried.
+      })(),
+    };
+  }
+  async remove(owned: OwnedFile, directory = false, missingAllowed = true, onRemoved?: () => void): Promise<void> {
+    // Only a missing parent/target observed before the namespace syscall is a
+    // definite no-op. ENOENT from the syscall or its parent sync is uncertain.
     try {
       await this.directory(dirname(owned.path), 'cleanup');
-      const current = await lstat(owned.path);
+    } catch (error) {
+      if (missing(error) && missingAllowed) return;
+      throw sanitized(error);
+    }
+    let current: Stats;
+    try { current = await lstat(owned.path); }
+    catch (error) {
+      if (missing(error) && missingAllowed) return;
+      throw sanitized(error);
+    }
+    let namespaceCompleted = false;
+    try {
       if (!sameIdentity(current, owned.identity) || (!directory && !sameFile(current, owned.identity))) fail('path-changed');
       await this.scope.revalidate('cleanup', owned.path, current);
       await this.fault('cleanup', 'cleanup');
       if (directory) await rmdir(owned.path); else await unlink(owned.path);
+      namespaceCompleted = true;
+      onRemoved?.();
       await this.syncDirectory(dirname(owned.path), 'cleanup');
-    } catch (error) { if (!missing(error)) throw sanitized(error); }
+    } catch (error) {
+      // After unlink/rmdir returns, every later failure (including generic
+      // parent-sync, evidence, or callback failures) leaves the outcome unknown.
+      if (namespaceCompleted) fail('outcome-uncertain');
+      throw sanitized(error, missing(error) ? 'outcome-uncertain' : 'unavailable');
+    }
   }
   async socket(path: string, operation: 'socket-bind' | 'socket-connect'): Promise<OwnedFile> {
     await this.directory(dirname(path), operation);

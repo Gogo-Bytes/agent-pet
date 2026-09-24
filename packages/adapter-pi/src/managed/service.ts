@@ -7,8 +7,8 @@ import { AuthStore } from './auth-store.js';
 import { fail, missing, sanitized } from './errors.js';
 import { Bucket, Frames, frameBudget, lowerLimits, sendFrame, type Limits } from './frames.js';
 import { PrivateFiles, type FaultHook, type OwnedFile } from './private-files.js';
-import { NodeFilesPort } from './node-files-port.js';
-import type { FileReceipt } from './files-port.js';
+import { NodeFilesPort, REMOVE_AFTER_DRAIN } from './node-files-port.js';
+import type { FileReceipt, OwnerClaim } from './files-port.js';
 import { sameIdentity, type FilesystemPolicy, type Roots } from './path-policy.js';
 import { ackFor, opaqueId, parseAuth, parseEvent, PROTOCOL, type AuthHello } from './protocol.js';
 import { DISCOVERY_BYTES, endpoint, type Discovery } from './discovery.js';
@@ -33,9 +33,10 @@ export async function openManagedCore(options: CoreOptions): Promise<ManagedCore
     const files = new PrivateFiles(scope, options.fault);
     await files.directory(scope.roots.storageRoot, 'ownership');
     await files.directory(scope.roots.runtimeRoot, 'ownership');
-    const claim = await files.createDirectory(join(scope.roots.storageRoot, 'owner'), 'ownership');
-    // A failed open deliberately retains the durable claim. Never guess whether IO committed.
+    // Acquire and sync the durable claim before opening any authority bytes.
     const storage = new NodeFilesPort(files);
+    const claim = await storage.acquireOwner();
+    // A failed open deliberately retains the durable claim. Never guess whether IO committed.
     const store = await AuthStore.open(storage, options.initialize);
     return new ManagedCore(files, storage, claim, store, options.publish, lowerLimits(options.limits));
   } catch (error) { throw sanitized(error); }
@@ -58,7 +59,7 @@ export class ManagedCore {
   private failed = false;
   private listening = false;
   private ready = false;
-  constructor(private readonly files: PrivateFiles, private readonly storage: NodeFilesPort, private readonly claim: OwnedFile,
+  constructor(private readonly files: PrivateFiles, private readonly storage: NodeFilesPort, private readonly claim: OwnerClaim,
     readonly store: AuthStore, private readonly publish: (observation: SessionObservation) => void,
     private readonly limits: Limits) {
     this.global = frameBudget(limits);
@@ -151,22 +152,63 @@ export class ManagedCore {
   stop(): Promise<void> { this.stopping ??= this.stopOnce(); return this.stopping; }
   private async stopOnce(): Promise<void> {
     this.stopped = true; this.ready = false; this.destroyPeers();
-    if (this.starting) await this.starting.catch(() => {});
-    await this.store.close();
-    // Node itself unlinks its UDS on close. This cannot provide compare-and-unlink against hostile same-uid replacement.
+    let failure: unknown;
+    const preserve = (error: unknown): void => { if (failure === undefined) failure = error; };
+    // Startup may still be publishing a listener. Settle it before teardown,
+    // but never let a startup failure skip the remaining teardown.
+    if (this.starting) await this.starting.catch(() => { /* failed start is represented by this.failed */ });
+    // Preserve baseline ordering: store close precedes socket identity/listener
+    // teardown. Unlike baseline, retain the original error while still making
+    // listener teardown mandatory when store close fails.
+    try { await this.store.close(); } catch (error) { preserve(error); }
     let pathChanged = false;
     if (this.socketIdentity) {
       try { if (!sameIdentity(this.socketIdentity.identity, await lstat(this.socketIdentity.path))) pathChanged = true; }
       catch { pathChanged = true; }
     }
-    if (this.listening) await new Promise<void>(resolve => this.server.close(() => resolve()));
-    if (pathChanged) { this.failed = true; fail('path-changed'); }
-    // Durable preexisting recovery barrier MUST survive uncertain outcomes, including ordinary stop.
-    if (this.store.poisoned || this.failed) fail('outcome-uncertain');
+    if (this.listening) {
+      await new Promise<void>(resolve => this.server.close(() => resolve())).catch(error => { preserve(error); });
+      this.listening = false;
+    }
+    try { await this.storage.drain(); } catch (error) { preserve(error); }
+
+    if (pathChanged) preserve(sanitized(null, 'path-changed'));
+    // Non-claim runtime resources may be cleaned after fencing even on a poison
+    // path, except when Node has already observed a substituted socket leaf;
+    // preserve the discovery evidence for that explicit barrier.
+    if (!pathChanged && this.discovery) {
+      try { await this.storage[REMOVE_AFTER_DRAIN](this.discovery, this.claim); this.discovery = undefined; }
+      catch (error) { preserve(error); }
+    }
+    if (!pathChanged && this.instance) {
+      try { await this.storage[REMOVE_AFTER_DRAIN](this.instance, this.claim, true); this.instance = undefined; }
+      catch (error) { preserve(error); }
+    }
+    // Durable poison and failed-open barriers retain the owner claim. In
+    // particular, releasing the backend here would permit work to outlive it.
+    if (failure !== undefined || this.store.poisoned || this.failed) {
+      this.failed = true;
+      throw sanitized(failure, 'outcome-uncertain');
+    }
+
+    // Claim removal is checked and one-way. If a final directory sync reports
+    // uncertainty after unlink, OwnerClaim records that the path is gone and
+    // permits disposal without trying to recreate the deleted barrier.
+    try { await this.claim.remove(); }
+    catch (error) {
+      try { await this.claim.close(); await this.storage.close(); }
+      catch { /* retain the original claim-removal error; disposal is secondary */ }
+      this.failed = true;
+      throw sanitized(error);
+    }
     try {
-      if (this.discovery) await this.storage.remove(this.discovery);
-      if (this.instance) await this.files.remove(this.instance, true);
-      await this.files.remove(this.claim, true);
-    } catch (error) { this.failed = true; throw sanitized(error); }
+      await this.claim.close();
+      await this.storage.close();
+    } catch (error) {
+      // The claim is already removed; never recreate it or claim that the
+      // durable barrier survived a late lease/backend close failure.
+      this.failed = true;
+      throw sanitized(error);
+    }
   }
 }

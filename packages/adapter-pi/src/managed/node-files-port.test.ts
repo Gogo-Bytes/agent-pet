@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { access, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, rename, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { NodeFilesPort } from './node-files-port.js';
 import { PrivateFiles } from './private-files.js';
@@ -72,6 +72,258 @@ test('NodeFilesPort transaction states distinguish pre-write, write/fsync, publi
   await expect(parent.abort()).rejects.toThrow('outcome-uncertain'); await parent.close();
   mode = undefined;
   await unlink(directory);
+});
+
+test('NodeFilesPort rejects close before a completed drain', async () => {
+  const f = await fixture(); const adapter = new NodeFilesPort(new PrivateFiles(await f.policy.openRoots(f.roots)));
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+  await adapter.drain();
+  await adapter.close();
+});
+
+test('NodeFilesPort rejects retained receipt removal after close', async () => {
+  const f = await fixture(); const adapter = new NodeFilesPort(new PrivateFiles(await f.policy.openRoots(f.roots)));
+  const path = join(f.roots.storageRoot, 'retained.json'); const receipt = await adapter.publish(path, { value: true }, 1024, 'authority-write');
+  await adapter.drain(); await adapter.close();
+  await expect(adapter.remove(receipt)).rejects.toThrow('unavailable');
+  await expect(access(path)).resolves.toBeUndefined();
+});
+
+test('NodeFilesPort drains a live unpublished transaction before backend close', async () => {
+  const f = await fixture(); const adapter = new NodeFilesPort(new PrivateFiles(await f.policy.openRoots(f.roots)));
+  const transaction = await adapter.beginWrite(join(f.roots.storageRoot, 'drain.json'), 1024, 'authority-write');
+  await adapter.drain();
+  expect(transaction.state).toBe('Aborted');
+  expect((await readdir(f.roots.storageRoot)).filter(name => name.startsWith('.write-'))).toEqual([]);
+  await adapter.close();
+  await expect(access(join(f.roots.storageRoot, 'drain.json'))).rejects.toThrow();
+});
+
+test.each(['create', 'write'] as const)('NodeFilesPort drains in-flight %s without exposing its cleanup capability', async stepToPause => {
+  const f = await fixture(); let release!: () => void; let entered!: () => void; let armed = false;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), async (step, operation) => {
+    if (armed && step === stepToPause && operation === 'authority-write') { entered(); await gate; }
+  });
+  const adapter = new NodeFilesPort(backend);
+  const idle = await adapter.beginWrite(join(f.roots.storageRoot, 'idle.json'), 1024, 'authority-write');
+  const path = join(f.roots.storageRoot, 'in-flight-write.json');
+  const writing = stepToPause === 'write' ? await adapter.beginWrite(path, 1024, 'authority-write') : undefined;
+  armed = true;
+  const work = writing ? writing.write({ value: true }).then(() => writing) : adapter.beginWrite(path, 1024, 'authority-write');
+  await enteredPromise;
+  const draining = adapter.drain();
+  let drained = false; void draining.then(() => { drained = true; });
+  // The idle transaction is not busy: these rejections must come from the fence.
+  for (const action of [() => idle.write({}), () => idle.publishNew(), () => idle.publishReplace({}), () => idle.abort(), () => idle.close()]) {
+    await expect(action()).rejects.toThrow('unavailable');
+  }
+  await expect(adapter.beginWrite(path, 1024, 'authority-write')).rejects.toThrow('unavailable');
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+  expect(drained).toBe(false);
+  expect((await readdir(f.roots.storageRoot)).some(name => name.startsWith('.write-'))).toBe(true);
+  release(); const transaction = await work; await draining;
+  expect(transaction.state).toBe('Aborted'); expect(idle.state).toBe('Aborted');
+  expect((await readdir(f.roots.storageRoot)).filter(name => name.startsWith('.write-'))).toEqual([]);
+  await expect(access(path)).rejects.toThrow();
+  await expect(transaction.abort()).rejects.toThrow('unavailable');
+  await expect(transaction.close()).rejects.toThrow('unavailable');
+  await adapter.close();
+  await expect(idle.abort()).rejects.toThrow('unavailable');
+  await expect(idle.close()).rejects.toThrow('unavailable');
+});
+
+test.each(['directory-sync', 'transaction-close'] as const)('NodeFilesPort retains a failed drain abort barrier on %s failure', async faultStep => {
+  const f = await fixture(); let failures = 0;
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), (step, operation) => {
+    if (step === faultStep && (step === 'transaction-close' || operation === 'cleanup')) {
+      failures++; throw Object.assign(new Error('abort failed'), { code: 'ENOENT' });
+    }
+  });
+  const adapter = new NodeFilesPort(backend);
+  const path = join(f.roots.storageRoot, 'drain-abort-failure.json');
+  const transaction = await adapter.beginWrite(path, 1024, 'authority-write');
+  await transaction.write({ value: true });
+  const temporaries = (await readdir(f.roots.storageRoot)).filter(name => name.startsWith('.write-'));
+  expect(temporaries).toHaveLength(1);
+  const draining = adapter.drain();
+  await expect(draining).rejects.toThrow('outcome-uncertain');
+  expect(transaction.state).toBe(faultStep === 'transaction-close' ? 'CloseUncertain' : 'MutationUncertain');
+  expect((await readdir(f.roots.storageRoot)).filter(name => name.startsWith('.write-'))).toEqual(faultStep === 'transaction-close' ? temporaries : []);
+  expect(adapter.drain()).toBe(draining);
+  await expect(adapter.drain()).rejects.toThrow('outcome-uncertain');
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+  await expect(transaction.abort()).rejects.toThrow('unavailable');
+  await expect(transaction.close()).rejects.toThrow('unavailable');
+  expect(failures).toBe(1);
+  await expect(access(path)).rejects.toThrow();
+});
+
+test('NodeFilesPort drain cleanup cannot bypass a poisoned adapter', async () => {
+  const f = await fixture(); let closes = 0;
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), (step, operation) => {
+    if (step === 'transaction-close') closes++;
+    if (step === 'directory-sync' && operation === 'authority-write') throw new Error('sync failed');
+  });
+  const adapter = new NodeFilesPort(backend);
+  const transaction = await adapter.beginWrite(join(f.roots.storageRoot, 'poisoned.json'), 1024, 'authority-write');
+  const temporaries = (await readdir(f.roots.storageRoot)).filter(name => name.startsWith('.write-'));
+  expect(temporaries).toHaveLength(1);
+  await expect(adapter.createDirectory(join(f.roots.storageRoot, 'poison'), 'authority-write')).rejects.toThrow('outcome-uncertain');
+  await expect(adapter.drain()).rejects.toThrow('outcome-uncertain');
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+  expect(transaction.state).toBe('Prepared'); expect(closes).toBe(1);
+  expect((await readdir(f.roots.storageRoot)).filter(name => name.startsWith('.write-'))).toEqual(temporaries);
+});
+
+test('NodeFilesPort waits for an in-flight removal before drain completes and close', async () => {
+  const f = await fixture(); let release!: () => void; let entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), async (step, operation) => {
+    if (step === 'cleanup' && operation === 'cleanup') { entered(); await gate; }
+  });
+  const adapter = new NodeFilesPort(backend); const path = join(f.roots.storageRoot, 'in-flight.json');
+  const receipt = await adapter.publish(path, { value: true }, 1024, 'authority-write');
+  const removing = adapter.remove(receipt); await enteredPromise;
+  const draining = adapter.drain();
+  await expect(access(path)).resolves.toBeUndefined();
+  release(); await Promise.all([removing, draining]); await adapter.close();
+  await expect(access(path)).rejects.toThrow();
+});
+
+test('NodeFilesPort tracks owner acquisition until it cannot escape drain', async () => {
+  const f = await fixture(); let release!: () => void; let entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), async (step, operation) => {
+    if (step === 'create' && operation === 'ownership') { entered(); await gate; }
+  });
+  const adapter = new NodeFilesPort(backend); const acquiring = adapter.acquireOwner(); await enteredPromise;
+  const draining = adapter.drain();
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+  release();
+  await expect(acquiring).rejects.toThrow('unavailable');
+  await draining; await adapter.close();
+  await expect(access(join(f.roots.storageRoot, 'owner'))).rejects.toThrow();
+});
+
+test('NodeFilesPort poisons the drain barrier after owner post-mkdir failure', async () => {
+  const f = await fixture();
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), (step, operation) => {
+    if (step === 'directory-sync' && operation === 'ownership') throw new Error('sync failed');
+  });
+  const adapter = new NodeFilesPort(backend);
+  await expect(adapter.acquireOwner()).rejects.toThrow('outcome-uncertain');
+  await expect(access(join(f.roots.storageRoot, 'owner'))).resolves.toBeUndefined();
+  await expect(adapter.drain()).rejects.toThrow('outcome-uncertain');
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+});
+
+test('NodeFilesPort poisons owner cleanup after a substitution race across drain', async () => {
+  const f = await fixture(); let release!: () => void; let entered!: () => void; let closeCalls = 0;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+  class DelayedOwnerFiles extends PrivateFiles {
+    override async acquireOwner() {
+      const owner = await super.acquireOwner();
+      entered(); await gate;
+      return {
+        path: owner.path,
+        get removed() { return owner.removed; },
+        remove: owner.remove.bind(owner),
+        close: async () => { closeCalls++; await owner.close(); },
+      };
+    }
+  }
+  const backend = new DelayedOwnerFiles(await f.policy.openRoots(f.roots));
+  const adapter = new NodeFilesPort(backend); const owner = join(f.roots.storageRoot, 'owner');
+  const acquiring = adapter.acquireOwner(); await enteredPromise;
+  const draining = adapter.drain(); const replacement = join(f.roots.storageRoot, 'owner-replaced');
+  await rename(owner, replacement); await mkdir(owner, { mode: 0o700 });
+  release();
+  await expect(acquiring).rejects.toThrow('path-changed');
+  await expect(draining).rejects.toThrow('outcome-uncertain');
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+  expect(() => adapter.acquireOwner()).toThrow('unavailable');
+  expect(closeCalls).toBe(0);
+  await access(owner); await access(replacement);
+});
+
+test('NodeFilesPort tracks directory creation until drain completes', async () => {
+  const f = await fixture(); let release!: () => void; let entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const enteredPromise = new Promise<void>(resolve => { entered = resolve; });
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), async (step, operation) => {
+    if (step === 'create' && operation === 'authority-write') { entered(); await gate; }
+  });
+  const adapter = new NodeFilesPort(backend); const path = join(f.roots.storageRoot, 'created-during-drain');
+  const creating = adapter.createDirectory(path, 'authority-write'); await enteredPromise;
+  const draining = adapter.drain();
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+  release(); await creating; await draining; await adapter.close();
+  await access(path); await rmdir(path);
+});
+
+test('NodeFilesPort poisons the drain barrier after a generic post-mkdir failure', async () => {
+  const f = await fixture();
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), (step, operation) => {
+    if (step === 'directory-sync' && operation === 'authority-write') throw new Error('sync failed');
+  });
+  const adapter = new NodeFilesPort(backend); const path = join(f.roots.storageRoot, 'post-mkdir-generic');
+  await expect(adapter.createDirectory(path, 'authority-write')).rejects.toThrow('outcome-uncertain');
+  await expect(access(path)).resolves.toBeUndefined();
+  await expect(adapter.drain()).rejects.toThrow('outcome-uncertain');
+});
+
+test('NodeFilesPort keeps an unpublished transaction tracked after close', async () => {
+  const f = await fixture(); const adapter = new NodeFilesPort(new PrivateFiles(await f.policy.openRoots(f.roots)));
+  const path = join(f.roots.storageRoot, 'closed-unpublished.json');
+  const transaction = await adapter.beginWrite(path, 1024, 'authority-write');
+  await transaction.write({ value: true }); await transaction.close();
+  expect(transaction.state).toBe('Writing');
+  await expect(adapter.close()).rejects.toThrow('unavailable');
+  await adapter.drain(); expect(transaction.state).toBe('Aborted');
+  await adapter.close();
+  await expect(access(path)).rejects.toThrow();
+});
+
+test('NodeFilesPort maps generic post-unlink sync errors to mutation uncertainty', async () => {
+  const f = await fixture();
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), (step, operation) => {
+    if (step === 'directory-sync' && operation === 'cleanup') throw new Error('sync failed');
+  });
+  const adapter = new NodeFilesPort(backend); const path = join(f.roots.storageRoot, 'post-mutation-generic.json');
+  const receipt = await adapter.publish(path, { value: true }, 1024, 'authority-write');
+  await expect(adapter.remove(receipt)).rejects.toThrow('outcome-uncertain');
+  await expect(access(path)).rejects.toThrow();
+  await expect(adapter.drain()).rejects.toThrow('outcome-uncertain');
+});
+
+test('NodeFilesPort treats post-unlink ENOENT as mutation uncertainty', async () => {
+  const f = await fixture();
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), (step, operation) => {
+    if (step === 'directory-sync' && operation === 'cleanup') throw Object.assign(new Error('missing sync'), { code: 'ENOENT' });
+  });
+  const adapter = new NodeFilesPort(backend); const path = join(f.roots.storageRoot, 'post-mutation.json');
+  const receipt = await adapter.publish(path, { value: true }, 1024, 'authority-write');
+  await expect(adapter.remove(receipt)).rejects.toThrow('outcome-uncertain');
+  await expect(access(path)).rejects.toThrow();
+  await expect(adapter.drain()).rejects.toThrow('outcome-uncertain');
+});
+
+test('NodeFilesPort retains a transaction barrier when abort sync returns ENOENT', async () => {
+  const f = await fixture();
+  const backend = new PrivateFiles(await f.policy.openRoots(f.roots), (step, operation) => {
+    if (step === 'directory-sync' && operation === 'cleanup') throw Object.assign(new Error('missing sync'), { code: 'ENOENT' });
+  });
+  const adapter = new NodeFilesPort(backend); const transaction = await adapter.beginWrite(join(f.roots.storageRoot, 'abort-uncertain.json'), 1024, 'authority-write');
+  await transaction.write({ value: true });
+  await expect(transaction.abort()).rejects.toThrow('outcome-uncertain');
+  expect(transaction.state).toBe('MutationUncertain');
+  await transaction.close();
+  await expect(adapter.drain()).rejects.toThrow('outcome-uncertain');
 });
 
 test('NodeFilesPort receipts are single-use and repeated descriptor-free reads settle', async () => {

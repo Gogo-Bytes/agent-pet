@@ -5,6 +5,15 @@ export type WriteOperation = 'authority-write' | 'credential-write' | 'discovery
 export type FileReceipt = object;
 export type TransactionState = 'Prepared' | 'Writing' | 'Published' | 'Aborted' | 'MutationUncertain' | 'CloseUncertain';
 
+/** Durable owner claim. Removal is a one-way operation; an uncertain attempt is never retried. */
+export interface OwnerClaim {
+  readonly path: string;
+  /** True only after this capability's successful namespace removal, even if subsequent sync fails. */
+  readonly removed: boolean;
+  remove(): Promise<void>;
+  close(): Promise<void>;
+}
+
 /** Single owner; operations may not overlap. Always close, even after abort/publish fails. */
 export interface WriteTransaction {
   readonly state: TransactionState;
@@ -24,6 +33,12 @@ export interface FilesReader {
   release(receipt: FileReceipt): void;
 }
 export interface FilesPort extends FilesReader {
+  /** The claim is created and parent-synced before authority reads are allowed. */
+  acquireOwner(): Promise<OwnerClaim>;
+  /** Fence new work, await in-flight writes, settle unpublished transactions; never close the owner claim. */
+  drain(): Promise<void>;
+  /** Final disposal only after drain and claim removal. Close uncertainty is terminal, never retried. */
+  close(): Promise<void>;
   createDirectory(path: string, operation: WriteOperation): Promise<void>;
   beginWrite(path: string, max: number, operation: WriteOperation): Promise<WriteTransaction>;
   /** Owns the entire transaction, including abort on known failure and unconditional close. */

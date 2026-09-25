@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { relative, sep } from 'node:path';
 import { fail, sanitized } from './errors.js';
-import type { FileReceipt, FilesPort, OwnerClaim, ReadOperation, TransactionState, WriteOperation, WriteTransaction } from './files-port.js';
+import type { FileReceipt, FilesPort, FilesReader, OwnerClaim, ReadOperation, TransactionState, WriteOperation, WriteTransaction } from './files-port.js';
 import { acceptDarwinEvidence } from './darwin-policy.js';
-import { loadDarwinWritePrimitives, type DarwinEvidence, type DarwinWritePrimitives, type NativeHandle } from './native-darwin.js';
+import { loadDarwinPrimitives, loadDarwinWritePrimitives, type DarwinEvidence, type DarwinWritePrimitives, type NativeHandle } from './native-darwin.js';
 import { validatePath } from './path-policy.js';
 
 const MAX_BYTES = 256 * 1024;
@@ -121,11 +121,11 @@ export class DarwinFilesPort implements FilesPort {
     }
   }
 
-  private available(): void {
-    if (this.#closed || this.#draining || this.#poisoned) fail('unavailable');
+  private available(allowDrain = false): void {
+    if (this.#closed || (!allowDrain && this.#draining) || this.#poisoned) fail('unavailable');
   }
-  private requireOwner(): void {
-    this.available();
+  private requireOwner(allowDrain = false): void {
+    this.available(allowDrain);
     if (!this.#owner || this.#owner.removed) fail('unavailable');
   }
   private track<T>(work: Promise<T>): Promise<T> {
@@ -152,8 +152,8 @@ export class DarwinFilesPort implements FilesPort {
     record.active = false;
     return record;
   }
-  private layout(path: string): Layout {
-    this.requireOwner(); validatePath(path);
+  private layout(path: string, allowDrain = false): Layout {
+    this.requireOwner(allowDrain); validatePath(path);
     const rel = relative(this.storageRoot, path);
     if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith(sep) || rel.includes('\0')) fail('unsupported-path');
     const parts = rel.split(sep);
@@ -470,6 +470,31 @@ export class DarwinFilesPort implements FilesPort {
     })());
   }
 
+  /** Core-only cleanup after drain; unlike remove(), this cannot admit new public work. */
+  async removeAfterDrain(receipt: FileReceipt): Promise<void> {
+    if (!this.#drainSucceeded) return Promise.reject(sanitized(null));
+    this.requireOwner(true);
+    const record = this.consume(receipt);
+    await this.track((async () => {
+      const { parent, name } = this.layout(record.path, true);
+      let file: NativeHandle | undefined;
+      try {
+        file = this.#native.openFile(parent, name);
+        const current = this.acceptHandles(parent, file);
+        if (!sameIdentity(record.evidence, current)) fail('path-changed');
+        this.#native.removeChecked(file, this.#lease);
+        const removed = file; file = undefined;
+        this.closeOrThrow(removed);
+      } catch (error) {
+        let closeFailure: unknown;
+        if (file) { const opened = file; file = undefined; closeFailure = this.closeNative(opened); }
+        if (closeFailure) mapNative(closeFailure, 'outcome-uncertain');
+        if (nativeCode(error) === 'remove-missing') return;
+        this.mapMutation(error, 'unavailable');
+      }
+    })());
+  }
+
   drain(): Promise<void> {
     this.#draining = true;
     return this.#drained ??= this.drainOnce();
@@ -499,5 +524,109 @@ export class DarwinFilesPort implements FilesPort {
       }
       if (failure) { this.#poisoned = true; mapNative(failure, 'outcome-uncertain'); }
     })();
+  }
+}
+
+/** Internal B3 client reader. It opens only a root descriptor and never acquires writer.lock. */
+export class DarwinFilesReader implements FilesReader {
+  readonly storageRoot: string;
+  readonly #native: ReturnType<typeof loadDarwinPrimitives>;
+  readonly #root: NativeHandle;
+  readonly #owned = new WeakMap<FileReceipt, { active: boolean }>();
+  #closed = false;
+
+  private constructor(storageRoot: string, native: ReturnType<typeof loadDarwinPrimitives>, root: NativeHandle) {
+    this.storageRoot = storageRoot; this.#native = native; this.#root = root;
+  }
+
+  static async open(storageRoot: string): Promise<DarwinFilesReader> {
+    validatePath(storageRoot);
+    if (process.platform !== 'darwin') return fail('unsupported-platform');
+    try {
+      const native = loadDarwinPrimitives();
+      return new DarwinFilesReader(storageRoot, native, native.openRoot(storageRoot));
+    } catch (error) { mapNative(error, 'store-corrupt'); }
+    throw new Error('unreachable');
+  }
+
+  private available(): void { if (this.#closed) fail('unavailable'); }
+  private parent(path: string): { parent: NativeHandle; name: string; close: NativeHandle | undefined } {
+    this.available(); validatePath(path);
+    const rel = relative(this.storageRoot, path);
+    if (rel === AUTHORITY || rel === DISCOVERY) return { parent: this.#root, name: rel, close: undefined };
+    if (rel.startsWith(`${TARGETS}${sep}`) && TARGET_FILE.test(rel.slice(TARGETS.length + 1))) {
+      try {
+        const directory = this.#native.openDirectory(this.#root, TARGETS);
+        return { parent: directory, name: rel.slice(TARGETS.length + 1), close: directory };
+      } catch (error) {
+        this.#closed = true;
+        throw error;
+      }
+    }
+    return fail('unsupported-path');
+  }
+  private accept(parent: NativeHandle, file: NativeHandle): DarwinEvidence {
+    const uid = process.getuid?.();
+    if (uid === undefined) fail('unsupported-platform');
+    for (const ancestor of this.#native.ancestors(this.#root)) acceptDarwinEvidence(ancestor, 'ancestor', uid);
+    const root = this.#native.inspect(this.#root);
+    acceptDarwinEvidence(root, 'directory', uid);
+    const parentEvidence = this.#native.inspect(parent);
+    acceptDarwinEvidence(parentEvidence, 'directory', uid);
+    const evidence = this.#native.inspect(file);
+    acceptDarwinEvidence(evidence, 'file', uid);
+    if (evidence.dev !== root.dev || evidence.fsid0 !== root.fsid0 || evidence.fsid1 !== root.fsid1) fail('unsupported-mount');
+    return evidence;
+  }
+  async read(path: string, max: number, _operation: ReadOperation): Promise<{ value: unknown; owned: FileReceipt }> {
+    this.available();
+    let layout: ReturnType<DarwinFilesReader['parent']> | undefined;
+    let file: NativeHandle | undefined;
+    let value: unknown;
+    let receipt: FileReceipt | undefined;
+    let primaryError: unknown;
+    let failed = false;
+    let closeFailure: unknown;
+    try {
+      layout = this.parent(path);
+      file = this.#native.openFile(layout.parent, layout.name);
+      this.accept(layout.parent, file);
+      const result = this.#native.readBounded(file, max);
+      const before = this.accept(layout.parent, file);
+      acceptDarwinEvidence(result.before, 'file', process.getuid!());
+      acceptDarwinEvidence(result.after, 'file', process.getuid!());
+      if (!sameIdentity(before, result.after)) fail('path-changed');
+      value = JSON.parse(result.bytes.toString('utf8')) as unknown;
+      receipt = Object.freeze(Object.create(null)) as FileReceipt;
+    } catch (error) {
+      failed = true;
+      primaryError = error;
+    } finally {
+      if (file) {
+        try { this.#native.close(file); }
+        catch (error) { this.#closed = true; closeFailure ??= error; }
+      }
+      if (layout?.close) {
+        try { this.#native.close(layout.close); }
+        catch (error) { this.#closed = true; closeFailure ??= error; }
+      }
+    }
+    // A read failure remains the primary diagnostic, but any uncertain close
+    // poisons admission and is surfaced when there is no earlier failure.
+    if (failed) mapNative(primaryError, 'store-corrupt');
+    if (closeFailure) mapNative(closeFailure, 'outcome-uncertain');
+    this.#owned.set(receipt!, { active: true });
+    return { value, owned: receipt! };
+  }
+  release(receipt: FileReceipt): void {
+    this.available();
+    const record = this.#owned.get(receipt);
+    if (!record || !record.active) fail('path-changed');
+    record.active = false;
+  }
+  close(): void {
+    if (this.#closed) return;
+    this.#closed = true;
+    try { this.#native.close(this.#root); } catch (error) { mapNative(error, 'outcome-uncertain'); }
   }
 }

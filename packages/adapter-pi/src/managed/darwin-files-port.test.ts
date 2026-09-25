@@ -3,13 +3,14 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AuthStore, CREDENTIAL_BYTES, credentialPath, parseCredential } from './auth-store.js';
-import { DarwinFilesPort } from './darwin-files-port.js';
+import { DarwinFilesPort, DarwinFilesReader } from './darwin-files-port.js';
 
 // Controlled native adapter faults; no production native implementation is changed.
 const nativeControl = vi.hoisted(() => ({
   loaderFailure: undefined as Error | undefined,
   rootFailure: undefined as Error | undefined,
-  closeFailure: undefined as 'owner' | 'transaction' | 'file' | 'root' | undefined,
+  closeFailure: undefined as 'owner' | 'transaction' | 'directory' | 'file' | 'root' | undefined,
+  readerOpenFailure: undefined as 'directory' | undefined,
   inspectFailure: undefined as 'file' | undefined,
   inspectFailures: 0,
   inspectAfterPublication: false,
@@ -23,6 +24,36 @@ vi.mock('./native-darwin.js', async importOriginal => {
   const actual = await importOriginal<typeof import('./native-darwin.js')>();
   return {
     ...actual,
+    loadDarwinPrimitives: () => {
+      const native = actual.loadDarwinPrimitives();
+      type Handle = Parameters<typeof native.close>[0];
+      const kinds = new WeakMap<Handle, string>();
+      const remember = (handle: Handle, kind: string): Handle => {
+        kinds.set(handle, kind);
+        nativeControl.cleanup.set(handle, () => native.close(handle));
+        return handle;
+      };
+      return {
+        ...native,
+        openRoot(path: string) { const handle = native.openRoot(path); return remember(handle, 'root'); },
+        ancestors(handle: Handle) { return native.ancestors(handle); },
+        inspect(handle: Handle) { return native.inspect(handle); },
+        readBounded(...args: Parameters<typeof native.readBounded>) { return native.readBounded(...args); },
+        openDirectory(parent: Handle, name: string) {
+          if (nativeControl.readerOpenFailure === 'directory') throw new Error('directory-open-failed');
+          return remember(native.openDirectory(parent, name), 'directory');
+        },
+        openFile(parent: Handle, name: string) { return remember(native.openFile(parent, name), 'file'); },
+        close(handle: Handle) {
+          nativeControl.closeCalls++;
+          const kind = kinds.get(handle) ?? 'file';
+          nativeControl.closeKinds.push(kind);
+          native.close(handle);
+          nativeControl.cleanup.delete(handle);
+          if (kind === nativeControl.closeFailure) throw new Error('close-uncertain');
+        },
+      };
+    },
     loadDarwinWritePrimitives: () => {
       if (nativeControl.loaderFailure) throw nativeControl.loaderFailure;
       const native = actual.loadDarwinWritePrimitives();
@@ -96,6 +127,7 @@ vi.mock('./native-darwin.js', async importOriginal => {
 afterEach(() => {
   nativeControl.loaderFailure = nativeControl.rootFailure = undefined;
   nativeControl.closeFailure = undefined;
+  nativeControl.readerOpenFailure = undefined;
   nativeControl.inspectFailure = undefined;
   nativeControl.inspectFailures = 0;
   nativeControl.inspectAfterPublication = false;
@@ -389,6 +421,55 @@ nativeTest('DarwinFilesPort treats read cleanup close uncertainty as terminal', 
     nativeControl.closeFailure = undefined;
     if (claim) { await claim.remove().catch(() => {}); await claim.close().catch(() => {}); }
     if (files) { await files.drain().catch(() => {}); await files.close().catch(() => {}); }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+nativeTest('DarwinFilesReader fails closed on each owned handle close uncertainty without retry', async () => {
+  const root = await fixture();
+  let files: DarwinFilesPort | undefined;
+  let claim: Awaited<ReturnType<DarwinFilesPort['acquireOwner']>> | undefined;
+  let reader: DarwinFilesReader | undefined;
+  try {
+    files = await DarwinFilesPort.open(root, true);
+    claim = await files.acquireOwner();
+    await files.createDirectory(join(root, 'targets'), 'authority-write');
+    const path = join(root, 'targets', `${'a'.repeat(32)}.1.json`);
+    const receipt = await files.publish(path, { value: true }, 1024, 'credential-write');
+    files.release(receipt);
+    reader = await DarwinFilesReader.open(root);
+
+    nativeControl.closeFailure = 'file';
+    const beforeFile = nativeControl.closeKinds.filter(kind => kind === 'file').length;
+    const beforeDirectory = nativeControl.closeKinds.filter(kind => kind === 'directory').length;
+    await expect(reader.read(path, 1024, 'credential-read')).rejects.toThrow('outcome-uncertain');
+    expect(nativeControl.closeKinds.filter(kind => kind === 'file').length - beforeFile).toBe(1);
+    expect(nativeControl.closeKinds.filter(kind => kind === 'directory').length - beforeDirectory).toBe(1);
+    await expect(reader.read(path, 1024, 'credential-read')).rejects.toThrow('unavailable');
+    expect(nativeControl.closeKinds.filter(kind => kind === 'file').length - beforeFile).toBe(1);
+    expect(nativeControl.closeKinds.filter(kind => kind === 'directory').length - beforeDirectory).toBe(1);
+  } finally {
+    nativeControl.closeFailure = undefined;
+    reader?.close();
+    if (claim) { await claim.remove().catch(() => {}); await claim.close().catch(() => {}); }
+    if (files) { await files.drain().catch(() => {}); await files.close().catch(() => {}); }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+nativeTest('DarwinFilesReader poisons itself when target directory cannot be opened', async () => {
+  const root = await fixture();
+  let reader: DarwinFilesReader | undefined;
+  try {
+    reader = await DarwinFilesReader.open(root);
+    nativeControl.readerOpenFailure = 'directory';
+    const path = join(root, 'targets', `${'b'.repeat(32)}.1.json`);
+    await expect(reader.read(path, 1024, 'credential-read')).rejects.toThrow();
+    nativeControl.readerOpenFailure = undefined;
+    await expect(reader.read(path, 1024, 'credential-read')).rejects.toThrow('unavailable');
+  } finally {
+    nativeControl.readerOpenFailure = undefined;
+    reader?.close();
     await rm(root, { recursive: true, force: true });
   }
 });

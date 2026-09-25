@@ -1,6 +1,7 @@
 import net, { type Socket } from 'node:net';
-import { chmod, lstat } from 'node:fs/promises';
+import { chmod, lstat, mkdir, rmdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import type { Stats } from 'node:fs';
 import type { SessionObservation } from '@agent-pet/domain';
 import { PiSessionMapper } from '../session-mapper.js';
 import { AuthStore } from './auth-store.js';
@@ -8,7 +9,8 @@ import { fail, missing, sanitized } from './errors.js';
 import { Bucket, Frames, frameBudget, lowerLimits, sendFrame, type Limits } from './frames.js';
 import { PrivateFiles, type FaultHook, type OwnedFile } from './private-files.js';
 import { NodeFilesPort, REMOVE_AFTER_DRAIN } from './node-files-port.js';
-import type { FileReceipt, OwnerClaim } from './files-port.js';
+import type { FileReceipt, FilesPort, OwnerClaim } from './files-port.js';
+import { DarwinFilesPort } from './darwin-files-port.js';
 import { sameIdentity, type FilesystemPolicy, type Roots } from './path-policy.js';
 import { ackFor, opaqueId, parseAuth, parseEvent, PROTOCOL, type AuthHello } from './protocol.js';
 import { DISCOVERY_BYTES, endpoint, type Discovery } from './discovery.js';
@@ -26,6 +28,65 @@ export type CoreOptions = {
   publish(observation: SessionObservation): void;
   limits?: Partial<Limits>; fault?: FaultHook;
 };
+
+type RuntimeResource = { path: string; identity: Stats };
+interface RuntimeBoundary {
+  readonly runtimeRoot: string;
+  createInstance(path: string): Promise<RuntimeResource>;
+  socket(path: string): Promise<RuntimeResource>;
+  unchanged(resource: RuntimeResource): Promise<boolean>;
+  remove(resource: RuntimeResource): Promise<void>;
+}
+
+function nodeRuntime(files: PrivateFiles, storage: NodeFilesPort, owner: OwnerClaim): RuntimeBoundary {
+  return {
+    runtimeRoot: files.scope.roots.runtimeRoot,
+    async createInstance(path) {
+      return files.createDirectory(path, 'socket-bind');
+    },
+    async socket(path) {
+      return files.socket(path, 'socket-bind');
+    },
+    async unchanged(resource) {
+      try { return sameIdentity(resource.identity, await lstat(resource.path)); }
+      catch { return false; }
+    },
+    async remove(resource) {
+      await storage[REMOVE_AFTER_DRAIN](resource as never, owner, true);
+    },
+  };
+}
+
+// The native backend deliberately uses Node only for the synthetic UDS fixture
+// boundary. Storage authority, owner claim and credentials remain native.
+function nativeRuntime(runtimeRoot: string): RuntimeBoundary {
+  const resource = async (path: string, operation: 'directory' | 'socket'): Promise<RuntimeResource> => {
+    const identity = await lstat(path);
+    if (operation === 'directory' && (!identity.isDirectory() || identity.isSymbolicLink())) fail('unsafe-type');
+    if (operation === 'socket' && (!identity.isSocket() || identity.isSymbolicLink())) fail('unsafe-type');
+    if (identity.uid !== process.getuid?.() || (operation === 'directory' ? (identity.mode & 0o7777) !== 0o700 : (identity.mode & 0o7777) !== 0o600)) fail('unsafe-mode');
+    return { path, identity };
+  };
+  return {
+    runtimeRoot,
+    async createInstance(path) {
+      await mkdir(path, { mode: 0o700 });
+      return resource(path, 'directory');
+    },
+    socket(path) { return resource(path, 'socket'); },
+    async unchanged(value) {
+      try {
+        const current = await lstat(value.path);
+        return sameIdentity(value.identity, current);
+      } catch { return false; }
+    },
+    async remove(value) {
+      if (!(await resource(value.path, 'directory'))) return;
+      await rmdir(value.path);
+    },
+  };
+}
+
 /** Internal mechanism seam only. ./managed does not expose policy injection. */
 export async function openManagedCore(options: CoreOptions): Promise<ManagedCore> {
   try {
@@ -33,13 +94,26 @@ export async function openManagedCore(options: CoreOptions): Promise<ManagedCore
     const files = new PrivateFiles(scope, options.fault);
     await files.directory(scope.roots.storageRoot, 'ownership');
     await files.directory(scope.roots.runtimeRoot, 'ownership');
-    // Acquire and sync the durable claim before opening any authority bytes.
     const storage = new NodeFilesPort(files);
     const claim = await storage.acquireOwner();
-    // A failed open deliberately retains the durable claim. Never guess whether IO committed.
     const store = await AuthStore.open(storage, options.initialize);
-    return new ManagedCore(files, storage, claim, store, options.publish, lowerLimits(options.limits));
+    return new ManagedCore(nodeRuntime(files, storage, claim), storage, claim, store, options.publish, lowerLimits(options.limits));
   } catch (error) { throw sanitized(error); }
+}
+
+/** Internal B3-only native factory. It is intentionally not exported publicly. */
+export async function openNativeManagedCore(options: Omit<CoreOptions, 'policy'>): Promise<ManagedCore> {
+  if (process.platform !== 'darwin') return fail('unsupported-platform');
+  let storage: DarwinFilesPort | undefined;
+  try {
+    storage = await DarwinFilesPort.open(options.roots.storageRoot, options.initialize);
+    const claim = await storage.acquireOwner();
+    const store = await AuthStore.open(storage, options.initialize);
+    return new ManagedCore(nativeRuntime(options.roots.runtimeRoot), storage, claim, store, options.publish, lowerLimits(options.limits));
+  } catch (error) {
+    if (storage) { await storage.drain().catch(() => {}); await storage.close().catch(() => {}); }
+    throw sanitized(error);
+  }
 }
 
 export class ManagedCore {
@@ -59,7 +133,7 @@ export class ManagedCore {
   private failed = false;
   private listening = false;
   private ready = false;
-  constructor(private readonly files: PrivateFiles, private readonly storage: NodeFilesPort, private readonly claim: OwnerClaim,
+  constructor(private readonly runtime: RuntimeBoundary, private readonly storage: FilesPort, private readonly claim: OwnerClaim,
     readonly store: AuthStore, private readonly publish: (observation: SessionObservation) => void,
     private readonly limits: Limits) {
     this.global = frameBudget(limits);
@@ -82,25 +156,26 @@ export class ManagedCore {
     try {
       let instanceId = '';
       for (let attempt = 0; attempt < 4; attempt++) {
-        instanceId = opaqueId(); const path = endpoint(this.files.scope.roots.runtimeRoot, instanceId);
-        try { this.instance = await this.files.createDirectory(dirname(path), 'socket-bind'); break; }
+        instanceId = opaqueId(); const path = endpoint(this.runtime.runtimeRoot, instanceId);
+        try { this.instance = await this.runtime.createInstance(dirname(path)); break; }
         catch (error) { if (sanitized(error).code !== 'ownership-busy') throw error; }
       }
       if (!this.instance) fail('ownership-busy');
-      const path = endpoint(this.files.scope.roots.runtimeRoot, instanceId);
+      const path = endpoint(this.runtime.runtimeRoot, instanceId);
       try { await lstat(path); fail('ownership-busy'); } catch (error) { if (!missing(error)) throw error; }
-      await this.files.directory(this.instance.path, 'socket-bind');
+      // Runtime directories and the UDS are synthetic fixture resources in B3;
+      // the native storage backend does not claim socket ACL security.
       await new Promise<void>((resolve, reject) => {
         const error = () => reject(sanitized(null));
         this.server.once('error', error);
         this.server.listen(path, () => { this.server.off('error', error); this.listening = true; resolve(); });
       });
       await chmod(path, 0o600);
-      this.socketIdentity = await this.files.socket(path, 'socket-bind');
+      this.socketIdentity = await this.runtime.socket(path);
       const discovery: Discovery = { schema: 1, protocolVersion: PROTOCOL, authSetId: this.store.snapshot().authSetId,
         generation: this.generation, instance: instanceId, credentialLayout: 1 };
       // Stable discovery from a crash is not silently adopted or overwritten.
-      this.discovery = await this.storage.publish(join(this.files.scope.roots.storageRoot, 'discovery.json'), discovery, DISCOVERY_BYTES, 'discovery-write');
+      this.discovery = await this.storage.publish(join(this.storage.storageRoot, 'discovery.json'), discovery, DISCOVERY_BYTES, 'discovery-write');
       this.ready = !this.stopped && !this.store.poisoned; return discovery;
     } catch (error) { this.failed = true; this.ready = false; this.destroyPeers(); throw sanitized(error); }
   }
@@ -163,8 +238,7 @@ export class ManagedCore {
     try { await this.store.close(); } catch (error) { preserve(error); }
     let pathChanged = false;
     if (this.socketIdentity) {
-      try { if (!sameIdentity(this.socketIdentity.identity, await lstat(this.socketIdentity.path))) pathChanged = true; }
-      catch { pathChanged = true; }
+      if (!(await this.runtime.unchanged(this.socketIdentity))) pathChanged = true;
     }
     if (this.listening) {
       await new Promise<void>(resolve => this.server.close(() => resolve())).catch(error => { preserve(error); });
@@ -177,11 +251,15 @@ export class ManagedCore {
     // path, except when Node has already observed a substituted socket leaf;
     // preserve the discovery evidence for that explicit barrier.
     if (!pathChanged && this.discovery) {
-      try { await this.storage[REMOVE_AFTER_DRAIN](this.discovery, this.claim); this.discovery = undefined; }
-      catch (error) { preserve(error); }
+      try {
+        if (this.storage instanceof NodeFilesPort) await this.storage[REMOVE_AFTER_DRAIN](this.discovery, this.claim);
+        else if (this.storage instanceof DarwinFilesPort) await this.storage.removeAfterDrain(this.discovery);
+        else await this.storage.remove(this.discovery);
+        this.discovery = undefined;
+      } catch (error) { preserve(error); }
     }
     if (!pathChanged && this.instance) {
-      try { await this.storage[REMOVE_AFTER_DRAIN](this.instance, this.claim, true); this.instance = undefined; }
+      try { await this.runtime.remove(this.instance); this.instance = undefined; }
       catch (error) { preserve(error); }
     }
     // Durable poison and failed-open barriers retain the owner claim. In

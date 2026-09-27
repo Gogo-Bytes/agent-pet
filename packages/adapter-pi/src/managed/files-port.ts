@@ -1,4 +1,5 @@
 /** Internal storage seam, not a public plugin or filesystem security policy. */
+export type JsonValue = null | boolean | string | number | JsonValue[] | { [key: string]: JsonValue };
 export type ReadOperation = 'authority-read' | 'credential-read' | 'discovery-read';
 export type WriteOperation = 'authority-write' | 'credential-write' | 'discovery-write';
 /** Descriptor-free, backend-local evidence, never a native handle. */
@@ -29,8 +30,8 @@ export interface FilesReader {
   readonly storageRoot: string;
   /** Accept complete parent/leaf policy before bytes; close read handles before returning. */
   read(path: string, max: number, operation: ReadOperation): Promise<{ value: unknown; owned: FileReceipt }>;
-  /** Synchronous, descriptor-free invalidation; foreign/released/consumed receipts fail. */
-  release(receipt: FileReceipt): void;
+  /** Acknowledged descriptor-free invalidation; foreign/released/consumed receipts fail. */
+  release(receipt: FileReceipt): Promise<void>;
 }
 export interface FilesPort extends FilesReader {
   /** The claim is created and parent-synced before authority reads are allowed. */
@@ -47,15 +48,15 @@ export interface FilesPort extends FilesReader {
   remove(owned: FileReceipt): Promise<void>;
 }
 /** Ordinary parsed reads never transfer receipt ownership to callers, including on parse failure. */
-export function readValue<T>(files: FilesReader, path: string, max: number, operation: ReadOperation,
+export async function readValue<T>(files: FilesReader, path: string, max: number, operation: ReadOperation,
   parse: (value: unknown) => T): Promise<T> {
-  return files.read(path, max, operation).then(result => {
+  return files.read(path, max, operation).then(async result => {
     let parsed: T;
     let failure: unknown;
     let parsedSuccessfully = false;
     try { parsed = parse(result.value); parsedSuccessfully = true; }
     catch (error) { failure = error; }
-    try { files.release(result.owned); }
+    try { await files.release(result.owned); }
     catch (error) {
       // Release uncertainty is more important than a parse result: ownership did
       // not settle, so never hide this barrier behind a parser error.

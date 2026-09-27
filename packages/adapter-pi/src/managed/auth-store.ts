@@ -69,7 +69,7 @@ export class AuthStore {
           store.tokens.set(target.targetId, credential);
         }
       } catch (error) {
-        try { files.release(result.owned); }
+        try { await files.release(result.owned); }
         catch (releaseError) { throw releaseError; }
         throw error;
       }
@@ -127,7 +127,7 @@ export class AuthStore {
     const credential: Credential = { schema: 1, authSetId: this.registry.authSetId, targetId, epoch, token: randomBytes(32).toString('hex') };
     const receipt = await this.files.publish(credentialPath(this.files.storageRoot, targetId, epoch), credential, CREDENTIAL_BYTES, 'credential-write');
     // Credential publication is not retained by AuthStore; settle its receipt now.
-    this.files.release(receipt);
+    await this.files.release(receipt);
     return credential;
   }
   private async cleanupCredential(targetId: string, epoch: number, expectedDigest: string): Promise<void> {
@@ -135,12 +135,12 @@ export class AuthStore {
     let credential: Credential;
     try { credential = parseCredential(receipt.value, this.registry.authSetId, targetId); }
     catch (error) {
-      try { this.files.release(receipt.owned); }
+      try { await this.files.release(receipt.owned); }
       catch (releaseError) { throw releaseError; }
       throw error;
     }
     if (credential.epoch !== epoch || digest(credential.token) !== expectedDigest) {
-      try { this.files.release(receipt.owned); }
+      try { await this.files.release(receipt.owned); }
       catch (releaseError) { throw releaseError; }
       fail('store-corrupt');
     }
@@ -203,13 +203,21 @@ export class AuthStore {
     return auth.authSetId === this.registry.authSetId && this.current(auth.targetId, auth.epoch) && !!credential &&
       validToken(auth.token) && timingSafeEqual(Buffer.from(auth.token, 'hex'), Buffer.from(credential.token, 'hex'));
   }
+  /** Synchronous terminal fencing used when the Worker transport is uncertain. */
+  failUncertain(_error?: unknown): void {
+    if (this.poisoned && this.closed) return;
+    this.poisoned = true;
+    this.closed = true;
+    this.tokens.clear();
+    this.onDeny();
+  }
   async close(): Promise<void> {
     this.closed = true; this.tokens.clear(); this.onDeny();
     let failure: unknown; let failed = false;
     try { await this.queue; }
     catch (error) { failure = error; failed = true; }
     if (this.authority) {
-      try { this.files.release(this.authority); this.authority = undefined; }
+      try { await this.files.release(this.authority); this.authority = undefined; }
       catch (error) { if (!failed) { failure = error; failed = true; } }
     }
     if (failed) throw failure;

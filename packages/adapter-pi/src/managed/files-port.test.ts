@@ -14,7 +14,7 @@ class MemoryFiles implements FilesPort {
   async acquireOwner(): Promise<OwnerClaim> { return { path: `${this.storageRoot}/owner`, removed: true, async remove() {}, async close() {} }; }
   async drain(): Promise<void> {}
   async close(): Promise<void> {}
-  release(owned: FileReceipt): void { this.releasedPaths.push(this.receipts.get(owned) ?? 'unknown'); }
+  release(owned: FileReceipt): Promise<void> { this.releasedPaths.push(this.receipts.get(owned) ?? 'unknown'); return Promise.resolve(); }
   set(path: string, value: unknown): void {
     const entry = this.entries.get(path);
     this.entries.set(path, { value: structuredClone(value), owned: entry?.owned ?? Object.freeze(Object.create(null)) });
@@ -64,7 +64,7 @@ test('AuthStore uses backend-independent receipts through prepare, enable, reope
   await store.enableTarget(target.targetId, 1, store.snapshot().revision);
   const authSetId = store.snapshot().authSetId;
   const credentialRead = await files.read(credentialPath(files.storageRoot, target.targetId, 1), CREDENTIAL_BYTES, 'credential-read');
-  const credential = parseCredential(credentialRead.value, authSetId, target.targetId); files.release(credentialRead.owned);
+  const credential = parseCredential(credentialRead.value, authSetId, target.targetId); await files.release(credentialRead.owned);
   const auth = { type: 'auth', protocolVersion: 2, authSetId, targetId: target.targetId, epoch: 1, generation: 'a'.repeat(32), token: credential.token } as const;
   expect(store.authenticate(auth)).toBe(true);
   await store.close();
@@ -87,10 +87,10 @@ test('AuthStore uses backend-independent receipts through prepare, enable, reope
 
 test('parsed reads settle receipts on parser failure and surface release uncertainty', async () => {
   const receipt = Object.freeze(Object.create(null)); let releases = 0;
-  const reader: FilesReader = { storageRoot: '/synthetic-storage', read: async () => ({ value: {}, owned: receipt }), release: () => { releases++; } };
+  const reader: FilesReader = { storageRoot: '/synthetic-storage', read: async () => ({ value: {}, owned: receipt }), release: () => { releases++; return Promise.resolve(); } };
   await expect(readValue(reader, '/synthetic-storage/value.json', 1024, 'credential-read', () => { throw new Error('parse'); })).rejects.toThrow('parse');
   expect(releases).toBe(1);
-  const uncertain: FilesReader = { ...reader, release: () => { throw new Error('release'); } };
+  const uncertain: FilesReader = { ...reader, release: () => Promise.reject(new Error('release')) };
   await expect(readValue(uncertain, '/synthetic-storage/value.json', 1024, 'credential-read', () => { throw new Error('parse'); })).rejects.toThrow('release');
 });
 
@@ -115,6 +115,6 @@ test('discovery consumes its opaque backend receipt before returning parsed data
   const result = await readDiscovery(reader, discovery.authSetId);
   expect(result).toEqual(discovery);
   expect(Object.keys(owned)).toEqual([]);
-  files.release(owned);
+  await files.release(owned);
   await expect(readDiscovery(reader, 'd'.repeat(32))).rejects.toThrow('unauthorized');
 });

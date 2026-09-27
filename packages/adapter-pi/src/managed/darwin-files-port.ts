@@ -224,7 +224,7 @@ export class DarwinFilesPort implements FilesPort {
       }
     })());
   }
-  release(receipt: FileReceipt): void { this.consume(receipt); }
+  async release(receipt: FileReceipt): Promise<void> { this.consume(receipt); }
 
   async acquireOwner(): Promise<OwnerClaim> {
     this.available();
@@ -618,7 +618,7 @@ export class DarwinFilesReader implements FilesReader {
     this.#owned.set(receipt!, { active: true });
     return { value, owned: receipt! };
   }
-  release(receipt: FileReceipt): void {
+  async release(receipt: FileReceipt): Promise<void> {
     this.available();
     const record = this.#owned.get(receipt);
     if (!record || !record.active) fail('path-changed');

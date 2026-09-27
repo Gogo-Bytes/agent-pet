@@ -333,8 +333,8 @@ test('NodeFilesPort receipts are single-use and repeated descriptor-free reads s
   const descriptorsBefore = await readdir('/proc/self/fd').catch(() => undefined);
   for (let n = 0; n < 100; n++) {
     const result = await adapter.read(path, 1024, 'authority-read');
-    adapter.release(result.owned);
-    expect(() => adapter.release(result.owned)).toThrow('path-changed');
+    await adapter.release(result.owned);
+    await expect(adapter.release(result.owned)).rejects.toThrow('path-changed');
   }
   const descriptorsAfter = await readdir('/proc/self/fd').catch(() => undefined);
   if (descriptorsBefore && descriptorsAfter) expect(descriptorsAfter.length).toBeLessThanOrEqual(descriptorsBefore.length + 2);

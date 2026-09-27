@@ -37,13 +37,20 @@
 | B1：复用存储边界 | 提取小型内部 FilesPort；现有 PrivateFiles 作为 Node 适配器；AuthStore 与 discovery 改依赖该接口，仍只有一份授权状态机 | 现有调用实际经过接口而不是留下空抽象；原有事务顺序、失败注入、撤销/停止竞争及公开拒绝行为不变；无原生安全升级宣称 |
 | B2：原生事务与授权存储 | 实现目录句柄约束的创建、写入、发布、替换、删除和同步；稳定锁初始化与持有；native FilesPort 接入同一 AuthStore | 临时 APFS 上实际完成 prepare/enable/revoke/rotate 与重开；原生 syscall 故障矩阵证明失败关闭和保留不确定状态；不是只测未接入的写入函数 |
 | B3：连接核心纵向集成 | 同一 service/client 使用原生存储；先持锁再接触授权状态；停止排空后才释放锁；残余 Node UDS 操作独立为明确的测试边界 | 实际 native FS → AuthStore/core → 测试用真实 UDS → Application；重连不回放、双目标隔离、轮换撤销、失败后保留 owner 并拒绝重开全部通过 |
-| B4：异步运行与交付兼容 | 将阻塞原生调用移出 Electron Main；明确 Worker 所有权、消息上限、迟到结果失效和停止协议；验证 addon 在受支持 Node/Electron 与应用资源布局下加载 | GUI 不被原生 I/O 阻塞；Worker 死亡/暂停不会误报成功、提前释放写入权或接受旧结果；开发运行和打包运行分别验证，不以桌面构建代替 native 加载证据 |
+| B4：异步运行与交付兼容 | 分为 B4.1 Node Worker fixture seam、B4.2 actual Darwin addon Worker、B4.3 Electron Worker、B4.4 packaged/signed delivery；各阶段单独验收，不提前激活生产入口 | GUI 不被原生 I/O 阻塞；Worker 死亡/暂停不会误报成功、提前释放写入权或接受旧结果；开发运行和打包运行分别验证，不以桌面构建代替 native 加载证据 |
 | B5：生产目录与端点安全 | 固定生产 namespace 与锁域；跨窗口/实例/渠道一致；补齐 socket 叶节点 ACL/身份检查、发送 token 前验证与关闭语义 | 无测试祖先豁免进入生产；伪造发现记录/端点时实际收到零 token 字节；明确解决或经用户接受已记录的 Node close 替换叶节点删除限制，不靠“目录私有”掩盖问题 |
 | B6：安全准入与恢复决策 | 经授权在独立第二用户环境执行读目录/凭证/连接 UDS 的正反例；核对兼容与打包证据；单独落实已确认的恢复策略或明确保持恢复不支持 | 逐项证据审查通过后才安排 P2c；失败、未测与不支持不能显示成通过。真实安装仍另需用户授权 |
 
 B1 实施记录（已完成独立审查与主代理复验）：已增加内部 `FilesPort` / 只读 `FilesReader` 与 `NodeFilesPort`，AuthStore 及实际 service/client 的授权、发现文件读写经过适配器；所有权 receipt 不携带 Stats/数值身份，由适配器私有 WeakMap 关联，伪造、跨适配器及错路径 receipt 在写入前拒绝。保留唯一授权状态机、原有 PrivateFiles 与 Node socket 边界；未实现原生写入或 B2–B6。新增 5 项接口/适配器行为测试；本轮验证 40 文件 / 371 项回归、19 项原生测试、类型检查、桌面构建和 diff 检查通过。原生测试仅重跑既有切片，不代表原生存储接入或安全升级。
 
 B1–B3 保持生产入口关闭，只允许显式临时测试目标。B4–B6 也不得顺带打开安装或真实连接开关；通过准入审查后，再单独安排产品入口接线。B4 与 B5 的设计可以并行，修改共享原生/核心文件时串行实施。
+
+#### B4.1–B4.4 边界
+
+- **B4.1（本阶段）**：仅使用固定内部 Node `worker_threads` entry 与既有 `NodeFilesPort`/fixture backend。Worker 独占 backend roots、owner claim、transactions 与 receipts；Main 保留 Core、AuthStore、UDS 与同步 fail-closed fencing。消息使用有 generation/sequence/requestId 的严格 envelope、有限队列、opaque capability IDs；超时不是取消，不重启/重放/抢租约。此阶段证明 fixture owner-claim ordering，不证明 Darwin writer lease、native syscall fault injection、Electron loading 或 packaging。
+- **B4.2（后续）**：真实 Darwin addon 在 Node Worker 内加载并验证 root/lease/owner/transaction/receipt 全部 Worker-owned；另行补真实 native fault evidence。不得把 B4.1 fixture failures 描述为 syscall fault injection。
+- **B4.3（后续）**：显式 Electron Worker entry，验证嵌入 Node/N-API 兼容及 Main responsiveness；不以 desktop build 代替 Worker/addon load evidence，且保持 managed production activation 关闭。
+- **B4.4（后续）**：固定 ASAR 外 native resource layout、architecture/version/manifest checks、nested addon/app signing 与 packaged Worker load verification；不加入 runtime download、arbitrary path override、recovery 或 silent fallback。
 
 ### B2 内部检查点（避免再次变成过大任务）
 

@@ -11,6 +11,7 @@ import { PrivateFiles, type FaultHook, type OwnedFile } from './private-files.js
 import { NodeFilesPort, REMOVE_AFTER_DRAIN } from './node-files-port.js';
 import type { FileReceipt, FilesPort, OwnerClaim } from './files-port.js';
 import { DarwinFilesPort } from './darwin-files-port.js';
+import { WorkerFilesPort } from './worker/files-port-proxy.js';
 import { sameIdentity, type FilesystemPolicy, type Roots } from './path-policy.js';
 import { ackFor, opaqueId, parseAuth, parseEvent, PROTOCOL, type AuthHello } from './protocol.js';
 import { DISCOVERY_BYTES, endpoint, type Discovery } from './discovery.js';
@@ -59,6 +60,16 @@ function nodeRuntime(files: PrivateFiles, storage: NodeFilesPort, owner: OwnerCl
 
 // The native backend deliberately uses Node only for the synthetic UDS fixture
 // boundary. Storage authority, owner claim and credentials remain native.
+function workerRuntime(files: PrivateFiles, storage: FilesPort, owner: OwnerClaim): RuntimeBoundary {
+  return {
+    runtimeRoot: files.scope.roots.runtimeRoot,
+    async createInstance(path) { return files.createDirectory(path, 'socket-bind'); },
+    async socket(path) { return files.socket(path, 'socket-bind'); },
+    async unchanged(resource) { try { return sameIdentity(resource.identity, await lstat(resource.path)); } catch { return false; } },
+    async remove(resource) { await files.remove(resource, true); },
+  };
+}
+
 function nativeRuntime(runtimeRoot: string): RuntimeBoundary {
   const resource = async (path: string, operation: 'directory' | 'socket'): Promise<RuntimeResource> => {
     const identity = await lstat(path);
@@ -99,6 +110,23 @@ export async function openManagedCore(options: CoreOptions): Promise<ManagedCore
     const store = await AuthStore.open(storage, options.initialize);
     return new ManagedCore(nodeRuntime(files, storage, claim), storage, claim, store, options.publish, lowerLimits(options.limits));
   } catch (error) { throw sanitized(error); }
+}
+
+/** B4.1 Node Worker fixture factory. It is internal and never selected by production entry points. */
+export async function openWorkerManagedCore(options: CoreOptions): Promise<ManagedCore> {
+  let store: AuthStore | undefined;
+  let core: ManagedCore | undefined;
+  const storage = new WorkerFilesPort({ roots: options.roots, initialize: options.initialize, onFailure: error => { store?.failUncertain(error); core?.failUncertain(error); } });
+  try {
+    await storage.initialized();
+    const scope = await options.policy.openRoots(options.roots);
+    const files = new PrivateFiles(scope, options.fault);
+    await files.directory(scope.roots.runtimeRoot, 'ownership');
+    const claim = await storage.acquireOwner();
+    store = await AuthStore.open(storage, options.initialize);
+    core = new ManagedCore(workerRuntime(files, storage, claim), storage, claim, store, options.publish, lowerLimits(options.limits));
+    return core;
+  } catch (error) { store?.failUncertain(error); await storage.close().catch(() => {}); throw sanitized(error); }
 }
 
 /** Internal B3-only native factory. It is intentionally not exported publicly. */
@@ -224,6 +252,8 @@ export class ManagedCore {
     });
   }
   private destroyPeers(): void { for (const socket of this.sockets) socket.destroy(); }
+  /** Called synchronously by the Worker transport before pending RPC rejection. */
+  failUncertain(_error?: unknown): void { this.failed = true; this.ready = false; this.destroyPeers(); }
   stop(): Promise<void> { this.stopping ??= this.stopOnce(); return this.stopping; }
   private async stopOnce(): Promise<void> {
     this.stopped = true; this.ready = false; this.destroyPeers();
@@ -252,7 +282,7 @@ export class ManagedCore {
     // preserve the discovery evidence for that explicit barrier.
     if (!pathChanged && this.discovery) {
       try {
-        if (this.storage instanceof NodeFilesPort) await this.storage[REMOVE_AFTER_DRAIN](this.discovery, this.claim);
+        if (this.storage instanceof NodeFilesPort || this.storage instanceof WorkerFilesPort) await this.storage[REMOVE_AFTER_DRAIN](this.discovery, this.claim);
         else if (this.storage instanceof DarwinFilesPort) await this.storage.removeAfterDrain(this.discovery);
         else await this.storage.remove(this.discovery);
         this.discovery = undefined;

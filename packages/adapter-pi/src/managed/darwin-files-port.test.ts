@@ -161,10 +161,10 @@ nativeTest('DarwinFilesPort runs the sole AuthStore through native create/read/p
     await store.enableTarget(pending.targetId, pending.epoch, store.snapshot().revision);
     const firstRead = await files.read(join(root, 'authorization.json'), 256 * 1024, 'authority-read');
     expect(firstRead.value).toMatchObject({ schema: 1 });
-    files.release(firstRead.owned);
+    await files.release(firstRead.owned);
     const credentialRead = await files.read(credentialPath(root, pending.targetId, pending.epoch), CREDENTIAL_BYTES, 'credential-read');
     const credential = parseCredential(credentialRead.value, store.snapshot().authSetId, pending.targetId);
-    files.release(credentialRead.owned);
+    await files.release(credentialRead.owned);
     expect(store.authenticate({ type: 'auth', protocolVersion: 2, authSetId: credential.authSetId,
       targetId: credential.targetId, epoch: credential.epoch, generation: 'g'.repeat(32), token: credential.token })).toBe(true);
 
@@ -412,7 +412,7 @@ nativeTest('DarwinFilesPort treats read cleanup close uncertainty as terminal', 
     files = await DarwinFilesPort.open(root, true);
     claim = await files.acquireOwner();
     const receipt = await files.publish(join(root, 'authorization.json'), { revision: 1 }, 1024, 'authority-write');
-    files.release(receipt);
+    await files.release(receipt);
     nativeControl.inspectFailure = 'file'; nativeControl.inspectFailures = 1; nativeControl.closeFailure = 'file';
     const before = nativeControl.closeKinds.filter(kind => kind === 'file').length;
     await expect(files.read(join(root, 'authorization.json'), 1024, 'authority-read')).rejects.toThrow('outcome-uncertain');
@@ -436,7 +436,7 @@ nativeTest('DarwinFilesReader fails closed on each owned handle close uncertaint
     await files.createDirectory(join(root, 'targets'), 'authority-write');
     const path = join(root, 'targets', `${'a'.repeat(32)}.1.json`);
     const receipt = await files.publish(path, { value: true }, 1024, 'credential-write');
-    files.release(receipt);
+    await files.release(receipt);
     reader = await DarwinFilesReader.open(root);
 
     nativeControl.closeFailure = 'file';

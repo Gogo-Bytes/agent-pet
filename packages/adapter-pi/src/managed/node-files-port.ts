@@ -78,7 +78,7 @@ export class NodeFilesPort implements FilesPort {
       return { value: result.value, owned };
     })());
   }
-  release(receipt: FileReceipt): void { this.consume(receipt); }
+  async release(receipt: FileReceipt): Promise<void> { this.consume(receipt); }
   async createDirectory(path: string, operation: WriteOperation): Promise<void> {
     this.available();
     await this.trackCleanup(this.files.createDirectory(path, operation));

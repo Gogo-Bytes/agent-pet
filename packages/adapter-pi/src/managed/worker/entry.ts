@@ -3,15 +3,17 @@ import { randomBytes } from 'node:crypto';
 import { fixturePolicy } from '../test-policy.js';
 import { PrivateFiles } from '../private-files.js';
 import { NodeFilesPort, REMOVE_AFTER_DRAIN } from '../node-files-port.js';
-import type { FileReceipt, OwnerClaim, WriteTransaction } from '../files-port.js';
-import { fail, sanitized } from '../errors.js';
+import { DarwinFilesPort } from '../darwin-files-port.js';
+import type { FileReceipt, FilesPort, OwnerClaim, WriteTransaction } from '../files-port.js';
+import { fail, ManagedError } from '../errors.js';
 import { validateEnvelope, validateRequestBody, sanitizedWorkerError } from './validation.js';
 import { MAX_RECEIPTS, MAX_TRANSACTIONS, WORKER_PROTOCOL, type RequestBody, type ReplyBody, type ReplyResult, type WireEnvelope, type OpaqueId } from './protocol.js';
 
 if (!parentPort) throw new Error('protocol-failure');
 const generation: OpaqueId = workerData && typeof workerData.workerGeneration === 'string' && /^[a-f0-9]{32}$/.test(workerData.workerGeneration) ? workerData.workerGeneration : randomBytes(16).toString('hex');
 let sendSequence = 0; let receiveSequence = 0;
-let storage: NodeFilesPort | undefined; let owner: OwnerClaim | undefined; let ownerCap: OpaqueId | undefined; let stopped = false;
+let storage: FilesPort | undefined; let owner: OwnerClaim | undefined; let ownerCap: OpaqueId | undefined; let stopped = false;
+let initializationFailed = false;
 const receipts = new Map<OpaqueId, FileReceipt>();
 const transactions = new Map<OpaqueId, WriteTransaction>();
 let receiptReservations = 0;
@@ -42,9 +44,31 @@ function post(kind: 'reply' | 'event', requestId: OpaqueId, body: ReplyBody | { 
 function protocolFailure(): void {
   try { post('event', cap(), { type: 'failed', error: { code: 'protocol-failure', effect: 'none' } }); } catch { /* transport is already unavailable */ }
 }
-function requireOwner(value: OpaqueId): NodeFilesPort {
+function requireOwner(value: OpaqueId): FilesPort {
   if (!storage || !ownerCap || value !== ownerCap || stopped) fail('unavailable');
   return storage;
+}
+async function cleanupInitialization(candidate: { files?: FilesPort; claim?: OwnerClaim; ownerState: 'none' | 'definitely-acquired' | 'acquisition-uncertain' | 'close-uncertain' }): Promise<ManagedError | undefined> {
+  const files = candidate.files;
+  if (!files) return undefined;
+  if (candidate.ownerState === 'definitely-acquired' && candidate.claim) {
+    try { await files.drain(); } catch { return new ManagedError('outcome-uncertain'); }
+    try { await candidate.claim.remove(); } catch {
+      // An uncertain owner remains the restart barrier. Never retry or close it.
+      if (!candidate.claim.removed) return undefined;
+    }
+    if (!candidate.claim.removed) return undefined;
+    try { await candidate.claim.close(); } catch { candidate.ownerState = 'close-uncertain'; return new ManagedError('outcome-uncertain'); }
+  } else if (candidate.ownerState === 'acquisition-uncertain' || candidate.ownerState === 'close-uncertain') {
+    // Preserve unknown ownership/close barriers. No owner removal is legal.
+    return undefined;
+  } else {
+    // A definite ownership-busy result means no owner directory was acquired.
+    // Drain first so Darwin can release its retained lease/root handles.
+    try { await files.drain(); } catch { candidate.ownerState = 'close-uncertain'; return new ManagedError('outcome-uncertain'); }
+  }
+  try { await files.close(); } catch { candidate.ownerState = 'close-uncertain'; return new ManagedError('outcome-uncertain'); }
+  return undefined;
 }
 function takeReceipt(key: OpaqueId): FileReceipt {
   const value = receipts.get(key); if (!value) fail('path-changed');
@@ -52,13 +76,37 @@ function takeReceipt(key: OpaqueId): FileReceipt {
 }
 async function dispatch(body: RequestBody): Promise<ReplyResult> {
   if (body.type === 'init') {
-    if (storage || body.backend !== 'node-fixture') fail('unavailable');
-    const policy = await fixturePolicy(body.roots);
-    const scope = await policy.openRoots(body.roots);
-    const files = new PrivateFiles(scope);
-    await files.directory(body.roots.storageRoot, 'ownership'); await files.directory(body.roots.runtimeRoot, 'ownership');
-    storage = new NodeFilesPort(files); owner = await storage.acquireOwner(); ownerCap = cap();
-    return { type: 'initialized', ownerCap };
+    if (storage || initializationFailed) fail('unavailable');
+    const candidate: { files?: FilesPort; claim?: OwnerClaim; ownerState: 'none' | 'definitely-acquired' | 'acquisition-uncertain' | 'close-uncertain' } = { ownerState: 'none' };
+    try {
+      if (body.backend === 'node-fixture') {
+        const policy = await fixturePolicy(body.roots);
+        const scope = await policy.openRoots(body.roots);
+        const files = new PrivateFiles(scope);
+        await files.directory(body.roots.storageRoot, 'ownership'); await files.directory(body.roots.runtimeRoot, 'ownership');
+        candidate.files = new NodeFilesPort(files);
+      } else {
+        // Darwin owns storageRoot, lease, owner and all native handles inside
+        // this fixed Worker. Main never constructs this backend.
+        candidate.files = await DarwinFilesPort.open(body.roots.storageRoot, body.initialize);
+      }
+      try {
+        candidate.claim = await candidate.files.acquireOwner();
+        candidate.ownerState = 'definitely-acquired';
+      } catch (error) {
+        // Darwin distinguishes a definite existing owner from a mutation whose
+        // result is unknown. Only the former permits releasing the lease/root.
+        candidate.ownerState = error instanceof ManagedError && error.code === 'ownership-busy'
+          ? 'none' : 'acquisition-uncertain';
+        throw error;
+      }
+      storage = candidate.files; owner = candidate.claim; ownerCap = cap();
+      return { type: 'initialized', ownerCap };
+    } catch (error) {
+      const cleanupError = await cleanupInitialization(candidate);
+      initializationFailed = true; stopped = true;
+      throw cleanupError ?? error;
+    }
   }
   const files = requireOwner(body.ownerCap);
   switch (body.type) {
@@ -95,18 +143,31 @@ async function dispatch(body: RequestBody): Promise<ReplyResult> {
     case 'transaction-close': { const transaction = transactions.get(body.transactionCap); if (!transaction) fail('unavailable'); await transaction.close(); const state = transaction.state; if (state === 'Published' || state === 'Aborted') transactions.delete(body.transactionCap); return { type: 'transaction-closed', state }; }
     case 'remove': { const value = takeReceipt(body.receiptCap); await files.remove(value); return { type: 'removed' }; }
     case 'drain': await files.drain(); transactions.clear(); return { type: 'drained', transactions: 0 };
-    case 'remove-after-drain': { const value = takeReceipt(body.receiptCap); await files[REMOVE_AFTER_DRAIN](value, owner!); return { type: 'removed' }; }
+    case 'remove-after-drain': {
+      const value = takeReceipt(body.receiptCap);
+      if (files instanceof NodeFilesPort) await files[REMOVE_AFTER_DRAIN](value, owner!);
+      else if (files instanceof DarwinFilesPort) await files.removeAfterDrain(value);
+      else fail('unavailable');
+      return { type: 'removed' };
+    }
     case 'remove-owner': {
       if (!owner || body.ownerCap !== ownerCap) fail('unavailable');
       let removalError: unknown;
       try { await owner.remove(); } catch (error) { removalError = error; }
-      // A known unlink followed by parent-sync failure is the narrow clean-final-release
-      // exception: finish local disposal, but report committed uncertainty to Main.
+      // A known unlink followed by parent/lock sync or disposal failure is a
+      // terminal committed outcome. Main must fence, but must not recreate or
+      // reacquire the already-removed owner.
       if (owner.removed) {
         try { await owner.close(); await files.close(); } catch (error) { removalError ??= error; }
         stopped = true;
       }
-      if (removalError) fail('outcome-uncertain');
+      if (removalError) {
+        const committed = owner.removed;
+        const error = Object.assign(new Error(committed ? 'owner-unlink-committed' : 'outcome-uncertain'), {
+          code: committed ? 'owner-unlink-committed' : 'outcome-uncertain', effect: committed ? 'committed' : 'uncertain',
+        });
+        throw error;
+      }
       return { type: 'owner-removed', parentSync: 'complete' };
     }
   }
@@ -129,7 +190,8 @@ parentPort.on('message', async (value: unknown) => {
     if (envelope.body.type === 'init') post('event', cap(), { type: 'ready' });
     if (envelope.body.type === 'remove-owner') { post('event', cap(), { type: 'stopped', clean: true }); parentPort!.unref(); }
   } catch (error) {
-    const safe = sanitizedWorkerError({ code: sanitized(error).code });
+    // Preserve only the fixed code/effect union; never forward native details.
+    const safe = sanitizedWorkerError(error);
     post('reply', envelope.requestId, { type: 'reply', ok: false, error: safe });
   }
 });

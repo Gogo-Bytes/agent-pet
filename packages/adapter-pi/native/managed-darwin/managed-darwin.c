@@ -31,7 +31,7 @@ typedef struct cap {
   struct cap *parent;
   napi_ref parent_ref, lease_ref;
   int fd, kind, active; /* 1 directory, 2 regular reader, 3 writer lease, 4 write transaction */
-  int stale, published, poisoned;
+  int stale, published, poisoned, retained;
   char name[256], final_name[256];
   uint64_t max_bytes, written;
   struct stat identity;
@@ -130,6 +130,9 @@ static int release(napi_env env, cap *c) {
 }
 static void finalize(napi_env env, void *data, void *hint) {
   (void)hint; cap *c=data;
+  /* Retained uncertainty caps have no normal JS lifetime: their descriptor
+     remains the ownership barrier until environment cleanup. */
+  if (c->retained) return;
   release(env,c);
   if (c->parent_ref) napi_delete_reference(env,c->parent_ref);
   if (c->state) {
@@ -167,12 +170,28 @@ static int open_owned(napi_env env, cap *c, int parent, const char *name, int fl
   c->state->descriptors++;
   return fd;
 }
-static napi_value wrap(napi_env env, cap *c, napi_value parent) {
+static napi_value wrap(napi_env env, cap *c, napi_value parent, int retain_on_failure) {
   napi_value value;
   if (napi_create_object(env,&value)!=napi_ok || napi_type_tag_object(env,value,&cap_tag)!=napi_ok ||
-      (parent && napi_create_reference(env,parent,1,&c->parent_ref)!=napi_ok)) { finalize(env,c,NULL); return error(env,"native-api"); }
-  if (napi_wrap(env,value,c,finalize,NULL,NULL)!=napi_ok) { finalize(env,c,NULL); return error(env,"native-api"); }
+      (parent && napi_create_reference(env,parent,1,&c->parent_ref)!=napi_ok)) {
+    if (retain_on_failure) c->retained=1;
+    else finalize(env,c,NULL);
+    return error(env,"native-api");
+  }
+  if (napi_wrap(env,value,c,finalize,NULL,NULL)!=napi_ok) {
+    if (retain_on_failure) c->retained=1;
+    else finalize(env,c,NULL);
+    return error(env,"native-api");
+  }
   if (c->kind==3 && napi_create_reference(env,value,1,&c->lease_ref)!=napi_ok) {
+    if (retain_on_failure) {
+      void *removed=NULL;
+      /* A failed lease reference must not leave a finalizer attached to the
+         retained cap. The lock remains in the environment list until cleanup. */
+      (void)napi_remove_wrap(env,value,&removed);
+      c->retained=1;
+      return error(env,"native-api");
+    }
     release(env,c); return error(env,"native-api");
   }
   return value;
@@ -199,7 +218,7 @@ static napi_value open_root(napi_env env, napi_callback_info info) {
   }
   c->fd=fd; c->identity=c->chain[c->depth-1].identity;
   if (!bound(c)) { finalize(env,c,NULL); return error(env,"path-changed"); }
-  return wrap(env,c,NULL);
+  return wrap(env,c,NULL,0);
 }
 static int private_file(const struct stat *st) {
   return S_ISREG(st->st_mode) && st->st_uid==getuid() && (st->st_mode&07777)==0600 && st->st_nlink==1 && st->st_size>=0 && st->st_size<=READ_MAX;
@@ -272,13 +291,15 @@ static napi_value open_child(napi_env env, napi_callback_info info, int kind) {
       (kind==3 && c->identity.st_size!=0) || !bound(c)) { finalize(env,c,NULL); return error(env,"unsafe-object"); }
   if (kind==3 && flock(c->fd,LOCK_EX|LOCK_NB)) { int busy=errno==EWOULDBLOCK; finalize(env,c,NULL); return error(env,busy?"ownership-busy":"native-lock"); }
   if (!bound(c)) { finalize(env,c,NULL); return error(env,"path-changed"); }
-  return wrap(env,c,argv[0]);
+  return wrap(env,c,argv[0],0);
 }
 static napi_value open_dir(napi_env e,napi_callback_info i) { return open_child(e,i,1); }
 static napi_value open_file(napi_env e,napi_callback_info i) { return open_child(e,i,2); }
 static napi_value acquire(napi_env e,napi_callback_info i) { return open_child(e,i,3); }
 static napi_value uncertain_created(napi_env env, cap *c) {
-  finalize(env,c,NULL);
+  /* Keep the created lock cap in the environment list without a JS wrapper.
+     Its fd is the ownership barrier until the environment cleanup hook runs. */
+  c->retained=1;
   bool pending=false; napi_is_exception_pending(env,&pending);
   if (pending) { napi_value ignored; napi_get_and_clear_last_exception(env,&ignored); }
   return error(env,"ownership-uncertain");
@@ -300,19 +321,19 @@ static napi_value initialize_writer(napi_env env, napi_callback_info info) {
   struct stat lock;
   /* Never remove this inode: every post-create failure is an uncertainty barrier. */
   if (!safe_lock_stat(c->fd,&lock) || !volume(root->fd,c->fd)) {
-    finalize(env,c,NULL); return error(env,"ownership-uncertain");
+    return uncertain_created(env,c);
   }
   if (!evidence(env,c->fd)) return uncertain_created(env,c);
   c->identity=lock;
   if (flock(c->fd,LOCK_EX|LOCK_NB) || !bound(c)) {
-    finalize(env,c,NULL); return error(env,"ownership-uncertain");
+    return uncertain_created(env,c);
   }
   /* The directory entry is durable before success is reported. Never remove the
      inode if either barrier fails; the caller must treat ownership as uncertain. */
   if (!sync_parent_and_lock(root,c)) {
-    finalize(env,c,NULL); return error(env,"ownership-uncertain");
+    return uncertain_created(env,c);
   }
-  napi_value value=wrap(env,c,argv[0]);
+  napi_value value=wrap(env,c,argv[0],1);
   if (!value) {
     bool pending=false; napi_is_exception_pending(env,&pending);
     if (pending) { napi_value ignored; napi_get_and_clear_last_exception(env,&ignored); }
@@ -352,7 +373,7 @@ static napi_value create_directory(napi_env env, napi_callback_info info) {
     lease->poisoned=1; finalize(env,c,NULL); return error(env,"mkdir-uncertain");
   }
   if (!sync_parent_and_lock(parent,lease)) { lease->poisoned=1; finalize(env,c,NULL); return error(env,"sync-uncertain"); }
-  return wrap(env,c,argv[0]);
+  return wrap(env,c,argv[0],0);
 }
 static int tx_ready(cap *tx) {
   struct stat st;
@@ -379,7 +400,7 @@ static napi_value begin_write(napi_env env, napi_callback_info info) {
   if (fstat(c->fd,&c->identity) || !private_file(&c->identity) || !volume(parent->fd,c->fd) || !bound(c)) {
     finalize(env,c,NULL); return error(env,"unsafe-object");
   }
-  napi_value value=wrap(env,c,argv[0]);
+  napi_value value=wrap(env,c,argv[0],0);
   if (!value) return NULL;
   if (napi_create_reference(env,argv[4],1,&c->lease_ref)!=napi_ok) { release(env,c); return error(env,"native-api"); }
   return value;
@@ -459,7 +480,14 @@ static napi_value remove_checked(napi_env env,napi_callback_info info,int direct
     return error(env,"remove-uncertain");
   }
   expected->stale=1;
-  if (!sync_parent_and_lock(expected->parent,lease)) { expected->poisoned=1; lease->poisoned=1; return error(env,"remove-uncertain"); }
+  if (!sync_parent_and_lock(expected->parent,lease)) {
+    expected->poisoned=1; lease->poisoned=1;
+    /* Directory unlink is already committed. Keep this distinct from an
+       unknown unlink so the Worker can fence without retaining a false owner
+       barrier; no claim of a durable parent/lock barrier is made. */
+    if (directory) return error(env,"owner-unlink-committed");
+    return error(env,"remove-uncertain");
+  }
   napi_value out; N(napi_get_undefined(env,&out)); return out;
 }
 static napi_value remove_file_checked(napi_env env,napi_callback_info info) { return remove_checked(env,info,0); }

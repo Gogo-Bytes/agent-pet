@@ -9,6 +9,7 @@ import { DarwinFilesPort, DarwinFilesReader } from './darwin-files-port.js';
 const nativeControl = vi.hoisted(() => ({
   loaderFailure: undefined as Error | undefined,
   rootFailure: undefined as Error | undefined,
+  initializeFailure: false,
   closeFailure: undefined as 'owner' | 'transaction' | 'directory' | 'file' | 'root' | undefined,
   readerOpenFailure: undefined as 'directory' | undefined,
   inspectFailure: undefined as 'file' | undefined,
@@ -70,7 +71,13 @@ vi.mock('./native-darwin.js', async importOriginal => {
           if (nativeControl.rootFailure) throw nativeControl.rootFailure;
           return remember(native.openRoot(path), 'root');
         },
-        initializeWriter: (root: Handle) => remember(native.initializeWriter(root), 'lease'),
+        initializeWriter(root: Handle) {
+          const lease = remember(native.initializeWriter(root), 'lease');
+          // Simulation only: native initialization has already created/locked
+          // the inode, then the seam reports its post-create uncertainty.
+          if (nativeControl.initializeFailure) throw new Error('ownership-uncertain');
+          return lease;
+        },
         acquireWriter: (root: Handle) => remember(native.acquireWriter(root), 'lease'),
         openFile: (parent: Handle, name: string) => remember(native.openFile(parent, name), 'file'),
         createDirectory: (...args: Parameters<typeof native.createDirectory>) => {
@@ -126,6 +133,7 @@ vi.mock('./native-darwin.js', async importOriginal => {
 
 afterEach(() => {
   nativeControl.loaderFailure = nativeControl.rootFailure = undefined;
+  nativeControl.initializeFailure = false;
   nativeControl.closeFailure = undefined;
   nativeControl.readerOpenFailure = undefined;
   nativeControl.inspectFailure = undefined;
@@ -146,6 +154,20 @@ const fixtureParent = fileURLToPath(new URL('../../native/managed-darwin/', impo
 async function fixture(): Promise<string> {
   return mkdtemp(join(fixtureParent, '.d3-native-store-'));
 }
+
+nativeTest('DarwinFilesPort preserves a simulated ownership-uncertain lock for environment teardown', async () => {
+  const root = await fixture();
+  try {
+    nativeControl.initializeFailure = true;
+    await expect(DarwinFilesPort.open(root, true)).rejects.toThrow('outcome-uncertain');
+    // This controlled seam is not native syscall fault-injection evidence. The
+    // successful native create/lock is retained in the test cleanup map, while
+    // open must not attempt a normal lease/root close after uncertainty.
+    expect(nativeControl.closeCalls).toBe(0);
+    expect(nativeControl.closeKinds).toEqual([]);
+    expect(nativeControl.cleanup.size).toBe(2);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 
 nativeTest('DarwinFilesPort runs the sole AuthStore through native create/read/publish/replace/remove and reopen', async () => {
   const root = await fixture();
@@ -263,6 +285,25 @@ nativeTest('DarwinFilesPort poisons after uncertain owner removal', async () => 
     nativeControl.nativeFailure = { method: 'removeDirectoryChecked', code: 'remove-uncertain' };
     await expect(claim.remove()).rejects.toThrow('outcome-uncertain');
     await expect(files.beginWrite(join(root, 'authorization.json'), 1024, 'authority-write')).rejects.toThrow('unavailable');
+  } finally {
+    nativeControl.nativeFailure = undefined;
+    if (files) { await files.drain().catch(() => {}); await files.close().catch(() => {}); }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+nativeTest('DarwinFilesPort reports committed owner unlink separately and never retries it', async () => {
+  const root = await fixture();
+  let files: DarwinFilesPort | undefined;
+  let claim: Awaited<ReturnType<DarwinFilesPort['acquireOwner']>> | undefined;
+  try {
+    files = await DarwinFilesPort.open(root, true);
+    claim = await files.acquireOwner();
+    nativeControl.nativeFailure = { method: 'removeDirectoryChecked', code: 'owner-unlink-committed' };
+    await expect(claim.remove()).rejects.toMatchObject({ code: 'owner-unlink-committed' });
+    expect(claim.removed).toBe(true);
+    await expect(files.beginWrite(join(root, 'authorization.json'), 1024, 'authority-write')).rejects.toThrow('unavailable');
+    await claim.close();
   } finally {
     nativeControl.nativeFailure = undefined;
     if (files) { await files.drain().catch(() => {}); await files.close().catch(() => {}); }

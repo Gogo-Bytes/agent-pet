@@ -21,6 +21,17 @@ test('WorkerHost fences duplicate responses after the first response settles', a
   await host.stop();
 });
 
+test('WorkerHost fences committed owner unlink before exposing terminal cleanup failure', async () => {
+  let fenced = false;
+  const worker = new Worker(`const { parentPort } = require('node:worker_threads'); parentPort.on('message', m => { const body = m.body.type === 'init' ? { type: 'reply', ok: true, result: { type: 'initialized', ownerCap: 'c'.repeat(32) } } : { type: 'reply', ok: false, error: { code: 'owner-unlink-committed', effect: 'committed' } }; parentPort.postMessage({ ...m, kind: 'reply', body }); });`, { eval: true });
+  const host = new WorkerHost({ roots: { storageRoot: '/tmp/a', runtimeRoot: '/tmp/b' }, initialize: true, timeoutMs: 1000, worker, onFailure: () => { fenced = true; } });
+  await expect(host.initialized).resolves.toMatchObject({ type: 'initialized' });
+  await expect(host.request({ type: 'remove-owner', ownerCap: 'c'.repeat(32) })).rejects.toEqual({ code: 'owner-unlink-committed', effect: 'committed' });
+  expect(fenced).toBe(true);
+  expect(host.failed).toBe(true);
+  await host.stop();
+});
+
 test('WorkerHost poisons on malformed failed events before exposing their error', async () => {
   let fenced = false;
   const worker = new Worker(`const { parentPort } = require('node:worker_threads'); parentPort.on('message', m => parentPort.postMessage({ ...m, kind: 'event', requestId: 'd'.repeat(32), sequence: 1, body: { type: 'failed', error: { code: 'forged', effect: 'none' } } }));`, { eval: true });

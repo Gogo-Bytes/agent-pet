@@ -11,13 +11,13 @@ export const MAX_TRANSACTIONS = 128;
 export const MAX_RECEIPTS = 256;
 export type OpaqueId = string;
 export type ManagedWorkerErrorCode =
-  | 'unavailable' | 'outcome-uncertain' | 'limit-exceeded' | 'path-changed' | 'ownership-busy'
+  | 'unavailable' | 'outcome-uncertain' | 'owner-unlink-committed' | 'limit-exceeded' | 'path-changed' | 'ownership-busy'
   | 'store-corrupt' | 'durability-failed' | 'unsupported-path' | 'unsafe-type' | 'unsafe-owner'
-  | 'unsafe-mode' | 'unsupported-platform' | 'protocol-failure';
+  | 'unsafe-mode' | 'unsupported-platform' | 'unsupported-mount' | 'acl-unverified' | 'protocol-failure';
 export type ManagedWorkerError = { code: ManagedWorkerErrorCode; effect: 'none' | 'committed' | 'uncertain' };
 export type TransactionState = 'Prepared' | 'Writing' | 'Published' | 'Aborted' | 'MutationUncertain' | 'CloseUncertain';
 export type RequestBody =
-  | { type: 'init'; backend: 'node-fixture'; roots: { storageRoot: string; runtimeRoot: string }; initialize: boolean }
+  | { type: 'init'; backend: 'node-fixture' | 'darwin-addon'; roots: { storageRoot: string; runtimeRoot: string }; initialize: boolean }
   | { type: 'read'; ownerCap: OpaqueId; path: string; maxBytes: number; operation: 'authority-read' | 'credential-read' | 'discovery-read' }
   | { type: 'release'; ownerCap: OpaqueId; receiptCap: OpaqueId }
   | { type: 'create-directory'; ownerCap: OpaqueId; path: string; operation: 'authority-write' | 'credential-write' | 'discovery-write' }

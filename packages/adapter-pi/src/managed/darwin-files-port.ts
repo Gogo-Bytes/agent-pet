@@ -25,7 +25,7 @@ type TransactionRecord = {
 
 const NATIVE_MUTATION_UNCERTAINTY_CODES = new Set([
   'outcome-uncertain', 'publication-uncertain', 'write-uncertain', 'write-not-durable',
-  'mkdir-uncertain', 'sync-uncertain', 'remove-uncertain', 'ownership-uncertain',
+  'mkdir-uncertain', 'sync-uncertain', 'remove-uncertain', 'owner-unlink-committed', 'ownership-uncertain',
 ]);
 function nativeCode(error: unknown): string {
   return error instanceof Error ? error.message : '';
@@ -38,6 +38,7 @@ function mapNative(error: unknown, fallback: Parameters<typeof fail>[0] = 'unava
   if (code === 'outcome-uncertain') return fail('outcome-uncertain');
   if (code === 'ownership-busy' || code === 'destination-exists' || code === 'native-mkdir') return fail('ownership-busy');
   if (code === 'unsupported-mount') return fail('unsupported-mount');
+  if (code === 'owner-unlink-committed') return fail('owner-unlink-committed');
   if (code === 'unsupported-acl' || code === 'acl-unavailable' || code === 'evidence-unavailable' || code === 'unsafe-ancestor') return fail('acl-unverified');
   if (code === 'limit-exceeded') return fail('limit-exceeded');
   if (code === 'path-changed' || code === 'stale-handle' || code === 'stale-operation' || code === 'unsafe-object') return fail('path-changed');
@@ -113,10 +114,17 @@ export class DarwinFilesPort implements FilesPort {
       const files = new DarwinFilesPort(storageRoot, native, root, lease);
       return files;
     } catch (error) {
-      let closeFailure: unknown;
-      if (native && lease) closeFailure = closeOnce(lease);
-      if (native && root) { const failure = closeOnce(root); if (closeFailure === undefined && failure !== undefined) closeFailure = failure; }
-      if (closeFailure) mapNative(closeFailure, 'outcome-uncertain');
+      // initialize_writer may have created and locked writer.lock before a
+      // post-create failure. Native keeps that ownership-uncertain cap alive
+      // until its environment teardown; closing root/lease here would drop the
+      // only retained barrier. This path is terminal in the Worker, so there
+      // is no later normal close or reopen to perform.
+      if (nativeCode(error) !== 'ownership-uncertain') {
+        let closeFailure: unknown;
+        if (native && lease) closeFailure = closeOnce(lease);
+        if (native && root) { const failure = closeOnce(root); if (closeFailure === undefined && failure !== undefined) closeFailure = failure; }
+        if (closeFailure) mapNative(closeFailure, 'outcome-uncertain');
+      }
       mapNative(error, 'store-corrupt');
     }
   }
@@ -240,7 +248,12 @@ export class DarwinFilesPort implements FilesPort {
           remove: async () => {
             if (owner.removed) fail('unavailable');
             try { this.#native.removeDirectoryChecked(owner.handle, this.#lease); owner.removed = true; }
-            catch (error) { this.mapMutation(error, 'outcome-uncertain'); }
+            catch (error) {
+              // The native primitive reports this only after unlink committed;
+              // retain the fact before fencing the adapter.
+              if (nativeCode(error) === 'owner-unlink-committed') owner.removed = true;
+              this.mapMutation(error, 'outcome-uncertain');
+            }
           },
           close: async () => {
             if (owner.closeUncertain) fail('outcome-uncertain');

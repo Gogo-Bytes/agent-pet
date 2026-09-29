@@ -6,7 +6,7 @@ import { validateEnvelope, wireBytes } from './validation.js';
 const id = (): string => randomBytes(16).toString('hex');
 const transportError: ManagedWorkerError = { code: 'outcome-uncertain', effect: 'uncertain' };
 type Pending = { requestId: string; body: RequestBody; bytes: number; resolve: (result: any) => void; reject: (error: ManagedWorkerError) => void; timer: ReturnType<typeof setTimeout> };
-export type WorkerHostOptions = { roots: { storageRoot: string; runtimeRoot: string }; initialize: boolean; timeoutMs?: number; onFailure?: (error: ManagedWorkerError) => void; worker?: Worker };
+export type WorkerHostOptions = { roots: { storageRoot: string; runtimeRoot: string }; initialize: boolean; backend?: 'node-fixture' | 'darwin-addon'; timeoutMs?: number; onFailure?: (error: ManagedWorkerError) => void; worker?: Worker };
 
 /** B4.1 transport: one dispatched operation, bounded FIFO, terminal poison. */
 export class WorkerHost {
@@ -30,7 +30,7 @@ export class WorkerHost {
     this.#worker.on('message', message => this.receive(message));
     this.#worker.on('error', () => this.poison());
     this.#worker.on('exit', code => { if (!this.#stopped && code !== 0) this.poison(); });
-    const init: RequestBody = { type: 'init', backend: 'node-fixture', roots: options.roots, initialize: options.initialize };
+    const init: RequestBody = { type: 'init', backend: options.backend ?? 'node-fixture', roots: options.roots, initialize: options.initialize };
     this.initialized = this.request<{ type: 'initialized'; ownerCap: string }>(init);
   }
   get failed(): boolean { return this.#failed; }
@@ -77,7 +77,7 @@ export class WorkerHost {
     if (!pending || this.#inFlight !== pending || envelope.kind !== 'reply') { this.poison(); return; }
     clearTimeout(pending.timer);
     const body = envelope.body as ReplyBody;
-    if (!body.ok && body.error.effect === 'uncertain') { this.poison(body.error); return; }
+    if (!body.ok && (body.error.effect === 'uncertain' || body.error.code === 'owner-unlink-committed')) { this.poison(body.error); return; }
     this.#requests.delete(pending.requestId); this.#inFlight = undefined;
     if (body.ok) pending.resolve(body.result); else pending.reject(body.error);
     this.pump();

@@ -3,8 +3,8 @@ import { validatePath } from '../path-policy.js';
 import { validId } from '../protocol.js';
 import { MAX_ENVELOPE_BYTES, MAX_OPERATION_BYTES, MAX_PATH_BYTES, WORKER_PROTOCOL, type ManagedWorkerErrorCode, type WireEnvelope } from './protocol.js';
 
-const ERROR_CODES: ManagedWorkerErrorCode[] = ['unavailable', 'outcome-uncertain', 'limit-exceeded', 'path-changed', 'ownership-busy',
-  'store-corrupt', 'durability-failed', 'unsupported-path', 'unsafe-type', 'unsafe-owner', 'unsafe-mode', 'unsupported-platform', 'protocol-failure'];
+const ERROR_CODES: ManagedWorkerErrorCode[] = ['unavailable', 'outcome-uncertain', 'owner-unlink-committed', 'limit-exceeded', 'path-changed', 'ownership-busy',
+  'store-corrupt', 'durability-failed', 'unsupported-path', 'unsafe-type', 'unsafe-owner', 'unsafe-mode', 'unsupported-platform', 'unsupported-mount', 'acl-unverified', 'protocol-failure'];
 const fail = (): never => { throw new Error('protocol-failure'); };
 const keys = (value: object, expected: string[]): void => {
   const actual = Object.getOwnPropertyNames(value);
@@ -65,7 +65,7 @@ function requestBody(input: unknown): void {
   if (!safeObject(value) || typeof value.type !== 'string') fail();
   switch (value.type) {
     case 'init': keys(value, ['type', 'backend', 'roots', 'initialize']);
-      if (value.backend !== 'node-fixture' || typeof value.initialize !== 'boolean' || !safeObject(value.roots)) fail();
+      if (!['node-fixture', 'darwin-addon'].includes(value.backend as string) || typeof value.initialize !== 'boolean' || !safeObject(value.roots)) fail();
       keys(value.roots, ['storageRoot', 'runtimeRoot']); path(value.roots.storageRoot); path(value.roots.runtimeRoot); break;
     case 'read': ownerBody(value, ['type', 'ownerCap', 'path', 'maxBytes', 'operation']); path(value.path); integer(value.maxBytes, MAX_OPERATION_BYTES); if (!['authority-read', 'credential-read', 'discovery-read'].includes(value.operation as string)) fail(); break;
     case 'release': ownerBody(value, ['type', 'ownerCap', 'receiptCap']); id(value.receiptCap); break;
@@ -134,7 +134,21 @@ export function validateEnvelope(input: unknown): asserts input is WireEnvelope 
   wireBytes(value);
 }
 export function validateRequestBody(value: unknown): asserts value is import('./protocol.js').RequestBody { requestBody(value); }
+function localDataField(value: unknown, key: string): unknown {
+  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Normalize local failures without treating Error instances as wire JSON or invoking getters. */
 export function sanitizedWorkerError(error: unknown, fallback: import('./protocol.js').ManagedWorkerErrorCode = 'outcome-uncertain'): import('./protocol.js').ManagedWorkerError {
-  const code = safeObject(error) && typeof error.code === 'string' && ERROR_CODES.includes(error.code as ManagedWorkerErrorCode) ? error.code as ManagedWorkerErrorCode : fallback;
-  return { code, effect: code === 'outcome-uncertain' ? 'uncertain' : 'none' };
+  const candidate = localDataField(error, 'code');
+  const code = typeof candidate === 'string' && ERROR_CODES.includes(candidate as ManagedWorkerErrorCode)
+    ? candidate as ManagedWorkerErrorCode : fallback;
+  const effect = code === 'owner-unlink-committed' ? 'committed' : code === 'outcome-uncertain' ? 'uncertain' : 'none';
+  return { code, effect };
 }

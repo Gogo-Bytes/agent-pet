@@ -48,9 +48,11 @@ B1–B3 保持生产入口关闭，只允许显式临时测试目标。B4–B6 �
 #### B4.1–B4.4 边界
 
 - **B4.1（本阶段）**：仅使用固定内部 Node `worker_threads` entry 与既有 `NodeFilesPort`/fixture backend。Worker 独占 backend roots、owner claim、transactions 与 receipts；Main 保留 Core、AuthStore、UDS 与同步 fail-closed fencing。消息使用有 generation/sequence/requestId 的严格 envelope、有限队列、opaque capability IDs；超时不是取消，不重启/重放/抢租约。此阶段证明 fixture owner-claim ordering，不证明 Darwin writer lease、native syscall fault injection、Electron loading 或 packaging。
-- **B4.2（后续）**：真实 Darwin addon 在 Node Worker 内加载并验证 root/lease/owner/transaction/receipt 全部 Worker-owned；另行补真实 native fault evidence。不得把 B4.1 fixture failures 描述为 syscall fault injection。
+- **B4.2（已完成本阶段）**：真实 Darwin addon 在固定 Node Worker 内加载；root/lease/owner/transaction/receipt 全部由 Worker 持有，Core/AuthStore/UDS 保持既有 host 边界。真实 Worker fixture 覆盖读写/release、Core start-stop discovery/owner cleanup、保留 lease 竞争及 clean reopen；受控 adapter/transport fault seam 覆盖启动 ownership-busy 清理与 committed owner unlink 的 poison/fence 传播。未把受控 seam 描述为 native syscall failure；现有 native fault-injection gate 仍为 skipped。
 - **B4.3（后续）**：显式 Electron Worker entry，验证嵌入 Node/N-API 兼容及 Main responsiveness；不以 desktop build 代替 Worker/addon load evidence，且保持 managed production activation 关闭。
 - **B4.4（后续）**：固定 ASAR 外 native resource layout、architecture/version/manifest checks、nested addon/app signing 与 packaged Worker load verification；不加入 runtime download、arbitrary path override、recovery 或 silent fallback。
+
+B4.2 实施记录（本阶段）：`worker/service-worker.test.ts` 的 Darwin-only fixture 在 Node Worker 中实际执行 native addon read/write/release/remove、lease contention、Core discovery/owner 清理和 clean reopen；受控 `darwin-files-port.test.ts` 模拟 committed owner unlink 后验证 removed 状态、终端 poison 与不重试。验证结果为 B4.2 focused 38/38、全仓 Vitest 448 passed/1 skipped、native-check 70 passed、`pnpm typecheck` 与 desktop build 通过；尚未宣称真实 syscall failure 注入、Electron Worker、打包/签名加载或生产入口启用。
 
 ### B2 内部检查点（避免再次变成过大任务）
 

@@ -1,7 +1,7 @@
 export type ManagedErrorCode =
   | 'unsupported-platform' | 'unsupported-path' | 'unsafe-owner' | 'unsafe-mode'
   | 'unsafe-type' | 'unsafe-link' | 'acl-unverified' | 'acl-denied' | 'mount-unverified'
-  | 'unsupported-mount' | 'path-changed' | 'path-too-long' | 'store-corrupt'
+  | 'unsupported-mount' | 'owner-unlink-committed' | 'path-changed' | 'path-too-long' | 'store-corrupt'
   | 'ownership-busy' | 'stale-operation' | 'durability-failed' | 'outcome-uncertain'
   | 'limit-exceeded' | 'malformed-frame' | 'frame-too-large' | 'unauthorized'
   | 'handshake-timeout' | 'rate-limited' | 'backpressure' | 'unavailable';

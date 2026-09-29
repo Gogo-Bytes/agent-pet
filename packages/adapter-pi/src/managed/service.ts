@@ -114,9 +114,19 @@ export async function openManagedCore(options: CoreOptions): Promise<ManagedCore
 
 /** B4.1 Node Worker fixture factory. It is internal and never selected by production entry points. */
 export async function openWorkerManagedCore(options: CoreOptions): Promise<ManagedCore> {
+  return openWorkerBackend(options, 'node-fixture');
+}
+
+/** Internal Darwin addon Worker factory. Storage remains entirely Worker-owned; runtimeRoot is the synthetic UDS fixture boundary. */
+export async function openWorkerDarwinManagedCore(options: CoreOptions): Promise<ManagedCore> {
+  if (process.platform !== 'darwin') return fail('unsupported-platform');
+  return openWorkerBackend(options, 'darwin-addon');
+}
+
+async function openWorkerBackend(options: CoreOptions, backend: 'node-fixture' | 'darwin-addon'): Promise<ManagedCore> {
   let store: AuthStore | undefined;
   let core: ManagedCore | undefined;
-  const storage = new WorkerFilesPort({ roots: options.roots, initialize: options.initialize, onFailure: error => { store?.failUncertain(error); core?.failUncertain(error); } });
+  const storage = new WorkerFilesPort({ backend, roots: options.roots, initialize: options.initialize, onFailure: error => { store?.failUncertain(error); core?.failUncertain(error); } });
   try {
     await storage.initialized();
     const scope = await options.policy.openRoots(options.roots);

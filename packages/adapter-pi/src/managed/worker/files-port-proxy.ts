@@ -22,7 +22,12 @@ export class WorkerFilesPort implements FilesPort {
     if (this.#owner) throw Object.assign(new Error('ownership-busy'), { code: 'ownership-busy' });
     let removed = false; let removePromise: Promise<void> | undefined;
     const claim: OwnerClaim = { path: `${this.storageRoot}/owner`, get removed() { return removed; },
-      remove: () => removePromise ??= this.host.request({ type: 'remove-owner', ownerCap: result.ownerCap }).then(() => { removed = true; }),
+      remove: () => removePromise ??= this.host.request({ type: 'remove-owner', ownerCap: result.ownerCap }).then(() => { removed = true; }, error => {
+        // Darwin may have committed the final unlink before its parent/lock
+        // barrier failed. Preserve that fact locally before the host fences.
+        if (error && typeof error === 'object' && (error as { code?: unknown }).code === 'owner-unlink-committed') removed = true;
+        throw error;
+      }),
       close: async () => { if (!removed) throw Object.assign(new Error('unavailable'), { code: 'unavailable' }); await this.host.stop(); } };
     this.#owner = claim; this.#ownerCap = result.ownerCap; return claim;
   }

@@ -6,7 +6,7 @@ import { validateEnvelope, wireBytes } from './validation.js';
 const id = (): string => randomBytes(16).toString('hex');
 const transportError: ManagedWorkerError = { code: 'outcome-uncertain', effect: 'uncertain' };
 type Pending = { requestId: string; body: RequestBody; bytes: number; resolve: (result: any) => void; reject: (error: ManagedWorkerError) => void; timer: ReturnType<typeof setTimeout> };
-export type WorkerHostOptions = { roots: { storageRoot: string; runtimeRoot: string }; initialize: boolean; backend?: 'node-fixture' | 'darwin-addon'; timeoutMs?: number; onFailure?: (error: ManagedWorkerError) => void; worker?: Worker };
+export type WorkerHostOptions = { roots: { storageRoot: string; runtimeRoot: string }; initialize: boolean; backend?: 'node-fixture' | 'darwin-addon'; timeoutMs?: number; onFailure?: (error: ManagedWorkerError) => void; worker?: Worker; testPauseMs?: number; testSmokeStages?: boolean };
 
 /** B4.1 transport: one dispatched operation, bounded FIFO, terminal poison. */
 export class WorkerHost {
@@ -18,6 +18,8 @@ export class WorkerHost {
   #workerSequence = 0;
   #failed = false;
   #stopped = false;
+  #removeOwnerAcknowledged: { requestId: string; sequence: number } | undefined;
+  #stoppedEvent = false;
   #queue: Pending[] = [];
   #queuedBytes = 0;
   #inFlight: Pending | undefined;
@@ -26,10 +28,23 @@ export class WorkerHost {
   constructor(options: WorkerHostOptions) {
     this.#timeout = options.timeoutMs ?? 5000;
     this.#onFailure = options.onFailure;
-    this.#worker = options.worker ?? new Worker(new URL('./entry.mjs', import.meta.url), { workerData: { workerGeneration: this.generation } });
+    this.#worker = options.worker ?? new Worker(new URL('./entry.mjs', import.meta.url), {
+      workerData: {
+        workerGeneration: this.generation,
+        ...(options.testPauseMs === undefined ? {} : { testPauseMs: options.testPauseMs }),
+        ...(options.testSmokeStages === true ? { testSmokeStages: true } : {}),
+      },
+    });
     this.#worker.on('message', message => this.receive(message));
     this.#worker.on('error', () => this.poison());
-    this.#worker.on('exit', code => { if (!this.#stopped && code !== 0) this.poison(); });
+    this.#worker.on('exit', code => {
+      // A zero exit is clean only after remove-owner was acknowledged, the
+      // Worker committed its terminal stopped event, and no work is stranded.
+      // Unref is not a stop ack.
+      const clean = this.#removeOwnerAcknowledged !== undefined && this.#stoppedEvent &&
+        this.#queue.length === 0 && this.#inFlight === undefined && this.#requests.size === 0;
+      if (code !== 0 || !clean) this.poison();
+    });
     const init: RequestBody = { type: 'init', backend: options.backend ?? 'node-fixture', roots: options.roots, initialize: options.initialize };
     this.initialized = this.request<{ type: 'initialized'; ownerCap: string }>(init);
   }
@@ -41,6 +56,13 @@ export class WorkerHost {
   }
   request<T = any>(body: RequestBody): Promise<T> {
     if (this.#failed || this.#stopped) return Promise.reject(transportError);
+    // remove-owner commits the Worker to terminal shutdown. Reject and fence
+    // a caller that races that acknowledgement instead of queueing work the
+    // stopped Worker cannot answer.
+    if (this.#removeOwnerAcknowledged || this.#stoppedEvent) {
+      this.poison();
+      return Promise.reject(transportError);
+    }
     const requestId = id();
     const envelope = { protocolVersion: WORKER_PROTOCOL, kind: 'request', workerGeneration: this.generation,
       sequence: this.#sequence + 1, requestId, body } as WireEnvelope;
@@ -70,7 +92,18 @@ export class WorkerHost {
     if (envelope.workerGeneration !== this.generation || envelope.sequence !== this.#workerSequence + 1) { this.poison(); return; }
     this.#workerSequence = envelope.sequence;
     if (envelope.kind === 'event') {
-      if ((envelope.body as any).type === 'failed') this.poison((envelope.body as any).error);
+      const event = envelope.body as any;
+      if (event.type === 'failed') this.poison(event.error);
+      else if (event.type === 'stopped') {
+        const acknowledged = this.#removeOwnerAcknowledged;
+        // A terminal stopped event is meaningful only when it names the exact
+        // remove-owner request that was acknowledged immediately beforehand.
+        if (event.clean !== true || this.#stoppedEvent || !acknowledged || envelope.requestId !== acknowledged.requestId || envelope.sequence !== acknowledged.sequence + 1 ||
+          this.#queue.length !== 0 || this.#inFlight !== undefined || this.#requests.size !== 0) {
+          this.poison(); return;
+        }
+        this.#stoppedEvent = true;
+      }
       return;
     }
     const pending = this.#requests.get(envelope.requestId);
@@ -79,7 +112,18 @@ export class WorkerHost {
     const body = envelope.body as ReplyBody;
     if (!body.ok && (body.error.effect === 'uncertain' || body.error.code === 'owner-unlink-committed')) { this.poison(body.error); return; }
     this.#requests.delete(pending.requestId); this.#inFlight = undefined;
-    if (body.ok) pending.resolve(body.result); else pending.reject(body.error);
+    if (body.ok) {
+      if (pending.body.type === 'remove-owner' && body.result.type === 'owner-removed') {
+        this.#removeOwnerAcknowledged = { requestId: pending.requestId, sequence: envelope.sequence };
+      }
+      pending.resolve(body.result);
+    } else pending.reject(body.error);
+    // Do not dispatch work queued behind remove-owner. It can never be
+    // acknowledged by a Worker that has committed terminal shutdown.
+    if (this.#removeOwnerAcknowledged) {
+      if (this.#queue.length !== 0 || this.#inFlight !== undefined || this.#requests.size !== 0) this.poison();
+      return;
+    }
     this.pump();
   }
   private poison(error: ManagedWorkerError = transportError): void {

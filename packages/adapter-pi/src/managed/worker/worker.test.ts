@@ -50,6 +50,26 @@ test('real entry rejects foreign generation before init and does not advance rec
   expect((await requestReply(worker, wire(generation, 3, 'f'.repeat(32), { type: 'remove-owner', ownerCap }))).body.ok).toBe(true);
 });
 
+test('real entry correlates stopped event to the acknowledged remove-owner request', async () => {
+  const f = await fixture();
+  const generation = 'a'.repeat(32);
+  const worker = new Worker(new URL('./entry.mjs', import.meta.url), { workerData: { workerGeneration: generation } });
+  cleanups.push(async () => { worker.unref(); });
+  const initRequestId = 'b'.repeat(32);
+  const initialized = await requestReply(worker, wire(generation, 1, initRequestId, { type: 'init', backend: 'node-fixture', roots: f.roots, initialize: true }));
+  const ownerCap = initialized.body.result.ownerCap;
+  const drain = await requestReply(worker, wire(generation, 2, 'd'.repeat(32), { type: 'drain', ownerCap }));
+  expect(drain.body).toMatchObject({ ok: true, result: { type: 'drained' } });
+  const removeRequestId = 'c'.repeat(32);
+  const stopped = new Promise<Message>(resolve => {
+    const onMessage = (value: Message) => { if (value.kind === 'event' && value.body.type === 'stopped') { worker.off('message', onMessage); resolve(value); } };
+    worker.on('message', onMessage);
+  });
+  const removed = await requestReply(worker, wire(generation, 3, removeRequestId, { type: 'remove-owner', ownerCap }));
+  expect(removed.body).toMatchObject({ ok: true, result: { type: 'owner-removed' } });
+  await expect(stopped).resolves.toMatchObject({ requestId: removeRequestId, workerGeneration: generation, sequence: 5, body: { type: 'stopped', clean: true } });
+});
+
 test('real entry transaction saturation rejects before allocating an extra temporary inode', async () => {
   const f = await fixture();
   const files = new WorkerFilesPort({ roots: f.roots, initialize: true });

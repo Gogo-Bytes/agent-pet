@@ -11,6 +11,12 @@ import { MAX_RECEIPTS, MAX_TRANSACTIONS, WORKER_PROTOCOL, type RequestBody, type
 
 if (!parentPort) throw new Error('protocol-failure');
 const generation: OpaqueId = workerData && typeof workerData.workerGeneration === 'string' && /^[a-f0-9]{32}$/.test(workerData.workerGeneration) ? workerData.workerGeneration : randomBytes(16).toString('hex');
+// Test-only cooperative delay: this yields to the Worker event loop and is
+// not native syscall blocking, cancellation, or fault injection.
+const testPauseMs = workerData && Number.isSafeInteger(workerData.testPauseMs) && workerData.testPauseMs >= 0 && workerData.testPauseMs <= 1000 ? workerData.testPauseMs : 0;
+const testSmokeStages = workerData?.testSmokeStages === true;
+const smokeStage = (name: string): void => { if (testSmokeStages) console.log(`B4.3 STAGE ${name} t=${Date.now()}`); };
+smokeStage('worker-entry-loaded');
 let sendSequence = 0; let receiveSequence = 0;
 let storage: FilesPort | undefined; let owner: OwnerClaim | undefined; let ownerCap: OpaqueId | undefined; let stopped = false;
 let initializationFailed = false;
@@ -88,7 +94,9 @@ async function dispatch(body: RequestBody): Promise<ReplyResult> {
       } else {
         // Darwin owns storageRoot, lease, owner and all native handles inside
         // this fixed Worker. Main never constructs this backend.
+        smokeStage('native-open-start');
         candidate.files = await DarwinFilesPort.open(body.roots.storageRoot, body.initialize);
+        smokeStage('native-open-complete');
       }
       try {
         candidate.claim = await candidate.files.acquireOwner();
@@ -186,9 +194,10 @@ parentPort.on('message', async (value: unknown) => {
   catch { protocolFailure(); return; }
   try {
     const result = await dispatch(envelope.body);
+    if (envelope.body.type === 'init' && testPauseMs > 0) await new Promise<void>(resolve => setTimeout(resolve, testPauseMs));
     post('reply', envelope.requestId, { type: 'reply', ok: true, result });
     if (envelope.body.type === 'init') post('event', cap(), { type: 'ready' });
-    if (envelope.body.type === 'remove-owner') { post('event', cap(), { type: 'stopped', clean: true }); parentPort!.unref(); }
+    if (envelope.body.type === 'remove-owner') { post('event', envelope.requestId, { type: 'stopped', clean: true }); parentPort!.unref(); }
   } catch (error) {
     // Preserve only the fixed code/effect union; never forward native details.
     const safe = sanitizedWorkerError(error);

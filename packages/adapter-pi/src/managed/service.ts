@@ -1,4 +1,5 @@
 import net, { type Socket } from 'node:net';
+import type { Worker } from 'node:worker_threads';
 import { chmod, lstat, mkdir, rmdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { Stats } from 'node:fs';
@@ -27,7 +28,7 @@ function nextObservationRevision(): number {
 export type CoreOptions = {
   roots: Roots; policy: FilesystemPolicy; initialize: boolean;
   publish(observation: SessionObservation): void;
-  limits?: Partial<Limits>; fault?: FaultHook;
+  limits?: Partial<Limits>; fault?: FaultHook; worker?: Worker; testPauseMs?: number; testSmokeStages?: boolean;
 };
 
 type RuntimeResource = { path: string; identity: Stats };
@@ -126,7 +127,11 @@ export async function openWorkerDarwinManagedCore(options: CoreOptions): Promise
 async function openWorkerBackend(options: CoreOptions, backend: 'node-fixture' | 'darwin-addon'): Promise<ManagedCore> {
   let store: AuthStore | undefined;
   let core: ManagedCore | undefined;
-  const storage = new WorkerFilesPort({ backend, roots: options.roots, initialize: options.initialize, onFailure: error => { store?.failUncertain(error); core?.failUncertain(error); } });
+  const storage = new WorkerFilesPort({ backend, roots: options.roots, initialize: options.initialize,
+    ...(options.worker ? { worker: options.worker } : {}),
+    ...(options.testPauseMs === undefined ? {} : { testPauseMs: options.testPauseMs }),
+    ...(options.testSmokeStages === true ? { testSmokeStages: true } : {}),
+    onFailure: error => { store?.failUncertain(error); core?.failUncertain(error); } });
   try {
     await storage.initialized();
     const scope = await options.policy.openRoots(options.roots);

@@ -23,6 +23,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "smoke:managed-worker": "node ../../scripts/electron-managed-worker-smoke.mjs",
     "typecheck": "tsc --noEmit"
   }
 }

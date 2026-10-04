@@ -1,15 +1,30 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { randomBytes } from 'node:crypto';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { fixturePolicy } from '../test-policy.js';
 import { PrivateFiles } from '../private-files.js';
 import { NodeFilesPort, REMOVE_AFTER_DRAIN } from '../node-files-port.js';
 import { DarwinFilesPort } from '../darwin-files-port.js';
+import type { DarwinAddonIdentity } from '../native-darwin.js';
 import type { FileReceipt, FilesPort, OwnerClaim, WriteTransaction } from '../files-port.js';
 import { fail, ManagedError } from '../errors.js';
 import { validateEnvelope, validateRequestBody, sanitizedWorkerError } from './validation.js';
 import { MAX_RECEIPTS, MAX_TRANSACTIONS, WORKER_PROTOCOL, type RequestBody, type ReplyBody, type ReplyResult, type WireEnvelope, type OpaqueId } from './protocol.js';
 
 if (!parentPort) throw new Error('protocol-failure');
+type StagedNativeAddon = { root: string; relativePath: string; absolutePath: string };
+function stagedNativeAddon(value: unknown): StagedNativeAddon | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Object.keys(value).sort().join(',') !== 'absolutePath,relativePath,root') throw new Error('staged-native-addon-contract');
+  const item = value as Record<string, unknown>;
+  if (typeof item.root !== 'string' || typeof item.relativePath !== 'string' || typeof item.absolutePath !== 'string' ||
+      !isAbsolute(item.root) || !isAbsolute(item.absolutePath) || item.relativePath !== 'native/managed-darwin.node') throw new Error('staged-native-addon-path');
+  const root = resolve(item.root); const absolute = resolve(item.absolutePath); const expected = resolve(root, item.relativePath);
+  const within = relative(root, absolute);
+  if (absolute !== expected || !within || within.startsWith(`..${sep}`) || isAbsolute(within)) throw new Error('staged-native-addon-path');
+  return { root, relativePath: item.relativePath, absolutePath: absolute };
+}
+const stagedAddon = stagedNativeAddon(workerData?.stagedNativeAddon);
 const generation: OpaqueId = workerData && typeof workerData.workerGeneration === 'string' && /^[a-f0-9]{32}$/.test(workerData.workerGeneration) ? workerData.workerGeneration : randomBytes(16).toString('hex');
 // Test-only cooperative delay: this yields to the Worker event loop and is
 // not native syscall blocking, cancellation, or fault injection.
@@ -84,6 +99,7 @@ async function dispatch(body: RequestBody): Promise<ReplyResult> {
   if (body.type === 'init') {
     if (storage || initializationFailed) fail('unavailable');
     const candidate: { files?: FilesPort; claim?: OwnerClaim; ownerState: 'none' | 'definitely-acquired' | 'acquisition-uncertain' | 'close-uncertain' } = { ownerState: 'none' };
+    let nativeAddonIdentity: DarwinAddonIdentity | undefined;
     try {
       if (body.backend === 'node-fixture') {
         const policy = await fixturePolicy(body.roots);
@@ -95,8 +111,15 @@ async function dispatch(body: RequestBody): Promise<ReplyResult> {
         // Darwin owns storageRoot, lease, owner and all native handles inside
         // this fixed Worker. Main never constructs this backend.
         smokeStage('native-open-start');
-        candidate.files = await DarwinFilesPort.open(body.roots.storageRoot, body.initialize);
+        const opened = await DarwinFilesPort.open(body.roots.storageRoot, body.initialize, stagedAddon?.absolutePath);
+        candidate.files = opened;
+        nativeAddonIdentity = opened.nativeAddonIdentity;
         smokeStage('native-open-complete');
+        if (stagedAddon && (!nativeAddonIdentity || nativeAddonIdentity.requestedPath !== stagedAddon.absolutePath ||
+          nativeAddonIdentity.loadedPath !== stagedAddon.absolutePath || nativeAddonIdentity.pathMatches !== true)) {
+          throw new Error('staged-native-addon-identity');
+        }
+        if (stagedAddon) smokeStage('native-addon-loaded:manifest-selected');
       }
       try {
         candidate.claim = await candidate.files.acquireOwner();
@@ -109,7 +132,7 @@ async function dispatch(body: RequestBody): Promise<ReplyResult> {
         throw error;
       }
       storage = candidate.files; owner = candidate.claim; ownerCap = cap();
-      return { type: 'initialized', ownerCap };
+      return { type: 'initialized', ownerCap, ...(nativeAddonIdentity === undefined ? {} : { nativeAddonIdentity }) };
     } catch (error) {
       const cleanupError = await cleanupInitialization(candidate);
       initializationFailed = true; stopped = true;

@@ -89,7 +89,17 @@ function replyBody(input: unknown): void {
   keys(value, ['type', 'ok', 'result']);
   const result = value.result;
   switch (result.type) {
-    case 'initialized': keys(result, ['type', 'ownerCap']); id(result.ownerCap); break;
+    case 'initialized': {
+      id(result.ownerCap);
+      if (Object.hasOwn(result, 'nativeAddonIdentity')) {
+        keys(result, ['type', 'ownerCap', 'nativeAddonIdentity']);
+        const identity = result.nativeAddonIdentity;
+        if (!safeObject(identity)) fail();
+        keys(identity, ['requestedPath', 'loadedPath', 'pathMatches']);
+        string(identity.requestedPath); string(identity.loadedPath); if (identity.pathMatches !== true) fail();
+      } else keys(result, ['type', 'ownerCap']);
+      break;
+    }
     case 'read': keys(result, ['type', 'value', 'receiptCap']); if (!validJson(result.value)) fail(); id(result.receiptCap); break;
     case 'released': case 'directory-created': case 'removed': case 'owner-finalized': keys(result, ['type']); break;
     case 'transaction-begun': keys(result, ['type', 'transactionCap', 'state']); id(result.transactionCap); if (result.state !== 'Prepared') fail(); break;

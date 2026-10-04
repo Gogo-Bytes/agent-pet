@@ -3,7 +3,7 @@ import { relative, sep } from 'node:path';
 import { fail, sanitized } from './errors.js';
 import type { FileReceipt, FilesPort, FilesReader, OwnerClaim, ReadOperation, TransactionState, WriteOperation, WriteTransaction } from './files-port.js';
 import { acceptDarwinEvidence } from './darwin-policy.js';
-import { loadDarwinPrimitives, loadDarwinWritePrimitives, type DarwinEvidence, type DarwinWritePrimitives, type NativeHandle } from './native-darwin.js';
+import { loadDarwinPrimitives, loadDarwinWritePrimitives, type DarwinAddonIdentity, type DarwinEvidence, type DarwinWritePrimitives, type NativeHandle } from './native-darwin.js';
 import { validatePath } from './path-policy.js';
 
 const MAX_BYTES = 256 * 1024;
@@ -89,12 +89,12 @@ export class DarwinFilesPort implements FilesPort {
   #disposal: Promise<void> | undefined;
 
   private constructor(readonly storageRoot: string, native: DarwinWritePrimitives,
-    root: NativeHandle, lease: NativeHandle) {
+    root: NativeHandle, lease: NativeHandle, readonly nativeAddonIdentity?: DarwinAddonIdentity) {
     this.#native = native; this.#root = root; this.#lease = lease;
   }
 
   /** Opens an explicit repository-local root. No home/configuration discovery is performed. */
-  static async open(storageRoot: string, initialize: boolean): Promise<DarwinFilesPort> {
+  static async open(storageRoot: string, initialize: boolean, nativeAddonPath?: string): Promise<DarwinFilesPort> {
     validatePath(storageRoot);
     if (process.platform !== 'darwin') return fail('unsupported-platform');
     let native: DarwinWritePrimitives | undefined;
@@ -108,10 +108,10 @@ export class DarwinFilesPort implements FilesPort {
       catch (closeError) { return closeError; }
     };
     try {
-      native = loadDarwinWritePrimitives();
+      native = loadDarwinWritePrimitives(nativeAddonPath);
       root = native.openRoot(storageRoot);
       lease = initialize ? native.initializeWriter(root) : native.acquireWriter(root);
-      const files = new DarwinFilesPort(storageRoot, native, root, lease);
+      const files = new DarwinFilesPort(storageRoot, native, root, lease, native.addonIdentity);
       return files;
     } catch (error) {
       // initialize_writer may have created and locked writer.lock before a

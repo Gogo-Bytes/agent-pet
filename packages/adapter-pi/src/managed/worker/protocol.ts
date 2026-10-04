@@ -31,8 +31,9 @@ export type RequestBody =
   | { type: 'drain'; ownerCap: OpaqueId }
   | { type: 'remove-after-drain'; ownerCap: OpaqueId; receiptCap: OpaqueId }
   | { type: 'remove-owner'; ownerCap: OpaqueId };
+export type NativeAddonIdentity = { requestedPath: string; loadedPath: string; pathMatches: true };
 export type ReplyResult =
-  | { type: 'initialized'; ownerCap: OpaqueId }
+  | { type: 'initialized'; ownerCap: OpaqueId; nativeAddonIdentity?: NativeAddonIdentity }
   | { type: 'read'; value: JsonValue; receiptCap: OpaqueId }
   | { type: 'released' } | { type: 'directory-created' }
   | { type: 'transaction-begun'; transactionCap: OpaqueId; state: 'Prepared' }

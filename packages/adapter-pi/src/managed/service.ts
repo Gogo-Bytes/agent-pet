@@ -13,6 +13,7 @@ import { NodeFilesPort, REMOVE_AFTER_DRAIN } from './node-files-port.js';
 import type { FileReceipt, FilesPort, OwnerClaim } from './files-port.js';
 import { DarwinFilesPort } from './darwin-files-port.js';
 import { WorkerFilesPort } from './worker/files-port-proxy.js';
+import type { StagedNativeAddon } from './worker/host.js';
 import { sameIdentity, type FilesystemPolicy, type Roots } from './path-policy.js';
 import { ackFor, opaqueId, parseAuth, parseEvent, PROTOCOL, type AuthHello } from './protocol.js';
 import { DISCOVERY_BYTES, endpoint, type Discovery } from './discovery.js';
@@ -29,6 +30,8 @@ export type CoreOptions = {
   roots: Roots; policy: FilesystemPolicy; initialize: boolean;
   publish(observation: SessionObservation): void;
   limits?: Partial<Limits>; fault?: FaultHook; worker?: Worker; testPauseMs?: number; testSmokeStages?: boolean;
+  /** Internal staged-resource smoke seam; production callers cannot select resources. */
+  workerEntry?: URL; stagedNativeAddon?: StagedNativeAddon; testWorkerCleanExit?: () => void; testWorkerIdentity?: (identity: { requestedPath: string; loadedPath: string; pathMatches: true }) => void;
 };
 
 type RuntimeResource = { path: string; identity: Stats };
@@ -131,6 +134,10 @@ async function openWorkerBackend(options: CoreOptions, backend: 'node-fixture' |
     ...(options.worker ? { worker: options.worker } : {}),
     ...(options.testPauseMs === undefined ? {} : { testPauseMs: options.testPauseMs }),
     ...(options.testSmokeStages === true ? { testSmokeStages: true } : {}),
+    ...(options.workerEntry === undefined ? {} : { workerEntry: options.workerEntry }),
+    ...(options.stagedNativeAddon === undefined ? {} : { stagedNativeAddon: options.stagedNativeAddon }),
+    ...(options.testWorkerCleanExit === undefined ? {} : { testWorkerCleanExit: options.testWorkerCleanExit }),
+    ...(options.testWorkerIdentity === undefined ? {} : { testWorkerIdentity: options.testWorkerIdentity }),
     onFailure: error => { store?.failUncertain(error); core?.failUncertain(error); } });
   try {
     await storage.initialized();

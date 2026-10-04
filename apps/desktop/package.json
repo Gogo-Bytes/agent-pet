@@ -24,6 +24,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "smoke:managed-worker": "node ../../scripts/electron-managed-worker-smoke.mjs",
+    "smoke:managed-worker-staged": "node ../../scripts/electron-managed-worker-staged-smoke.mjs",
     "typecheck": "tsc --noEmit"
   }
 }

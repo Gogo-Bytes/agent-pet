@@ -1,4 +1,6 @@
 import { createRequire } from 'node:module';
+import { realpathSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
 import { acceptDarwinEvidence } from './darwin-policy.js';
 
 /** Internal primitive only. No package export, runtime build, path override, or policy injection into P2b.1. */
@@ -24,7 +26,14 @@ export interface DarwinPrimitives {
   readBounded(file: NativeHandle, max: number): { bytes: Buffer; before: DarwinEvidence; after: DarwinEvidence };
   close(handle: NativeHandle): void;
 }
+export type DarwinAddonIdentity = {
+  readonly requestedPath: string;
+  readonly loadedPath: string;
+  readonly pathMatches: true;
+};
 export interface DarwinWritePrimitives extends DarwinPrimitives {
+  /** Internal staged-resource smoke identity; absent for the default loader. */
+  readonly addonIdentity?: DarwinAddonIdentity;
   readonly writeVersion: 1;
   initializeWriter(root: NativeHandle): NativeHandle;
   createDirectory(parent: NativeHandle, name: string, lease: NativeHandle): NativeHandle;
@@ -37,10 +46,18 @@ export interface DarwinWritePrimitives extends DarwinPrimitives {
 }
 type RawDarwinWritePrimitives = DarwinWritePrimitives;
 const require = createRequire(import.meta.url);
-export function loadDarwinPrimitives(): DarwinPrimitives {
+const addonIdentities = new WeakMap<object, DarwinAddonIdentity>();
+export function loadDarwinPrimitives(nativeAddonPath?: string): DarwinPrimitives {
   if (process.platform !== 'darwin') throw new Error('unsupported-platform');
   // Development location only. Packaged Electron/external Node resource delivery is not approved.
-  const native = require('../../native/managed-darwin/out/managed-darwin.node') as DarwinPrimitives;
+  const requested = nativeAddonPath === undefined ? undefined : resolve(nativeAddonPath);
+  if (requested !== undefined && (!isAbsolute(nativeAddonPath!) || realpathSync(requested) !== requested)) throw new Error('staged-native-addon-path');
+  const addon = requested ?? '../../native/managed-darwin/out/managed-darwin.node';
+  const resolved = require.resolve(addon);
+  const loadedPath = realpathSync(resolved);
+  if (requested !== undefined && loadedPath !== requested) throw new Error('staged-native-addon-path');
+  const native = require(resolved) as DarwinPrimitives;
+  if (requested !== undefined) addonIdentities.set(native as object, { requestedPath: requested, loadedPath, pathMatches: true });
   if (native.version !== 1 || native.napi !== 8 ||
       !['openRoot', 'openDirectory', 'openFile', 'acquireWriter', 'inspect', 'ancestors', 'readBounded', 'close']
         .every(name => typeof (native as unknown as Record<string, unknown>)[name] === 'function')) {
@@ -55,8 +72,8 @@ function sameVolume(...samples: DarwinEvidence[]): void {
   }
 }
 /** Exact dormant write capability loader. It returns a policy-gated adapter, never raw mutators. */
-export function loadDarwinWritePrimitives(): DarwinWritePrimitives {
-  const raw = loadDarwinPrimitives() as RawDarwinWritePrimitives;
+export function loadDarwinWritePrimitives(nativeAddonPath?: string): DarwinWritePrimitives {
+  const raw = loadDarwinPrimitives(nativeAddonPath) as RawDarwinWritePrimitives;
   if (raw.writeVersion !== 1 ||
       !['initializeWriter', 'createDirectory', 'beginWrite', 'write', 'publishNew', 'publishReplace',
         'removeChecked', 'removeDirectoryChecked'].every(name =>
@@ -113,8 +130,10 @@ export function loadDarwinWritePrimitives(): DarwinWritePrimitives {
     if (!lease) throw new Error('path-changed');
     return lease;
   }
+  const addonIdentity = addonIdentities.get(raw as object);
   const adapter: DarwinWritePrimitives = {
     version: 1, napi: 8, writeVersion: 1,
+    ...(addonIdentity === undefined ? {} : { addonIdentity }),
     openRoot(path) {
       const root = raw.openRoot(path); return remember(root, root);
     },

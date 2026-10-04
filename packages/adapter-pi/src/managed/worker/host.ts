@@ -1,12 +1,13 @@
 import { Worker, type MessagePort } from 'node:worker_threads';
 import { randomBytes } from 'node:crypto';
-import { MAX_PENDING, MAX_QUEUE, MAX_QUEUE_BYTES, WORKER_PROTOCOL, type ManagedWorkerError, type RequestBody, type ReplyBody, type WireEnvelope } from './protocol.js';
+import { MAX_PENDING, MAX_QUEUE, MAX_QUEUE_BYTES, WORKER_PROTOCOL, type ManagedWorkerError, type NativeAddonIdentity, type RequestBody, type ReplyBody, type WireEnvelope } from './protocol.js';
 import { validateEnvelope, wireBytes } from './validation.js';
 
 const id = (): string => randomBytes(16).toString('hex');
 const transportError: ManagedWorkerError = { code: 'outcome-uncertain', effect: 'uncertain' };
 type Pending = { requestId: string; body: RequestBody; bytes: number; resolve: (result: any) => void; reject: (error: ManagedWorkerError) => void; timer: ReturnType<typeof setTimeout> };
-export type WorkerHostOptions = { roots: { storageRoot: string; runtimeRoot: string }; initialize: boolean; backend?: 'node-fixture' | 'darwin-addon'; timeoutMs?: number; onFailure?: (error: ManagedWorkerError) => void; worker?: Worker; testPauseMs?: number; testSmokeStages?: boolean };
+export type StagedNativeAddon = { root: string; relativePath: string; absolutePath: string };
+export type WorkerHostOptions = { roots: { storageRoot: string; runtimeRoot: string }; initialize: boolean; backend?: 'node-fixture' | 'darwin-addon'; timeoutMs?: number; onFailure?: (error: ManagedWorkerError) => void; worker?: Worker; testPauseMs?: number; testSmokeStages?: boolean; /** Internal staged-resource smoke seam; never selected by production entry points. */ workerEntry?: URL; stagedNativeAddon?: StagedNativeAddon; testWorkerCleanExit?: () => void; testWorkerIdentity?: (identity: NativeAddonIdentity) => void };
 
 /** B4.1 transport: one dispatched operation, bounded FIFO, terminal poison. */
 export class WorkerHost {
@@ -28,9 +29,10 @@ export class WorkerHost {
   constructor(options: WorkerHostOptions) {
     this.#timeout = options.timeoutMs ?? 5000;
     this.#onFailure = options.onFailure;
-    this.#worker = options.worker ?? new Worker(new URL('./entry.mjs', import.meta.url), {
+    this.#worker = options.worker ?? new Worker(options.workerEntry ?? new URL('./entry.mjs', import.meta.url), {
       workerData: {
         workerGeneration: this.generation,
+        ...(options.stagedNativeAddon === undefined ? {} : { stagedNativeAddon: options.stagedNativeAddon }),
         ...(options.testPauseMs === undefined ? {} : { testPauseMs: options.testPauseMs }),
         ...(options.testSmokeStages === true ? { testSmokeStages: true } : {}),
       },
@@ -43,10 +45,14 @@ export class WorkerHost {
       // Unref is not a stop ack.
       const clean = this.#removeOwnerAcknowledged !== undefined && this.#stoppedEvent &&
         this.#queue.length === 0 && this.#inFlight === undefined && this.#requests.size === 0;
-      if (code !== 0 || !clean) this.poison();
+      if (code !== 0 || !clean || this.#failed) this.poison();
+      else options.testWorkerCleanExit?.();
     });
     const init: RequestBody = { type: 'init', backend: options.backend ?? 'node-fixture', roots: options.roots, initialize: options.initialize };
-    this.initialized = this.request<{ type: 'initialized'; ownerCap: string }>(init);
+    this.initialized = this.request<{ type: 'initialized'; ownerCap: string; nativeAddonIdentity?: NativeAddonIdentity }>(init).then(result => {
+      if (result.nativeAddonIdentity) options.testWorkerIdentity?.(result.nativeAddonIdentity);
+      return result;
+    });
   }
   get failed(): boolean { return this.#failed; }
   private envelope(kind: 'request' | 'reply' | 'event', requestId: string, body: any): WireEnvelope {

@@ -113,3 +113,38 @@ git diff --check
 7. Ordered fsync/F_FULLFSYNC and failure behavior on the supported filesystem, with accurate power-loss limitations. The dormant additive native slice now attempts ordered parent/temp sync and `F_FULLFSYNC` barriers for bootstrap and transactions, but has no deterministic native syscall fault-injection switch, so failure-stage behavior is not dynamically proven and no unconditional power-loss claim is made. Process kill is not power loss or snapshot anti-rollback.
 
 Other ordinary OS users remain the target isolation boundary. Malicious same-uid/root actors, complete snapshot rollback, and atomic socket authentication are not promised. Default public managed activation remains blocked until the required security evidence **and** integration/consent/release gates are actually satisfied and reviewed.
+
+## D6.1 — bounded synthetic current-account harness
+
+This is a **harness-only** checkpoint against `af68305`, not production activation or a new security mechanism. The design is READY only with the review correction below; production admission remains **BLOCKED**. Historical B2/B3/B4 results above are not relabeled as D6 evidence. Public factories and `productionPolicy` remain unchanged and reject before input/filesystem/socket activity. There is no same-UID isolation promise.
+
+### Corrected D6 gate matrix
+
+The original D6 design's stale-generation zero-byte criterion is explicitly superseded:
+
+| Case / gate | Required evidence / current boundary |
+| --- | --- |
+| Malformed discovery; rejected path/ACL/identity | **Zero credential bytes before transmission.** D6.1 measures total decoy bytes (therefore also credential bytes), after a known one-byte positive listener control. Implemented path probe uses an actual unsafe socket mode, not a fabricated ACL/peer check. |
+| Well-formed retired generation at an otherwise accepted endpoint | **Authentication rejection, zero session admissions and zero observations**, NOT zero credential bytes. D6.1 obtains the retired generation from an actual clean Core restart; authentication is checked by the existing Core after transmission. |
+| Stale-generation prevention before send | **BLOCKED**: no independent freshness authority. No new freshness/peer-UID mechanism is implied. |
+| D6.1 same-account ACL controls | Existing installed native helper/addon: no-ACL APFS positive read/delete; deny-delete ACE with actual denied unlink; accessible allow-read object rejected by policy; inherited allow ACE detected/rejected. These are private-object controls, **not complete production ancestor validation or cross-user denial**. |
+| D6.1 namespace inputs | Existing fixture policy: malformed/aliased inputs, endpoint byte bound, no-clobber directory collision with unchanged identity. This is not approval of a shared production namespace, channel policy, or `/tmp` exception. |
+| D6.1 lifecycle | Actual native lease busy during an owned child; SIGKILL followed by completed child close; same lock inode reacquirable; fixture durable owner remains and fresh **Node Core** open refuses. Native lease + Node fixture owner composition is not native-Core/Worker crash certification. Normal Core stop/reopen is independently exercised. |
+| Socket-native security | **BLOCKED**: no socket-leaf native ACL or kernel peer evidence API. Root/parent/leaf socket rebinding and Node `Server.close()` replacement-leaf unlink residual remain unclosed. |
+| Cross-user / native syscall faults | **BLOCKED**: no second-account authorization; no controlled native create/write/sync/publish/close fault injection. TS tests cannot close this gate. |
+| Packaging / recovery / real target | **BLOCKED**: no signing/install/native external-client delivery, reset/revoke-all/lease steal, or real pi/config/endpoint access. |
+
+### Reproduce and interpret
+
+```sh
+pnpm exec vitest run packages/adapter-pi/src/managed/d6/evidence.test.ts packages/adapter-pi/src/managed/d6/harness.test.ts
+pnpm test:d61
+```
+
+The standalone runner waits for one bounded Vitest process (single Worker thread, no Electron), caps and suppresses raw child output, and prints a **SANITIZED_EVIDENCE** directory containing `environment.json`, `cases.jsonl`, and `cleanup.json`. Exit **1** means failed/incomplete evidence; exit **2** means gates remain blocked (including missing prerequisites). It never exits 0 for admission. A successful self-test is not production admission. Missing Darwin/addon/helper/APFS/ordinary-account prerequisites are NOT-RUN/BLOCKED, not passing native evidence. An incomplete run may additionally leave a fixed-code `runner.json`; it is failure evidence, not a completed manifest.
+
+Evidence is bounded, exact-key validated, and restricted to fixed aliases/codes, booleans/counters, platform/version, source commit and a digest of the D6 harness sources. It excludes raw errors, account IDs/principals, production paths, tokens and token hashes. The source digest is **not a credential digest**. Schema tests reject injected fake secrets, unknown/missing keys, oversize data, getters and serialization hooks. Runner artifacts are not test console logs.
+
+Only fresh owned fixtures are used. The Core/client share existing implementations; a separate synthetic client snapshot permits discovery mutation without bypassing the Core's checked discovery cleanup receipt. Existing test helpers with recursive removal are not imported. Exact-object cleanup checks ownership/identity and the complete bounded allowlist before deletion; unknown objects, failed checks, or uncertainty preserve the new root. Native handles and known child/socket closes settle first. A successful lease-death probe deliberately leaves `lease-root` **PRESERVED/BARRIER**: kernel lease release never authorizes owner removal. Thus behavior and cleanup verdicts are separate; even successful behavior may have cleanup BLOCKED. Do not remove these barriers automatically. No historical native/bundle fixture is inspected or cleaned, and no existing/production ancestor ACL is changed. ACL inheritance changes are confined to the newly owned ACL fixture parent/child.
+
+Every actual harness invocation (including full `pnpm test`) creates its own lease fixture and intentionally retains that barrier. No automatic retry, repair, cleanup sweep or recovery follows. Electron staged smoke and the broad legacy native-check runner are not used as D6 evidence; the D6 harness invokes only the installed bounded ACL helper and isolated lease child with its own ownership/cleanup discipline.

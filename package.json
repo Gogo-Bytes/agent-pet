@@ -4,6 +4,7 @@
   "packageManager": "pnpm@12.4.2",
   "scripts": {
     "test": "vitest run",
+    "test:d61": "node packages/adapter-pi/src/managed/d6/run.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

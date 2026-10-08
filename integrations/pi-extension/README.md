@@ -31,16 +31,27 @@ manual environment exports, or generation helper at runtime. The helper itself i
 currently source-only and requires its adjacent `index.ts` at generation time;
 it is not yet a packaged desktop resource.
 
-A future M2 authorized selective deploy can consume that text, but must own preview,
-no-clobber placement, private permissions, identity/content tracking and withdrawal.
+The M2 temporary-only `PiTemporaryDeployment` helper in
+`apps/desktop/src/main/pi-temp-deployment.ts` consumes that text once per preview.
+An explicitly injected configuration root maps to `extensions/agent-pet.ts`
+(pi 0.85.1's installed `docs/extensions.md`, read in full, documents this layout).
+Read-only bounded preview and cancellation, host-held single-use confirmation,
+revalidation, exclusive 0600 creation and identity/content-matched withdrawal are
+tested on disposable roots. Conflicts, loading obstacles and uncertain write/close
+failures are preserved, not adopted or overwritten; only unchanged, empty directories
+created by that apply may be removed. Failure can leave residual files/directories.
+Ownership is in memory only: losing the host means residuals are unknown, not
+permission to delete them. No HOME discovery, settings/trust changes, Main activation,
+real pi launch or runtime unloading is implemented. This is local no-clobber behavior,
+not same-UID attacker isolation or a production installer. A configuration target is
+not a pi installation, and placement proves neither loading nor connection.
 Generated text contains a capability token: treat it as a private target credential,
 not a log, diagnostic, Renderer payload, snapshot, committed file or public bundle.
-M1 only places synthetic test artifacts with exclusive creation (`wx`, mode 0600)
-under owned disposable roots; there is no installer or real-target access here.
 
 `configured-source.test.ts` loads the generated extension in a Node child with an
 empty environment, using synthetic hooks and a real isolated PiBridgeAdapter socket
-and Application. It verifies working/completed/error/ack, serialized data safety,
+and Application, including loading the actual M2-applied `agent-pet.ts` file.
+It verifies working/completed/error/ack, serialized data safety,
 no overwrite, and bounded natural exit with absent/detached bridges. Existing env,
 reconnect and no-replay tests remain. This is not actual pi TUI acceptance. Main still
 uses its existing explicit environment opt-in; daily configuration supply, real

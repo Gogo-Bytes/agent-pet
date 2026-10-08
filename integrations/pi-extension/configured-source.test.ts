@@ -1,12 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { renderConfiguredPiExtension } from './configured-source.js';
 import { PiBridgeAdapter } from '../../packages/adapter-pi/src/index.js';
 import { createApplication } from '../../packages/application/src/index.js';
+import { PiTemporaryDeployment } from '../../apps/desktop/src/main/pi-temp-deployment.js';
 
 // Synthetic pi surface only. The child imports the deployed artifact, not the workspace.
 const runner = `
@@ -54,8 +55,8 @@ async function callback(child: ChildProcess, event: string, payload = {}): Promi
   expect(result.elapsed).toBeLessThan(500);
 }
 
-async function fixture() {
-  const directory = await mkdtemp(join(tmpdir(), 'pet-cfg-'));
+async function fixture(placement: 'rendered' | 'deployed' = 'rendered') {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'pet-cfg-')));
   const endpoint = process.platform === 'win32'
     ? `\\\\.\\pipe\\pet-cfg-${process.pid}-${Date.now()}` : join(directory, 'p".sock');
   // Deliberately source-shaped synthetic data, including replacement metacharacters.
@@ -63,10 +64,22 @@ async function fixture() {
   let child: ChildProcess | undefined;
   let closed: Promise<unknown> | undefined;
   try {
-    const source = await renderConfiguredPiExtension({ endpoint, token });
-    const extensionPath = join(directory, 'extension.mts');
-    await writeFile(extensionPath, source, { flag: 'wx', mode: 0o600 });
-    await writeFile(join(directory, 'runner.mjs'), runner, { flag: 'wx', mode: 0o600 });
+    let extensionPath: string;
+    let source: string;
+    if (placement === 'deployed') {
+      const deployment = new PiTemporaryDeployment(join(directory, 'target'), { endpoint, token });
+      const preview = await deployment.preview();
+      const applied = await deployment.apply(preview);
+      if (applied.status !== 'deployed') throw new Error('Fixture deployment failed');
+      extensionPath = applied.receipt.path;
+      source = await readFile(extensionPath, 'utf8');
+    } else {
+      source = await renderConfiguredPiExtension({ endpoint, token });
+      extensionPath = join(directory, 'extension.mts');
+      await writeFile(extensionPath, source, { flag: 'wx', mode: 0o600 });
+    }
+    const childRunner = placement === 'deployed' ? runner.replace('./extension.mts', './target/extensions/agent-pet.ts') : runner;
+    await writeFile(join(directory, 'runner.mjs'), childRunner, { flag: 'wx', mode: 0o600 });
     return {
       directory, endpoint, token, source, extensionPath,
       async start() {
@@ -120,8 +133,8 @@ it.each([
   await expect(renderConfiguredPiExtension(config)).rejects.toThrow(/^Invalid pi extension configuration$/);
 });
 
-it('runs the temporary configured extension without env through working, terminal, and ack states', async () => {
-  const target = await fixture();
+it.each(['rendered', 'deployed'] as const)('runs the %s temporary configured extension without env through working, terminal, and ack states', async placement => {
+  const target = await fixture(placement);
   const adapter = new PiBridgeAdapter();
   const app = createApplication([adapter]);
   let handle: Awaited<ReturnType<typeof adapter.start>> | undefined;

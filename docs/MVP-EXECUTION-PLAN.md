@@ -94,13 +94,13 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 - [controller 测试](../apps/desktop/src/main/pi-connection.test.ts)：真正由 UI controller apply 后的 artifact → 空 env Node 合成 hooks → 真实私有 socket → PiBridgeAdapter/Application，验证 working/completed/ack、hello/断线、0600/0700、退出资源清理；以及取消/伪造/旧计划零写入、重复请求、失败/保留与 late handle stop。秘密检查以真实生成 artifact 为正控制；Main IPC/RTL 证明信任窗口、选择/预览/确认/撤回和推送状态，不冒充视觉验收。
 - `git diff --check`：通过。实施时完整 diff：`/tmp/agent-pet-m2-desktop-review.patch`，不含两份历史 fixture 或生成凭据。独立审查 **READY**；Main 全量复验 **539 passed / 1 skipped**、类型检查与构建通过（`/tmp/agent-pet-m2-desktop-main-{tests,types,build}.log`）。审查和自动化证据仅覆盖本增量，不替代真实 pi 或视觉验收。
 
-人工操作结果通过 [MVP 人工验收 Checklist](MVP-MANUAL-CHECKLIST.md) 记录，不替代本计划的状态判断。2026-10-08 用户授权 Codex 以 Computer-Use 在独立测试目录验收。原生 picker 的自动点击不可靠，用户手动选定 `/Users/gan/Desktop/🥷/agent-pet-acceptance-nRJIrE` 后，管理页显示正确路径；A1–A8 的常规窗口布局、预览、取消零写入、目标切换失效、独占部署及 0600 文件通过。用户以显式 `PI_CODING_AGENT_DIR` 启动真实 pi，桥接加载与 legacy hello 连接通过。独立配置根初次缺模型凭据，用户随后登录并在原有 pi 发起任务；桌宠只显示一条工作气泡，工作中点击未清除，完成后转为“已完成”，确认后 AX 中通知消失。用户退出 pi 后，Codex 在同一根重启 TUI，管理页重新显示已连接，之后 Ctrl+D 退出再显示断开。在同一桌面进程的明确确认步骤中停用接收并撤回本次扩展，界面与文件系统核对一致。P1 同名冲突阻止覆盖、P2 用户修改保留、P3 无关文件保留均在独立目标实际通过；P2 修改后的扩展按保护规则留存。C2 完整提示、C4 旧通知不回放、C5 多轮状态链和可选 C6 仍未通过整项。`--print` 不启动仅 TUI 模式的扩展；后续自建交互 PTY 完成真实模型回复，但宠物通知未能可靠观察，不冒充状态链通过。
+人工操作结果通过 [MVP 人工验收 Checklist](MVP-MANUAL-CHECKLIST.md) 记录，不替代本计划的状态判断。2026-10-08 用户授权 Codex 以 Computer-Use 在独立测试目录验收。原生 picker 的自动点击不可靠，用户手动选定 `/Users/gan/Desktop/🥷/agent-pet-acceptance-nRJIrE` 后，管理页显示正确路径；A1–A8 的常规窗口布局、预览、取消零写入、目标切换失效、独占部署及 0600 文件通过。用户以显式 `PI_CODING_AGENT_DIR` 启动真实 pi，桥接加载与 legacy hello 连接通过。独立配置根初次缺模型凭据，用户随后登录并在原有 pi 发起任务；桌宠只显示一条工作气泡，工作中点击未清除，完成后转为“已完成”，确认后 AX 中通知消失。此后同根 TUI 的重连与断开、同进程选择性撤回均核对一致。P1 同名冲突阻止覆盖、P2 用户修改保留、P3 无关文件保留均在独立目标实际通过；P2 修改后的扩展按保护规则留存。再次以 `/tmp` 中的独立 TUI 提交真实任务，用户现场观察到工作气泡保留、Open Session 不支持提示、完成未读和确认移除；同一桌面进程中正常重启 pi 后，Computer-Use 宠物 AX/截图未见旧完成通知，管理页确认重新收到 legacy hello。此前自建 PTY 无法可靠观察的尝试仍单独保留为未通过证据，不与本次通过混同。可选 C6 没有可证明的真实错误终态。
 
-**仍待验收：** C2 的 Open Session 提示、C4 同进程重启不回放、C5 第二轮完整状态链、可选 C6 错误终态、日常持久化/重启重配及独立应用包。后续若改用其他真实目标，仍须给出精确路径、读写范围、预览、生效条件和撤回方式并获得同意。仅在自建独立测试目标部署，未访问日常 HOME/pi 配置；当前测试进程结束前须按预览范围选择性撤回扩展。
+**仍待验收：** 可选 C6 的真实错误终态、日常持久化/桌面重启重配、完整多 Session 与异常重连矩阵及独立应用包。后续若改用其他真实目标，仍须给出精确路径、读写范围、预览、生效条件和撤回方式并获得同意。本轮仅在自建独立测试目标部署并按预览范围撤回，未访问日常 HOME/pi 配置。
 
 验收：用户授权目标与实际版本记录明确；新部署不会重复加载；UI 区分“已配置/等待加载/已连接/失败”；用户在允许时机正常打开或重载 pi 后，真实 Session 建立观察连接。连接依据须符合所选协议，legacy 的 hello 不冒充 managed auth/ack。保存脱敏证据和选择性撤回方法，不泄露 token。单独在线还不是 M3 通过。
 
-### M3：真实状态、确认、重连与重启 — PARTIAL（首轮正常工作/完成/确认及重连已验）
+### M3：真实状态、确认、重连与重启 — PARTIAL（两轮正常任务、确认、pi 重启不回放已验）
 
 验收同一目标上的 idle → working → completed-unread / error-unread → 点击确认；idle 是无工作/无未读时的宠物基线，不新增 idle 通知。工作中点击不消失，终态确认后旧事件不复活；名称更新、多轮与独立 Session 不互相覆盖。错误必须来自可证明的工作终态，不能把工具单次错误或连接断开伪造为 Agent 失败。
 
@@ -128,4 +128,4 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 - [连接](DESKTOP-P2B-LOCAL-CONNECTION.md)、[文件系统/D6](DESKTOP-P2B2-FILESYSTEM-POLICY.md)、[生命周期](DESKTOP-P2B2-LIFECYCLE-DESIGN.md)：现有机制不变量及旧严格准入；延期的验证保持未关闭。
 - [安装契约](P0-MANAGED-INSTALLATION.md)、[本机安全研究](P0-LOCAL-SECURITY-DECISION.md)、[发布研究](P0-SECURITY-RELEASE-RESEARCH.md)：按 M1 路线取用已有正确性/所有权要求，不把未来全部生产承诺重新塞进 MVP。
 
-M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连与撤回已验，日常与完整视觉验收未完成）；M3 为 PARTIAL（首轮真实任务 working→完成未读→确认已验，旧事件不回放、多轮和错误终态未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 PLANNED。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。
+M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连、撤回与本轮管理页视觉检查已验，日常配置和持久化未完成）；M3 为 PARTIAL（两轮真实任务 working→完成未读→确认、Open Session 不支持提示、同桌面进程内 pi 重启不回放已验；可选错误终态与完整多 Session/异常重连矩阵未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 PLANNED。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。

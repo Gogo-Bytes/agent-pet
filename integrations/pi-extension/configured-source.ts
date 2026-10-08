@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import source from './index.ts?raw';
 
 export type PiExtensionConfig = {
   endpoint: string;
@@ -18,7 +17,6 @@ export async function renderConfiguredPiExtension(config: PiExtensionConfig): Pr
 
   // Fixed, trusted implementation at generation time only. No caller-provided code/path,
   // workspace import in the artifact, or second copy of the event state machine.
-  const source = await readFile(join(__dirname, 'index.ts'), 'utf8');
   if (source.split(configSlot).length !== 2) {
     throw new Error('Pi extension configuration slot must occur exactly once');
   }

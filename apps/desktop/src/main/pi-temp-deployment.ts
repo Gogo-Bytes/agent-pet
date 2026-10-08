@@ -30,7 +30,7 @@ const identity = (s: Stats) => [s.dev, s.ino, s.birthtimeMs, s.mode, s.uid, s.gi
 const fingerprint = (s: Stats) => [identity(s), s.size, s.nlink, s.mtimeMs, s.ctimeMs].join(':');
 const equalEvidence = (a: Evidence, b: Evidence) => a.size === b.size && [...a].every(([p, v]) => b.get(p) === v);
 
-/** Temporary fixtures only. No discovery, Main activation, persistent ownership or runtime unloading.
+/** Explicit-target deployment only. No discovery, persistent ownership or runtime unloading.
  * Local revalidation + exclusive creation are not same-UID attacker isolation.
  */
 export class PiTemporaryDeployment {
@@ -88,7 +88,7 @@ export class PiTemporaryDeployment {
         action: after.findings.every(f => f === 'missing-target') ? 'create' : 'blocked',
         findings: Object.freeze([...after.findings]),
         createDirectories: Object.freeze(directories),
-        loadRequirements: 'Temporary deployment only; not installation or loaded/connected evidence. The selected pi configuration root must be active, extensions enabled and project trust granted where applicable. User must open pi or safely /reload; no settings/trust changes or automatic reload. Withdrawal does not unload a running extension.',
+        loadRequirements: 'Process-local deployment only; not installation or loaded/connected evidence. The selected pi configuration root must be active, extensions enabled and project trust granted where applicable. User must open pi or safely /reload; no settings/trust changes or automatic reload. Withdrawal does not unload a running extension.',
       });
       if (preview.action === 'create') this.#plans.set(preview, { source, evidence: after.evidence, directories });
       return preview;

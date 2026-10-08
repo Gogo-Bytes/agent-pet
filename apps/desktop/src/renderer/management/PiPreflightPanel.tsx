@@ -25,7 +25,7 @@ export function PiPreflightPanel({ api }: { api: PiPreflightApi }) {
       <Heading as="h3" size="4">pi</Heading>
       <Box><Badge>P2a · 检测与只读预检</Badge></Box>
       <Text as="p">仅检测安装候选与用户指定的配置目标，不执行 pi、shell 或扩展，不修改配置。</Text>
-      <Text as="p">安装和连接尚未开放。本页不查询开发桥接，不表示已配置、在线或离线。</Text>
+      <Text as="p">本区仅提供预检，不表示已配置、在线或离线。部署授权与连接状态见下方独立区域。</Text>
       <Flex wrap="wrap" gap="2">
         <Button onClick={() => { void run(() => api.detect()); }}>检测 / 重新扫描</Button>
         <Button variant="soft" onClick={() => { void run(() => api.chooseInstallation()); }}>选择安装包目录</Button>

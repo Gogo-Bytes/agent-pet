@@ -45,8 +45,8 @@ requests survive navigation. The size slider still previews locally and saves on
 on release (or keyboard commit), preserving P1 cancellation and stale-reply safety.
 See `../../docs/MANAGEMENT-UI-COMPONENTS.md` for the full before/after inventory,
 Themes thumb accessibility adaptation, keyboard behavior, automated evidence and
-outstanding browser/native checks. No Main/preload capabilities or P2a consent
-boundaries changed; this restyle is not native or release acceptance.
+outstanding browser/native checks. That restyle was not native or release acceptance.
+The M2 opt-in deployment entry below adds a separate Main/preload consent boundary.
 
 ## pi detection and read-only preflight (P2a)
 
@@ -54,7 +54,7 @@ The management connection page now offers explicit detect/rescan, a Main-owned
 installation-package directory picker, a separate configuration-directory picker,
 and an explicit **inspect selected target** action. Selecting a directory alone
 does not read its settings. The default `~/.pi/agent` is only a candidate, not a
-claim about the active terminal's configuration. Nothing is installed or changed.
+claim about the active terminal's configuration. These P2a controls install or change nothing.
 
 Detection probes at most 32 GUI PATH entries plus three fixed bin locations;
 it never runs pi, wrappers or shell profiles, scans processes/sessions, or calls
@@ -70,12 +70,60 @@ unsupported settings extension/package rules are **unknown**, not approximately
 parsed into a green result. No raw settings or errors cross the narrow management
 IPC. Cancelled or stale requests cannot replace a newer target.
 
-There is no installer, credential storage, connection server or online claim on
-this page. Existing opt-in development pi behavior below is unchanged. See
+The P2a section itself makes no deployment or online claim; the separate M2 section
+below supplies explicit consent and connection status. Existing env opt-in remains. See
 `../../docs/DESKTOP-P2A-PREFLIGHT.md` for exact budgets, automated evidence and
 remaining native picker, ACL, filesystem-race and release gaps. Native dialogs
 have not been accepted through mocks. The accepted P1 Dock recovery remains;
 the separate top menu-bar issue is still open.
+
+## Explicit desktop pi deployment (M2 partial)
+
+The connection page now offers a bounded local opt-in flow:
+
+1. Use **选择配置目录** to choose an existing pi agentDir through the native picker.
+   Selection does not read settings; the default candidate cannot be deployed directly.
+2. **同意读取所选目标并预览部署** authorizes bounded reads of fixed configuration and
+   metadata only. Review the precise `extensions/agent-pet.ts` path, directories,
+   conflicts and loading conditions. Cancel writes nothing and opens no listener.
+3. **确认部署并开始接收** exclusively creates the private extension (0600) and starts
+   the existing legacy Adapter using the same Main-generated configuration. No manual
+   environment export is needed for this flow. Main owns token, endpoint, source and
+   single-use plans; none are exposed through Renderer/IPC/logs. Closing/reloading the
+   window, changing target, cancelling or requesting a new preview invalidates old ids.
+4. Only the user may safely open/reload pi. The root must actually be active, extensions
+   enabled and project trust satisfied where applicable. This flow does not change
+   settings/ignore/trust, launch pi, reload it, or control Agent work.
+
+Status distinguishes not configured, configured/waiting, connected, disconnected and
+failed. Connected means the latest token-validated legacy hello; it is not managed
+ack/auth, aggregate health of all peers, or real business-state acceptance. Observations
+feed the existing Application/pet, with Open Session still unsupported.
+
+The listener uses an exclusive 0700 short random directory under `/tmp`, not a long
+userData/TMPDIR socket path. Startup never unlinks an unknown socket or configuration.
+Quit waits for pending operations and Adapter stop, then only tries empty-only removal
+of its own unchanged runtime directory. Failed deployment/start preserves uncertain
+files and any valid receipt; it does not claim success or automatically retry.
+
+**Process-local trial, not daily readiness:** credentials and ownership are not persisted.
+Restart does not reconnect, adopt, overwrite or delete the old extension. Before quitting,
+use the explicit receipt-backed **停用接收并撤回本次文件…** flow when appropriate. It stops
+reception and removes only identity/content-matching files, preserving edits/unknowns.
+Removing a file or stopping reception does **not** unload a running pi extension. After
+withdrawal, restart and select/preview again to reconfigure; there is no auto recovery.
+If the host has already exited, old files require separately authorized manual handling.
+
+Any supplied dev endpoint/token env reserves the original development path, even when
+invalid; the UI will not silently replace it or create a second bridge. The trusted
+canonical extension is bundled as inert Vite raw text in Main, without user credentials;
+only the generated target file contains the process-local capability.
+
+Automated evidence includes controller-applied artifact → isolated Node synthetic
+hooks → real socket/Adapter/Application, trusted IPC, cancellation/staleness, receipt
+withdrawal, quit, RTL and source-independent built template checks. No real target/pi,
+Electron default profile or visual QA was run. M2 remains PARTIAL; see the current plan
+for exact test counts and outstanding real consent, persistence and native acceptance.
 
 ## Development session simulation
 
@@ -122,8 +170,8 @@ is a loading error.
 
 ## Explicit pi bridge development configuration
 
-The desktop process starts the pi Adapter only with a nonempty endpoint and a
-16–256 character token (both trimmed):
+The original environment-based development path starts the pi Adapter only with a
+nonempty endpoint and a 16–256 character token (both trimmed):
 
 ```sh
 AGENT_PET_PI_ENDPOINT=/tmp/agent-pet-pi.sock \
@@ -131,9 +179,10 @@ AGENT_PET_PI_TOKEN=replace-with-a-random-16-plus-character-token \
 pnpm --filter @agent-pet/desktop dev
 ```
 
-Without valid configuration no socket is opened. The read-only extension lives in
+Without valid env configuration this development path opens no socket. The separate
+consented desktop flow above generates its own config only when opted into. The read-only extension lives in
 `../../integrations/pi-extension/index.ts`; its README documents explicit user
-loading with the same endpoint/token. Nothing installs it or edits pi settings
-automatically. Do not run these commands or reload an active pi session on the
+loading with the same endpoint/token. No startup scan, automatic installation or pi settings
+edit is performed. Do not run these commands or reload an active pi session on the
 user's behalf. The Adapter never starts or resumes pi and `openSession` remains
 unsupported.

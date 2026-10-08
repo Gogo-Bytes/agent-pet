@@ -1,6 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ManagementState, PreferencePatch } from '../shared/preferences.js';
 import type { PiPreflightApi } from '../shared/pi-preflight.js';
+import type { PiConnectionApi, PiConnectionState } from '../shared/pi-connection.js';
+const piConnection: PiConnectionApi = {
+  getState: () => ipcRenderer.invoke('management:pi-connection-state'),
+  preview: () => ipcRenderer.invoke('management:pi-connection-preview'),
+  cancel: () => ipcRenderer.invoke('management:pi-connection-cancel'),
+  confirm: id => ipcRenderer.invoke('management:pi-connection-confirm', id),
+  remove: () => ipcRenderer.invoke('management:pi-connection-remove'),
+  subscribe(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, state: PiConnectionState) => listener(state);
+    ipcRenderer.on('management:pi-connection-state', handler);
+    return () => { ipcRenderer.removeListener('management:pi-connection-state', handler); };
+  },
+};
 const piPreflight: PiPreflightApi = {
   getState: () => ipcRenderer.invoke('management:pi-state'),
   detect: () => ipcRenderer.invoke('management:pi-detect'),
@@ -11,7 +24,7 @@ const piPreflight: PiPreflightApi = {
   inspect: () => ipcRenderer.invoke('management:pi-inspect'),
 };
 const managementApi = {
-  piPreflight,
+  piPreflight, piConnection,
   getState(): Promise<ManagementState> { return ipcRenderer.invoke('management:get-state'); },
   updatePreferences(patch: PreferencePatch): Promise<ManagementState> { return ipcRenderer.invoke('management:update-preferences', patch); },
   setLogin(enabled: boolean): Promise<ManagementState> { return ipcRenderer.invoke('management:set-login', enabled); },

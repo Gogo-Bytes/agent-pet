@@ -56,7 +56,10 @@ function startPrimaryInstance(): void {
   let piHandle: AdapterHandle | undefined;
   const piConfig = readPiBridgeConfig(process.env);
   const piAdapter = new PiBridgeAdapter();
-  const application = createApplication(piConfig ? [piAdapter] : []);
+  const application = createApplication([piAdapter]);
+  // Partial/invalid env configuration also reserves the dev path: never silently replace it.
+  const developmentEnvironment = process.env.AGENT_PET_PI_ENDPOINT !== undefined ||
+    process.env.AGENT_PET_PI_TOKEN !== undefined || piConfig !== undefined;
   application.subscribe((snapshot) => {
     if (petWindow && !petWindow.isDestroyed()) {
       petWindow.webContents.send('pet:snapshot', snapshot);
@@ -158,21 +161,25 @@ if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, {
   }
 
   async function startConfiguredAdapters(): Promise<void> {
-    if (!piConfig) return;
+    if (!piConfig) {
+      if (developmentEnvironment) management?.connection.developmentStarted(false);
+      return;
+    }
     try {
       piHandle = await piAdapter.start(piConfig, {
         publish: observation => application.observe(observation),
         connectionChanged: state => {
-          if (state !== 'connected') console.info(`[pi adapter] ${state}`);
+          management?.connection.connectionChanged(state);
         },
       });
-    } catch (error) {
-      console.warn('[pi adapter] disabled:', error instanceof Error ? error.message : error);
+      management?.connection.developmentStarted(true);
+    } catch {
+      management?.connection.developmentStarted(false);
+      console.warn('[pi adapter] start failed');
     }
   }
 
   app.whenReady().then(() => {
-    adapterStart = startConfiguredAdapters();
     petWindow = createPetWindow();
     updateOverlay();
     screen.on('display-removed', updateOverlay);
@@ -194,6 +201,7 @@ if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, {
       }
     }
     management = createManagement({
+      pi: { adapter: piAdapter, publish: observation => application.observe(observation), developmentEnvironment },
       applyPreferences: preferences => {
         const visibilityChanged = !preferencesApplied || petVisible !== preferences.petVisible;
         preferencesApplied = true;
@@ -216,5 +224,6 @@ if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, {
         { label: '当前模拟任务出错', click: () => demo('error') },
       ] }] : [],
     });
+    adapterStart = startConfiguredAdapters();
   });
 }

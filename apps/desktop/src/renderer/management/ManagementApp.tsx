@@ -3,6 +3,7 @@ import { Cat, Cable, Settings } from 'lucide-react';
 import { Box, Button, Callout, Card, Checkbox, Flex, Grid, Heading, TabNav, Text, Theme } from '@radix-ui/themes';
 import type { ManagementState } from '../../shared/preferences.js';
 import { PiPreflightPanel } from './PiPreflightPanel.js';
+import { PiConnectionPanel } from './PiConnectionPanel.js';
 import { PetSizeControl } from './PetSizeControl.js';
 
 export function ManagementApp({ bridge = window.management }: { bridge?: Window['management'] }) {
@@ -49,11 +50,11 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Window[
               </button>
             </TabNav.Link>)}
         </TabNav.Root>
-        <Text as="p" color="gray" size="2" mt="5" className="sidebar-note">macOS 预览版 · P2a</Text>
+        <Text as="p" color="gray" size="2" mt="5" className="sidebar-note">macOS 预览版 · M2 本机试用</Text>
       </aside></Box>
       <Box asChild p={{ initial: '4', sm: '6' }} className="management-main"><main>
         <Heading as="h2" size="6" mb="3">{page}</Heading>
-        <Text as="p" color="gray" size="2" mb="4">关闭此窗口后，宠物与已配置的开发桥接继续运行。可从菜单栏重新打开；退出请使用“退出 Agent Pet”。</Text>
+        <Text as="p" color="gray" size="2" mb="4">关闭此窗口后，宠物与已确认的桥接继续运行。可从菜单栏重新打开；退出请使用“退出 Agent Pet”。</Text>
         {error && <Callout.Root role="alert" color="red" mb="3"><Callout.Text>{error}</Callout.Text></Callout.Root>}
         {!state && error && <Button disabled={busy || sizeSaving} onClick={() => { void change(() => bridge.getState()); }}>重新读取设置</Button>}
         {page !== '宠物' && state?.preferenceError && <Callout.Root role="alert" color="red" mb="3"><Callout.Text>{state.preferenceError}</Callout.Text></Callout.Root>}
@@ -66,6 +67,7 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Window[
               <Text as="p">只读观察 Session 名称和状态，不读取对话正文，也不控制 Agent。</Text>
             </section></Card>
             <PiPreflightPanel api={bridge.piPreflight} />
+            <PiConnectionPanel api={bridge.piConnection} />
             <Card asChild size="3"><section><Heading as="h3" size="4" mb="3">其他 Agent</Heading><Text as="p">Codex 和 Claude Code 接入尚不支持。</Text></section></Card>
           </Flex>
         </div>
@@ -102,7 +104,7 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Window[
           </section></Card>
           <Card asChild size="3"><section>
             <Heading as="h3" size="4" mb="3">关于与数据</Heading>
-            <Text as="p" mb="3">P2a 只读预检，非一键接入或正式发布验收。</Text>
+            <Text as="p" mb="3">提供只读预检与显式授权的临时接入；尚非日常持久化、完整 MVP 或正式发布验收。</Text>
             <Text as="p" mb="3">偏好仅保存宠物显隐与大小。Session 未读状态不会跨重启保存。登录项以系统实际状态为准。</Text>
             <Text as="p">所有窗口隐藏后，仍可通过菜单栏、Dock 或重新打开应用找回管理窗口。</Text>
           </section></Card>

@@ -4,6 +4,7 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { initialPreflight, preflightBridge } from './test-preflight.js';
+import { connectionBridge } from './test-connection.js';
 import type { PreflightState } from '../../shared/pi-preflight.js';
 import { ManagementApp } from './ManagementApp.js';
 import { defaultPreferences, type ManagementState, type PreferencePatch } from '../../shared/preferences.js';
@@ -53,6 +54,7 @@ function createBridge(supported = false) {
   const off = vi.fn(() => { listener = undefined; });
   const bridge = {
     piPreflight: preflightBridge(),
+    piConnection: connectionBridge(),
     getState: vi.fn(async () => state),
     updatePreferences: vi.fn(async (patch: PreferencePatch) => { state = { ...state, preferences: { ...state.preferences, ...patch } }; return state; }),
     setLogin: vi.fn(async (enabled: boolean) => { state = { ...state, login: { ...state.login, enabled } }; return state; }),

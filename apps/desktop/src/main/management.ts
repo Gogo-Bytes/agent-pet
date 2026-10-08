@@ -2,6 +2,9 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'el
 import { join } from 'node:path';
 import { PreferenceStore } from './preferences.js';
 import { PiPreflight } from './pi-preflight.js';
+import { PiConnection } from './pi-connection.js';
+import type { PiBridgeAdapter } from '@agent-pet/adapter-pi';
+import type { ObservationSink } from '@agent-pet/adapter-core';
 import { assertWindowSender, loadTrustedEntry } from './window-trust.js';
 import type { ManagementState, PreferencePatch, Preferences } from '../shared/preferences.js';
 
@@ -9,6 +12,7 @@ export function createManagement(options: {
   applyPreferences(preferences: Preferences): void;
   stop(): Promise<void>;
   developmentMenu: Electron.MenuItemConstructorOptions[];
+  pi: { adapter: PiBridgeAdapter; publish: ObservationSink['publish']; developmentEnvironment: boolean };
 }) {
   const preferences = new PreferenceStore(join(app.getPath('userData'), 'preferences.json'));
   let window: BrowserWindow | undefined;
@@ -22,6 +26,10 @@ export function createManagement(options: {
       });
       return result.canceled ? null : result.filePaths[0] ?? null;
     },
+  });
+  const connection = new PiConnection({ ...options.pi, target: () => preflight.snapshot() });
+  connection.subscribe(snapshot => {
+    if (window && !window.isDestroyed()) window.webContents.send('management:pi-connection-state', snapshot);
   });
   let tray: Tray;
   let quitting = false;
@@ -59,11 +67,16 @@ export function createManagement(options: {
         webPreferences: { preload: join(__dirname, '../preload/management.cjs'),
           contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true } });
       const current = window;
-      current.on('close', event => { if (!quitting) { event.preventDefault(); windowRequested = false; current.hide(); } });
+      current.on('close', event => {
+        connection.invalidate();
+        if (!quitting) { event.preventDefault(); windowRequested = false; current.hide(); }
+      });
+      current.webContents.on('did-start-loading', () => connection.invalidate());
+      current.webContents.on('render-process-gone', () => connection.invalidate());
       current.once('ready-to-show', () => {
         if (!quitting && windowRequested && window === current && !current.isDestroyed()) current.show();
       });
-      current.on('closed', () => { if (window === current) window = undefined; });
+      current.on('closed', () => { connection.invalidate(); if (window === current) window = undefined; });
       const dev = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
       loadTrustedEntry(current, join(__dirname, '../renderer/management.html'), dev ? new URL('management.html', dev.endsWith('/') ? dev : dev + '/').href : undefined);
     } else {
@@ -118,6 +131,7 @@ export function createManagement(options: {
     }
     return publish();
   });
+  let preflightPending = 0;
   const preflightHandlers = {
     'management:pi-state': () => preflight.snapshot(),
     'management:pi-detect': () => preflight.detect(),
@@ -129,12 +143,39 @@ export function createManagement(options: {
   for (const [channel, handle] of Object.entries(preflightHandlers)) ipcMain.handle(channel, (event, ...args: unknown[]) => {
     assertWindowSender(window, event);
     if (quitting || args.length) throw new Error('Invalid preflight request');
-    return handle();
+    if (channel !== 'management:pi-state') {
+      if (connection.snapshot().busy) throw new Error('Connection operation busy');
+      connection.invalidate();
+    }
+    const result = handle();
+    if (result instanceof Promise) {
+      preflightPending++;
+      return result.finally(() => { preflightPending--; connection.invalidate(); });
+    }
+    return result;
   });
   ipcMain.handle('management:pi-select-installation', (event, ...args: unknown[]) => {
     assertWindowSender(window, event);
     if (quitting || args.length !== 1) throw new Error('Invalid preflight request');
+    if (connection.snapshot().busy) throw new Error('Connection operation busy');
+    connection.invalidate();
     return preflight.selectInstallation(args[0]);
+  });
+  const connectionHandlers = {
+    state: () => connection.snapshot(), preview: () => connection.preview(),
+    cancel: () => connection.invalidate(), remove: () => connection.remove(),
+  };
+  for (const [action, handle] of Object.entries(connectionHandlers)) ipcMain.handle(`management:pi-connection-${action}`, (event, ...args: unknown[]) => {
+    assertWindowSender(window, event);
+    if (quitting || args.length) throw new Error('Invalid connection request');
+    if (action === 'preview' && preflightPending) throw new Error('Preflight operation busy');
+    return handle();
+  });
+  ipcMain.handle('management:pi-connection-confirm', (event, ...args: unknown[]) => {
+    assertWindowSender(window, event);
+    if (quitting || args.length !== 1 || typeof args[0] !== 'string' || args[0].length > 80) throw new Error('Invalid connection request');
+    if (preflightPending) throw new Error('Preflight operation busy');
+    return connection.confirm(args[0]);
   });
   app.on('activate', open);
   app.on('second-instance', open);
@@ -145,7 +186,7 @@ export function createManagement(options: {
     if (quitting) return;
     quitting = true;
     preflight.close();
-    void options.stop().catch(() => { console.warn('Adapter shutdown failed'); }).finally(() => {
+    void Promise.all([options.stop(), connection.stop()]).catch(() => { console.warn('Adapter shutdown failed'); }).finally(() => {
       stopped = true; tray.destroy();
       // Let native cancellation of the first before-quit unwind before retrying.
       // A microtask retry can leave a windowless process holding the instance lock.
@@ -154,5 +195,5 @@ export function createManagement(options: {
   });
   options.applyPreferences(preferences.snapshot());
   open();
-  return { update, open, isQuitting: () => quitting };
+  return { update, open, connection, isQuitting: () => quitting };
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, realpathSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -19,7 +19,7 @@ const native = vi.hoisted(() => {
   return {
     handlers: new Map<string, (event: unknown, value?: unknown) => unknown>(),
     appEvents: new Map<string, (event?: { preventDefault(): void }) => void>(),
-    path: '', lock: true, quit: vi.fn(), stop: vi.fn(), start: vi.fn(), loginSet: vi.fn(), loginGet: vi.fn(() => ({ openAtLogin: false })),
+    path: '', lock: true, envConfigured: true, quit: vi.fn(), stop: vi.fn(), start: vi.fn(), loginSet: vi.fn(), loginGet: vi.fn(() => ({ openAtLogin: false })),
     pick: vi.fn(async () => ({ canceled: true, filePaths: [] as string[] })),
     management: undefined as typeof window | undefined,
     tray: { setContextMenu: vi.fn(), setToolTip: vi.fn(), on: vi.fn(), destroy: vi.fn() },
@@ -61,7 +61,7 @@ vi.mock('electron', () => ({
     getCursorScreenPoint: () => native.cursor, on: vi.fn(),
   },
 }));
-vi.mock('./pi-config.js', () => ({ readPiBridgeConfig: () => ({ endpoint: 'test-only', token: 'test-only' }) }));
+vi.mock('./pi-config.js', () => ({ readPiBridgeConfig: () => native.envConfigured ? ({ endpoint: 'test-only', token: 'test-only' }) : undefined }));
 vi.mock('@agent-pet/adapter-pi', () => ({ PiBridgeAdapter: class {
   readonly provider = 'pi';
   async openSession() { return { status: 'unsupported' }; }
@@ -95,8 +95,8 @@ function expectHit(hit: boolean) {
 beforeEach(async () => {
   vi.resetModules(); vi.clearAllMocks(); vi.useFakeTimers();
   native.handlers.clear(); native.appEvents.clear(); native.publish = undefined;
-  native.isPackaged = true; native.lock = true;
-  native.path = mkdtempSync(join(tmpdir(), 'pet-p1-main-'));
+  native.isPackaged = true; native.lock = true; native.envConfigured = true;
+  native.path = realpathSync(mkdtempSync(join(tmpdir(), 'pet-p1-main-')));
   native.stop.mockResolvedValue(undefined); native.start.mockResolvedValue(undefined);
   native.loginGet.mockReturnValue({ openAtLogin: false });
   native.area = { x: 0, y: 25, width: 1440, height: 875 };
@@ -128,6 +128,75 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     const cancelled = await native.handlers.get('management:pi-choose-target')!(trusted) as { notice: string; target: unknown };
     expect(cancelled.notice).toBe('cancelled'); expect(cancelled.target).toEqual(snapshot.target);
     expect(native.pick).toHaveBeenCalledWith(management, expect.objectContaining({ properties: ['openDirectory', 'dontAddToRecent'] }));
+  });
+  it('restricts deployment IPC to trusted management, accepts no paths, and does not replace the env bridge', async () => {
+    const management = native.management!;
+    const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
+    for (const action of ['state', 'preview', 'cancel', 'remove', 'confirm']) {
+      const handler = native.handlers.get(`management:pi-connection-${action}`)!;
+      for (const event of [{ sender: native.webContents, senderFrame: native.webContents.mainFrame },
+        { sender: management.webContents, senderFrame: { url: management.webContents.mainFrame.url } },
+        { sender: management.webContents, senderFrame: null }]) expect(() => handler(event)).toThrow('Untrusted renderer');
+      expect(() => handler(trusted, { path: '/arbitrary/path' })).toThrow('Invalid connection request');
+      const url = management.webContents.mainFrame.url;
+      management.webContents.mainFrame.url = 'https://untrusted.invalid/';
+      expect(() => handler(trusted)).toThrow('Untrusted renderer'); management.webContents.mainFrame.url = url;
+    }
+    expect(await native.handlers.get('management:pi-connection-preview')!(trusted)).toMatchObject({ mode: 'development-env', preview: null, canConfigure: false });
+    expect(native.start).toHaveBeenCalledOnce();
+  });
+  it('wires selected-target preview/cancel/closure invalidation and confirmed observations to the existing Application', async () => {
+    native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks(); native.envConfigured = false;
+    vi.stubEnv('AGENT_PET_PI_ENDPOINT', undefined); vi.stubEnv('AGENT_PET_PI_TOKEN', undefined);
+    await import('./index.js');
+    const management = native.management!;
+    const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
+    const request = (action: string, ...args: unknown[]) => {
+      const handler = native.handlers.get(`management:pi-connection-${action}`)!;
+      return args.length ? handler(trusted, args[0]) : handler(trusted);
+    };
+    expect(native.start).not.toHaveBeenCalled();
+    expect(await request('preview')).toMatchObject({ notice: 'choose-target' });
+    const target = join(native.path, 'target'); mkdirSync(target, { mode: 0o700 });
+    native.pick.mockResolvedValueOnce({ canceled: false, filePaths: [target] });
+    await native.handlers.get('management:pi-choose-target')!(trusted);
+    type PreviewState = { preview: { id: string; path: string } };
+    const beforePicker = await request('preview') as PreviewState;
+    let finishPicker!: (value: { canceled: boolean; filePaths: string[] }) => void;
+    native.pick.mockImplementationOnce(() => new Promise(resolve => { finishPicker = resolve; }));
+    const picking = native.handlers.get('management:pi-choose-target')!(trusted);
+    expect(() => request('preview')).toThrow('Preflight operation busy');
+    expect(() => request('confirm', beforePicker.preview.id)).toThrow('Preflight operation busy');
+    finishPicker({ canceled: false, filePaths: [target] }); await picking;
+    expect(await request('confirm', beforePicker.preview.id)).toMatchObject({ notice: 'invalid-plan' });
+    const cancelled = await request('preview') as PreviewState;
+    await request('cancel');
+    expect(await request('confirm', cancelled.preview.id)).toMatchObject({ notice: 'invalid-plan' });
+    expect(existsSync(cancelled.preview.path)).toBe(false); expect(native.start).not.toHaveBeenCalled();
+    for (const invalidate of [
+      () => management.on.mock.calls.find(([name]) => name === 'close')![1]({ preventDefault: vi.fn() }),
+      () => management.webContents.on.mock.calls.find(([name]) => name === 'did-start-loading')![1](),
+      () => native.handlers.get('management:pi-default-target')!(trusted),
+    ]) {
+      const old = await request('preview') as PreviewState;
+      invalidate();
+      expect(await request('confirm', old.preview.id)).toMatchObject({ notice: 'invalid-plan' });
+      expect(existsSync(old.preview.path)).toBe(false);
+    }
+    native.pick.mockResolvedValueOnce({ canceled: false, filePaths: [target] });
+    await native.handlers.get('management:pi-choose-target')!(trusted);
+    const ready = await request('preview') as PreviewState;
+    expect(await request('confirm', ready.preview.id)).toMatchObject({ status: 'configured-waiting', canRemove: true });
+    expect(native.start).toHaveBeenCalledOnce(); expect(existsSync(ready.preview.path)).toBe(true);
+    native.publish!(piObservation()); invoke('pet:request-snapshot');
+    expect(native.webContents.send.mock.calls.filter(([name]) => name === 'pet:snapshot').at(-1)?.[1].bubbles[0]).toMatchObject({ status: 'working' });
+    native.appEvents.get('before-quit')!({ preventDefault: vi.fn() });
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    expect(native.stop).toHaveBeenCalledOnce();
+    expect(existsSync(ready.preview.path)).toBe(true); // no silent uninstall on quit
+    // Await filesystem disposal as well as the mock handle before fixture removal.
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(native.tray.destroy).toHaveBeenCalledOnce());
   });
   it.each(['packaged', 'development'])('allows only exact entry reload in %s, not other navigation', async mode => {
     if (mode === 'development') {

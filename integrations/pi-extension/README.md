@@ -20,18 +20,21 @@ self-contained and does not depend on the Agent Pet npm workspace.
 - Does not register tools or commands, modify messages, control the agent, or
   block pi on bridge availability.
 
-## Explicit configuration supply (M1 temporary-target slice)
+## Explicit configuration supply (M1/M2)
 
 `renderConfiguredPiExtension({ endpoint, token })` in `configured-source.ts` returns
 self-contained TypeScript source from this directory's fixed `index.ts`. It embeds
 validated, JSON-serialized configuration in one data slot; the event state machine
 and builtin-only imports are unchanged. It accepts no executable code/source path
 and performs no target writes. The generated extension needs no workspace imports,
-manual environment exports, or generation helper at runtime. The helper itself is
-currently source-only and requires its adjacent `index.ts` at generation time;
-it is not yet a packaged desktop resource.
+manual environment exports, or generation helper at runtime. Vite/Vitest load the
+canonical `index.ts` through `?raw`, bundling inert source in desktop Main with no
+user credentials. Generation no longer reads the live workspace. The helper's source
+entry now expects that Vite raw-import mechanism (not direct Node source execution).
+An isolated built-module test and an inert actual-Main-bundle check verify rendering
+without workspace source reads; this is not a standalone `.app` acceptance.
 
-The M2 temporary-only `PiTemporaryDeployment` helper in
+The M2 explicit-target `PiTemporaryDeployment` helper in
 `apps/desktop/src/main/pi-temp-deployment.ts` consumes that text once per preview.
 An explicitly injected configuration root maps to `extensions/agent-pet.ts`
 (pi 0.85.1's installed `docs/extensions.md`, read in full, documents this layout).
@@ -41,8 +44,12 @@ tested on disposable roots. Conflicts, loading obstacles and uncertain write/clo
 failures are preserved, not adopted or overwritten; only unchanged, empty directories
 created by that apply may be removed. Failure can leave residual files/directories.
 Ownership is in memory only: losing the host means residuals are unknown, not
-permission to delete them. No HOME discovery, settings/trust changes, Main activation,
-real pi launch or runtime unloading is implemented. This is local no-clobber behavior,
+permission to delete them. Main now uses it only after native target selection,
+explicit read/preview and confirm consent, with a host-held opaque plan id. No HOME
+discovery, settings/trust changes, real pi launch or runtime unloading is implemented.
+Main supplies the same generated config to its existing Adapter and the deployed
+artifact, offers process-local receipt withdrawal, and discloses restart limitations.
+This is local no-clobber behavior,
 not same-UID attacker isolation or a production installer. A configuration target is
 not a pi installation, and placement proves neither loading nor connection.
 Generated text contains a capability token: treat it as a private target credential,
@@ -53,9 +60,11 @@ empty environment, using synthetic hooks and a real isolated PiBridgeAdapter soc
 and Application, including loading the actual M2-applied `agent-pet.ts` file.
 It verifies working/completed/error/ack, serialized data safety,
 no overwrite, and bounded natural exit with absent/detached bridges. Existing env,
-reconnect and no-replay tests remain. This is not actual pi TUI acceptance. Main still
-uses its existing explicit environment opt-in; daily configuration supply, real
-deployment and source-independent application packaging remain M2–M5 work.
+reconnect and no-replay tests remain. The desktop controller also has a real fixture
+artifact/socket/Application integration. This is not actual pi TUI acceptance. Main
+preserves the separate explicit environment opt-in without silent fallback/replacement.
+Real deployment, daily credential/ownership persistence, visual/native acceptance and
+source-independent application packaging remain M2–M5 work.
 
 ## Explicit local development test
 
@@ -86,7 +95,7 @@ behavior is covered using real sockets and synthetic pi callbacks, not a live TU
 Only TUI mode enables observation.
 
 Still pending: real `/reload` identity continuity, multiple real pi processes,
-retry-period cancellation, connection health UI and Windows pipe security checks.
+retry-period cancellation, native acceptance of the new connection health UI and Windows pipe security checks.
 
 `session_shutdown` is connection cleanup, not task completion. The desktop side
 keeps `openSession` unsupported until the original terminal window can be

@@ -118,6 +118,8 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 
 先确认最小本地打包路径；若需安装 packager/依赖，单独说明范围并取得许可。复用现有构建、资产和 M1 路线，只携带实际需要的 Worker/native/扩展资源；外部 pi 不依赖 workspace、源码路径或 Electron ASAR 的特殊读取。
 
+2026-10-08 有界本地探路：尝试用现有 Electron runtime 与 `electron-vite` 产物直接制作 `.app`，未安装依赖。原 runtime 的 `codesign --verify --deep --strict` 已报资源签名不匹配；复制后 ad hoc 深度签名在 `Mantle.framework` 报 bundle 格式歧义，改为顶层签名后严格校验仍在 `Electron Framework.framework` 报同类错误。按一次修正复验的停点停止，不运行或验收该产物，实验性打包脚本已撤回。两份失败复制品留在忽略的 `dist/agent-pet-local-n86P5a`、`dist/agent-pet-local-1P3yhK`；强制删除命令被自动审批拒绝，未改动其他目录。后续需先找到可校验的本地签名/打包路径，再继续 M5。
+
 验收：产物自带 Electron runtime，可从源码树外打开，无需 Node/pnpm/开发服务器；已有外部 pi 不被捆绑或自动安装。至少在本机移动/重新打开 `.app` 后复验连接、状态和停用链路，记录实际 OS/架构与资源加载结果；不以 `electron-vite build` 或 B4.4a staged smoke 代替。未签名/本地签名及 Gatekeeper/隔离属性限制明确记录，不要求关闭系统保护来假装通过；若系统阻止本地运行，则该项仍未验收。正式签名、公证、跨机器分发和自动更新继续单列后续工作。
 
 ## 历史材料与后续生产化

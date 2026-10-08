@@ -19,7 +19,7 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 - 秘密不进日志、Renderer、诊断或随包源码；不采集 prompt、响应、工具正文或完整 transcript。
 - 保留未知配置/文件与用户修改；不覆盖共享 settings/trust，不绕过用户禁用扩展的意图，不自动删除不确定数据或残留 owner/lock。
 - 安装候选、配置目标、已部署、已加载、连接在线与业务事件通过分别提供证据。只读检查不是安装同意，socket connect 不是业务验收。
-- 当前仅授权 M1/M2 部署与桌面授权入口的代码实现、自有临时目标/隔离 socket 验证；不读写真实 HOME/pi 配置或安装目标，不运行真实 pi/App，不安装依赖。M2 真实读写/部署/连接必须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权。本次没有该授权。
+- 此前仅授权 M1/M2 部署与桌面授权入口的代码实现、自有临时目标/隔离 socket 验证。2026-10-08 用户另授权以 Computer-Use 操作桌面端验收，范围为本轮自建的独立测试目录；开发版 App 已运行。仍不读写日常 HOME/pi 配置或安装目标、不安装依赖。M2 的目标读写/部署/连接须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权；本轮已按预览确认写入并在同一桌面进程撤回自有测试扩展。
 - 普通实现与小修复由 Main 按范围推进，不逐项询问用户；只有结果/范围变化、真实环境权限、不可逆动作、新增依赖/实质成本或风险接受需要另行确认。打包依赖安装与签名账号/证书成本分开处理，不默认获准。
 
 ## 当前事实与证据
@@ -37,7 +37,7 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 | managed 内部 Core/AuthStore/native/Worker | 已有复用实现与 fixture 集成，不是全部尚未接入，也不是生产入口已可用 | [service.ts](../packages/adapter-pi/src/managed/service.ts)、[Worker 测试](../packages/adapter-pi/src/managed/worker/service-worker.test.ts)、[P2 历史记录](DESKTOP-P2-IMPLEMENTATION.md) |
 | B4.3 / B4.4a | VERIFIED（历史 Electron Worker / disposable staged-resource 范围）；B4.4a 没有 ASAR/最终 `.app`/签名，不是应用包 | [P2 B4 证据](DESKTOP-P2-IMPLEMENTATION.md)、[staged launcher](../scripts/electron-managed-worker-staged-smoke.mjs) |
 | D6.1 | VERIFIED（有界同账户 harness 已完成）；完整 D6 仍 BLOCKED，且不再是本地 MVP gate | [D6.1 契约](DESKTOP-P2B2-FILESYSTEM-POLICY.md#d61--bounded-synthetic-current-account-harness)、[harness.test.ts](../packages/adapter-pi/src/managed/d6/harness.test.ts)、[evidence.test.ts](../packages/adapter-pi/src/managed/d6/evidence.test.ts) |
-| 独立本地应用包、真实部署全链路 | PLANNED；真实端到端验收 **NOT DONE**，不能说“只剩加载一下”或“生产集成就绪” | [desktop scripts](../apps/desktop/package.json)、[根 scripts](../package.json)、[adapter exports](../packages/adapter-pi/package.json) |
+| 独立本地应用包、真实部署全链路 | 独立 `.app` 为 PLANNED；开发版在独立测试目标完成部署→真实 pi 连接→首轮状态→选择性撤回，日常配置与完整端到端矩阵仍未验收，不能称“生产集成就绪” | [desktop scripts](../apps/desktop/package.json)、[根 scripts](../package.json)、[人工清单](MVP-MANUAL-CHECKLIST.md) |
 
 历史基线结果：**489 passed / 1 skipped**；历史 D6.1 runner **8 PASS / 7 BLOCKED，exit 2**。M1 本次全量测试 **497 passed / 1 skipped**，类型检查与 desktop 源码构建通过；未单独运行 D6.1 runner。单项 skip、blocked 与保留的 fixture barrier 不因总测试通过而消失。旧文档中的 335/371/448 等数字仍只对应各自历史阶段。
 
@@ -62,9 +62,9 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 - `pnpm --filter @agent-pet/desktop build`：通过；只是源码构建，不是 `.app`/真实 TUI 验收。
 - `git diff --check`：通过；完整 tracked + 新源码 diff 另存 `/tmp/agent-pet-m1-review.patch`（不含历史 fixture、生成凭据文件）。
 
-**边界与下一步：** 这是 M1 合成纵向切片，不是实际 pi API/TUI 验收；hook surface、Session/process/work 身份、状态映射、重连仅 working/idle 基线与无历史回放语义不变。生成文本包含目标 capability，必须作为目标私有凭据文件处理，不写日志/Renderer/诊断，不放入公共应用包或提交；本次只使用临时测试数据。M1 当时仅有 `wx` 冲突测试，不等于 M2 通过。后续临时目标预览/取消、并发变化拒绝、单入口部署、自有文件追踪及撤回见下方 M2 PARTIAL；真实目标精确授权与加载仍未完成。M2 下方已补有界 Main 配置供给、连接状态 UI 和 canonical template 构建证据；日常持久化、真实停用与应用包仍未验收。legacy 不具备 managed auth/ack 或完整端点保护，生产 D6 仍 BLOCKED。回滚点为撤回本次配置槽/helper/tests/docs；无真实目标更改。
+**边界与下一步：** 这是 M1 合成纵向切片，不是实际 pi API/TUI 验收；hook surface、Session/process/work 身份、状态映射、重连仅 working/idle 基线与无历史回放语义不变。生成文本包含目标 capability，必须作为目标私有凭据文件处理，不写日志/Renderer/诊断，不放入公共应用包或提交；本次只使用临时测试数据。M1 当时仅有 `wx` 冲突测试，不等于 M2 通过；M2 的独立目标人工证据见下方。M2 已补有界 Main 配置供给、连接状态 UI 和 canonical template 构建证据；日常持久化与应用包仍未验收。legacy 不具备 managed auth/ack 或完整端点保护，生产 D6 仍 BLOCKED。M1 代码回滚点为撤回该配置槽/helper/tests/docs；当时无真实目标更改。
 
-### M2：一个明确授权的真实 pi 目标部署与连接 — PARTIAL（临时目标部署 + 桌面授权入口；真实目标/日常持久化/视觉验收未完成）
+### M2：一个明确授权的真实 pi 目标部署与连接 — PARTIAL（独立目标实际部署、连接和撤回已验；日常持久化与完整视觉验收未完成）
 
 临时部署 helper 的实施基线为 `1872b015af53876534b0cba6ee6d44dc42dbe46d`，该阶段提交为 `c052037`（所有权修复后审查 READY）。当时新增 [pi-temp-deployment.ts](../apps/desktop/src/main/pi-temp-deployment.ts)，未接 Main/IPC/Renderer；当前桌面增量在下面单列。构造时显式注入目标配置根与配置，绝不发现 HOME 或选择安装目录。复用 P2a `inspectTarget`/`ReadBudget` 的有界只读检查和 findings，固定读取相关配置、metadata，不枚举配置树；安装候选、配置目标、已部署、已加载、在线仍是不同证据。已完整阅读本机安装的 pi **0.85.1** `docs/extensions.md`（仅文档/包 metadata，未运行 pi、未访问真实配置），确认配置根下 `extensions/agent-pet.ts` 符合自动发现位置；实际 active root、扩展开关、项目 trust 与用户安全打开或 `/reload` 仍是生效条件，helper 不改 settings/trust、不自动 reload。
 
@@ -94,13 +94,13 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 - [controller 测试](../apps/desktop/src/main/pi-connection.test.ts)：真正由 UI controller apply 后的 artifact → 空 env Node 合成 hooks → 真实私有 socket → PiBridgeAdapter/Application，验证 working/completed/ack、hello/断线、0600/0700、退出资源清理；以及取消/伪造/旧计划零写入、重复请求、失败/保留与 late handle stop。秘密检查以真实生成 artifact 为正控制；Main IPC/RTL 证明信任窗口、选择/预览/确认/撤回和推送状态，不冒充视觉验收。
 - `git diff --check`：通过。实施时完整 diff：`/tmp/agent-pet-m2-desktop-review.patch`，不含两份历史 fixture 或生成凭据。独立审查 **READY**；Main 全量复验 **539 passed / 1 skipped**、类型检查与构建通过（`/tmp/agent-pet-m2-desktop-main-{tests,types,build}.log`）。审查和自动化证据仅覆盖本增量，不替代真实 pi 或视觉验收。
 
-人工操作由用户通过 [MVP 人工验收 Checklist](MVP-MANUAL-CHECKLIST.md) 记录；清单初始全部未验收，不替代本计划的状态判断。
+人工操作结果通过 [MVP 人工验收 Checklist](MVP-MANUAL-CHECKLIST.md) 记录，不替代本计划的状态判断。2026-10-08 用户授权 Codex 以 Computer-Use 在独立测试目录验收。原生 picker 的自动点击不可靠，用户手动选定 `/Users/gan/Desktop/🥷/agent-pet-acceptance-nRJIrE` 后，管理页显示正确路径；A2–A4、A6–A8 的预览、取消零写入、独占部署及 0600 文件通过。用户以显式 `PI_CODING_AGENT_DIR` 启动真实 pi，桥接加载与 legacy hello 连接通过。独立配置根初次缺模型凭据，用户随后登录并在原有 pi 发起任务；桌宠只显示一条工作气泡，工作中点击未清除，完成后转为“已完成”，确认后 AX 中通知消失。用户退出 pi 后，Codex 在同一根重启 TUI，管理页重新显示已连接，之后 Ctrl+D 退出再显示断开。最后在同一桌面进程的明确确认步骤中停用接收并撤回本次 `extensions/agent-pet.ts`；界面显示未配置/文件已移除，文件系统核对一致，pi 生成的其他配置与登录凭据原样保留。A1/A5、C2 完整提示、C4 旧通知不回放、C5/C6 及独立 P1–P3 未测。`--print` 不启动仅 TUI 模式的扩展，另起交互 PTY 的任务提交未能证实，两者不作为产品故障或业务通过证据。
 
-**仍待精确授权/验收：** 真实配置目标读取/写入/部署、真实 pi 加载及业务连接；日常持久化/重启重配体验、真实停用与撤回、原生 picker/管理 UI 视觉验收和独立应用包。真实操作前须给出精确路径、读写范围、预览、生效条件和撤回方式并获得同意；本次测试与实现不授予该权限，未启动真实 pi/Electron/profile。
+**仍待验收：** 第二轮真实模型任务、错误终态、旧完成通知在重启后不回放、日常持久化/重启重配、原生 picker/管理 UI 完整视觉验收、独立文件保护场景及独立应用包。后续若改用其他真实目标，仍须给出精确路径、读写范围、预览、生效条件和撤回方式并获得同意。本轮仅在自建独立测试目标部署并撤回，未访问日常 HOME/pi 配置；开发版 Electron 可退出，不会继续持有本次部署。
 
 验收：用户授权目标与实际版本记录明确；新部署不会重复加载；UI 区分“已配置/等待加载/已连接/失败”；用户在允许时机正常打开或重载 pi 后，真实 Session 建立观察连接。连接依据须符合所选协议，legacy 的 hello 不冒充 managed auth/ack。保存脱敏证据和选择性撤回方法，不泄露 token。单独在线还不是 M3 通过。
 
-### M3：真实状态、确认、重连与重启 — PLANNED
+### M3：真实状态、确认、重连与重启 — PARTIAL（首轮正常工作/完成/确认及重连已验）
 
 验收同一目标上的 idle → working → completed-unread / error-unread → 点击确认；idle 是无工作/无未读时的宠物基线，不新增 idle 通知。工作中点击不消失，终态确认后旧事件不复活；名称更新、多轮与独立 Session 不互相覆盖。错误必须来自可证明的工作终态，不能把工具单次错误或连接断开伪造为 Agent 失败。
 
@@ -108,7 +108,7 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 
 验收证据须区分真实 TUI 与合成回归；缺少真实失败/重启等场景则该项未通过，不能以既有用户反馈替代整段。
 
-### M4：日常生命周期、失败提示、停用与选择性卸载 — PLANNED
+### M4：日常生命周期、失败提示、停用与选择性卸载 — PARTIAL（独立目标的停用和选择性撤回已验）
 
 复用 P1 的关闭隐藏、Dock/菜单入口、单实例和退出等待；验证重新打开、全隐藏找回、退出释放连接。修复阻碍日用的菜单入口问题，未采用的可选登录自启保持默认关闭，不暗中登记登录项。
 
@@ -126,4 +126,4 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 - [连接](DESKTOP-P2B-LOCAL-CONNECTION.md)、[文件系统/D6](DESKTOP-P2B2-FILESYSTEM-POLICY.md)、[生命周期](DESKTOP-P2B2-LIFECYCLE-DESIGN.md)：现有机制不变量及旧严格准入；延期的验证保持未关闭。
 - [安装契约](P0-MANAGED-INSTALLATION.md)、[本机安全研究](P0-LOCAL-SECURITY-DECISION.md)、[发布研究](P0-SECURITY-RELEASE-RESEARCH.md)：按 M1 路线取用已有正确性/所有权要求，不把未来全部生产承诺重新塞进 MVP。
 
-M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（临时部署 helper + 桌面授权入口，真实目标/日常/视觉验收未完成），M3–M5 仍为 PLANNED，没有给予真实目标权限。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。
+M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连与撤回已验，日常与完整视觉验收未完成）；M3 为 PARTIAL（首轮真实任务 working→完成未读→确认已验，旧事件不回放、多轮和错误终态未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回已验，日常生命周期和失败场景未验）；M5 为 PLANNED。测试扩展已从独立目标选择性移除，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。

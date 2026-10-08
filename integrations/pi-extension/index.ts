@@ -20,6 +20,10 @@ type PiApi = {
 
 type BridgeStatus = 'working' | 'completed' | 'error' | 'idle' | 'offline';
 
+// Replaced with serialized data by configured-source.ts, never a runtime source loader.
+const explicitConfig = undefined /* AGENT_PET_EXPLICIT_CONFIG */ as
+  { endpoint: string; token: string } | undefined;
+
 const processInstanceId = randomBytes(12).toString('hex');
 
 function sessionName(ctx: PiContext): string | undefined {
@@ -43,8 +47,8 @@ function stopReasonStatus(reason: unknown): BridgeStatus | undefined {
 }
 
 export default function agentPetPiExtension(pi: PiApi): void {
-  const endpoint = process.env.AGENT_PET_PI_ENDPOINT?.trim();
-  const token = process.env.AGENT_PET_PI_TOKEN?.trim();
+  const endpoint = (explicitConfig?.endpoint ?? process.env.AGENT_PET_PI_ENDPOINT)?.trim();
+  const token = (explicitConfig?.token ?? process.env.AGENT_PET_PI_TOKEN)?.trim();
   if (!endpoint || !token || token.length < 16) return;
   const configuredEndpoint = endpoint;
   const configuredToken = token;

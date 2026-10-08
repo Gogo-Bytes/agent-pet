@@ -20,7 +20,33 @@ self-contained and does not depend on the Agent Pet npm workspace.
 - Does not register tools or commands, modify messages, control the agent, or
   block pi on bridge availability.
 
-## Explicit local test
+## Explicit configuration supply (M1 temporary-target slice)
+
+`renderConfiguredPiExtension({ endpoint, token })` in `configured-source.ts` returns
+self-contained TypeScript source from this directory's fixed `index.ts`. It embeds
+validated, JSON-serialized configuration in one data slot; the event state machine
+and builtin-only imports are unchanged. It accepts no executable code/source path
+and performs no target writes. The generated extension needs no workspace imports,
+manual environment exports, or generation helper at runtime. The helper itself is
+currently source-only and requires its adjacent `index.ts` at generation time;
+it is not yet a packaged desktop resource.
+
+A future M2 authorized selective deploy can consume that text, but must own preview,
+no-clobber placement, private permissions, identity/content tracking and withdrawal.
+Generated text contains a capability token: treat it as a private target credential,
+not a log, diagnostic, Renderer payload, snapshot, committed file or public bundle.
+M1 only places synthetic test artifacts with exclusive creation (`wx`, mode 0600)
+under owned disposable roots; there is no installer or real-target access here.
+
+`configured-source.test.ts` loads the generated extension in a Node child with an
+empty environment, using synthetic hooks and a real isolated PiBridgeAdapter socket
+and Application. It verifies working/completed/error/ack, serialized data safety,
+no overwrite, and bounded natural exit with absent/detached bridges. Existing env,
+reconnect and no-replay tests remain. This is not actual pi TUI acceptance. Main still
+uses its existing explicit environment opt-in; daily configuration supply, real
+deployment and source-independent application packaging remain M2–M5 work.
+
+## Explicit local development test
 
 The desktop Adapter must already be running with the same endpoint and token.
 The user must explicitly load this file in an existing idle pi TUI, for example

@@ -19,12 +19,12 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 - 秘密不进日志、Renderer、诊断或随包源码；不采集 prompt、响应、工具正文或完整 transcript。
 - 保留未知配置/文件与用户修改；不覆盖共享 settings/trust，不绕过用户禁用扩展的意图，不自动删除不确定数据或残留 owner/lock。
 - 安装候选、配置目标、已部署、已加载、连接在线与业务事件通过分别提供证据。只读检查不是安装同意，socket connect 不是业务验收。
-- 本次仅文档校准：不读真实配置、不运行 pi/App、不激活连接、不安装依赖、不改运行代码。下一步 M1 可先做代码与临时目标工作；M2 真实读写/部署/连接必须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权。本次没有该授权。
+- 本次仅授权 M1 代码实现与自有临时目标/隔离 socket 验证；不读写真实 HOME/pi 配置或安装目标，不运行真实 pi/App，不安装依赖。M2 真实读写/部署/连接必须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权。本次没有该授权。
 - 普通实现与小修复由 Main 按范围推进，不逐项询问用户；只有结果/范围变化、真实环境权限、不可逆动作、新增依赖/实质成本或风险接受需要另行确认。打包依赖安装与签名账号/证书成本分开处理，不默认获准。
 
 ## 当前事实与证据
 
-基线：`eedda5d935bd464220085697438d389fcfbae5c8`。以下代码入口已静态核对；历史执行结果归属原阶段，不是本次重跑。
+M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，本次验证另列于 M1。两个历史未跟踪 native smoke fixture 原样保留；本次不暂存、不提交、不推送。
 
 状态用语：**PLANNED**＝未交付该检查点；**IMPLEMENTED-NOT-ACCEPTED**＝有实现，但缺该范围实际验收；**VERIFIED**＝仅所列范围有执行证据，不外推到整个产品。
 
@@ -39,7 +39,7 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 | D6.1 | VERIFIED（有界同账户 harness 已完成）；完整 D6 仍 BLOCKED，且不再是本地 MVP gate | [D6.1 契约](DESKTOP-P2B2-FILESYSTEM-POLICY.md#d61--bounded-synthetic-current-account-harness)、[harness.test.ts](../packages/adapter-pi/src/managed/d6/harness.test.ts)、[evidence.test.ts](../packages/adapter-pi/src/managed/d6/evidence.test.ts) |
 | 独立本地应用包、真实部署全链路 | PLANNED；真实端到端验收 **NOT DONE**，不能说“只剩加载一下”或“生产集成就绪” | [desktop scripts](../apps/desktop/package.json)、[根 scripts](../package.json)、[adapter exports](../packages/adapter-pi/package.json) |
 
-最近 Main 执行的基线结果：**489 passed / 1 skipped**；D6.1 runner **8 PASS / 7 BLOCKED，exit 2**。本次不重跑测试、native harness 或构建。单项 skip、blocked 与保留的 fixture barrier 不因总测试通过而消失。旧文档中的 335/371/448 等数字仍只对应各自历史阶段。
+历史基线结果：**489 passed / 1 skipped**；历史 D6.1 runner **8 PASS / 7 BLOCKED，exit 2**。M1 本次全量测试 **497 passed / 1 skipped**，类型检查与 desktop 源码构建通过；未单独运行 D6.1 runner。单项 skip、blocked 与保留的 fixture barrier 不因总测试通过而消失。旧文档中的 335/371/448 等数字仍只对应各自历史阶段。
 
 `PI-ACCEPTANCE.md` 的工作/完成/重启等用户反馈继续有效，但没有记录为当前 M2–M5 路线下完整部署、故障、卸载和应用包验收；不能升级为全链路通过。
 
@@ -47,16 +47,22 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 每段只交付一个可独立验证、回滚的增量，复用已完成阶段。实现阶段按改动运行针对性测试、必要类型检查/构建并核对 diff；本地提交与推送遵循 [工程规则](../AGENTS.md)。文档校准以链接、范围一致性和独立审查验证，不以未运行的功能测试作为完成证据。
 
-### M1：选定最小接入路线并交付一个纵向切片 — PLANNED
+### M1：选定最小接入路线并交付一个纵向切片 — VERIFIED（临时目标、合成 callbacks 范围）
 
-**下一可执行动作就是 M1，不是补完整 D6。** 先以代码作一次简短决策，比较：
+**选择 legacy bridge，不开放 managed 工厂。** 代码依据：Main 的 `startConfiguredAdapters` 已通过 `readPiBridgeConfig` 向 `PiBridgeAdapter` 提供 endpoint/token；`integrations/pi-extension/index.ts` 是只依赖 Node builtins 的现成单一状态机，已有真实隔离 socket → Application/气泡与重连基线。managed 的内部 Core/AuthStore/Worker 虽已有实现，但公开 `managed/index.ts` 仍在参数读取/FS/socket 前拒绝 `acl-unverified`，Main 与扩展均未消费 managed 协议。为本地切片启用它会扩大到目录/端点 policy、扩展协议及资源交付；本次不改 guard、不另建 Core/AuthStore、不将 legacy 当 managed fallback。
 
-- **沿用 legacy bridge**：Main 与自包含扩展已有状态链路；仍需解决日常启动的配置供给、连接状态、授权部署/停用，不能把手填环境变量当最终产品，也不能宣称已有 managed auth/ack 或完整端点保护。
-- **复用 managed 内部机制**：已有每目标授权、发现、撤销和 Worker 存储；公开工厂仍关闭，生产目录/端点、扩展消费方式与外部 Node 资源交付仍有缺口。不能把换掉拒绝值当完成集成。
+**已实现的小增量：** [configured-source.ts](../integrations/pi-extension/configured-source.ts) 的 `renderConfiguredPiExtension({ endpoint, token })` 读取固定的受信任 `index.ts`，校验配置并以 JSON 数据替换唯一配置槽，返回自包含 TypeScript 扩展文本。不接受代码或源文件路径，不 eval，不写目标，不在运行时导入 workspace；原文件仍保持显式开发环境变量 opt-in。生成入口本身目前是 source-only 工具，依赖同目录的 canonical source；并未打包进 desktop。Main 仍保持现有 env opt-in，未接入默认目录、自动启动或真实目标配置供给。
 
-产物是**一个有代码依据的路线结论＋一个临时目标上的小纵向切片**：明确复用入口、必要改动、适用本地边界、未验证项及回滚点；把一条当前状态送到既有 Application/气泡并证明断开不阻塞 pi 侧逻辑。保持另一条路线独立，不复制 Core/AuthStore/协议状态机，不另造通用安全框架。若所选路线改变 guard/风险边界，先明确实施决定，不能由文档延期自动推导许可。
+**临时目标证据：** [configured-source.test.ts](../integrations/pi-extension/configured-source.test.ts) 用 `mkdtemp` 自有目录、`wx`/0600 放置新扩展，重复放置拒绝且原内容不变。配置中的引号、反斜线、换行、Unicode 分隔符和替换元字符按数据保留。Node 22 子进程在该目录直接加载生成文件，环境为空；仅 builtin imports，无源目录依赖。合成 pi hooks 经真实 `PiBridgeAdapter`/Application 验证 working → completed-unread、error-unread → 确认移除，working 确认不移除，Open Session 诚实返回 unsupported；快照不含 endpoint/token。absent/detached bridge 下 callbacks 同步返回，移除测试 IPC 保活后不发 shutdown 也在有界时间内自然退出。仅清理已停止句柄/子进程对应的自有对象；历史 fixture 不清理。
 
-验收：针对性合成集成测试通过；现有正确性/保留数据断言不下降；失败有明确停点。这里不要求完整安装器、多目标管理、跨用户或正式打包。若发现阻塞，限定一次最小复现/修复/复验，仍失败则按同一任务协议报告并停止，不扩大成架构项目。
+本次顺序验证：
+- `pnpm test integrations/pi-extension apps/desktop/src/main/pi-config.test.ts packages/adapter-pi/src/managed/legacy-regression.test.ts`：**16 passed / 5 files**，含原有 env bridge、重连/no replay 与 managed 隔离回归。
+- `pnpm test`：**497 passed / 1 skipped / 52 files**，新增 8 项；既有 managed 正确性、保留数据与失败关闭测试未删除。保留 Three.js 多实例警告。
+- `pnpm typecheck`：通过。
+- `pnpm --filter @agent-pet/desktop build`：通过；只是源码构建，不是 `.app`/真实 TUI 验收。
+- `git diff --check`：通过；完整 tracked + 新源码 diff 另存 `/tmp/agent-pet-m1-review.patch`（不含历史 fixture、生成凭据文件）。
+
+**边界与下一步：** 这是 M1 合成纵向切片，不是实际 pi API/TUI 验收；hook surface、Session/process/work 身份、状态映射、重连仅 working/idle 基线与无历史回放语义不变。生成文本包含目标 capability，必须作为目标私有凭据文件处理，不写日志/Renderer/诊断，不放入公共应用包或提交；本次只使用临时测试数据。M2 可复用返回文本做选择性部署，但精确授权、预览/取消、并发变化拒绝、加载去重、自有文件追踪及撤回仍待实现；仅 `wx` 冲突测试不等于 M2 通过。日常 Main 配置供给、连接状态 UI、真实停用和包资源也未交付；legacy 不具备 managed auth/ack 或完整端点保护，生产 D6 仍 BLOCKED。回滚点为撤回本次配置槽/helper/tests/docs；无真实目标更改。
 
 ### M2：一个明确授权的真实 pi 目标部署与连接 — PLANNED
 
@@ -90,4 +96,4 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 - [连接](DESKTOP-P2B-LOCAL-CONNECTION.md)、[文件系统/D6](DESKTOP-P2B2-FILESYSTEM-POLICY.md)、[生命周期](DESKTOP-P2B2-LIFECYCLE-DESIGN.md)：现有机制不变量及旧严格准入；延期的验证保持未关闭。
 - [安装契约](P0-MANAGED-INSTALLATION.md)、[本机安全研究](P0-LOCAL-SECURITY-DECISION.md)、[发布研究](P0-SECURITY-RELEASE-RESEARCH.md)：按 M1 路线取用已有正确性/所有权要求，不把未来全部生产承诺重新塞进 MVP。
 
-本计划尚未选定 legacy/managed 路线，也没有给予真实目标权限。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。
+M1 已选定 legacy 并验证临时合成切片；M2–M5 仍为 PLANNED，没有给予真实目标权限。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。

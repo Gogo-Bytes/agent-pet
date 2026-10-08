@@ -94,6 +94,8 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 - [controller 测试](../apps/desktop/src/main/pi-connection.test.ts)：真正由 UI controller apply 后的 artifact → 空 env Node 合成 hooks → 真实私有 socket → PiBridgeAdapter/Application，验证 working/completed/ack、hello/断线、0600/0700、退出资源清理；以及取消/伪造/旧计划零写入、重复请求、失败/保留与 late handle stop。秘密检查以真实生成 artifact 为正控制；Main IPC/RTL 证明信任窗口、选择/预览/确认/撤回和推送状态，不冒充视觉验收。
 - `git diff --check`：通过。实施时完整 diff：`/tmp/agent-pet-m2-desktop-review.patch`，不含两份历史 fixture 或生成凭据。独立审查 **READY**；Main 全量复验 **539 passed / 1 skipped**、类型检查与构建通过（`/tmp/agent-pet-m2-desktop-main-{tests,types,build}.log`）。审查和自动化证据仅覆盖本增量，不替代真实 pi 或视觉验收。
 
+人工操作由用户通过 [MVP 人工验收 Checklist](MVP-MANUAL-CHECKLIST.md) 记录；清单初始全部未验收，不替代本计划的状态判断。
+
 **仍待精确授权/验收：** 真实配置目标读取/写入/部署、真实 pi 加载及业务连接；日常持久化/重启重配体验、真实停用与撤回、原生 picker/管理 UI 视觉验收和独立应用包。真实操作前须给出精确路径、读写范围、预览、生效条件和撤回方式并获得同意；本次测试与实现不授予该权限，未启动真实 pi/Electron/profile。
 
 验收：用户授权目标与实际版本记录明确；新部署不会重复加载；UI 区分“已配置/等待加载/已连接/失败”；用户在允许时机正常打开或重载 pi 后，真实 Session 建立观察连接。连接依据须符合所选协议，legacy 的 hello 不冒充 managed auth/ack。保存脱敏证据和选择性撤回方法，不泄露 token。单独在线还不是 M3 通过。

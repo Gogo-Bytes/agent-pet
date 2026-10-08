@@ -1,5 +1,7 @@
 # pi read-only adapter
 
+当前范围/进度/下一步统一见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。legacy 开发 bridge 已存在，managed 公开入口仍 fail-closed；两者不混称生产接入。旧 P2c 完整安全准入不再是本地 MVP gate，但未验证项、生产 guard 与数据保留测试不变。
+
 This package implements the Agent Pet side of a local newline-delimited JSON
 bridge. It does not start pi, resume a pi session, read session JSONL, send
 prompts, or modify pi configuration.
@@ -15,8 +17,9 @@ The pi extension sends only:
 
 Every message includes `schemaVersion`, a capability token, monotonic `seq`,
 process/session identity and `sentAt`. Unknown fields are rejected. Prompts,
-responses, tool payloads, transcript paths, credentials and raw provider data
-are not part of the accepted protocol.
+responses, tool payloads, transcript paths, provider credentials and raw provider
+data are not part of the accepted protocol. The bridge capability token above is
+transport authentication data, not a pi/provider credential.
 
 `PiBridgeAdapter` listens on a configured Unix-domain socket or Windows named
 pipe. Its endpoint and token are supplied by explicit development environment
@@ -49,8 +52,10 @@ legacy IDs and events remain unchanged. Credential existence alone never grants
 admission. Revoke immediately denies/closes peers, then persists, then cleans
 owned credentials; uncertain failures retain a claim that blocks restart.
 
-**Mechanism core implemented; real activation remains blocked.** A verified
-P2b.2 ACL/mount/recovery backend and native evidence are mandatory **before P2c**.
+**Mechanism core implemented; public managed activation remains blocked.** The
+old strict production route required P2b.2 ACL/mount/recovery and native evidence
+before P2c. Current local MVP sequencing instead follows M1–M5; this does not
+authorize bypassing the public guard or claim those security gates passed.
 Mode/owner fixtures are not native ACL isolation or sudden-power-loss proof;
 no same-uid/root isolation or cryptographic server authentication is promised.
 Node's observed `server.close()` unlink of a replaced socket leaf is explicitly
@@ -61,15 +66,18 @@ Tests: `pnpm exec vitest run packages/adapter-pi/src/managed`. These use tempora
 filesystem targets/UDS only and include a deliberately killed test subprocess.
 No real pi installation, configuration or process is used.
 
-### P2b.2a native primitives (not integrated; not P2b.2 completion)
+### Internal native/Worker integration (not production activation)
 
 Internal `native/managed-darwin/` and `src/managed/{native-darwin,darwin-policy}.ts`
-add a dependency-free C Node-API inspection/rooted-read/existing-inode writer-lease
-slice with real temporary APFS/ACL/lock/crash tests. There is no production export,
-Main wiring, native publication backend or recovery API. P2b.1 pathname mutations
-are unchanged, not newly secured by these primitives. Recovery consequences have
-not received owner approval; cross-user, Electron/packaging, namespace, durability
-and consent gates remain mandatory. See [the exact boundaries and evidence](../../docs/DESKTOP-P2B2-FILESYSTEM-POLICY.md).
+provide C Node-API primitives. Later `darwin-files-port.ts`, `service.ts` and
+`worker/` integrate native storage with the existing Core/AuthStore in fixtures;
+this is no longer merely an unintegrated read/lease slice. B4.3 has historical
+Electron Worker evidence; B4.4a has staged-resource evidence, not a packaged app.
+There is still no public native activation, Main managed wiring, managed extension
+deployment or recovery API. Full production security gates remain unverified;
+D6.1 is a completed bounded harness, not D6 admission. See
+[stage evidence](../../docs/DESKTOP-P2-IMPLEMENTATION.md) and
+[filesystem/D6 boundaries](../../docs/DESKTOP-P2B2-FILESYSTEM-POLICY.md).
 
 Explicit developer-only commands (existing Darwin compiler/SDK/matching installed
 Node headers required; no downloads or runtime compilation):

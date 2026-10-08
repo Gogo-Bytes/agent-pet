@@ -1,5 +1,7 @@
 # P2b.2a — native filesystem primitives (dormant, incomplete P2b.2)
 
+> **当前排期以 [MVP 执行计划](MVP-EXECUTION-PLAN.md) 为准。** 下文 B2.1 的 outstanding/not integrated 与 hard gates 是历史切片/旧严格生产边界，不是当前全部实现清单；内部 native Core/Worker 和 B4.3/B4.4a 已有后续证据。D6.1 有界 harness 已完成，完整 D6 仍 BLOCKED，但不阻塞本地 MVP。跨用户、完整 socket/peer、native syscall faults、正式签名和自动恢复延后且未通过；公开工厂/productionPolicy、已有数据保留与故障测试不变。B4.4a 不是最终应用包。
+
 **This is the approved bounded P2b.2a/B2.1 slice, not P2b.2 completion, production activation, recovery approval, or permission to proceed to P2c.** It now includes dormant additive native writer bootstrap and descriptor-rooted write/publication/removal primitives (`writeVersion: 1`); they are not production activation. Public managed service/client entrances and `productionPolicy` still unconditionally reject `acl-unverified`. There is no activation flag. No Main, renderer, preload, extension, installer, real pi configuration, home/cache resolver or Agent execution was added.
 
 P2b.2a baseline status: implementation, independent code/retrievability review and parent-run verification complete for that bounded slice; no blocking slice findings. The resource/lifetime prerequisite below is a subsequent reduced-scope change; independent review found no issues within that reduced scope. Production gates below remain open.

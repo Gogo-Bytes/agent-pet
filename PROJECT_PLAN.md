@@ -1,12 +1,14 @@
 # Agent Pet 项目实施计划
 
+> **当前优先级已变更：先完成单用户本机 macOS/pi MVP。唯一当前执行计划是 [MVP-EXECUTION-PLAN](docs/MVP-EXECUTION-PLAN.md)，下一步为 M1 最小路线选择与纵向切片。** 下文为历史初始规划，不是当前待办或实现清单；多平台/多 Agent、签名更新及“前六项完成前不接真实 Agent”等旧限制不再作为本地 MVP gate。安全延期是未验证，不授权绕过生产 guard；真实配置读写/部署仍需精确预览授权。
+>
 > 历史初始规划，包含尚未实现的目标目录/能力，不是当前实现清单。产品术语与只读范围以 [CONTEXT.md](CONTEXT.md) 为准；Renderer 后续决策见 [迁移计划](docs/RENDERER-MIGRATION-PLAN.md)，当前验收边界见 [R4 库存](docs/RENDERER-R4-ACCEPTANCE.md)。已落地的是 React + R3F/Drei Renderer 与显式 opt-in pi 扩展/Adapter；本文旧的 UI、loader、Agent 接入顺序描述不应覆盖后续已批准决策。
 
 ## 1. 项目目标
 
 构建一个 Electron 桌面应用：显示 3D 宠物，并根据 Codex、pi、Claude Code 等 Agent session 状态触发动画。宠物支持拖拽、缩放、置顶、点击穿透切换和自定义 GLB 资产。
 
-MVP 目标平台：macOS、Windows。Linux 暂作为 best-effort，不承诺 Wayland 下完整的置顶和点击穿透能力。
+历史 MVP 目标平台（已由当前计划收窄）：macOS、Windows。Linux 暂作为 best-effort，不承诺 Wayland 下完整的置顶和点击穿透能力。
 
 ## 2. 技术决策
 
@@ -157,7 +159,7 @@ type PetManifest = {
 - Linux/Wayland 完整兼容承诺
 - Claude Code 完整实时 session stream
 
-## 8. 发布阻塞项
+## 8. 历史正式发布阻塞项（非当前本地 MVP gate）
 
 1. 窗口能力矩阵：透明、置顶、点击穿透、DPI、多显示器、睡眠恢复
 2. Agent 事件真值模型和 stale 状态
@@ -176,9 +178,9 @@ type PetManifest = {
 5. 建立 `fixtures/` 和状态回放测试
 6. 在真实 macOS/Windows 上验证窗口行为
 
-在这六项完成前，不接入真实 Agent，也不实现复杂设置页面。
+历史顺序要求为“在这六项完成前，不接入真实 Agent，也不实现复杂设置页面”；现已由当前 MVP 计划替代，不得据此阻止 M1/M2。
 
-## 10. 待用户确认
+## 10. 历史待确认问题（不重新打开已确认的 macOS/pi MVP 范围）
 
 - 首发是否只支持 macOS + Windows
 - 是否接受 Electron 较高的包体和内存占用

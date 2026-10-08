@@ -1,5 +1,7 @@
 # Desktop development
 
+当前范围、进度与下一步见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。此页开发命令不是安装许可；`build` 不产出可独立交付的应用包，B4.4a staged-resource 也不是 `.app`。完整真实端到端仍待验收，managed 入口仍关闭。
+
 From the repository root:
 
 ```sh

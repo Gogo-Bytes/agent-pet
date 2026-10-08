@@ -1,5 +1,7 @@
 # Agent Pet pi extension
 
+当前部署路线与验收见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。本页说明已存在的 legacy opt-in 扩展，不是 managed 客户端或自动安装器；真实目标加载/配置操作须另获精确范围授权，完整端到端尚未验收。
+
 This is an opt-in, read-only pi extension for the local bridge. It is intentionally
 self-contained and does not depend on the Agent Pet npm workspace.
 
@@ -12,7 +14,9 @@ self-contained and does not depend on the Agent Pet npm workspace.
 - Treats `agent_settled` plus `ctx.isIdle()` as the point at which a work cycle
   may become completed/error.
 - Sends no prompt, response, thinking, tool input/output, transcript path,
-  environment, credential or raw event payload.
+  environment, provider credential or raw event payload. The legacy bridge's
+  configured capability token is included in every protocol frame; it is not
+  managed auth/ack or cryptographic server authentication.
 - Does not register tools or commands, modify messages, control the agent, or
   block pi on bridge availability.
 

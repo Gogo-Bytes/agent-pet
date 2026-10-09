@@ -113,7 +113,7 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 
 自动化（仅新建自有测试根，未访问真实 pi、userData 或历史验收目录）：focused **120 passed / 12 files**；新增后全量 **578 passed / 1 skipped / 58 files**，`pnpm typecheck` 和 `pnpm --filter @agent-pet/desktop build` 顺序通过。新增 restart/store 测试覆盖第二 controller/store、显式 resume 前无监听/目标检查、同一生成扩展经真实隔离 socket 到 Application、disabled 重启、编辑/替换保留、未知 socket/坏记录拒绝、写/close/rename 不确定结果、撤回重试、并发/late callbacks、secret 正控制与 trusted IPC/RTL。初次 focused 唯一失败为原 process-only 文案断言；更新为新披露政策后一次有界复验通过。既有 Darwin publication `path-changed` 历史 flake 本轮未复现，未改动其实现/测试；Three.js 多实例警告与原 skip 保留。
 
-原 [人工验收清单](MVP-MANUAL-CHECKLIST.md) 的 checked 结果完全不变，不将本增量冒充人工通过。[新增重启清单](MVP-RESTART-CHECKLIST.md) 全部未勾选。本增量未启动 Electron/pi、操作真实目标、安装依赖或打包 `.app`；代码按工程规则本地提交，不自动推送；credential-bearing 测试目录、两份历史 d3 fixture 和失败打包复制品未读取或清理。独立审查 READY；审查指出的旧 env 接入“接收已停止”显示回归已修正，新增启动成功/失败、hello 与 peer 断开时接收状态测试。Main 最终全量复验 **579 passed / 1 skipped / 58 files**，类型检查与 desktop 构建通过（`/tmp/agent-pet-restart-main-{tests,types,build}.log`）。当前下一步为用户按新增清单做干净桌面重启验收，再回到 M5 打包。
+原 [人工验收清单](MVP-MANUAL-CHECKLIST.md) 的 checked 结果完全不变。[新增重启清单](MVP-RESTART-CHECKLIST.md) 的 R1–R10 已完成人工或隔离故障验收；本增量通过该范围验收，但不外推为整个 MVP/生产安全通过。本增量未安装依赖或打包 `.app`；credential-bearing 测试目录、两份历史 d3 fixture 和失败打包复制品未读取或清理。独立审查 READY；审查指出的旧 env 接入“接收已停止”显示回归已修正，新增启动成功/失败、hello 与 peer 断开时接收状态测试。Main 最终全量复验 **579 passed / 1 skipped / 58 files**，类型检查与 desktop 构建通过（`/tmp/agent-pet-restart-main-{tests,types,build}.log`）。当前下一步为回到 M5 打包：先确定可校验的本地打包路径，再做脱离源码目录的实际 `.app` 验收。
 
 ### M3：真实状态、确认、重连与重启 — PARTIAL（两轮正常任务、确认、pi 重启不回放已验）
 
@@ -143,4 +143,4 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 - [连接](DESKTOP-P2B-LOCAL-CONNECTION.md)、[文件系统/D6](DESKTOP-P2B2-FILESYSTEM-POLICY.md)、[生命周期](DESKTOP-P2B2-LIFECYCLE-DESIGN.md)：现有机制不变量及旧严格准入；延期的验证保持未关闭。
 - [安装契约](P0-MANAGED-INSTALLATION.md)、[本机安全研究](P0-LOCAL-SECURITY-DECISION.md)、[发布研究](P0-SECURITY-RELEASE-RESEARCH.md)：按 M1 路线取用已有正确性/所有权要求，不把未来全部生产承诺重新塞进 MVP。
 
-M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连、撤回与本轮管理页视觉检查已验，干净重启持久化已实现但尚未人工验收）；M3 为 PARTIAL（两轮真实任务 working→完成未读→确认、Open Session 不支持提示、同桌面进程内 pi 重启不回放已验；可选错误终态与完整多 Session/异常重连矩阵未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 PLANNED。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。
+M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连、撤回、管理页视觉检查与干净重启持久化均已验；仍不包含独立 `.app`、正式发布或生产安全）；M3 为 PARTIAL（两轮真实任务 working→完成未读→确认、Open Session 不支持提示、同桌面进程内 pi 重启不回放已验；可选错误终态与完整多 Session/异常重连矩阵未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 PLANNED。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。

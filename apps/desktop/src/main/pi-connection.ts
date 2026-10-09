@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { lstat, mkdir, rmdir } from 'node:fs/promises';
-import type { Stats } from 'node:fs';
+import { dirname } from 'node:path';
 import type { AdapterHandle, ObservationSink } from '@agent-pet/adapter-core';
 import type { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import type { PiBridgeConfig } from './pi-config.js';
@@ -8,10 +8,13 @@ import type { PreflightState } from '../shared/pi-preflight.js';
 import type { PiConnectionState } from '../shared/pi-connection.js';
 import { PiTemporaryDeployment, type TemporaryDeploymentPreview, type TemporaryDeploymentReceipt } from './pi-temp-deployment.js';
 
+import { PiConnectionStore, sameIdentity, type SavedConnection } from './pi-connection-store.js';
+import { saveStat, type SavedStat } from './pi-temp-deployment.js';
+
 type Plan = { id: string; revision: number; deployment: PiTemporaryDeployment; preview: TemporaryDeploymentPreview;
   config: PiBridgeConfig; root: string };
 
-/** One explicit, process-local desktop deployment. Never adopts/replaces an env bridge or old artifact. */
+/** One explicit desktop deployment, with optional host-only durable ownership. Never adopts/replaces an env bridge or old artifact. */
 export class PiConnection {
   private state: PiConnectionState;
   private plan: Plan | undefined;
@@ -19,17 +22,36 @@ export class PiConnection {
   private pending: Promise<PiConnectionState> | undefined;
   private closed = false;
   private handle: AdapterHandle | undefined;
-  private runtime: { path: string; stat: Stats } | undefined;
+  private runtime: { path: string; stat: SavedStat } | undefined;
   private owned: { deployment: PiTemporaryDeployment; receipt: TemporaryDeploymentReceipt } | undefined;
+  private saved: SavedConnection | undefined;
+  private callbackEpoch = 0;
   private listeners = new Set<(state: PiConnectionState) => void>();
   constructor(private readonly options: {
     target(): PreflightState;
     adapter: Pick<PiBridgeAdapter, 'start'>;
     publish: ObservationSink['publish'];
     developmentEnvironment: boolean;
+    store?: PiConnectionStore;
   }) {
     this.state = { revision: 0, status: 'not-configured', mode: options.developmentEnvironment ? 'development-env' : 'desktop',
-      busy: false, canConfigure: !options.developmentEnvironment, preview: null, deployedPath: null, canRemove: false, notice: 'none' };
+      busy: false, canConfigure: !options.developmentEnvironment, preview: null, deployedPath: null, canRemove: false, canResume: false, receiving: 'stopped', saved: 'none', notice: 'none' };
+    if (!options.developmentEnvironment && options.store) {
+      if (options.store.error) {
+        this.state.status = 'failed'; this.state.notice = 'saved-invalid'; this.state.saved = 'invalid'; this.state.canConfigure = false;
+      } else {
+        const saved = options.store.snapshot();
+        if (saved) {
+          this.saved = saved;
+          const deployment = new PiTemporaryDeployment(saved.target, saved.config);
+          this.owned = { deployment, receipt: deployment.restoreOwnership(saved.ownership) };
+          this.runtime = { path: dirname(saved.config.endpoint), stat: saved.runtime };
+          this.state.deployedPath = this.owned.receipt.path; this.state.canRemove = true; this.state.canResume = true;
+          this.state.canConfigure = false; this.state.status = 'disconnected';
+          this.state.saved = saved.disabled ? 'disabled' : 'ready'; this.state.notice = 'resume-required';
+        }
+      }
+    }
   }
   snapshot(): PiConnectionState { return structuredClone(this.state); }
   subscribe(listener: (state: PiConnectionState) => void): () => void {
@@ -43,10 +65,12 @@ export class PiConnection {
   }
   // Legacy reports the latest validated hello/close, not managed auth/ack or aggregate peer health.
   connectionChanged(state: 'connected' | 'degraded' | 'disconnected'): void {
+    if (this.closed || (!this.options.developmentEnvironment && this.state.receiving !== 'active')) return;
     this.state.status = state === 'degraded' ? 'failed' : state;
     this.emit();
   }
   developmentStarted(ok: boolean): void {
+    this.state.receiving = ok ? 'active' : 'stopped';
     this.state.status = ok ? 'configured-waiting' : 'failed';
     this.state.notice = ok ? 'none' : 'start-failed'; this.emit();
   }
@@ -110,8 +134,9 @@ export class PiConnection {
     return this.run(async () => {
       try {
         await mkdir(plan.root, { mode: 0o700 }); // exclusive; EEXIST is never permission to unlink/adopt
-        this.runtime = { path: plan.root, stat: await lstat(plan.root) };
-        if (!this.runtime.stat.isDirectory() || (this.runtime.stat.mode & 0o777) !== 0o700) throw new Error();
+        const stat = await lstat(plan.root);
+        if (!stat.isDirectory() || (stat.mode & 0o7777) !== 0o700 || stat.uid !== process.getuid?.()) throw new Error();
+        this.runtime = { path: plan.root, stat: saveStat(stat) };
       } catch {
         plan.deployment.cancel(plan.preview);
         this.state.status = 'failed'; this.state.notice = 'runtime-failed'; this.state.canConfigure = false;
@@ -120,7 +145,7 @@ export class PiConnection {
       if (generation !== this.generation || this.closed || !this.targetMatches(plan.revision, plan.preview.target.path)) {
         plan.deployment.cancel(plan.preview); await this.releaseRuntime(); return;
       }
-      // No automatic retry/reconfiguration or credential persistence in this slice.
+      // Deployment must finish before its exact ownership can be saved; failure retains the receipt.
       this.state.canConfigure = false;
       const applied = await plan.deployment.apply(plan.preview);
       if (applied.status !== 'deployed') {
@@ -130,35 +155,93 @@ export class PiConnection {
       }
       this.owned = { deployment: plan.deployment, receipt: applied.receipt };
       this.state.deployedPath = applied.receipt.path; this.state.canRemove = true;
-      if (this.closed) { this.state.status = 'disconnected'; return; }
-      try {
-        this.state.status = 'configured-waiting';
-        this.handle = await this.options.adapter.start(plan.config, {
-          publish: this.options.publish, connectionChanged: state => this.connectionChanged(state),
-        });
-      } catch {
-        // Deployed file/receipt and uncertain runtime are retained, never reported as connected.
-        this.state.status = 'failed'; this.state.notice = 'start-failed';
+      if (this.options.store) {
+        this.saved = { target: plan.preview.target.path, config: plan.config, runtime: this.runtime!.stat,
+          ownership: plan.deployment.exportOwnership(applied.receipt), disabled: false };
+        if (!this.persist(false)) return;
       }
+      if (this.closed) { this.state.status = 'disconnected'; return; }
+      await this.startAdapter(plan.config);
     });
+  }
+  private persist(disabled: boolean): boolean {
+    if (!this.options.store || !this.saved) return true;
+    const next = { ...this.saved, disabled };
+    if (!this.options.store.save(next)) {
+      this.state.saved = 'uncertain'; this.state.notice = 'save-failed'; this.state.status = 'failed'; this.state.canResume = false;
+      return false;
+    }
+    this.saved = next; this.state.saved = disabled ? 'disabled' : 'ready'; return true;
+  }
+  private async startAdapter(config: PiBridgeConfig): Promise<void> {
+    const epoch = ++this.callbackEpoch;
+    this.state.canResume = false; this.state.receiving = 'active'; this.state.status = 'configured-waiting';
+    try {
+      this.handle = await this.options.adapter.start(config, {
+        publish: value => { if (!this.closed && epoch === this.callbackEpoch) this.options.publish(value); },
+        connectionChanged: state => { if (epoch === this.callbackEpoch) this.connectionChanged(state); },
+      });
+    } catch {
+      // The legacy adapter rejects before returning a listening handle; it never adopts an existing endpoint.
+      this.callbackEpoch++; this.state.receiving = 'stopped';
+      this.state.status = 'failed'; this.state.notice = 'start-failed';
+    }
+  }
+  resume(): Promise<PiConnectionState> {
+    return this.run(async () => {
+      if (!this.state.canResume || !this.saved || !this.runtime || !this.owned) return;
+      try {
+        const now = await lstat(this.runtime.path);
+        if (!now.isDirectory() || !sameIdentity(now, this.runtime.stat) || (now.mode & 0o7777) !== 0o700 || now.uid !== process.getuid?.()) throw new Error();
+        try { await lstat(this.saved.config.endpoint); throw new Error('Existing socket'); }
+        catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
+        if (!await this.owned.deployment.matches(this.owned.receipt)) throw new Error();
+      } catch { this.state.status = 'failed'; this.state.notice = 'resume-refused'; return; }
+      if (!this.persist(false) || this.closed) return;
+      await this.startAdapter(this.saved.config);
+    });
+  }
+  private async disableReceiving(): Promise<boolean> {
+    let stopped = true;
+    try { await this.stopHandle(); }
+    catch { stopped = false; this.state.receiving = 'unknown'; }
+    const persisted = this.persist(true);
+    if (!stopped) { this.state.status = 'failed'; this.state.notice = persisted ? 'stop-failed' : 'stop-save-failed'; return false; }
+    this.state.status = 'disconnected';
+    if (!persisted) return false;
+    this.state.notice = 'disabled'; this.state.canResume = !!this.saved;
+    return true;
+  }
+  disable(): Promise<PiConnectionState> {
+    this.invalidate();
+    return this.run(async () => { if (this.owned) await this.disableReceiving(); });
   }
   remove(): Promise<PiConnectionState> {
     this.invalidate();
     return this.run(async () => {
       if (!this.owned) { this.state.notice = 'retained-unknown'; return; }
-      try { await this.stopHandle(); }
-      catch { this.state.status = 'failed'; this.state.notice = 'failed-preserved'; return; }
+      if (!await this.disableReceiving()) return;
       const result = await this.owned.deployment.withdraw(this.owned.receipt);
       this.state.notice = result.file;
       this.state.status = result.file === 'removed' ? 'not-configured' : 'disconnected';
-      if (result.file !== 'failed-preserved') { this.owned = undefined; this.state.canRemove = false; }
-      if (result.file === 'removed') this.state.deployedPath = null;
-      await this.releaseRuntime();
+      // A failed unlink remains retryable; edited artifacts also keep their durable evidence.
+      if (result.file === 'removed') {
+        this.owned = undefined; this.state.canRemove = false; this.state.canResume = false; this.state.deployedPath = null;
+        if (this.options.store && !this.options.store.save(null)) {
+          this.state.saved = 'uncertain'; this.state.notice = 'removed-save-failed'; this.state.canConfigure = false;
+        } else {
+          this.saved = undefined; this.state.saved = 'none'; this.state.canConfigure = !!this.options.store;
+        }
+        await this.releaseRuntime();
+      } else if (!this.options.store && result.file !== 'failed-preserved') {
+        this.owned = undefined; this.state.canRemove = false; await this.releaseRuntime();
+      }
     });
   }
   private async stopHandle(): Promise<void> {
-    if (!this.handle) return;
-    await this.handle.stop(); this.handle = undefined;
+    this.callbackEpoch++; // Invalidate callbacks BEFORE awaiting stop, including late socket close/hello.
+    if (this.handle) { await this.handle.stop(); this.handle = undefined; }
+    this.state.receiving = 'stopped';
   }
   private async releaseRuntime(): Promise<void> {
     const runtime = this.runtime;
@@ -174,8 +257,12 @@ export class PiConnection {
   async stop(): Promise<void> {
     this.closed = true; this.invalidate();
     await this.pending;
-    await this.stopHandle();
-    await this.releaseRuntime();
+    try { await this.stopHandle(); }
+    catch {
+      this.state.receiving = 'unknown'; this.state.status = 'failed'; this.state.notice = 'stop-failed'; this.emit();
+      throw new Error('Pi receiver shutdown not confirmed');
+    }
+    if (!this.saved) await this.releaseRuntime();
     this.state.status = this.state.deployedPath ? 'disconnected' : 'not-configured';
     this.state.notice = 'stopped'; this.emit();
   }

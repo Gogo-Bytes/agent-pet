@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'el
 import { join } from 'node:path';
 import { PreferenceStore } from './preferences.js';
 import { PiPreflight } from './pi-preflight.js';
+import { PiConnectionStore } from './pi-connection-store.js';
 import { PiConnection } from './pi-connection.js';
 import type { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import type { ObservationSink } from '@agent-pet/adapter-core';
@@ -27,7 +28,8 @@ export function createManagement(options: {
       return result.canceled ? null : result.filePaths[0] ?? null;
     },
   });
-  const connection = new PiConnection({ ...options.pi, target: () => preflight.snapshot() });
+  const connection = new PiConnection({ ...options.pi, target: () => preflight.snapshot(),
+    ...(!options.pi.developmentEnvironment ? { store: new PiConnectionStore(app.getPath('userData')) } : {}) });
   connection.subscribe(snapshot => {
     if (window && !window.isDestroyed()) window.webContents.send('management:pi-connection-state', snapshot);
   });
@@ -163,6 +165,7 @@ export function createManagement(options: {
   });
   const connectionHandlers = {
     state: () => connection.snapshot(), preview: () => connection.preview(),
+    resume: () => connection.resume(), disable: () => connection.disable(),
     cancel: () => connection.invalidate(), remove: () => connection.remove(),
   };
   for (const [action, handle] of Object.entries(connectionHandlers)) ipcMain.handle(`management:pi-connection-${action}`, (event, ...args: unknown[]) => {

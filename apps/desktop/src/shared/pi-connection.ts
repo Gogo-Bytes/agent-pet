@@ -17,15 +17,21 @@ export interface PiConnectionState {
   preview: PiDeploymentPreview | null;
   deployedPath: string | null;
   canRemove: boolean;
+  canResume: boolean;
+  receiving: 'active' | 'stopped' | 'unknown';
+  saved: 'none' | 'ready' | 'disabled' | 'invalid' | 'uncertain';
   notice: 'none' | 'choose-target' | 'busy' | 'invalid-plan' | 'preview-failed' | 'stale-plan' |
     'deploy-failed-preserved' | 'start-failed' | 'runtime-failed' | 'removed' | 'retained-changed' |
-    'retained-unknown' | 'failed-preserved' | 'stopped';
+    'retained-unknown' | 'failed-preserved' | 'stopped' | 'saved-invalid' | 'save-failed' | 'resume-required' |
+    'resume-refused' | 'disabled' | 'stop-failed' | 'stop-save-failed' | 'removed-save-failed';
 }
 export interface PiConnectionApi {
   getState(): Promise<PiConnectionState>;
   preview(): Promise<PiConnectionState>;
   cancel(): Promise<PiConnectionState>;
   confirm(id: string): Promise<PiConnectionState>;
+  resume(): Promise<PiConnectionState>;
+  disable(): Promise<PiConnectionState>;
   remove(): Promise<PiConnectionState>;
   subscribe(listener: (state: PiConnectionState) => void): () => void;
 }

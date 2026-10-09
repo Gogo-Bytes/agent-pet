@@ -28,6 +28,18 @@ async function fixture(developmentEnvironment = false) {
   };
 }
 
+it('reports environment reception independently of peer connection state', async () => {
+  const { connection } = await fixture(true);
+  connection.developmentStarted(false);
+  expect(connection.snapshot()).toMatchObject({ status: 'failed', receiving: 'stopped' });
+  connection.developmentStarted(true);
+  expect(connection.snapshot()).toMatchObject({ status: 'configured-waiting', receiving: 'active' });
+  connection.connectionChanged('connected');
+  expect(connection.snapshot()).toMatchObject({ status: 'connected', receiving: 'active' });
+  connection.connectionChanged('disconnected');
+  expect(connection.snapshot()).toMatchObject({ status: 'disconnected', receiving: 'active' });
+});
+
 it('is inert until native target selection and explicit preview; cancelled/forged/stale plans never write or listen', async () => {
   const f = await fixture();
   expect(await readdir(f.target)).toEqual([]); expect(f.start).not.toHaveBeenCalled();

@@ -19,7 +19,7 @@ it('is inert on mount, requires separate read/preview and confirm consent, and c
   const user = userEvent.setup(); await act(async () => {});
   expect(api.preview).not.toHaveBeenCalled(); expect(api.confirm).not.toHaveBeenCalled();
   expect(screen.queryByRole('region', { name: '部署预览' })).toBeNull();
-  expect(screen.getByText(/仅本进程持有凭据/).textContent).toContain('退出 / 重启后不会自动重连');
+  expect(screen.getByText(/确认部署会在应用 userData/).textContent).toContain('不读目标、不自动监听');
   await user.click(screen.getByRole('button', { name: '同意读取所选目标并预览部署' }));
   expect(screen.getByRole('region', { name: '部署预览' }).textContent).toContain('/fixture/target/extensions/agent-pet.ts');
   expect(api.confirm).not.toHaveBeenCalled();
@@ -68,4 +68,22 @@ it('a pushed invalidation wins over stale IPC replies and blocked/env modes cann
   act(() => api.push({ ...initialConnection, revision: 12, mode: 'development-env', canConfigure: false }));
   expect((screen.getByRole('button', { name: '同意读取所选目标并预览部署' }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText(/不会替换、回退或创建第二个桥接/)).toBeTruthy();
+});
+
+it('discloses persistence and keeps saved/disabled connections inert until explicit resume or disable', async () => {
+  const api = connectionBridge();
+  const saved: PiConnectionState = { ...initialConnection, revision: 1, canConfigure: false, canResume: true,
+    canRemove: true, deployedPath: '/fixture/target/extensions/agent-pet.ts', saved: 'disabled', notice: 'resume-required' };
+  api.getState.mockResolvedValue(saved);
+  api.resume.mockResolvedValue({ ...saved, revision: 2, receiving: 'active', canResume: false, saved: 'ready' });
+  api.disable.mockResolvedValue({ ...saved, revision: 3, notice: 'disabled' });
+  render(<Theme><PiConnectionPanel api={api} /></Theme>);
+  const user = userEvent.setup(); await act(async () => {});
+  expect(api.resume).not.toHaveBeenCalled(); expect(api.disable).not.toHaveBeenCalled();
+  expect(screen.getByText(/确认部署会在应用 userData/).textContent).toContain('0600');
+  await user.click(screen.getByRole('button', { name: '恢复已保存连接' }));
+  expect(api.resume).toHaveBeenCalledExactlyOnceWith();
+  await user.click(screen.getByRole('button', { name: '停用接收并保存（保留文件）' }));
+  expect(api.disable).toHaveBeenCalledExactlyOnceWith();
+  expect(screen.getByText(/已停止接收并保存停用状态/)).toBeTruthy();
 });

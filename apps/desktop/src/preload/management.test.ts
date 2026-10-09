@@ -27,12 +27,13 @@ describe('management preload capability boundary', () => {
       ['management:pi-default-target'], ['management:pi-inspect'],
     ]);
     native.invoke.mockClear();
-    expect(Object.keys(api.piConnection).sort()).toEqual(['cancel', 'confirm', 'getState', 'preview', 'remove', 'subscribe']);
+    expect(Object.keys(api.piConnection).sort()).toEqual(['cancel', 'confirm', 'disable', 'getState', 'preview', 'remove', 'resume', 'subscribe']);
     await api.piConnection.getState(); await api.piConnection.preview(); await api.piConnection.cancel();
-    await api.piConnection.confirm('opaque-plan'); await api.piConnection.remove();
+    await api.piConnection.confirm('opaque-plan'); await api.piConnection.remove(); await api.piConnection.resume(); await api.piConnection.disable();
     expect(native.invoke.mock.calls).toEqual([
       ['management:pi-connection-state'], ['management:pi-connection-preview'], ['management:pi-connection-cancel'],
       ['management:pi-connection-confirm', 'opaque-plan'], ['management:pi-connection-remove'],
+       ['management:pi-connection-resume'], ['management:pi-connection-disable'],
     ]);
     const connectionCallback = vi.fn(); const stopConnection = api.piConnection.subscribe(connectionCallback);
     events.emit('management:pi-connection-state', { secretEvent: true }, { status: 'connected' });

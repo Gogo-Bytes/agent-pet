@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, realpathSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { SessionObservation } from '@agent-pet/domain';
 import type { OverlayLayout, Rect } from '../shared/overlay-layout.js';
@@ -132,7 +132,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
   it('restricts deployment IPC to trusted management, accepts no paths, and does not replace the env bridge', async () => {
     const management = native.management!;
     const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
-    for (const action of ['state', 'preview', 'cancel', 'remove', 'confirm']) {
+    for (const action of ['state', 'preview', 'cancel', 'remove', 'resume', 'disable', 'confirm']) {
       const handler = native.handlers.get(`management:pi-connection-${action}`)!;
       for (const event of [{ sender: native.webContents, senderFrame: native.webContents.mainFrame },
         { sender: management.webContents, senderFrame: { url: management.webContents.mainFrame.url } },
@@ -197,6 +197,9 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     // Await filesystem disposal as well as the mock handle before fixture removal.
     vi.useRealTimers();
     await vi.waitFor(() => expect(native.tray.destroy).toHaveBeenCalledOnce());
+    // Clean only the runtime recorded by this fresh test's private metadata, after stop settled.
+    const saved = JSON.parse(readFileSync(join(native.path, 'pi-connection/connection.json'), 'utf8'));
+    rmSync(dirname(saved.connection.config.endpoint), { recursive: true, force: true });
   });
   it.each(['packaged', 'development'])('allows only exact entry reload in %s, not other navigation', async mode => {
     if (mode === 'development') {

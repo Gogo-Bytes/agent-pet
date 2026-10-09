@@ -7,6 +7,8 @@ const piConnection: PiConnectionApi = {
   preview: () => ipcRenderer.invoke('management:pi-connection-preview'),
   cancel: () => ipcRenderer.invoke('management:pi-connection-cancel'),
   confirm: id => ipcRenderer.invoke('management:pi-connection-confirm', id),
+  resume: () => ipcRenderer.invoke('management:pi-connection-resume'),
+  disable: () => ipcRenderer.invoke('management:pi-connection-disable'),
   remove: () => ipcRenderer.invoke('management:pi-connection-remove'),
   subscribe(listener) {
     const handler = (_event: Electron.IpcRendererEvent, state: PiConnectionState) => listener(state);

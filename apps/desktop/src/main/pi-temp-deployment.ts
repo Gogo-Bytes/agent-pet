@@ -1,4 +1,5 @@
 import { constants, type Stats } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { mkdir, open, rmdir, unlink, type FileHandle } from 'node:fs/promises';
 import { dirname, join, normalize } from 'node:path';
 import { renderConfiguredPiExtension, type PiExtensionConfig } from '../../../../integrations/pi-extension/configured-source.js';
@@ -16,7 +17,12 @@ export interface TemporaryDeploymentPreview {
 export interface TemporaryDeploymentReceipt { readonly path: string; readonly status: 'deployed-awaiting-load' }
 type Evidence = Map<string, string | null>;
 type Plan = { source: string; evidence: Evidence; directories: readonly string[] };
-type Ownership = { source: string; file: Stats; directories: Map<string, Stats> };
+export type SavedStat = Pick<Stats, 'dev' | 'ino' | 'birthtimeMs' | 'mode' | 'uid' | 'gid' | 'size' | 'nlink' | 'mtimeMs' | 'ctimeMs'>;
+export const saveStat = (s: SavedStat): SavedStat => ({ dev: s.dev, ino: s.ino, birthtimeMs: s.birthtimeMs,
+  mode: s.mode, uid: s.uid, gid: s.gid, size: s.size, nlink: s.nlink, mtimeMs: s.mtimeMs, ctimeMs: s.ctimeMs });
+export type SavedOwnership = { digest: string; file: SavedStat; directories: [string, SavedStat][] };
+type Ownership = { digest: string; file: SavedStat; directories: Map<string, SavedStat> };
+const digest = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 // A narrow deterministic write/close failure seam, not a replacement filesystem/installer.
 type ArtifactIO = {
   write(file: FileHandle, source: string): Promise<void>;
@@ -26,11 +32,11 @@ const artifactIO: ArtifactIO = {
   async write(file, source) { await file.writeFile(source, 'utf8'); },
   async close(file) { await file.close(); },
 };
-const identity = (s: Stats) => [s.dev, s.ino, s.birthtimeMs, s.mode, s.uid, s.gid].join(':');
-const fingerprint = (s: Stats) => [identity(s), s.size, s.nlink, s.mtimeMs, s.ctimeMs].join(':');
+const identity = (s: SavedStat) => [s.dev, s.ino, s.birthtimeMs, s.mode, s.uid, s.gid].join(':');
+const fingerprint = (s: SavedStat) => [identity(s), s.size, s.nlink, s.mtimeMs, s.ctimeMs].join(':');
 const equalEvidence = (a: Evidence, b: Evidence) => a.size === b.size && [...a].every(([p, v]) => b.get(p) === v);
 
-/** Explicit-target deployment only. No discovery, persistent ownership or runtime unloading.
+/** Explicit-target deployment only. No discovery or runtime unloading. Host-only saved receipts must come from the private store.
  * Local revalidation + exclusive creation are not same-UID attacker isolation.
  */
 export class PiTemporaryDeployment {
@@ -143,7 +149,7 @@ export class PiTemporaryDeployment {
         directories.set(path, now);
       }
       const receipt: TemporaryDeploymentReceipt = Object.freeze({ path: preview.path, status: 'deployed-awaiting-load' });
-      this.#owned.set(receipt, { source: plan.source, file: stat, directories });
+      this.#owned.set(receipt, { digest: digest(plan.source), file: stat, directories });
       return { status: 'deployed', receipt };
     } catch {
       // Partial write/close is uncertain. Never unlink it, adopt it, or remove its directories.
@@ -151,6 +157,45 @@ export class PiTemporaryDeployment {
     } finally {
       if (file) { try { await file.close(); } catch { /* Preserve uncertain state; never claim success. */ } }
     }
+  }
+
+  /** Host-only export/import: never exposed as an IPC receipt or inferred from target files. */
+  exportOwnership(receipt: TemporaryDeploymentReceipt): SavedOwnership {
+    const owned = this.#owned.get(receipt);
+    if (!owned) throw new Error('Missing deployment ownership');
+    return { digest: owned.digest, file: saveStat(owned.file),
+      directories: [...owned.directories].map(([path, stat]) => [path, saveStat(stat)]) };
+  }
+  restoreOwnership(saved: SavedOwnership): TemporaryDeploymentReceipt {
+    const receipt: TemporaryDeploymentReceipt = Object.freeze({ path: join(this.#target, 'extensions', 'agent-pet.ts'), status: 'deployed-awaiting-load' });
+    this.#owned.set(receipt, { digest: saved.digest, file: saved.file, directories: new Map(saved.directories) });
+    return receipt;
+  }
+
+  async matches(receipt: TemporaryDeploymentReceipt): Promise<boolean> {
+    const owned = this.#owned.get(receipt);
+    if (!owned) return false;
+    try { return await this.#matches(receipt, owned, new ReadBudget()); } catch { return false; }
+  }
+  async #matches(receipt: TemporaryDeploymentReceipt, owned: Ownership, budget: ReadBudget): Promise<boolean> {
+      const before = await budget.regular(receipt.path);
+      if (!before || fingerprint(before) !== fingerprint(owned.file)) return false;
+      const file = await open(receipt.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      let matches = false;
+      try {
+        if (fingerprint(await file.stat()) !== fingerprint(owned.file)) return false;
+        const bytes = Buffer.alloc(owned.file.size + 1);
+        let offset = 0;
+        while (offset < bytes.length) {
+          budget.check();
+          const { bytesRead } = await file.read(bytes, offset, bytes.length - offset, offset);
+          if (!bytesRead) break;
+          offset += bytesRead;
+        }
+        matches = offset === owned.file.size && digest(bytes.subarray(0, offset)) === owned.digest && fingerprint(await file.stat()) === fingerprint(owned.file);
+      } finally { await file.close(); }
+      const after = await budget.stat(receipt.path);
+      return !!matches && !!after && fingerprint(after) === fingerprint(owned.file);
   }
 
   async withdraw(receipt: TemporaryDeploymentReceipt): Promise<{
@@ -162,28 +207,10 @@ export class PiTemporaryDeployment {
     const result = (file: 'removed' | 'retained-changed' | 'retained-unknown' | 'failed-preserved', directories: 'removed' | 'retained' = 'retained') =>
       ({ file, directories, runtime: 'not-unloaded' as const });
     if (!owned) return result('retained-unknown');
-    this.#owned.delete(receipt);
     let removed = false;
     try {
       const budget = new ReadBudget();
-      const before = await budget.regular(receipt.path);
-      if (!before || fingerprint(before) !== fingerprint(owned.file)) return result('retained-changed');
-      const file = await open(receipt.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-      let matches = false;
-      try {
-        if (fingerprint(await file.stat()) !== fingerprint(owned.file)) return result('retained-changed');
-        const bytes = Buffer.alloc(Buffer.byteLength(owned.source) + 1);
-        let offset = 0;
-        while (offset < bytes.length) {
-          budget.check();
-          const { bytesRead } = await file.read(bytes, offset, bytes.length - offset, offset);
-          if (!bytesRead) break;
-          offset += bytesRead;
-        }
-        matches = bytes.subarray(0, offset).equals(Buffer.from(owned.source)) && fingerprint(await file.stat()) === fingerprint(owned.file);
-      } finally { await file.close(); }
-      const after = await budget.stat(receipt.path);
-      if (!matches || !after || fingerprint(after) !== fingerprint(owned.file)) return result('retained-changed');
+      if (!await this.#matches(receipt, owned, budget)) return result('retained-changed');
       // Establish which owned directories are unchanged BEFORE our removal changes timestamps.
       const removable = new Set<string>();
       for (const [path, stat] of owned.directories) {
@@ -192,6 +219,7 @@ export class PiTemporaryDeployment {
       }
       await unlink(receipt.path);
       removed = true;
+      this.#owned.delete(receipt);
       let retained = false;
       for (const [path, stat] of [...owned.directories].reverse()) {
         try {

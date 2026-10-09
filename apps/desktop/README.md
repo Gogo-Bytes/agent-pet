@@ -102,28 +102,49 @@ feed the existing Application/pet, with Open Session still unsupported.
 
 The listener uses an exclusive 0700 short random directory under `/tmp`, not a long
 userData/TMPDIR socket path. Startup never unlinks an unknown socket or configuration.
-Quit waits for pending operations and Adapter stop, then only tries empty-only removal
-of its own unchanged runtime directory. Failed deployment/start preserves uncertain
-files and any valid receipt; it does not claim success or automatically retry.
+Quit waits for pending operations and Adapter stop, retaining the original runtime directory,
+configuration and ownership for a **clean desktop restart**. No target is read and no desktop
+listener starts automatically at startup: Main only reads bounded private metadata at
+`userData/pi-connection/connection.json` (0700 directory / 0600 file). The confirmation
+preview discloses this persistence policy before deployment. Credentials never enter ordinary
+preferences, IPC, logs, Renderer or the application bundle.
 
-**Process-local trial, not daily readiness:** credentials and ownership are not persisted.
-Restart does not reconnect, adopt, overwrite or delete the old extension. Before quitting,
-use the explicit receipt-backed **停用接收并撤回本次文件…** flow when appropriate. It stops
-reception and removes only identity/content-matching files, preserving edits/unknowns.
-Removing a file or stopping reception does **not** unload a running pi extension. After
-withdrawal, restart and select/preview again to reconfigure; there is no auto recovery.
-If the host has already exited, old files require separately authorized manual handling.
+After restarting, choose **恢复已保存连接** to validate the original runtime directory,
+absence of any existing endpoint, and the installed file's identity/metadata/content digest.
+Resume uses the identical endpoint/token and the same installed extension, without environment
+exports or redeployment. **停用接收并保存（保留文件）** stops the listener and persists disabled
+state. Even when saving fails, the next launch never auto-listens. The UI separately reports
+receiving state, saved state and partial failures; failed stop does not claim disabled reception.
+
+**停用接收并撤回本次文件…** stops receiving, saves disabled state, then selectively removes
+only the matching owned file. Edits, replacements, unknown entries and nonempty directories
+are retained; failed-preserved withdrawal remains retryable. Successful removal and metadata
+publication allow selecting/previewing a new setup in the same process. A failed publication
+blocks reconfiguration instead of pretending the record was cleared. Stopping/removing does
+**not** unload an already running pi extension; safely close/reload pi yourself.
+
+This is clean-restart usability, **not crash recovery or reboot resilience**. `/tmp` loss,
+system reboot, a changed/missing runtime directory or an existing stale/unknown socket makes
+resume fail visibly. It never reconstructs the runtime or steals/unlinks an endpoint to resume.
+Corrupt, foreign, symlinked, permissive or unknown-version records and incomplete saves fail
+closed without wiping, resetting or adopting old artifacts. Uncertain writes retain pending
+metadata and usable in-memory ownership; a preserved pending record prevents a new startup
+from assuming publication completed. Separately authorized manual handling may be needed.
+Old process-only deployments without a saved receipt are never adopted. The fixed-purpose
+store is not a new AuthStore, a same-UID attacker boundary or managed security authorization.
 
 Any supplied dev endpoint/token env reserves the original development path, even when
 invalid; the UI will not silently replace it or create a second bridge. The trusted
 canonical extension is bundled as inert Vite raw text in Main, without user credentials;
-only the generated target file contains the process-local capability.
+the generated target file and private Main metadata contain the capability.
 
 Automated evidence includes controller-applied artifact → isolated Node synthetic
 hooks → real socket/Adapter/Application, trusted IPC, cancellation/staleness, receipt
 withdrawal, quit, RTL and source-independent built template checks. No real target/pi,
 Electron default profile or visual QA was run. M2 remains PARTIAL; see the current plan
-for exact test counts and outstanding real consent, persistence and native acceptance.
+for exact test counts. Restart persistence is implemented but not manually accepted; see
+[the new unchecked restart checklist](../../docs/MVP-RESTART-CHECKLIST.md). Prior manually checked
+results remain historical evidence for their original process-local implementation.
 
 ## Development session simulation
 

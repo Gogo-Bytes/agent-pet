@@ -38,7 +38,7 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 | managed 内部 Core/AuthStore/native/Worker | 已有复用实现与 fixture 集成，不是全部尚未接入，也不是生产入口已可用 | [service.ts](../packages/adapter-pi/src/managed/service.ts)、[Worker 测试](../packages/adapter-pi/src/managed/worker/service-worker.test.ts)、[P2 历史记录](DESKTOP-P2-IMPLEMENTATION.md) |
 | B4.3 / B4.4a | VERIFIED（历史 Electron Worker / disposable staged-resource 范围）；B4.4a 没有 ASAR/最终 `.app`/签名，不是应用包 | [P2 B4 证据](DESKTOP-P2-IMPLEMENTATION.md)、[staged launcher](../scripts/electron-managed-worker-staged-smoke.mjs) |
 | D6.1 | VERIFIED（有界同账户 harness 已完成）；完整 D6 仍 BLOCKED，且不再是本地 MVP gate | [D6.1 契约](DESKTOP-P2B2-FILESYSTEM-POLICY.md#d61--bounded-synthetic-current-account-harness)、[harness.test.ts](../packages/adapter-pi/src/managed/d6/harness.test.ts)、[evidence.test.ts](../packages/adapter-pi/src/managed/d6/evidence.test.ts) |
-| 独立本地应用包、真实部署全链路 | 独立 `.app` 为 PLANNED；开发版在独立测试目标完成部署→真实 pi 连接→首轮状态→选择性撤回，日常配置与完整端到端矩阵仍未验收，不能称“生产集成就绪” | [desktop scripts](../apps/desktop/package.json)、[根 scripts](../package.json)、[人工清单](MVP-MANUAL-CHECKLIST.md) |
+| 独立本地应用包、真实部署全链路 | 独立 `.app` 已 IMPLEMENTED-NOT-ACCEPTED；本次 arm64 包含运行时与 bundled 资源并完成隔离 smoke，真实部署→连接→状态→选择性撤回和人工视觉验收仍未完成，不能称“生产集成就绪” | [desktop README](../apps/desktop/README.md)、[builder config](../apps/desktop/electron-builder.config.mjs)、[根 scripts](../package.json)、[M5 清单](MVP-MANUAL-CHECKLIST.md) |
 
 历史基线结果：**489 passed / 1 skipped**；历史 D6.1 runner **8 PASS / 7 BLOCKED，exit 2**。M1 本次全量测试 **497 passed / 1 skipped**，类型检查与 desktop 源码构建通过；未单独运行 D6.1 runner。单项 skip、blocked 与保留的 fixture barrier 不因总测试通过而消失。旧文档中的 335/371/448 等数字仍只对应各自历史阶段。
 
@@ -129,13 +129,18 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 
 验收：宠物在 pi 不在线/配置冲突/连接失败时仍可用，界面给出可理解的连接状态而不是伪造业务错误；扩展断线退避、不阻塞或保活 pi。用户可停用接收并选择性移除仍匹配身份与内容的自有扩展/配置，保留用户修改和未知残留；重启后停用不自动复活。清理或持久化失败如实报告，不谎称完全卸载。直接拖删 `.app` 不承诺自动清理，给出卸载前入口与残留说明。不实现自动 recovery/reset/revoke-all，不用删除未知 owner/lock 修复故障。
 
-### M5：脱离源码目录可运行的本地应用包 — PLANNED
+### M5：脱离源码目录可运行的本地应用包 — IMPLEMENTED-NOT-ACCEPTED
 
-先确认最小本地打包路径；若需安装 packager/依赖，单独说明范围并取得许可。复用现有构建、资产和 M1 路线，只携带实际需要的 Worker/native/扩展资源；外部 pi 不依赖 workspace、源码路径或 Electron ASAR 的特殊读取。
+已取得明确授权并安装 `electron-builder@26.15.3`（根开发依赖及 lockfile）。新增 `apps/desktop/electron-builder.config.mjs` 与 `scripts/package-desktop.mjs`：复用现有 `electron-vite` 输出，固定 `com.agentpet.desktop` / `Agent Pet` 元数据和 macOS `arm64` 目录目标；输出脚本拒绝非空目录，默认创建源码树外的 `/tmp/agent-pet-m5-*` 目录。仅携带 Electron runtime、bundled Main/preload/renderer 和 `starter.glb`，通过 ASAR 排除 `src`、`node_modules`、workspace 与 pi/managed Worker/native 资源；未设置签名凭据或自动签名。
 
-2026-10-08 有界本地探路：尝试用现有 Electron runtime 与 `electron-vite` 产物直接制作 `.app`，未安装依赖。原 runtime 的 `codesign --verify --deep --strict` 已报资源签名不匹配；复制后 ad hoc 深度签名在 `Mantle.framework` 报 bundle 格式歧义，改为顶层签名后严格校验仍在 `Electron Framework.framework` 报同类错误。按一次修正复验的停点停止，实验性打包脚本已撤回。两份失败复制品留在忽略的 `dist/agent-pet-local-n86P5a`、`dist/agent-pet-local-1P3yhK`；强制删除命令被自动审批拒绝，未改动其他目录。后续 Computer-Use 按应用名定位时意外打开 `dist/agent-pet-local-1P3yhK/Agent Pet.app`，仅见默认未配置管理页，随即退出且已核对无该路径进程；这不构成签名、资源、连接或独立运行验收。后续需先找到可校验的本地签名/打包路径，再继续 M5。
+2026-10-08 的失败复制品 `dist/agent-pet-local-n86P5a`、`dist/agent-pet-local-1P3yhK` 和两份历史 `.d3` fixture 目录保持原样，未清理。2026-10-09（本次）在 Apple Silicon `arm64` 上构建独立产物 `/tmp/agent-pet-m5-package-20260301-final/mac-arm64/Agent Pet.app`；`app.asar` 检查确认 Main/preload/renderer HTML、bundled JS 与 `starter.glb` 存在且无源码/workspace/node_modules 路径。直接启动时使用全新 `/tmp` profile/HOME，并解除 `AGENT_PET_PI_ENDPOINT`、`AGENT_PET_PI_TOKEN`、`ELECTRON_RENDERER_URL` 与 `NODE_OPTIONS`；进程保持运行至 10 秒有界 smoke 停止，未访问日常 HOME、pi 配置或真实 acceptance 目录。`codesign --verify --deep --strict` 如实失败（无签名资源/Developer ID），因此不构成 Gatekeeper、签名、公证或分发验收。
 
-验收：产物自带 Electron runtime，可从源码树外打开，无需 Node/pnpm/开发服务器；已有外部 pi 不被捆绑或自动安装。至少在本机移动/重新打开 `.app` 后复验连接、状态和停用链路，记录实际 OS/架构与资源加载结果；不以 `electron-vite build` 或 B4.4a staged smoke 代替。未签名/本地签名及 Gatekeeper/隔离属性限制明确记录，不要求关闭系统保护来假装通过；若系统阻止本地运行，则该项仍未验收。正式签名、公证、跨机器分发和自动更新继续单列后续工作。
+验收：产物自带 Electron runtime，可从源码树外启动，无需 Node/pnpm/开发服务器；外部 pi 不被捆绑或自动安装。M5 仍为 **IMPLEMENTED-NOT-ACCEPTED**：尚缺用户从 Finder/移动后的人工视觉验收、真实连接/状态/停用链路复验；不以 bounded process smoke 冒充这些结果。正式签名、公证、跨机器分发和自动更新继续单列后续工作。
+
+M5 packaging checklist（待用户手工完成）：
+- [ ] 从 `/tmp/agent-pet-m5-package-20260301-final/mac-arm64/Agent Pet.app` 或复制后的新路径通过 Finder 打开，记录 Gatekeeper/隔离属性结果。
+- [ ] 在不使用日常 HOME/pi 配置的明确授权隔离目标中，人工检查管理页、宠物/气泡视觉与退出/重开。
+- [ ] 仅在另行授权的隔离 pi 目标上复验部署、连接、状态、确认、停用/撤回；不得把启动 smoke 记录为真实业务连接。
 
 ## 历史材料与后续生产化
 
@@ -143,4 +148,4 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 - [连接](DESKTOP-P2B-LOCAL-CONNECTION.md)、[文件系统/D6](DESKTOP-P2B2-FILESYSTEM-POLICY.md)、[生命周期](DESKTOP-P2B2-LIFECYCLE-DESIGN.md)：现有机制不变量及旧严格准入；延期的验证保持未关闭。
 - [安装契约](P0-MANAGED-INSTALLATION.md)、[本机安全研究](P0-LOCAL-SECURITY-DECISION.md)、[发布研究](P0-SECURITY-RELEASE-RESEARCH.md)：按 M1 路线取用已有正确性/所有权要求，不把未来全部生产承诺重新塞进 MVP。
 
-M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连、撤回、管理页视觉检查与干净重启持久化均已验；仍不包含独立 `.app`、正式发布或生产安全）；M3 为 PARTIAL（两轮真实任务 working→完成未读→确认、Open Session 不支持提示、同桌面进程内 pi 重启不回放已验；可选错误终态与完整多 Session/异常重连矩阵未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 PLANNED。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。
+M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连、撤回、管理页视觉检查与干净重启持久化均已验；仍不包含独立 `.app`、正式发布或生产安全）；M3 为 PARTIAL（两轮真实任务 working→完成未读→确认、Open Session 不支持提示、同桌面进程内 pi 重启不回放已验；可选错误终态与完整多 Session/异常重连矩阵未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 IMPLEMENTED-NOT-ACCEPTED（已生成源码外 arm64 `.app` 并完成资源检查与进程 smoke；Finder/移动/视觉、真实 pi 连接与停用仍待人工验收，未签名限制已记录）。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。

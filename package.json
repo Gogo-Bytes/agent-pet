@@ -5,7 +5,8 @@
   "scripts": {
     "test": "vitest run",
     "test:d61": "node packages/adapter-pi/src/managed/d6/run.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "package:mac": "node scripts/package-desktop.mjs"
   },
   "devDependencies": {
     "@react-three/test-renderer": "9.1.0",
@@ -18,6 +19,7 @@
     "@types/three": "^0.177.0",
     "@vitejs/plugin-react": "5.2.0",
     "electron": "^36.0.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^4.0.0",
     "jsdom": "26.1.0",
     "typescript": "^5.8.0",

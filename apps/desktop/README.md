@@ -1,6 +1,25 @@
 # Desktop development
 
-当前范围、进度与下一步见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。此页开发命令不是安装许可；`build` 不产出可独立交付的应用包，B4.4a staged-resource 也不是 `.app`。完整真实端到端仍待验收，managed 入口仍关闭。
+当前范围、进度与下一步见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。此页开发命令不是安装许可；完整真实端到端仍待验收，managed 入口仍关闭。
+
+## Local macOS packaging (M5)
+
+The authorized local packaging path uses `electron-builder@26.15.3` and the existing
+Electron/Vite output. It targets the current Apple Silicon host (`arm64`) and emits
+an unpacked `Agent Pet.app` outside the source tree when `AGENT_PET_BUILD_DIR` points
+to a fresh directory:
+
+```sh
+AGENT_PET_BUILD_DIR=/tmp/agent-pet-m5-unique pnpm package:mac
+```
+
+The package contains the Electron runtime, bundled Main/preload/renderer output and
+`starter.glb` in `app.asar`; it does not bundle pi, managed Worker/native code, source,
+or workspace dependencies. The package has no signing identity configured. Local
+execution may therefore be blocked by Gatekeeper, and a successful local smoke is
+not a signed/distributed-app acceptance. Packaging does not read HOME/pi config or
+start a bridge unless the user explicitly performs the existing setup; the smoke
+check uses a fresh profile with the pi bridge environment unset.
 
 From the repository root:
 

@@ -1,5 +1,8 @@
 {
   "name": "@agent-pet/desktop",
+  "version": "0.1.0",
+  "description": "A local desktop companion for explicitly configured pi sessions.",
+  "author": "Agent Pet contributors",
   "private": true,
   "type": "module",
   "main": "out/main/index.cjs",

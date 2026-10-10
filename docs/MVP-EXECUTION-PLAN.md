@@ -115,7 +115,9 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 
 原 [人工验收清单](MVP-MANUAL-CHECKLIST.md) 的 checked 结果完全不变。[新增重启清单](MVP-RESTART-CHECKLIST.md) 的 R1–R10 已完成人工或隔离故障验收；本增量通过该范围验收，但不外推为整个 MVP/生产安全通过。本增量未安装依赖或打包 `.app`；credential-bearing 测试目录、两份历史 d3 fixture 和失败打包复制品未读取或清理。独立审查 READY；审查指出的旧 env 接入“接收已停止”显示回归已修正，新增启动成功/失败、hello 与 peer 断开时接收状态测试。Main 最终全量复验 **579 passed / 1 skipped / 58 files**，类型检查与 desktop 构建通过（`/tmp/agent-pet-restart-main-{tests,types,build}.log`）。当前下一步为回到 M5 打包：先确定可校验的本地打包路径，再做脱离源码目录的实际 `.app` 验收。
 
-### M3：真实状态、确认、重连与重启 — PARTIAL（正常任务、多 Session、断线重连与重启已由用户验收；真实错误终态未测）
+### M3：真实状态、确认、重连与重启 — PARTIAL（正常任务、多 Session、断线重连与重启已由用户验收；取消后下一轮与真实错误终态未测）
+
+剩余取消/下一轮、自然错误终态和边界核对见 [MVP 剩余行为验收](MVP-REMAINING-ACCEPTANCE.md)。
 
 验收同一目标上的 idle → working → completed-unread / error-unread → 点击确认；idle 是无工作/无未读时的宠物基线，不新增 idle 通知。工作中点击不消失，终态确认后旧事件不复活；名称更新、多轮与独立 Session 不互相覆盖。错误必须来自可证明的工作终态，不能把工具单次错误或连接断开伪造为 Agent 失败。
 

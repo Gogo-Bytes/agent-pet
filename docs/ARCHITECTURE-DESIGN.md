@@ -86,6 +86,8 @@ Every method validates arguments and returns typed results. It does not expose `
 
 Renderer owns presentation only: Three.js canvas, React/UI, validated GLB loading through a main-provided local asset handle, deterministic animation selection, bubble layout/content, drag gesture, independent visibility controls, loading/error states, and accessibility affordances. It subscribes to immutable snapshots and sends narrow commands through preload. Bubble clicks call one application command; they do not inspect session files or attempt OS activation. A single scene/container gives Pet and bubbles the same movement transform.
 
+The renderer follows the accepted Three.js scene + HTML controls decision in [ADR 0001](adr/0001-threejs-scene-html-controls.md): Three.js owns spatial presentation and animation, while HTML owns primary navigation and operations. Both read the same renderer-safe snapshot; no business state is duplicated between the canvas and DOM. Any 3D affordance has an HTML equivalent.
+
 Three.js is selected because GLB/glTF and animation tooling are mature and it can render the same browser-oriented runtime on macOS and Windows. React (or similarly lightweight UI composition) should remain a UI choice, not a domain dependency. Electron is selected over Tauri for a JavaScript/Three.js-first team, Chromium consistency, and straightforward stdio child-process integration; its larger footprint is accepted. Tauri remains a viable later shell replacement only if package boundaries stay intact, not a reason to add Rust now.
 
 ## 5. Adapter ports and session observation

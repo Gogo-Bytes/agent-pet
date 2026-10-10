@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 
 type Variant = 'a' | 'b' | 'c';
+type Scene = 'welcome' | 'waiting' | 'working' | 'completed' | 'disconnected';
 type Agent = { id: string; name: string; icon: string; color: string; state: string; stateCopy: string; connected: boolean };
 
 const agents: Agent[] = [
@@ -16,24 +17,34 @@ function currentVariant(): Variant {
   return value === 'b' || value === 'c' ? value : 'a';
 }
 
+function currentScene(): Scene {
+  const value = new URLSearchParams(location.search).get('scene');
+  return value === 'waiting' || value === 'working' || value === 'completed' || value === 'disconnected' ? value : 'welcome';
+}
+
+function goScene(scene: Scene) {
+  const url = new URL(location.href); url.searchParams.set('scene', scene); history.pushState({}, '', url); window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
 function goVariant(variant: Variant) {
   const url = new URL(location.href); url.searchParams.set('variant', variant); history.pushState({}, '', url); window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 function App() {
   const [variant, setVariant] = useState<Variant>(currentVariant);
+  const [scene, setScene] = useState<Scene>(currentScene);
   const [selected, setSelected] = useState('pi');
   const [connected, setConnected] = useState(true);
-  useEffect(() => { const onPop = () => setVariant(currentVariant()); addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop); }, []);
+  useEffect(() => { const onPop = () => { setVariant(currentVariant()); setScene(currentScene()); }; addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop); }, []);
   useEffect(() => { const onKey = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement) return; if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant); goVariant(order[(index + (event.key === 'ArrowRight' ? 1 : 2)) % 3]!); } }; addEventListener('keydown', onKey); return () => removeEventListener('keydown', onKey); }, [variant]);
   const selectedAgent = useMemo(() => agents.find(agent => agent.id === selected) ?? agents[0]!, [selected]);
   const connect = () => { setConnected(true); setSelected('pi'); };
   const props = { selected, setSelected, selectedAgent, connected, connect };
   return <div className="prototype-page">
-    {variant === 'a' && <VariantA {...props} />}
+    {variant === 'a' && <VariantA {...props} scene={scene} />}
     {variant === 'b' && <VariantB {...props} />}
     {variant === 'c' && <VariantC {...props} />}
-    <PrototypeSwitcher variant={variant} />
+    <PrototypeSwitcher variant={variant} scene={scene} />
   </div>;
 }
 
@@ -42,8 +53,17 @@ type ViewProps = { selected: string; setSelected: (id: string) => void; selected
 function Pet({ mood = 'happy' }: { mood?: 'happy' | 'working' | 'sleepy' }) { return <div className={`pet pet-${mood}`}><div className="pet-ears">⌃　⌃</div><div className="pet-face"><span>•</span><span>•</span><b>{mood === 'sleepy' ? '—' : mood === 'working' ? '◡' : 'ᴗ'}</b></div><div className="pet-body">✦</div></div>; }
 function AgentPills({ selected, setSelected }: Pick<ViewProps, 'selected' | 'setSelected'>) { return <div className="agent-pills">{agents.map(agent => <button className={selected === agent.id ? 'agent-pill selected' : 'agent-pill'} key={agent.id} onClick={() => setSelected(agent.id)}><span style={{ color: agent.color }}>{agent.icon}</span>{agent.name}</button>)}</div>; }
 
-function VariantA({ selected, setSelected, selectedAgent, connected, connect }: ViewProps) {
-  return <main className="shell variant-a"><header className="topbar"><div className="brand"><span className="brand-mark">✦</span><span>Agent Pet</span></div><span className="tiny-status"><i className="dot" /> {connected ? '陪伴中' : '等你选择'}</span></header><section className="hero-a"><div className="hero-copy"><p className="eyebrow">你的桌面小伙伴</p><h1>今天想让谁<br /><em>陪你一起玩？</em></h1><p className="subcopy">选一个 AI 伙伴，Agent Pet 会用自己的方式告诉你它正在做什么。</p><AgentPills selected={selected} setSelected={setSelected} /><button className="primary" onClick={connect}>{connected ? '让它继续陪着我' : '让它陪着我'} <span>→</span></button></div><div className="hero-pet"><div className="halo" /><Pet mood={connected ? 'working' : 'happy'} /><div className="bubble">{connected ? `${selectedAgent.name} 正在认真工作` : '等你挑一个伙伴'}</div></div></section><section className="mini-row"><div><strong>今天的心情</strong><span>有一点期待，也有一点可爱</span></div><div><strong>宠物状态</strong><span>{connected ? '正在陪伴你的工作' : '自由自在地等候中'}</span></div></section></main>;
+function VariantA({ selected, setSelected, scene }: ViewProps & { scene: Scene }) {
+  const copy: Record<Scene, { eyebrow: string; title: string; accent: string; body: string; bubble: string; status: string; action: string; mood: 'happy' | 'working' | 'sleepy' }> = {
+    welcome: { eyebrow: '你的桌面小伙伴', title: '今天想让谁', accent: '陪你一起玩？', body: '选一个 AI 伙伴。准备好之后，小宠物就能陪你度过每一次等待和完成。', bubble: '嗨，认识一下？', status: '还没有连接', action: '认识 pi', mood: 'happy' },
+    waiting: { eyebrow: 'pi 已准备好', title: '先歇一会儿', accent: '也很好。', body: '你正常打开 pi 后，宠物会在这里陪着你。不用一直盯着屏幕。', bubble: '我在这儿～', status: '等待 pi', action: '看看连接状态', mood: 'sleepy' },
+    working: { eyebrow: '正在陪伴 pi', title: '它在忙，', accent: '我陪你等。', body: 'pi 正在处理一件事。等它完成，我会轻轻提醒你。', bubble: 'pi 正在认真工作', status: '陪伴中', action: '看看现在的状态', mood: 'working' },
+    completed: { eyebrow: '有新消息啦', title: '好消息，', accent: '完成啦！', body: 'pi 刚刚完成了一件事。桌面的气泡会提醒你查看。', bubble: '有一件事完成了 ✨', status: '有新消息', action: '看看这件事', mood: 'happy' },
+    disconnected: { eyebrow: '稍等一下', title: 'pi 暂时', accent: '离开了。', body: '宠物还在这里。你重新打开 pi 后，就可以继续陪伴。', bubble: '我会在这儿等你', status: '暂时未连接', action: '看看怎么恢复', mood: 'sleepy' },
+  };
+  const current = copy[scene];
+  const unsupported = selected !== 'pi';
+  return <main className="shell variant-a"><header className="topbar"><div className="brand"><span className="brand-mark">✦</span><span>Agent Pet</span></div><span className="tiny-status"><i className={`dot ${scene === 'disconnected' || scene === 'welcome' ? 'dot-muted' : ''}`} /> {current.status}</span></header><section className="hero-a"><div className="hero-copy"><p className="eyebrow">{current.eyebrow}</p><h1>{current.title}<br /><em>{current.accent}</em></h1><p className="subcopy">{current.body}</p><div className="agent-pills">{agents.map(agent => <button className={selected === agent.id ? 'agent-pill selected' : 'agent-pill'} key={agent.id} onClick={() => setSelected(agent.id)} aria-pressed={selected === agent.id}><span style={{ color: agent.color }}>{agent.icon}</span>{agent.name}{!agent.connected && <small>即将支持</small>}</button>)}</div>{unsupported ? <p className="availability-note">{agents.find(agent => agent.id === selected)?.name} 还没有接入能力。目前可以先让宠物陪你使用 pi。</p> : <button className="primary" onClick={() => goScene(scene === 'welcome' ? 'waiting' : 'working')}>{current.action} <span>→</span></button>}</div><div className="hero-pet"><div className="halo" /><Pet mood={current.mood} /><div className="bubble">{unsupported ? '以后也想认识它！' : current.bubble}</div></div></section><section className="mini-row"><div><strong>宠物在这里</strong><span>没有 Agent 也可以一直陪着你</span></div><div><strong>当前伙伴</strong><span>{scene === 'welcome' ? '还没有连接' : 'pi · ' + current.status}</span></div></section></main>;
 }
 
 function VariantB({ selected, setSelected, selectedAgent, connected, connect }: ViewProps) {
@@ -54,6 +74,6 @@ function VariantC({ selected, setSelected, selectedAgent, connected, connect }: 
   return <main className="shell variant-c"><header className="topbar"><div className="brand"><span className="brand-mark">✦</span><span>Agent Pet</span></div><button className="icon-button">⚙</button></header><section className="control-center"><div className="mood-card"><div><p className="eyebrow">现在的 Agent Pet</p><h1>{connected ? '陪伴中，状态不错' : '正在等一个伙伴'}</h1><p className="subcopy">{connected ? `${selectedAgent.name} 正在安静地做自己的事。` : '选一个 AI，让今天变得更有趣。'}</p></div><Pet mood={connected ? 'happy' : 'sleepy'} /></div><div className="section-heading"><span>我的 AI 伙伴</span><button className="text-button">管理连接 →</button></div><div className="agent-grid">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'agent-tile selected' : 'agent-tile'} onClick={() => setSelected(agent.id)}><span className="tile-icon" style={{ color: agent.color }}>{agent.icon}</span><span className="tile-name">{agent.name}</span><span className={`tile-state ${selected === agent.id && connected ? 'online' : ''}`}>{selected === agent.id && connected ? '陪伴中' : agent.state}</span></button>)}</div><div className="activity-card"><div className="activity-icon">☀</div><div><strong>{connected ? '一切都好' : '还可以更热闹一点'}</strong><span>{connected ? '完成时我会轻轻提醒你。' : '挑一个 AI 伙伴，我就准备好了。'}</span></div><button className="primary small" onClick={connect}>{connected ? '查看状态' : '开始连接'}</button></div></section></main>;
 }
 
-function PrototypeSwitcher({ variant }: { variant: Variant }) { const names = { a: 'A · 宠物陪伴首页', b: 'B · 单步连接向导', c: 'C · 宠物控制中心' }; const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant); return <nav className="prototype-switcher" aria-label="原型方案切换"><button onClick={() => goVariant(order[(index + 2) % 3]!)}>←</button><span>{names[variant]}</span><button onClick={() => goVariant(order[(index + 1) % 3]!)}>→</button></nav>; }
+function PrototypeSwitcher({ variant, scene }: { variant: Variant; scene: Scene }) { const names = { a: 'A · 宠物陪伴首页', b: 'B · 单步连接向导', c: 'C · 宠物控制中心' }; const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant); return <nav className="prototype-switcher" aria-label="原型方案切换"><span className="demo-label">界面演示</span>{variant === 'a' && <select aria-label="演示状态" value={scene} onChange={event => goScene(event.target.value as Scene)}><option value="welcome">首次使用</option><option value="waiting">等待 pi</option><option value="working">工作中</option><option value="completed">已完成</option><option value="disconnected">连接中断</option></select>}<button onClick={() => goVariant(order[(index + 2) % 3]!)}>←</button><span>{names[variant]}</span><button onClick={() => goVariant(order[(index + 1) % 3]!)}>→</button></nav>; }
 
 createRoot(document.getElementById('root')!).render(<App />);

@@ -4,6 +4,7 @@ import './styles.css';
 
 type Variant = 'a' | 'b' | 'c';
 type Scene = 'welcome' | 'waiting' | 'working' | 'completed' | 'disconnected';
+type View = 'home' | 'pets' | 'connections' | 'settings';
 type Agent = { id: string; name: string; icon: string; color: string; state: string; stateCopy: string; connected: boolean };
 
 const agents: Agent[] = [
@@ -22,8 +23,17 @@ function currentScene(): Scene {
   return value === 'waiting' || value === 'working' || value === 'completed' || value === 'disconnected' ? value : 'welcome';
 }
 
+function currentView(): View {
+  const value = new URLSearchParams(location.search).get('view');
+  return value === 'pets' || value === 'connections' || value === 'settings' ? value : 'home';
+}
+
 function goScene(scene: Scene) {
   const url = new URL(location.href); url.searchParams.set('scene', scene); history.pushState({}, '', url); window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+function goView(view: View) {
+  const url = new URL(location.href); url.searchParams.set('view', view); history.pushState({}, '', url); window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 function goVariant(variant: Variant) {
@@ -33,15 +43,19 @@ function goVariant(variant: Variant) {
 function App() {
   const [variant, setVariant] = useState<Variant>(currentVariant);
   const [scene, setScene] = useState<Scene>(currentScene);
+  const [view, setView] = useState<View>(currentView);
   const [selected, setSelected] = useState('pi');
   const [connected, setConnected] = useState(true);
-  useEffect(() => { const onPop = () => { setVariant(currentVariant()); setScene(currentScene()); }; addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop); }, []);
+  useEffect(() => { const onPop = () => { setVariant(currentVariant()); setScene(currentScene()); setView(currentView()); }; addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop); }, []);
   useEffect(() => { const onKey = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement) return; if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant); goVariant(order[(index + (event.key === 'ArrowRight' ? 1 : 2)) % 3]!); } }; addEventListener('keydown', onKey); return () => removeEventListener('keydown', onKey); }, [variant]);
   const selectedAgent = useMemo(() => agents.find(agent => agent.id === selected) ?? agents[0]!, [selected]);
   const connect = () => { setConnected(true); setSelected('pi'); };
   const props = { selected, setSelected, selectedAgent, connected, connect };
   return <div className="prototype-page">
-    {variant === 'a' && <VariantA {...props} scene={scene} />}
+    {variant === 'a' && view === 'home' && <VariantA {...props} scene={scene} />}
+    {variant === 'a' && view === 'pets' && <PetsView {...props} />}
+    {variant === 'a' && view === 'connections' && <ConnectionsView {...props} />}
+    {variant === 'a' && view === 'settings' && <SettingsView {...props} />}
     {variant === 'b' && <VariantB {...props} />}
     {variant === 'c' && <VariantC {...props} />}
     <PrototypeSwitcher variant={variant} scene={scene} />
@@ -52,6 +66,18 @@ type ViewProps = { selected: string; setSelected: (id: string) => void; selected
 
 function Pet({ mood = 'happy' }: { mood?: 'happy' | 'working' | 'sleepy' }) { return <div className={`pet pet-${mood}`}><div className="pet-ears">⌃　⌃</div><div className="pet-face"><span>•</span><span>•</span><b>{mood === 'sleepy' ? '—' : mood === 'working' ? '◡' : 'ᴗ'}</b></div><div className="pet-body">✦</div></div>; }
 function AgentPills({ selected, setSelected }: Pick<ViewProps, 'selected' | 'setSelected'>) { return <div className="agent-pills">{agents.map(agent => <button className={selected === agent.id ? 'agent-pill selected' : 'agent-pill'} key={agent.id} onClick={() => setSelected(agent.id)}><span style={{ color: agent.color }}>{agent.icon}</span>{agent.name}</button>)}</div>; }
+
+function AppHeader({ view }: { view: View }) { return <header className="topbar"><button className="brand brand-button" onClick={() => goView('home')}><span className="brand-mark">✦</span><span>Agent Pet</span></button><nav className="app-nav" aria-label="功能导航">{([['home', '首页'], ['pets', '宠物'], ['connections', '连接'], ['settings', '设置']] as const).map(([id, label]) => <button key={id} className={view === id ? 'nav-link active' : 'nav-link'} onClick={() => goView(id)}>{label}</button>)}</nav></header>; }
+
+function FeatureHeader({ title, copy, view }: { title: string; copy: string; view: Exclude<View, 'home'> }) { return <><AppHeader view={view} /><div className="feature-heading"><p className="eyebrow">Agent Pet</p><h1>{title}</h1><p className="subcopy">{copy}</p></div></>; }
+
+function PetsView({ selected, setSelected }: ViewProps) { const [imported, setImported] = useState(false); return <main className="shell feature-shell"><FeatureHeader view="pets" title="让每个伙伴都有自己的样子" copy="选择一个宠物作为默认形象，也可以为不同的 AI 伙伴单独指定。" /><section className="pet-layout"><div className="asset-preview"><div className="halo small-halo" /><Pet /><span className="preview-label">{imported ? '刚刚导入的伙伴' : '当前默认宠物'}</span></div><div className="asset-panel"><div className="section-heading"><span>我的宠物</span><button className="text-button" onClick={() => setImported(true)}>＋ 导入宠物包</button></div><div className="asset-list"><button className="asset-card selected"><span className="asset-thumb">✦</span><span><strong>星星</strong><small>默认形象 · 可用于所有 Agent</small></span><span className="checkmark">✓</span></button>{imported && <button className="asset-card"><span className="asset-thumb peach">☼</span><span><strong>新伙伴</strong><small>刚刚导入 · 等待设置</small></span><span className="checkmark">○</span></button>}</div><div className="section-heading binding-heading"><span>按 Agent 选择</span><span className="muted-label">当前绑定</span></div>{agents.map(agent => <div className="binding-row" key={agent.id}><span className="status-icon" style={{ color: agent.color }}>{agent.icon}</span><strong>{agent.name}</strong><span className="binding-value">{selected === agent.id ? '星星' : '使用默认'}</span><button className="text-button" onClick={() => setSelected(agent.id)}>选择 →</button></div>)}<p className="quiet align-left">导入的宠物包需要包含 GLB 模型和描述信息，暂不读取远程资源。</p></div></section></main>; }
+
+function ConnectionsView({ selected, setSelected, connect }: ViewProps) { const [scanned, setScanned] = useState(false); return <main className="shell feature-shell"><FeatureHeader view="connections" title="找到你的 AI 伙伴" copy="我会先看看本机有哪些可以认识的 Agent。找不到时，也可以手动告诉我位置。" /><section className="connection-toolbar"><button className="primary" onClick={() => setScanned(true)}>{scanned ? '重新扫描' : '扫描我的 Agent'} <span>⌁</span></button><button className="secondary-button">手动选择位置</button><span className="scan-note">{scanned ? '刚刚看过 · 没有修改任何文件' : '只查看，不会修改你的 Agent'}</span></section><div className="connection-list">{agents.map(agent => <article className="connection-card" key={agent.id}><span className="connection-icon" style={{ background: agent.color }}>{agent.icon}</span><div className="connection-copy"><strong>{agent.name}</strong><span>{agent.id === 'pi' && scanned ? '已经找到，可以陪伴' : agent.id === 'pi' ? '已发现 · 尚未连接' : '即将支持'}</span></div><span className={`connection-state ${agent.id === 'pi' && scanned ? 'ready' : ''}`}>{agent.id === 'pi' && scanned ? '已连接' : agent.id === 'pi' ? '连接' : '稍后'}</span><button className="text-button" onClick={() => setSelected(agent.id)}>{selected === agent.id ? '已选中' : '查看 →'}</button></article>)}</div><p className="quiet align-left">连接成功后，首页会显示它的状态。你可以随时停用，不会控制 Agent 或读取对话内容。</p></main>; }
+
+function SettingsView({ connected }: ViewProps) { const [notifications, setNotifications] = useState(true); const [login, setLogin] = useState(false); return <main className="shell feature-shell"><FeatureHeader view="settings" title="让 Agent Pet 更像你的" copy="现在还没有很多设置。我们只放真正有用、不会让你困惑的选择。" /><section className="settings-list"><SettingRow title="完成时提醒我" copy="Agent 完成一件事时，让宠物轻轻提醒你。" checked={notifications} onChange={() => setNotifications(!notifications)} /><SettingRow title="登录时自动出现" copy="打开电脑后，Agent Pet 会自己回来。" checked={login} onChange={() => setLogin(!login)} /><div className="setting-note"><span>☀</span><div><strong>更多设置会慢慢长出来</strong><p>宠物位置、气泡行为和隐私选项会在真正需要时出现。</p></div></div><div className="privacy-note"><strong>关于陪伴</strong><span>Agent Pet 只观察 Agent 的状态，不读取对话正文，也不替你操作 Agent。</span></div></section></main>; }
+
+function SettingRow({ title, copy, checked, onChange }: { title: string; copy: string; checked: boolean; onChange: () => void }) { return <button className="setting-row" onClick={onChange}><span><strong>{title}</strong><small>{copy}</small></span><span className={checked ? 'toggle on' : 'toggle'}><i /></span></button>; }
 
 function VariantA({ selected, setSelected, scene }: ViewProps & { scene: Scene }) {
   const copy: Record<Scene, { eyebrow: string; title: string; accent: string; body: string; bubble: string; status: string; action: string; mood: 'happy' | 'working' | 'sleepy' }> = {

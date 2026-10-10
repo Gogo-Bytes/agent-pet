@@ -115,21 +115,21 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 
 原 [人工验收清单](MVP-MANUAL-CHECKLIST.md) 的 checked 结果完全不变。[新增重启清单](MVP-RESTART-CHECKLIST.md) 的 R1–R10 已完成人工或隔离故障验收；本增量通过该范围验收，但不外推为整个 MVP/生产安全通过。本增量未安装依赖或打包 `.app`；credential-bearing 测试目录、两份历史 d3 fixture 和失败打包复制品未读取或清理。独立审查 READY；审查指出的旧 env 接入“接收已停止”显示回归已修正，新增启动成功/失败、hello 与 peer 断开时接收状态测试。Main 最终全量复验 **579 passed / 1 skipped / 58 files**，类型检查与 desktop 构建通过（`/tmp/agent-pet-restart-main-{tests,types,build}.log`）。当前下一步为回到 M5 打包：先确定可校验的本地打包路径，再做脱离源码目录的实际 `.app` 验收。
 
-### M3：真实状态、确认、重连与重启 — PARTIAL（两轮正常任务、确认、pi 重启不回放已验）
+### M3：真实状态、确认、重连与重启 — PARTIAL（正常任务、多 Session、断线重连与重启已由用户验收；真实错误终态未测）
 
 验收同一目标上的 idle → working → completed-unread / error-unread → 点击确认；idle 是无工作/无未读时的宠物基线，不新增 idle 通知。工作中点击不消失，终态确认后旧事件不复活；名称更新、多轮与独立 Session 不互相覆盖。错误必须来自可证明的工作终态，不能把工具单次错误或连接断开伪造为 Agent 失败。
 
 覆盖桌面重启、pi 正常重启/用户安全 `/reload`、连接中断再恢复；只发布当前 working/idle，不回放离线完成/错误；未读无需跨应用重启恢复。取消/retry 的实际观察与未覆盖路径分别记录。Open Session 可诚实返回 unsupported，确认行为仍完成。不由测试者替用户发起 Agent 控制。
 
-验收证据须区分真实 TUI 与合成回归；缺少真实失败/重启等场景则该项未通过，不能以既有用户反馈替代整段。
+验收证据须区分真实 TUI 与合成回归。用户继续使用源码外 `.app` 与隔离 pi 目标，报告 A（空闲时正常退出 pi → 桌面断开但无伪造错误 → 同目标重启重新连接且无旧完成回放）、B（宠物隐藏/显示、管理窗口关闭/菜单重开、应用退出/重开后显式恢复）及 C（两个独立 Session 的气泡和确认互不覆盖）均正常；此轮只收到用户结论，未另附截图或日志。不把该结论升级为真实错误终态、取消/retry 或故障注入矩阵通过。
 
-### M4：日常生命周期、失败提示、停用与选择性卸载 — PARTIAL（独立目标的停用和选择性撤回已验）
+### M4：日常生命周期、失败提示、停用与选择性卸载 — PARTIAL（隔离目标停用/撤回、断线及窗口生命周期已验，其他失败场景未测）
 
 复用 P1 的关闭隐藏、Dock/菜单入口、单实例和退出等待；验证重新打开、全隐藏找回、退出释放连接。修复阻碍日用的菜单入口问题，未采用的可选登录自启保持默认关闭，不暗中登记登录项。
 
 验收：宠物在 pi 不在线/配置冲突/连接失败时仍可用，界面给出可理解的连接状态而不是伪造业务错误；扩展断线退避、不阻塞或保活 pi。用户可停用接收并选择性移除仍匹配身份与内容的自有扩展/配置，保留用户修改和未知残留；重启后停用不自动复活。清理或持久化失败如实报告，不谎称完全卸载。直接拖删 `.app` 不承诺自动清理，给出卸载前入口与残留说明。不实现自动 recovery/reset/revoke-all，不用删除未知 owner/lock 修复故障。
 
-### M5：脱离源码目录可运行的本地应用包 — IMPLEMENTED-NOT-ACCEPTED
+### M5：脱离源码目录可运行的本地应用包 — VERIFIED（本机未签名 arm64 范围）
 
 已取得明确授权并安装 `electron-builder@26.15.3`（根开发依赖及 lockfile）。新增 `apps/desktop/electron-builder.config.mjs` 与 `scripts/package-desktop.mjs`：复用现有 `electron-vite` 输出，固定 `com.agentpet.desktop` / `Agent Pet` 元数据和 macOS `arm64` 目录目标；输出脚本拒绝非空目录，默认创建源码树外的 `/tmp/agent-pet-m5-*` 目录。仅携带 Electron runtime、bundled Main/preload/renderer 和 `starter.glb`，通过 ASAR 排除 `src`、`node_modules`、workspace 与 pi/managed Worker/native 资源；未设置签名凭据或自动签名。
 
@@ -148,4 +148,4 @@ M5 packaging checklist（用户人工验收结果）：
 - [连接](DESKTOP-P2B-LOCAL-CONNECTION.md)、[文件系统/D6](DESKTOP-P2B2-FILESYSTEM-POLICY.md)、[生命周期](DESKTOP-P2B2-LIFECYCLE-DESIGN.md)：现有机制不变量及旧严格准入；延期的验证保持未关闭。
 - [安装契约](P0-MANAGED-INSTALLATION.md)、[本机安全研究](P0-LOCAL-SECURITY-DECISION.md)、[发布研究](P0-SECURITY-RELEASE-RESEARCH.md)：按 M1 路线取用已有正确性/所有权要求，不把未来全部生产承诺重新塞进 MVP。
 
-M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连、撤回、管理页视觉检查与干净重启持久化均已验；仍不包含独立 `.app`、正式发布或生产安全）；M3 为 PARTIAL（两轮真实任务 working→完成未读→确认、Open Session 不支持提示、同桌面进程内 pi 重启不回放已验；可选错误终态与完整多 Session/异常重连矩阵未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 VERIFIED（本机源码外 arm64 `.app` 的启动、隔离 pi 连接、任务状态、确认、停用与撤回已由用户人工验收；未签名本地包限制仍保留）。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。
+M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（隔离目标预览、部署、连接、撤回和干净重启持久化已验；正式发布/生产安全未验）；M3 为 PARTIAL（正常任务、确认、多 Session、pi 断线重连和应用重启后显式恢复已由用户报告正常；真实错误终态、取消/retry 未验）；M4 为 PARTIAL（隔离目标停用/撤回、P1–P3 文件保护及窗口生命周期已验，其他失败场景未验）；M5 为 VERIFIED（本机源码外 arm64 `.app` 的启动、隔离 pi 连接、任务状态、确认、停用与撤回已由用户人工验收；未签名本地包限制仍保留）。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。

@@ -46,6 +46,18 @@ The product-facing identity of an Agent integration. A Provider supplies discove
 
 The user-facing interpretation of Agent and Session facts expressed through the Pet's mood, animation, bubble and short copy. Companion state is not a replacement for the underlying Session status or connection health.
 
+### Pet asset package
+
+A local, validated directory containing a Pet asset model and its descriptive metadata. The package is a user-import boundary; an arbitrary GLB file is not automatically a supported Pet asset.
+
+### Configured Agent
+
+An Agent provider instance that the user has discovered, authorized and connected. It can have multiple Sessions and can be assigned a specific Pet asset.
+
+### Agent-Pet binding
+
+The user choice that assigns a Pet asset to one Configured Agent. A binding overrides the global default Pet for that Agent; missing bindings fall back to the global default.
+
 ## Confirmed product relationships
 
 ```text

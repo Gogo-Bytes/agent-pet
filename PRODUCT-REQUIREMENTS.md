@@ -1,10 +1,14 @@
-# Agent Pet 产品需求（当前本地 MVP）
+# Agent Pet 产品需求（多 Agent 产品方向 / 当前本地 MVP）
 
 当前执行顺序、实现状态与验收以 [MVP 执行计划](docs/MVP-EXECUTION-PLAN.md) 为准；本文定义产品行为，不把历史生产门槛或已规划能力当作交付事实。
 
+产品定位、低门槛原则、娱乐化方向和 Web 原型路线以 [产品方向与统一路线](docs/PRODUCT-DIRECTION.md) 为准。本文中的“当前 MVP”是第一个可验证的 pi 本地实现切片，不是最终产品只支持 pi 的承诺。
+
 ## 1. 产品目标
 
-先在单用户本机 macOS 上交付可独立运行的桌宠应用，观察用户已经安装并明确配置的 pi Session，通过跟随一个可拖拽 3D 宠物的多个气泡表达重要状态。Windows、Codex、Claude Code 留待后续，不作为当前 MVP 验收项。
+先在单用户本机 macOS 上交付可独立运行的桌宠应用，观察用户已经安装并明确配置的 Agent Session，通过跟随一个可拖拽 3D 宠物的多个气泡表达重要状态。当前先用 pi 完成纵向验证；Windows、Codex、Claude Code 和其他 Provider 留待后续，不作为当前 MVP 验收项。
+
+最终产品必须让非专业用户以接近“选择 AI 伙伴并允许陪伴”的方式完成接入，不要求用户理解 Agent 专用目录、协议、凭据、权限位或终端操作。技术细节放入次级诊断信息。
 
 MVP 是只读观察产品，不控制 Agent；观测扩展的部署仍需针对具体目标的写入预览和明确授权。
 
@@ -49,9 +53,11 @@ error-unread -> acknowledged -> hidden
 
 支持已安装并已配置 Adapter 的 Agent Session，不承诺自动发现机器上所有任意 Agent 进程。
 
-- 当前仅 pi：复用现有只读 Adapter/扩展；真实目标部署、连接及完整端到端仍待验收，不能把开发 bridge 或休眠 managed 核心当已交付产品接入。
+- 当前先支持 pi：复用现有只读 Adapter/扩展；真实目标部署、连接及完整端到端仍待验收，不能把开发 bridge 或休眠 managed 核心当已交付产品接入。产品界面和 Provider 契约不得因此固化为 pi 专用流程。
 - pi 的 Open Session 当前为 `unsupported`，不以新建终端或启动 pi 冒充打开原窗口。
 - Codex、Claude Code 的候选 Adapter 与兼容性属于后续工作。
+
+默认接入流程应优先自动发现和推荐，只有发现失败或存在歧义时才要求用户选择位置；不得把专业配置步骤作为常规入口。
 
 统一接口必须允许：
 

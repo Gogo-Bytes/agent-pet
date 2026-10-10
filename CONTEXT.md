@@ -2,14 +2,14 @@
 
 ## Product purpose
 
-Agent Pet is a desktop companion that observes explicitly configured local pi sessions for one macOS user and visualizes selected session states through one 3D pet and its session bubbles. The current MVP is read-only toward the Agent; authorized observation setup is distinct from Agent control.
+Agent Pet is an entertaining desktop companion for using multiple AI Agents. It visualizes selected Agent session states through one 3D pet and its session bubbles, with a low-friction, non-technical user experience. pi is the first local macOS adapter, not the product boundary. The current MVP is read-only toward the Agent; authorized observation setup is distinct from Agent control.
 
 Current scope and acceptance: [MVP execution plan](docs/MVP-EXECUTION-PLAN.md).
 
 ## Canonical terms
 
 ### Agent
-A coding tool or runtime that produces observable session activity. The current MVP targets pi only; Codex and Claude Code are future scope.
+A coding tool or runtime that produces observable session activity. The product is intended to support multiple Agents; pi is the first supported adapter and other providers are future scope until their own compatibility evidence exists.
 
 ### Adapter
 The integration boundary for one Agent. An Adapter converts that Agent's native observation surface into the product's Session facts and optionally provides a way to open the originating Agent window.
@@ -37,6 +37,14 @@ The user-visible action of bringing the originating Agent window or session to t
 
 ### Configured Agent Session
 A Session that the user has enabled through a supported Adapter and for which the product has a valid observation connection. The product does not promise discovery of every arbitrary process on the machine.
+
+### Provider
+
+The product-facing identity of an Agent integration. A Provider supplies discovery, connection, Session observation and optional Open Session capability through an Adapter, while keeping Agent-specific technical details out of the default user flow.
+
+### Companion state
+
+The user-facing interpretation of Agent and Session facts expressed through the Pet's mood, animation, bubble and short copy. Companion state is not a replacement for the underlying Session status or connection health.
 
 ## Confirmed product relationships
 

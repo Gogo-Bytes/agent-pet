@@ -6,7 +6,8 @@
     "test": "vitest run",
     "test:d61": "node packages/adapter-pi/src/managed/d6/run.mjs",
     "typecheck": "tsc --noEmit",
-    "package:mac": "node scripts/package-desktop.mjs"
+    "package:mac": "node scripts/package-desktop.mjs",
+    "prototype": "vite --config apps/desktop/vite.prototype.config.ts --host 127.0.0.1"
   },
   "devDependencies": {
     "@react-three/test-renderer": "9.1.0",

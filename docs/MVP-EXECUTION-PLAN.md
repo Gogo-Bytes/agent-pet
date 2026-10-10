@@ -135,12 +135,12 @@ M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入�
 
 2026-10-08 的失败复制品 `dist/agent-pet-local-n86P5a`、`dist/agent-pet-local-1P3yhK` 和两份历史 `.d3` fixture 目录保持原样，未清理。2026-10-09（本次）在 Apple Silicon `arm64` 上构建独立产物 `/tmp/agent-pet-m5-package-20260301-final/mac-arm64/Agent Pet.app`；`app.asar` 检查确认 Main/preload/renderer HTML、bundled JS 与 `starter.glb` 存在且无源码/workspace/node_modules 路径。直接启动时使用全新 `/tmp` profile/HOME，并解除 `AGENT_PET_PI_ENDPOINT`、`AGENT_PET_PI_TOKEN`、`ELECTRON_RENDERER_URL` 与 `NODE_OPTIONS`；进程保持运行至 10 秒有界 smoke 停止，未访问日常 HOME、pi 配置或真实 acceptance 目录。`codesign --verify --deep --strict` 如实失败（无签名资源/Developer ID），因此不构成 Gatekeeper、签名、公证或分发验收。
 
-验收：产物自带 Electron runtime，可从源码树外启动，无需 Node/pnpm/开发服务器；外部 pi 不被捆绑或自动安装。M5 仍为 **IMPLEMENTED-NOT-ACCEPTED**：尚缺用户从 Finder/移动后的人工视觉验收、真实连接/状态/停用链路复验；不以 bounded process smoke 冒充这些结果。正式签名、公证、跨机器分发和自动更新继续单列后续工作。
+验收：产物自带 Electron runtime，可从源码树外启动，无需 Node/pnpm/开发服务器；外部 pi 不被捆绑或自动安装。M5 已完成本机人工验收范围：用户从源码树外打开桌面 `.app`，隔离 pi 部署/连接、任务状态、停用与撤回流程均报告正常。产物仍为未签名本地 arm64 包，不代表 Gatekeeper、正式签名、公证、跨机器分发或自动更新通过；这些继续单列后续工作。
 
-M5 packaging checklist（待用户手工完成）：
-- [ ] 从 `/tmp/agent-pet-m5-package-20260301-final/mac-arm64/Agent Pet.app` 或复制后的新路径通过 Finder 打开，记录 Gatekeeper/隔离属性结果。
-- [ ] 在不使用日常 HOME/pi 配置的明确授权隔离目标中，人工检查管理页、宠物/气泡视觉与退出/重开。
-- [ ] 仅在另行授权的隔离 pi 目标上复验部署、连接、状态、确认、停用/撤回；不得把启动 smoke 记录为真实业务连接。
+M5 packaging checklist（用户人工验收结果）：
+- [x] 从源码树外的 `/Users/gan/Desktop/🥷/Agent Pet M5.app` 打开；界面正常，可重新打开，无启动错误。未签名限制保留。
+- [x] 使用项目内可见隔离目录 `m5-acceptance/`，人工检查管理页、宠物、连接与任务状态；实验结果正常。
+- [x] 在隔离 pi 目标上复验部署、连接、状态、确认、停用/撤回；用户报告实验结果正常。真实凭据仅以用户授权的 `auth.json` 副本供隔离目标使用，未读取或输出内容。
 
 ## 历史材料与后续生产化
 
@@ -148,4 +148,4 @@ M5 packaging checklist（待用户手工完成）：
 - [连接](DESKTOP-P2B-LOCAL-CONNECTION.md)、[文件系统/D6](DESKTOP-P2B2-FILESYSTEM-POLICY.md)、[生命周期](DESKTOP-P2B2-LIFECYCLE-DESIGN.md)：现有机制不变量及旧严格准入；延期的验证保持未关闭。
 - [安装契约](P0-MANAGED-INSTALLATION.md)、[本机安全研究](P0-LOCAL-SECURITY-DECISION.md)、[发布研究](P0-SECURITY-RELEASE-RESEARCH.md)：按 M1 路线取用已有正确性/所有权要求，不把未来全部生产承诺重新塞进 MVP。
 
-M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连、撤回、管理页视觉检查与干净重启持久化均已验；仍不包含独立 `.app`、正式发布或生产安全）；M3 为 PARTIAL（两轮真实任务 working→完成未读→确认、Open Session 不支持提示、同桌面进程内 pi 重启不回放已验；可选错误终态与完整多 Session/异常重连矩阵未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 IMPLEMENTED-NOT-ACCEPTED（已生成源码外 arm64 `.app` 并完成资源检查与进程 smoke；Finder/移动/视觉、真实 pi 连接与停用仍待人工验收，未签名限制已记录）。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。
+M1 已选定 legacy 并验证临时合成切片；M2 为 PARTIAL（独立测试目标的预览、部署、真实连接、重连、撤回、管理页视觉检查与干净重启持久化均已验；仍不包含独立 `.app`、正式发布或生产安全）；M3 为 PARTIAL（两轮真实任务 working→完成未读→确认、Open Session 不支持提示、同桌面进程内 pi 重启不回放已验；可选错误终态与完整多 Session/异常重连矩阵未验）；M4 为 PARTIAL（独立测试目标停用与选择性撤回、P1–P3 文件保护已验，日常生命周期和失败场景未验）；M5 为 VERIFIED（本机源码外 arm64 `.app` 的启动、隔离 pi 连接、任务状态、确认、停用与撤回已由用户人工验收；未签名本地包限制仍保留）。原连接测试目标与 P3 的扩展已选择性移除；P2 中被测试修改的扩展按保护规则保留，pi 生成的配置与登录凭据保留。后续只在对应检查点取得证据后更新状态；技能是复用流程而不是项目进度表，当前优先级留在本文件和 AGENTS，不复制进通用 skill。

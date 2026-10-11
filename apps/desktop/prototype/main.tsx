@@ -46,11 +46,12 @@ function App() {
   const [view, setView] = useState<View>(currentView);
   const [selected, setSelected] = useState('pi');
   const [connected, setConnected] = useState(true);
+  const [petBindings, setPetBindings] = useState<Record<string, string>>({ pi: '星星', codex: '云朵', claude: '小橘' });
   useEffect(() => { const onPop = () => { setVariant(currentVariant()); setScene(currentScene()); setView(currentView()); }; addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop); }, []);
   useEffect(() => { const onKey = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement) return; if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant); goVariant(order[(index + (event.key === 'ArrowRight' ? 1 : 2)) % 3]!); } }; addEventListener('keydown', onKey); return () => removeEventListener('keydown', onKey); }, [variant]);
   const selectedAgent = useMemo(() => agents.find(agent => agent.id === selected) ?? agents[0]!, [selected]);
   const connect = () => { setConnected(true); setSelected('pi'); };
-  const props = { selected, setSelected, selectedAgent, connected, connect };
+  const props = { selected, setSelected, selectedAgent, connected, connect, petBindings, setPetBindings };
   return <div className="prototype-page">
     {variant === 'a' && view === 'home' && <VariantA {...props} scene={scene} />}
     {variant === 'a' && view === 'pets' && <PetsView {...props} />}
@@ -62,7 +63,7 @@ function App() {
   </div>;
 }
 
-type ViewProps = { selected: string; setSelected: (id: string) => void; selectedAgent: Agent; connected: boolean; connect: () => void };
+type ViewProps = { selected: string; setSelected: (id: string) => void; selectedAgent: Agent; connected: boolean; connect: () => void; petBindings: Record<string, string>; setPetBindings: (bindings: Record<string, string>) => void };
 
 function Pet({ mood = 'happy', tone = 'violet' }: { mood?: 'happy' | 'working' | 'sleepy'; tone?: 'violet' | 'mint' | 'peach' }) { return <div className={`pet pet-${mood} pet-tone-${tone}`}><div className="pet-ears">⌃　⌃</div><div className="pet-face"><span>•</span><span>•</span><b>{mood === 'sleepy' ? '—' : mood === 'working' ? '◡' : 'ᴗ'}</b></div><div className="pet-body">✦</div></div>; }
 function AgentPills({ selected, setSelected }: Pick<ViewProps, 'selected' | 'setSelected'>) { return <div className="agent-pills">{agents.map(agent => <button className={selected === agent.id ? 'agent-pill selected' : 'agent-pill'} key={agent.id} onClick={() => setSelected(agent.id)}><span style={{ color: agent.color }}>{agent.icon}</span>{agent.name}</button>)}</div>; }
@@ -71,9 +72,10 @@ function AppHeader({ view }: { view: View }) { return <header className="topbar"
 
 function FeatureHeader({ title, copy, view }: { title: string; copy: string; view: Exclude<View, 'home'> }) { return <><AppHeader view={view} /><div className="feature-heading"><p className="eyebrow">Agent Pet</p><h1>{title}</h1><p className="subcopy">{copy}</p></div></>; }
 
-function PetsView({ selected, setSelected }: ViewProps) {
+function PetsView({ selected, setSelected, petBindings, setPetBindings }: ViewProps) {
   const [asset, setAsset] = useState('星星');
-  return <main className="game-shell feature-game"><AppHeader view="pets" /><section className="game-feature-room wardrobe"><div className="feature-kicker">宠物衣柜</div><div className="wardrobe-stage"><div className="wardrobe-glow" /><Pet /><strong>{asset}</strong><small>当前形象</small></div><div className="wardrobe-panel"><div className="panel-title">我的宠物 <span>1 / 1</span></div><button className="wardrobe-item selected" onClick={() => setAsset('星星')}><span className="wardrobe-icon">✦</span><span>星星</span><b>使用中</b></button><button className="wardrobe-import" onClick={() => alert('Web 原型暂不导入文件；正式版将校验 GLB + JSON 宠物包。')}>＋ 导入宠物包</button><div className="panel-title binding-title">给谁使用？</div><div className="binding-chips">{agents.filter(agent => agent.connected).map(agent => <button key={agent.id} className={selected === agent.id ? 'binding-chip active' : 'binding-chip'} onClick={() => setSelected(agent.id)}>{agent.icon} {agent.name} · {asset}</button>)}</div></div></section><GameDock /></main>;
+  const petOptions = [{ name: '星星', icon: '✦' }, { name: '云朵', icon: '☁' }, { name: '小橘', icon: '●' }];
+  return <main className="game-shell feature-game"><AppHeader view="pets" /><section className="game-feature-room wardrobe"><div className="feature-kicker">宠物衣柜</div><div className="wardrobe-stage"><div className="wardrobe-glow" /><Pet /><strong>{asset}</strong><small>当前形象</small></div><div className="wardrobe-panel"><div className="panel-title">我的宠物 <span>3 / 3</span></div>{petOptions.map(option => <button key={option.name} className={asset === option.name ? 'wardrobe-item selected' : 'wardrobe-item'} onClick={() => setAsset(option.name)}><span className="wardrobe-icon">{option.icon}</span><span>{option.name}</span>{asset === option.name && <b>预览中</b>}</button>)}<button className="wardrobe-import" onClick={() => alert('Web 原型暂不导入文件；正式版将校验 GLB + JSON 宠物包。')}>＋ 导入宠物包</button><div className="panel-title binding-title">给谁使用？</div><div className="binding-chips">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'binding-chip active' : 'binding-chip'} onClick={() => { setSelected(agent.id); setPetBindings({ ...petBindings, [agent.id]: asset }); }}>{agent.icon} {agent.name} · {petBindings[agent.id]}</button>)}</div></div></section><GameDock /></main>;
 }
 
 function ConnectionsView({ selected, setSelected }: ViewProps) {
@@ -91,8 +93,8 @@ function GameDock() { return <footer className="game-dock"><button onClick={() =
 
 function SettingRow({ title, copy, checked, onChange }: { title: string; copy: string; checked: boolean; onChange: () => void }) { return <button className="setting-row" onClick={onChange}><span><strong>{title}</strong><small>{copy}</small></span><span className={checked ? 'toggle on' : 'toggle'}><i /></span></button>; }
 
-function VariantA({ selected, setSelected, selectedAgent, scene }: ViewProps & { scene: Scene }) {
-  const petBinding = { pi: '星星', codex: '云朵', claude: '小橘' }[selectedAgent.id] ?? '星星';
+function VariantA({ selected, setSelected, selectedAgent, petBindings, scene }: ViewProps & { scene: Scene }) {
+  const petBinding = petBindings[selectedAgent.id] ?? '星星';
   const petTone = selectedAgent.id === 'codex' ? 'mint' : selectedAgent.id === 'claude' ? 'peach' : 'violet';
   const status: Record<Scene, { label: string; hint: string; mood: 'happy' | 'working' | 'sleepy'; action: string }> = {
     welcome: { label: '等待连接', hint: '还没有 Agent', mood: 'happy', action: '连接 pi' },

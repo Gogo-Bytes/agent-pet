@@ -13,11 +13,13 @@
 .pet-stage{position:relative;display:flex;align-items:center;justify-content:center;flex:1;min-height:540px;background:radial-gradient(circle at 50% 47%,#fff 0,#f3f0ff 44%,#eeecf8 100%)}
 .pet-stage-character{position:relative;display:grid;place-items:center;width:390px;height:405px}
 .pet-stage-orb{position:absolute;width:310px;height:310px;border-radius:50%;background:linear-gradient(145deg,#e7defd,#d5c9fb);box-shadow:inset 0 0 0 1px #ffffff99}
+.pet-stage-orb.tone-mint{background:linear-gradient(145deg,#d9f3eb,#bfe8dc)}.pet-stage-orb.tone-peach{background:linear-gradient(145deg,#ffe5d7,#f7c4ac)}
 .pet-stage-character .pet{transform:scale(1.12)}
 .pet-stage-shadow{position:absolute;z-index:1;bottom:30px;width:125px;height:20px;border-radius:50%;background:#82749a44;filter:blur(8px)}
 .pet-state-card{position:absolute;top:28px;left:28px;display:flex;align-items:center;gap:12px;min-width:165px;padding:12px 15px;border:1px solid #e9e4f1;border-radius:14px;background:#ffffffd9;box-shadow:0 5px 20px #66558d14}
 .pet-state-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#f5de91;color:#866427;font-size:20px}
 .pet-state-card div{display:flex;flex-direction:column;gap:2px}.pet-state-card strong{font-size:14px}.pet-state-card small{color:#8c8498;font-size:11px}
+.pet-tone-mint .pet-face{background:#83d5be}.pet-tone-mint .pet-body{background:#a4e3d1}.pet-tone-mint .pet-ears{color:#42a98f}.pet-tone-peach .pet-face{background:#f5a37f}.pet-tone-peach .pet-body{background:#ffc29c}.pet-tone-peach .pet-ears{color:#e6815e}
 .agent-status-strip{position:absolute;z-index:3;right:28px;bottom:28px;display:flex;gap:7px}
 .agent-status-chip{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:76px;padding:8px 9px;border:1px solid #e9e4f1;border-radius:13px;background:#ffffffd9;color:#5a526a;box-shadow:0 4px 12px #66558d13}
 .agent-status-chip.selected{border-color:#8c7aff;box-shadow:0 4px 12px #8c7aff22}.agent-status-chip span:first-child{font-size:21px}.agent-status-chip span:nth-child(2){font-size:11px;font-weight:700}.agent-status-chip small{color:#91899e;font-size:9px}.agent-status-chip.is-offline{opacity:.62}.agent-status-chip.is-offline.selected{opacity:1}.agent-status-chip.agent-add{border-style:dashed}

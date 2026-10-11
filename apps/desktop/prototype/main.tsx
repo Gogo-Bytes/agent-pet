@@ -64,7 +64,7 @@ function App() {
 
 type ViewProps = { selected: string; setSelected: (id: string) => void; selectedAgent: Agent; connected: boolean; connect: () => void };
 
-function Pet({ mood = 'happy' }: { mood?: 'happy' | 'working' | 'sleepy' }) { return <div className={`pet pet-${mood}`}><div className="pet-ears">⌃　⌃</div><div className="pet-face"><span>•</span><span>•</span><b>{mood === 'sleepy' ? '—' : mood === 'working' ? '◡' : 'ᴗ'}</b></div><div className="pet-body">✦</div></div>; }
+function Pet({ mood = 'happy', tone = 'violet' }: { mood?: 'happy' | 'working' | 'sleepy'; tone?: 'violet' | 'mint' | 'peach' }) { return <div className={`pet pet-${mood} pet-tone-${tone}`}><div className="pet-ears">⌃　⌃</div><div className="pet-face"><span>•</span><span>•</span><b>{mood === 'sleepy' ? '—' : mood === 'working' ? '◡' : 'ᴗ'}</b></div><div className="pet-body">✦</div></div>; }
 function AgentPills({ selected, setSelected }: Pick<ViewProps, 'selected' | 'setSelected'>) { return <div className="agent-pills">{agents.map(agent => <button className={selected === agent.id ? 'agent-pill selected' : 'agent-pill'} key={agent.id} onClick={() => setSelected(agent.id)}><span style={{ color: agent.color }}>{agent.icon}</span>{agent.name}</button>)}</div>; }
 
 function AppHeader({ view }: { view: View }) { return <header className="topbar"><button className="brand brand-button" onClick={() => goView('home')}><span className="brand-mark">✦</span><span>Agent Pet</span></button><nav className="app-nav" aria-label="功能导航">{([['home', '首页'], ['pets', '宠物'], ['connections', '连接'], ['settings', '设置']] as const).map(([id, label]) => <button key={id} className={view === id ? 'nav-link active' : 'nav-link'} onClick={() => goView(id)}>{label}</button>)}</nav></header>; }
@@ -92,6 +92,8 @@ function GameDock() { return <footer className="game-dock"><button onClick={() =
 function SettingRow({ title, copy, checked, onChange }: { title: string; copy: string; checked: boolean; onChange: () => void }) { return <button className="setting-row" onClick={onChange}><span><strong>{title}</strong><small>{copy}</small></span><span className={checked ? 'toggle on' : 'toggle'}><i /></span></button>; }
 
 function VariantA({ selected, setSelected, selectedAgent, scene }: ViewProps & { scene: Scene }) {
+  const petBinding = { pi: '星星', codex: '云朵', claude: '小橘' }[selectedAgent.id] ?? '星星';
+  const petTone = selectedAgent.id === 'codex' ? 'mint' : selectedAgent.id === 'claude' ? 'peach' : 'violet';
   const status: Record<Scene, { label: string; hint: string; mood: 'happy' | 'working' | 'sleepy'; action: string }> = {
     welcome: { label: '等待连接', hint: '还没有 Agent', mood: 'happy', action: '连接 pi' },
     waiting: { label: '待命中', hint: 'pi 尚未开始工作', mood: 'sleepy', action: '查看连接' },
@@ -105,8 +107,8 @@ function VariantA({ selected, setSelected, selectedAgent, scene }: ViewProps & {
   return <main className="game-shell">
     <header className="game-topbar"><div className="game-logo"><span>✦</span> Agent Pet</div><div className="game-status"><i className={scene === 'working' ? 'pulse' : ''} />{current.label}</div></header>
     <section className="pet-stage" aria-label="宠物展示台">
-      <div className="pet-stage-character"><div className="pet-stage-orb" /><Pet mood={current.mood} /><div className="pet-stage-shadow" /></div>
-      <div className="pet-state-card"><span className="pet-state-icon">{selectedAgent.connected && scene === 'completed' ? '✦' : selectedAgent.connected && scene === 'working' ? '⌁' : '☼'}</span><div><strong>{selectedAgent.name} · {current.label}</strong><small>{current.hint}</small></div></div>
+      <div className="pet-stage-character"><div className={`pet-stage-orb tone-${petTone}`} /><Pet mood={current.mood} tone={petTone} /><div className="pet-stage-shadow" /></div>
+      <div className="pet-state-card"><span className="pet-state-icon">{selectedAgent.connected && scene === 'completed' ? '✦' : selectedAgent.connected && scene === 'working' ? '⌁' : '☼'}</span><div><strong>{selectedAgent.name} · {current.label}</strong><small>{petBinding} · {current.hint}</small></div></div>
       <div className="agent-status-strip" aria-label="Agent 状态">
         {agents.map(agent => <button key={agent.id} className={`${selected === agent.id ? 'agent-status-chip selected' : 'agent-status-chip'}${agent.connected ? '' : ' is-offline'}`} onClick={() => setSelected(agent.id)} aria-pressed={selected === agent.id}><span style={{ color: agent.color }}>{agent.icon}</span><span>{agent.name}</span><small>{agent.connected ? (agent.id === selectedAgent.id ? current.label : agent.state) : '未连接'}</small></button>)}<button className="agent-status-chip agent-add" onClick={() => goView('connections')}><span>＋</span><span>添加</span></button>
       </div>

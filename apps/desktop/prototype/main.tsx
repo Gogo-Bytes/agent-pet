@@ -102,13 +102,11 @@ function VariantA({ selected, setSelected, scene }: ViewProps & { scene: Scene }
   const current = status[scene];
   return <main className="game-shell">
     <header className="game-topbar"><div className="game-logo"><span>✦</span> Agent Pet</div><div className="game-status"><i className={scene === 'working' ? 'pulse' : ''} />{current.label}</div></header>
-    <section className="game-room" aria-label="宠物房间">
-      <div className="room-decoration room-star-one">✦</div><div className="room-decoration room-star-two">✧</div>
-      <div className="room-shelf" aria-hidden="true"><span>◉</span><span>✿</span></div>
-      <div className="room-stage"><div className="room-circle" /><Pet mood={current.mood} /><div className="room-shadow" /></div>
-      <div className="room-status"><span className="room-status-icon">{scene === 'completed' ? '✦' : scene === 'working' ? '⌁' : '☼'}</span><div><strong>{current.label}</strong><small>{current.hint}</small></div></div>
-      <div className="room-agent-slots" aria-label="Agent 状态">
-        {agents.filter(agent => agent.connected).map(agent => <button key={agent.id} className={selected === agent.id ? 'room-agent selected' : 'room-agent'} onClick={() => setSelected(agent.id)} aria-pressed={selected === agent.id}><span style={{ color: agent.color }}>{agent.icon}</span><span>{agent.name}</span><small>{scene === 'welcome' ? '未连接' : current.label}</small></button>)}<button className="room-agent room-add" onClick={() => goView('connections')}><span>＋</span><span>添加</span></button>
+    <section className="pet-stage" aria-label="宠物展示台">
+      <div className="pet-stage-character"><div className="pet-stage-orb" /><Pet mood={current.mood} /><div className="pet-stage-shadow" /></div>
+      <div className="pet-state-card"><span className="pet-state-icon">{scene === 'completed' ? '✦' : scene === 'working' ? '⌁' : '☼'}</span><div><strong>{current.label}</strong><small>{current.hint}</small></div></div>
+      <div className="agent-status-strip" aria-label="Agent 状态">
+        {agents.filter(agent => agent.connected).map(agent => <button key={agent.id} className={selected === agent.id ? 'agent-status-chip selected' : 'agent-status-chip'} onClick={() => setSelected(agent.id)} aria-pressed={selected === agent.id}><span style={{ color: agent.color }}>{agent.icon}</span><span>{agent.name}</span><small>{scene === 'welcome' ? '未连接' : current.label}</small></button>)}<button className="agent-status-chip agent-add" onClick={() => goView('connections')}><span>＋</span><span>添加</span></button>
       </div>
     </section>
     <footer className="game-dock"><button onClick={() => goView('pets')}><span>♟</span>宠物</button><button onClick={() => goView('connections')}><span>⌁</span>连接</button><button onClick={() => goView('settings')}><span>⚙</span>设置</button><button className="dock-primary" onClick={() => goView('connections')}>{current.action} →</button></footer>

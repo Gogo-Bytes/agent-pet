@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
@@ -91,7 +91,11 @@ function GameLayout(props: ViewProps & { view: View; scene: Scene }) {
   return <main className={view === 'home' ? 'game-shell' : 'game-shell feature-game'}>{view === 'home' ? <VariantA {...rest} scene={scene} /> : view === 'pets' ? <PetsView {...rest} /> : view === 'connections' ? <ConnectionsView {...rest} /> : <SettingsView {...rest} />}<GameDock view={view} /></main>;
 }
 
-function GameDock({ view }: { view: View }) { return <footer className="game-dock"><nav className="dock-tabs" role="tablist" aria-label="页面导航">{([['home', '⌂', '首页'], ['pets', '♟', '宠物'], ['connections', '⌁', '连接'], ['settings', '⚙', '设置']] as const).map(([id, icon, label]) => <button key={id} className={view === id ? 'dock-tab active' : 'dock-tab'} role="tab" aria-selected={view === id} onClick={() => goView(id)}><span>{icon}</span><small>{label}</small></button>)}</nav>{view === 'home' && <button className="dock-primary" onClick={() => goView('connections')}>查看连接 →</button>}</footer>; }
+function GameDock({ view }: { view: View }) {
+  const tabs = [['home', '⌂', '首页'], ['pets', '♟', '宠物'], ['connections', '⌁', '连接'], ['settings', '⚙', '设置']] as const;
+  const activeIndex = tabs.findIndex(([id]) => id === view);
+  return <footer className="game-dock"><nav className="dock-tabs" role="tablist" aria-label="页面导航" style={{ '--dock-index': activeIndex } as CSSProperties}><span className="dock-tab-slider" aria-hidden="true" />{tabs.map(([id, icon, label]) => <button key={id} className={view === id ? 'dock-tab active' : 'dock-tab'} role="tab" aria-selected={view === id} onClick={() => goView(id)}><span>{icon}</span><small>{label}</small></button>)}</nav>{view === 'home' && <button className="dock-primary" onClick={() => goView('connections')}>查看连接 →</button>}</footer>;
+}
 
 function SettingRow({ title, copy, checked, onChange }: { title: string; copy: string; checked: boolean; onChange: () => void }) { return <button className="setting-row" onClick={onChange}><span><strong>{title}</strong><small>{copy}</small></span><span className={checked ? 'toggle on' : 'toggle'}><i /></span></button>; }
 

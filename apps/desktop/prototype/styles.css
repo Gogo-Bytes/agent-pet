@@ -65,3 +65,11 @@ html{overflow-y:scroll}.prototype-page{min-height:100dvh;padding:clamp(12px,3vw,
 .dock-tab small{display:block!important;font-size:12px}.dock-tab span{font-size:17px}.dock-tab:after{display:block;right:13px;bottom:2px;left:13px;height:2px;background:#8674e8;opacity:0;transform:scaleX(.3);transition:opacity .2s,transform .25s}.dock-tab.active{width:auto;padding-left:13px;background:#f0edfb!important;color:#5d4db4!important;box-shadow:none;transform:translateY(-1px)}.dock-tab.active:after{opacity:1;transform:scaleX(1)}
 .dock-primary{pointer-events:auto;margin-left:auto;padding:11px 17px!important;border:1px solid #7664df!important;border-radius:13px!important;background:#7664df!important;color:#fff!important;box-shadow:0 4px 0 #5849b7!important;white-space:nowrap}
 @media(max-width:720px){.game-dock{right:auto;bottom:auto;left:auto;gap:6px;padding:10px 13px}.dock-tabs{gap:0;overflow-x:auto}.dock-tab{height:38px;padding:6px 8px}.dock-tab.active{padding-left:9px;padding-right:9px}.dock-tab small{font-size:11px}.dock-primary{padding:9px 11px!important;font-size:12px!important}.agent-rail{bottom:86px}}
+
+/* One shared indicator physically slides between the four layout tabs. */
+.dock-tabs{position:relative;display:grid;grid-template-columns:repeat(4,minmax(66px,1fr));width:304px;flex:none;gap:4px;overflow:visible}
+.dock-tab-slider{position:absolute;z-index:0;inset:4px auto 4px 0;width:calc((100% - 12px) / 4);border-radius:13px;background:#f0edfb;box-shadow:0 3px 10px #62558d12;transform:translateX(calc(var(--dock-index) * (100% + 4px)));transition:transform .32s cubic-bezier(.22,.8,.24,1);will-change:transform}
+.dock-tab{z-index:1;width:auto!important;background:transparent!important;transition:color .2s,transform .2s}
+.dock-tab.active{background:transparent!important;transform:none}
+.dock-tab:after{display:none!important}
+@media(max-width:720px){.dock-tabs{width:min(304px,100%);grid-template-columns:repeat(4,minmax(58px,1fr));gap:2px}.dock-tab-slider{width:calc((100% - 6px) / 4);transform:translateX(calc(var(--dock-index) * (100% + 2px)))}}

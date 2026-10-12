@@ -71,10 +71,33 @@ function FeatureHeader({ title, copy, view }: { title: string; copy: string; vie
 
 function PetsView({ selected, setSelected, petBindings, setPetBindings }: ViewProps) {
   const [asset, setAsset] = useState('星星');
-  const petOptions = [{ name: '星星', icon: '✦' }, { name: '云朵', icon: '☁' }, { name: '小橘', icon: '●' }];
-  return <section className="game-feature-room wardrobe"><div className="feature-kicker">宠物衣柜</div><div className="wardrobe-stage"><div className="wardrobe-glow" /><Pet /><strong>{asset}</strong><small>当前形象</small></div><div className="wardrobe-panel"><div className="panel-title">我的宠物 <span>3 / 3</span></div>{petOptions.map(option => <button key={option.name} className={asset === option.name ? 'wardrobe-item selected' : 'wardrobe-item'} onClick={() => setAsset(option.name)}><span className="wardrobe-icon">{option.icon}</span><span>{option.name}</span>{asset === option.name && <b>预览中</b>}</button>)}<button className="wardrobe-import" onClick={() => alert('Web 原型暂不导入文件；正式版将校验 GLB + JSON 宠物包。')}>＋ 导入宠物包</button><div className="panel-title binding-title">给谁使用？</div><div className="binding-chips">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'binding-chip active' : 'binding-chip'} onClick={() => { setSelected(agent.id); setPetBindings({ ...petBindings, [agent.id]: asset }); }}>{agent.icon} {agent.name} · {petBindings[agent.id]}</button>)}</div></div></section>;
+  const [notice, setNotice] = useState('');
+  const petOptions = [
+    { name: '星星', icon: '✦', tone: 'violet' as const, mood: 'happy' as const, copy: '轻轻发光的陪伴者' },
+    { name: '云朵', icon: '☁', tone: 'mint' as const, mood: 'sleepy' as const, copy: '安静柔软的好朋友' },
+    { name: '小橘', icon: '●', tone: 'peach' as const, mood: 'working' as const, copy: '元气满满的行动派' },
+  ];
+  const pet = petOptions.find(option => option.name === asset) ?? petOptions[0]!;
+  const selectedAgent = agents.find(agent => agent.id === selected) ?? agents[0]!;
+  const equipped = petBindings[selectedAgent.id] === asset;
+  const handlePrimary = () => {
+    if (!selectedAgent.connected) { goView('connections'); return; }
+    setPetBindings({ ...petBindings, [selectedAgent.id]: asset });
+    setNotice(`${asset} 已经陪伴 ${selectedAgent.name}`);
+    window.setTimeout(() => setNotice(''), 2200);
+  };
+  return <section className="game-feature-room pet-library">
+    <header className="pet-library-head"><div><span className="pet-library-eyebrow">伙伴收藏</span><h1>选择一个伙伴</h1></div><span className="pet-library-count">{petOptions.length} / 12</span></header>
+    <div className="pet-library-stage">
+      <div className="pet-library-copy"><span>当前预览</span><h2>{pet.name}</h2><p>{pet.copy}</p><small>{equipped ? `${selectedAgent.name} 正在和它一起工作` : `预览中 · 尚未装备给 ${selectedAgent.name}`}</small></div>
+      <div className={`pet-library-scene tone-${pet.tone}`}><div className="pet-library-glow" /><Pet mood={pet.mood} tone={pet.tone} /></div>
+      <div className="pet-library-actions"><span>陪伴对象</span><div className="pet-agent-picker">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'pet-agent-choice active' : 'pet-agent-choice'} onClick={() => setSelected(agent.id)} aria-pressed={selected === agent.id}><i style={{ color: agent.color }}>{agent.icon}</i><b>{agent.name}</b><small>{agent.connected ? (petBindings[agent.id] ?? '未装备') : '未连接'}</small></button>)}</div><button className={equipped ? 'pet-equip-button equipped' : 'pet-equip-button'} onClick={handlePrimary}>{selectedAgent.connected ? (equipped ? '已装备' : `让它陪伴 ${selectedAgent.name}`) : `先连接 ${selectedAgent.name}`}</button></div>
+    </div>
+    <div className="pet-collection-head"><strong>我的伙伴</strong><span>左右滑动选择</span></div>
+    <div className="pet-carousel" role="list" aria-label="宠物选择"><div className="pet-carousel-track">{petOptions.map(option => <button key={option.name} role="listitem" className={asset === option.name ? 'pet-card active' : 'pet-card'} onClick={() => setAsset(option.name)}><span className={`pet-card-icon tone-${option.tone}`}>{option.icon}</span><span><b>{option.name}</b><small>{option.copy}</small></span>{asset === option.name && <i>预览中</i>}</button>)}<button className="pet-card pet-card-add" onClick={() => alert('Web 原型暂不导入文件；正式版将校验 GLB + JSON 宠物包。')}><span className="pet-card-plus">＋</span><span><b>添加新伙伴</b><small>导入宠物包</small></span></button></div></div>
+    <div className={notice ? 'pet-notice visible' : 'pet-notice'} role="status" aria-live="polite">{notice}</div>
+  </section>;
 }
-
 function ConnectionsView({ selected, setSelected }: ViewProps) {
   const [scanned, setScanned] = useState(false);
   return <section className="game-feature-room connection-room"><div className="feature-kicker">寻找伙伴</div><div className="radar"><div className="radar-ring one"/><div className="radar-ring two"/><span>⌁</span></div><div className="radar-panel"><strong>{scanned ? '找到 pi' : '准备扫描'}</strong><small>{scanned ? '可以查看并连接' : '扫描只会查看本机候选'}</small><button className="primary" onClick={() => setScanned(true)}>{scanned ? '重新扫描' : '扫描本机'}</button></div><div className="provider-tray">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'provider-token selected' : 'provider-token'} onClick={() => setSelected(agent.id)}><span style={{ color: agent.color }}>{agent.icon}</span><strong>{agent.name}</strong><small>{agent.id === 'pi' ? scanned ? '已找到' : '可扫描' : '即将支持'}</small></button>)}</div><button className="manual-link" onClick={() => alert('Web 原型暂不读取本机文件；桌面版会在自动扫描失败时提供系统选择器。')}>找不到？手动选择位置 →</button></section>;
@@ -88,7 +111,7 @@ function SettingsView({ connected }: ViewProps) {
 
 function GameLayout(props: ViewProps & { view: View; scene: Scene }) {
   const { view, scene, ...rest } = props;
-  return <main className={view === 'home' ? 'game-shell' : 'game-shell feature-game'}>{view === 'home' ? <VariantA {...rest} scene={scene} /> : view === 'pets' ? <PetsView {...rest} /> : view === 'connections' ? <ConnectionsView {...rest} /> : <SettingsView {...rest} />}<GameDock view={view} /></main>;
+  return <main className={view === 'home' ? 'game-shell' : 'game-shell feature-game'}>{view !== 'home' && <AppHeader view={view} />}{view === 'home' ? <VariantA {...rest} scene={scene} /> : view === 'pets' ? <PetsView {...rest} /> : view === 'connections' ? <ConnectionsView {...rest} /> : <SettingsView {...rest} />}<GameDock view={view} /></main>;
 }
 
 function GameDock({ view }: { view: View }) {

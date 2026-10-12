@@ -58,17 +58,10 @@ html{overflow-y:scroll}.prototype-page{min-height:100dvh;padding:clamp(12px,3vw,
 .feature-game .game-topbar{height:76px}.feature-game .app-nav{display:none}.feature-game .feature-page-label{display:block}.feature-kicker{top:34px;left:40px;font-size:20px;letter-spacing:-.06em}.wardrobe-panel,.radar-panel,.settings-board{border:1px solid #e8e1f2;border-radius:22px;background:#fffdfb;box-shadow:0 16px 36px #62558d15}.panel-title{font-size:20px}.settings-board h1{font-size:34px}.manual-link{color:#6652b4;font-weight:700}
 @media(max-width:720px){.game-topbar,.feature-game .game-topbar{height:64px;padding:0 17px}.pet-identity{top:26px;left:22px;gap:6px}.identity-agent{font-size:12px}.pet-identity h1{font-size:34px}.identity-status{font-size:14px}.agent-rail{right:16px}.game-dock{gap:8px;padding:10px 13px}.dock-tabs{gap:2px;overflow-x:auto}.dock-tab{padding:8px 9px 10px}.dock-primary{padding:9px 11px!important;font-size:12px!important}.feature-kicker{top:24px;left:24px;font-size:18px}}
 @media(max-width:720px){.agent-rail{right:50%;left:auto;transform:translateX(50%);max-width:calc(100% - 32px);overflow-x:auto}}
-/* Floating game menu: keep navigation inside the scene instead of a web footer. */
-.game-dock{position:absolute;z-index:6;right:26px;bottom:24px;left:26px;display:flex;align-items:center;gap:12px;padding:0;border:0;background:transparent;pointer-events:none}
-.dock-tabs{pointer-events:auto;display:flex;align-items:center;gap:4px;width:max-content;max-width:calc(100% - 170px);padding:6px;border:1px solid #ffffffc9;border-radius:22px;background:#ffffffd9;box-shadow:0 12px 28px #62558d20;backdrop-filter:blur(16px)}
-.dock-tab{width:44px;height:42px;justify-content:center;padding:8px;border-radius:15px;color:#9690a4!important;transition:width .2s,background .2s,color .2s,transform .2s}
-.dock-tab small{display:none}
-.dock-tab span{font-size:19px}
-.dock-tab:after{display:none}
-.dock-tab.active{width:82px;justify-content:flex-start;padding-left:13px;background:#7664df;color:#fff!important;box-shadow:0 5px 12px #7664df4d}
-.dock-tab.active small{display:block;color:inherit;font-size:12px;font-weight:800}
-.dock-primary{pointer-events:auto;margin-left:auto;padding:12px 16px!important;border:1px solid #ffffff66!important;border-radius:15px!important;background:#7664df!important;color:#fff!important;box-shadow:0 6px 0 #5849b7!important;white-space:nowrap}
-.feature-game .game-dock{bottom:22px}
-@media(max-width:720px){.game-dock{right:16px;bottom:18px;left:16px;gap:8px}.dock-tabs{max-width:calc(100% - 116px);padding:5px;border-radius:19px}.dock-tab{width:38px;height:38px;border-radius:13px}.dock-tab.active{width:70px;padding-left:10px}.dock-tab.active small{font-size:11px}.dock-primary{padding:10px 11px!important;font-size:12px!important;border-radius:13px!important}}
-.dock-tab.active{background:#7664df!important;color:#fff!important}
-@media(max-width:720px){.agent-rail{bottom:86px}}
+/* Shared footer tabs: one mounted layout control across every A view. */
+.game-dock{position:relative;right:auto;bottom:auto;left:auto;display:flex;align-items:center;gap:18px;padding:13px 26px 14px;border-top:1px solid #ebe5f3;border-radius:0;background:#fffdfb;pointer-events:auto}
+.dock-tabs{display:flex;align-items:center;gap:4px;width:auto;max-width:none;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none}
+.dock-tab{position:relative;width:auto;height:42px;justify-content:center;padding:8px 13px;border-radius:13px;transform:none!important;color:#9690a4!important;transition:background .2s,color .2s,transform .2s}
+.dock-tab small{display:block!important;font-size:12px}.dock-tab span{font-size:17px}.dock-tab:after{display:block;right:13px;bottom:2px;left:13px;height:2px;background:#8674e8;opacity:0;transform:scaleX(.3);transition:opacity .2s,transform .25s}.dock-tab.active{width:auto;padding-left:13px;background:#f0edfb!important;color:#5d4db4!important;box-shadow:none;transform:translateY(-1px)}.dock-tab.active:after{opacity:1;transform:scaleX(1)}
+.dock-primary{pointer-events:auto;margin-left:auto;padding:11px 17px!important;border:1px solid #7664df!important;border-radius:13px!important;background:#7664df!important;color:#fff!important;box-shadow:0 4px 0 #5849b7!important;white-space:nowrap}
+@media(max-width:720px){.game-dock{right:auto;bottom:auto;left:auto;gap:6px;padding:10px 13px}.dock-tabs{gap:0;overflow-x:auto}.dock-tab{height:38px;padding:6px 8px}.dock-tab.active{padding-left:9px;padding-right:9px}.dock-tab small{font-size:11px}.dock-primary{padding:9px 11px!important;font-size:12px!important}.agent-rail{bottom:86px}}

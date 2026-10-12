@@ -69,35 +69,7 @@ function AppHeader({ view }: { view: View }) { return <header className="game-to
 
 function FeatureHeader({ title, copy, view }: { title: string; copy: string; view: Exclude<View, 'home'> }) { return <><AppHeader view={view} /><div className="feature-heading"><p className="eyebrow">Agent Pet</p><h1>{title}</h1><p className="subcopy">{copy}</p></div></>; }
 
-function PetsView({ selected, setSelected, petBindings, setPetBindings }: ViewProps) {
-  const [asset, setAsset] = useState('星星');
-  const [notice, setNotice] = useState('');
-  const petOptions = [
-    { name: '星星', icon: '✦', tone: 'violet' as const, mood: 'happy' as const, copy: '轻轻发光的陪伴者' },
-    { name: '云朵', icon: '☁', tone: 'mint' as const, mood: 'sleepy' as const, copy: '安静柔软的好朋友' },
-    { name: '小橘', icon: '●', tone: 'peach' as const, mood: 'working' as const, copy: '元气满满的行动派' },
-  ];
-  const pet = petOptions.find(option => option.name === asset) ?? petOptions[0]!;
-  const selectedAgent = agents.find(agent => agent.id === selected) ?? agents[0]!;
-  const equipped = petBindings[selectedAgent.id] === asset;
-  const handlePrimary = () => {
-    if (!selectedAgent.connected) { goView('connections'); return; }
-    setPetBindings({ ...petBindings, [selectedAgent.id]: asset });
-    setNotice(`${asset} 已经陪伴 ${selectedAgent.name}`);
-    window.setTimeout(() => setNotice(''), 2200);
-  };
-  return <section className="game-feature-room pet-library">
-    <header className="pet-library-head"><div><span className="pet-library-eyebrow">伙伴收藏</span><h1>选择一个伙伴</h1></div><span className="pet-library-count">{petOptions.length} / 12</span></header>
-    <div className="pet-library-stage">
-      <div className="pet-library-copy"><span>当前预览</span><h2>{pet.name}</h2><p>{pet.copy}</p><small>{equipped ? `${selectedAgent.name} 正在和它一起工作` : `预览中 · 尚未装备给 ${selectedAgent.name}`}</small></div>
-      <div className={`pet-library-scene tone-${pet.tone}`}><div className="pet-library-glow" /><Pet mood={pet.mood} tone={pet.tone} /></div>
-      <div className="pet-library-actions"><span>陪伴对象</span><div className="pet-agent-picker">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'pet-agent-choice active' : 'pet-agent-choice'} onClick={() => setSelected(agent.id)} aria-pressed={selected === agent.id}><i style={{ color: agent.color }}>{agent.icon}</i><b>{agent.name}</b><small>{agent.connected ? (petBindings[agent.id] ?? '未装备') : '未连接'}</small></button>)}</div><button className={equipped ? 'pet-equip-button equipped' : 'pet-equip-button'} onClick={handlePrimary}>{selectedAgent.connected ? (equipped ? '已装备' : `让它陪伴 ${selectedAgent.name}`) : `先连接 ${selectedAgent.name}`}</button></div>
-    </div>
-    <div className="pet-collection-head"><strong>我的伙伴</strong><span>左右滑动选择</span></div>
-    <div className="pet-carousel" role="list" aria-label="宠物选择"><div className="pet-carousel-track">{petOptions.map(option => <button key={option.name} role="listitem" className={asset === option.name ? 'pet-card active' : 'pet-card'} onClick={() => setAsset(option.name)}><span className={`pet-card-icon tone-${option.tone}`}>{option.icon}</span><span><b>{option.name}</b><small>{option.copy}</small></span>{asset === option.name && <i>预览中</i>}</button>)}<button className="pet-card pet-card-add" onClick={() => alert('Web 原型暂不导入文件；正式版将校验 GLB + JSON 宠物包。')}><span className="pet-card-plus">＋</span><span><b>添加新伙伴</b><small>导入宠物包</small></span></button></div></div>
-    <div className={notice ? 'pet-notice visible' : 'pet-notice'} role="status" aria-live="polite">{notice}</div>
-  </section>;
-}
+
 function ConnectionsView({ selected, setSelected }: ViewProps) {
   const [scanned, setScanned] = useState(false);
   return <section className="game-feature-room connection-room"><div className="feature-kicker">寻找伙伴</div><div className="radar"><div className="radar-ring one"/><div className="radar-ring two"/><span>⌁</span></div><div className="radar-panel"><strong>{scanned ? '找到 pi' : '准备扫描'}</strong><small>{scanned ? '可以查看并连接' : '扫描只会查看本机候选'}</small><button className="primary" onClick={() => setScanned(true)}>{scanned ? '重新扫描' : '扫描本机'}</button></div><div className="provider-tray">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'provider-token selected' : 'provider-token'} onClick={() => setSelected(agent.id)}><span style={{ color: agent.color }}>{agent.icon}</span><strong>{agent.name}</strong><small>{agent.id === 'pi' ? scanned ? '已找到' : '可扫描' : '即将支持'}</small></button>)}</div><button className="manual-link" onClick={() => alert('Web 原型暂不读取本机文件；桌面版会在自动扫描失败时提供系统选择器。')}>找不到？手动选择位置 →</button></section>;
@@ -109,9 +81,43 @@ function SettingsView({ connected }: ViewProps) {
   return <section className="game-feature-room settings-room"><div className="feature-kicker">设置</div><div className="settings-board"><h1>基本设置</h1><SettingRow title="完成提醒" copy="宠物提醒我查看结果" checked={notifications} onChange={() => setNotifications(!notifications)} /><SettingRow title="登录时启动" copy="打开电脑后自动出现" checked={login} onChange={() => setLogin(!login)} /><div className="settings-footnote">只观察状态 · 不读取对话 · 不控制 Agent</div></div></section>;
 }
 
+const companionPets = [
+  { name: '星星', icon: '✦', tone: 'violet' as const },
+  { name: '云朵', icon: '☁', tone: 'mint' as const },
+  { name: '小橘', icon: '●', tone: 'peach' as const },
+  { name: '月兔', icon: '☾', tone: 'violet' as const },
+  { name: '泡泡', icon: '○', tone: 'mint' as const },
+  { name: '太阳', icon: '☀', tone: 'peach' as const },
+];
+
+function CompanionStage({ view, scene, selected, setSelected, selectedAgent, petBindings, setPetBindings }: ViewProps & { view: View; scene: Scene }) {
+  const [asset, setAsset] = useState(petBindings[selected] ?? '星星');
+  const [panel, setPanel] = useState<'pets' | 'agents' | null>(null);
+  const [motion, setMotion] = useState('idle');
+  const [play, setPlay] = useState(0);
+  const editing = view === 'pets';
+  const name = editing ? asset : petBindings[selected] || '星星';
+  const pet = companionPets.find(p => p.name === name) ?? companionPets[0]!;
+  useEffect(() => { if (view === 'home') setAsset(petBindings[selected] || '星星'); setPanel(null); }, [view, selected]);
+  useEffect(() => { const close = (e: KeyboardEvent) => { if (e.key === 'Escape') setPanel(null); }; addEventListener('keydown', close); return () => removeEventListener('keydown', close); }, []);
+  const step = (delta: number) => { const i = companionPets.findIndex(p => p.name === asset); setAsset(companionPets[(i + delta + companionPets.length) % companionPets.length]!.name); };
+  const trigger = (value: string) => { setMotion(value); setPlay(n => n + 1); };
+  const toggleAgentBinding = (agentId: string) => {
+    const next = { ...petBindings };
+    if (next[agentId] === asset) delete next[agentId];
+    else next[agentId] = asset;
+    setPetBindings(next);
+  };
+  return <section className="pet-stage shared-companion-stage" hidden={view !== 'home' && view !== 'pets'} aria-label="宠物场景">
+    <div className="shared-scene" data-scene-instance="persistent"><div className="pet-stage-character"><div className={`pet-stage-orb tone-${pet.tone}`} /><div key={play} className={`motion-preview motion-${motion}`}><Pet tone={pet.tone} mood={motion === 'sleep' ? 'sleepy' : 'happy'} /></div><div className="pet-stage-shadow" /></div></div>
+    <div className="pet-identity"><span className="identity-agent">{editing ? '我的宠物' : selectedAgent.name}</span><h1>{name}</h1>{editing ? <div className="pet-binding-tags" aria-label="使用这个宠物的 Agent">{agents.filter(agent => petBindings[agent.id] === asset).map(agent => <span className="pet-binding-tag" key={agent.id}><i style={{ color: agent.color }}>{agent.icon}</i>{agent.name}<button aria-label={`解除 ${agent.name} 的宠物绑定`} onClick={() => { const next = { ...petBindings }; delete next[agent.id]; setPetBindings(next); }}>×</button></span>)}<button className="pet-tag-add" aria-label="配置使用此宠物的 Agent" title="配置 Agent" onClick={() => setPanel('agents')}>＋</button></div> : <><span className="identity-status">{selectedAgent.connected ? ({welcome:'待命中',waiting:'待命中',working:'工作中',completed:'已完成',disconnected:'连接中断'}[scene]) : '未连接'}</span><div className="pet-binding-tags">{agents.map(agent => <button key={agent.id} className="pet-binding-tag" onClick={() => setSelected(agent.id)} aria-pressed={selected === agent.id}><i style={{color:agent.color}}>{agent.icon}</i>{agent.name}</button>)}</div></>}</div>
+    {editing && <><div className="pet-cycle"><button aria-label="上一个宠物" onClick={() => step(-1)}>‹</button><button className="pet-grid-open" title="所有宠物" aria-label="打开宠物收藏" onClick={() => setPanel('pets')}>▦ <small>{companionPets.findIndex(p => p.name === asset) + 1} / {companionPets.length}</small></button><button aria-label="下一个宠物" onClick={() => step(1)}>›</button></div><div className="pet-animation-picker" aria-label="动画预览">{[['idle','待机'],['work','工作'],['celebrate','庆祝'],['sleep','睡觉']].map(([id,label]) => <button key={id} aria-pressed={motion === id} onClick={() => trigger(id!)}>{label}</button>)}</div></>}
+    {panel && <div className="pet-panel-backdrop" onClick={() => setPanel(null)}><div className={panel === 'pets' ? 'pet-collection-drawer' : 'pet-agent-dialog'} role="dialog" aria-modal="true" aria-label={panel === 'pets' ? '宠物收藏' : '配置 Agent'} onClick={e => e.stopPropagation()}><header><h2>{panel === 'pets' ? '宠物收藏' : '配置给 Agent'}</h2><button aria-label="关闭弹窗" onClick={() => setPanel(null)}>×</button></header>{panel === 'pets' ? <div className="pet-avatar-grid">{companionPets.map(p => <button key={p.name} aria-pressed={asset === p.name} onClick={() => { setAsset(p.name); setPanel(null); }}><span className={`pet-card-icon tone-${p.tone}`}>{p.icon}</span>{p.name}</button>)}</div> : <><div className="pet-agent-options">{agents.map(agent => <button key={agent.id} className={petBindings[agent.id] === asset ? 'is-configured' : ''} aria-pressed={petBindings[agent.id] === asset} onClick={() => toggleAgentBinding(agent.id)}><i style={{color:agent.color}}>{agent.icon}</i><span>{agent.name}</span><small>{petBindings[agent.id] === asset ? '已配置 ✓' : petBindings[agent.id] || '未配置'}</small></button>)}</div><button className="dialog-done" onClick={() => setPanel(null)}>完成</button></>}</div></div>}
+  </section>;
+}
+
 function GameLayout(props: ViewProps & { view: View; scene: Scene }) {
-  const { view, scene, ...rest } = props;
-  return <main className={view === 'home' ? 'game-shell' : 'game-shell feature-game'}>{view !== 'home' && <AppHeader view={view} />}{view === 'home' ? <VariantA {...rest} scene={scene} /> : view === 'pets' ? <PetsView {...rest} /> : view === 'connections' ? <ConnectionsView {...rest} /> : <SettingsView {...rest} />}<GameDock view={view} /></main>;
+  return <main className="game-shell"><AppHeader view={props.view} /><CompanionStage {...props} />{props.view === 'connections' && <ConnectionsView {...props} />}{props.view === 'settings' && <SettingsView {...props} />}<GameDock view={props.view} /></main>;
 }
 
 function GameDock({ view }: { view: View }) {

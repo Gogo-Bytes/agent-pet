@@ -125,7 +125,7 @@ function CompanionStage({ view, scene, selected, setSelected, selectedAgent, pet
       }
     }
     const controls = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]'));
-    (dialog.querySelector<HTMLInputElement>('input') ?? controls()[0])?.focus();
+    (dialog.querySelector<HTMLInputElement>('input') ?? controls()[0])?.focus({ preventScroll: true });
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
       const items = controls();
@@ -133,14 +133,14 @@ function CompanionStage({ view, scene, selected, setSelected, selectedAgent, pet
       if (!first || !last) return;
       if (!dialog.contains(document.activeElement) || (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
         event.preventDefault();
-        (event.shiftKey ? last : first).focus();
+        (event.shiftKey ? last : first).focus({ preventScroll: true });
       }
     };
     dialog.addEventListener('keydown', trap);
     return () => {
       dialog.removeEventListener('keydown', trap);
       for (const entry of blocked) entry.element.inert = entry.inert;
-      if (previousFocus?.isConnected) previousFocus.focus();
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, [panel]);
   const step = (delta: number) => { const i = companionPets.findIndex(p => p.name === asset); setAsset(companionPets[(i + delta + companionPets.length) % companionPets.length]!.name); };

@@ -115,3 +115,18 @@
   .connections-heading { margin-bottom: 28px; }
   .connection-flow-heading { margin-bottom: 16px; }
 }
+.provider-mint { background: #d5e9e280; color: #689e90; }
+.provider-peach { background: #f2dfd080; color: #bd907d; }
+.provider-blue { background: #dce3f380; color: #8196c8; }
+.provider-slate { background: #dfe0ec80; color: #86849e; }
+.provider-rose { background: #eddae980; color: #ae83a2; }
+/* Longer mock lists scroll independently, keeping selection and detail in view. */
+@media(min-width:761px) {
+  .connections-page { display: flex; flex-direction: column; }
+  .connections-heading { flex-shrink: 0; }
+  .connections-layout { flex: 1; min-height: 0; }
+  .configured-connection-list, .connection-content { min-height: 0; overflow: auto; padding-bottom: 20px; scrollbar-width: thin; scrollbar-color: #c6b5d6 transparent; }
+}
+@media(min-width:761px) {
+  .configured-connection-list .connection-row { padding-block: 8px; margin-bottom: 4px; }
+}

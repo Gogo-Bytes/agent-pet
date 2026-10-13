@@ -1,7 +1,8 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { GlassButton, GlassSurface, GlassToolbar } from './components/glass.js';
+import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from './components/glass.js';
 import './styles.css';
+import './glass-layout.css';
 
 type Variant = 'a' | 'b' | 'c';
 type Scene = 'welcome' | 'waiting' | 'working' | 'completed' | 'disconnected';
@@ -63,7 +64,7 @@ function App() {
 
 type ViewProps = { selected: string; setSelected: (id: string) => void; selectedAgent: Agent; connected: boolean; connect: () => void; petBindings: Record<string, string>; setPetBindings: (bindings: Record<string, string>) => void };
 
-type IconName = 'home' | 'pet' | 'link' | 'settings' | 'grid' | 'left' | 'right' | 'plus' | 'close' | 'search' | 'play' | 'replay' | 'up' | 'down';
+type IconName = 'home' | 'pet' | 'link' | 'settings' | 'grid' | 'left' | 'right' | 'plus' | 'close' | 'search' | 'play' | 'replay' | 'up' | 'down' | 'check';
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, string> = {
     home: 'M3 10 12 3l9 7M5 9v12h14V9M9 21v-7h6v7',
@@ -72,9 +73,10 @@ function Icon({ name }: { name: IconName }) {
     settings: 'M4 7h16M4 17h16M8 4v6M16 14v6',
     grid: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
     left: 'm14 6-6 6 6 6', right: 'm10 6 6 6-6 6', plus: 'M12 5v14M5 12h14', close: 'm6 6 12 12M6 18 18 6', search: 'M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0',
+    check: 'm5 12 4 4L19 6',
     play: 'm8 4 12 8-12 8z', replay: 'M4 10a8 8 0 1 1 1 7M4 4v6h6', up: 'm6 14 6-6 6 6', down: 'm6 10 6 6 6-6',
   };
-  return <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
+  return <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
 
 function Pet({ mood = 'happy', tone = 'violet' }: { mood?: 'happy' | 'working' | 'sleepy'; tone?: 'violet' | 'mint' | 'peach' }) { return <div className={`pet pet-${mood} pet-tone-${tone}`}><div className="pet-ears">⌃　⌃</div><div className="pet-face"><span>•</span><span>•</span><b>{mood === 'sleepy' ? '—' : mood === 'working' ? '◡' : 'ᴗ'}</b></div><div className="pet-body">✦</div></div>; }
@@ -87,13 +89,13 @@ function FeatureHeader({ title, copy, view }: { title: string; copy: string; vie
 
 function ConnectionsView({ selected, setSelected }: ViewProps) {
   const [scanned, setScanned] = useState(false);
-  return <section className="game-feature-room connection-room"><div className="feature-kicker">寻找伙伴</div><div className="radar"><div className="radar-ring one"/><div className="radar-ring two"/><span>⌁</span></div><GlassSurface material="panel" className="radar-panel"><strong>{scanned ? '找到 pi' : '准备扫描'}</strong><small>{scanned ? '可以查看并连接' : '扫描只会查看本机候选'}</small><button className="primary" onClick={() => setScanned(true)}>{scanned ? '重新扫描' : '扫描本机'}</button></GlassSurface><div className="provider-tray">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'provider-token selected' : 'provider-token'} onClick={() => setSelected(agent.id)}><span style={{ color: agent.color }}>{agent.icon}</span><strong>{agent.name}</strong><small>{agent.id === 'pi' ? scanned ? '已找到' : '可扫描' : '即将支持'}</small></button>)}</div><button className="manual-link" onClick={() => alert('Web 原型暂不读取本机文件；桌面版会在自动扫描失败时提供系统选择器。')}>找不到？手动选择位置 →</button></section>;
+  return <section className="game-feature-room connection-room"><div className="feature-kicker">寻找伙伴</div><div className="radar"><div className="radar-ring one"/><div className="radar-ring two"/><span>⌁</span></div><div className="radar-panel"><strong>{scanned ? '找到 pi' : '准备扫描'}</strong><small>{scanned ? '可以查看并连接' : '扫描只会查看本机候选'}</small><button className="primary" onClick={() => setScanned(true)}>{scanned ? '重新扫描' : '扫描本机'}</button></div><div className="provider-tray">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'provider-token selected' : 'provider-token'} onClick={() => setSelected(agent.id)}><span style={{ color: agent.color }}>{agent.icon}</span><strong>{agent.name}</strong><small>{agent.id === 'pi' ? scanned ? '已找到' : '可扫描' : '即将支持'}</small></button>)}</div><button className="manual-link" onClick={() => alert('Web 原型暂不读取本机文件；桌面版会在自动扫描失败时提供系统选择器。')}>找不到？手动选择位置 →</button></section>;
 }
 
 function SettingsView({ connected }: ViewProps) {
   const [notifications, setNotifications] = useState(true);
   const [login, setLogin] = useState(false);
-  return <section className="game-feature-room settings-room"><div className="feature-kicker">设置</div><GlassSurface material="panel" className="settings-board"><h1>基本设置</h1><SettingRow title="完成提醒" copy="宠物提醒我查看结果" checked={notifications} onChange={() => setNotifications(!notifications)} /><SettingRow title="登录时启动" copy="打开电脑后自动出现" checked={login} onChange={() => setLogin(!login)} /><div className="settings-footnote">只观察状态 · 不读取对话 · 不控制 Agent</div></GlassSurface></section>;
+  return <section className="game-feature-room settings-room"><div className="feature-kicker">设置</div><div className="settings-board"><h1>基本设置</h1><SettingRow title="完成提醒" copy="宠物提醒我查看结果" checked={notifications} onChange={() => setNotifications(!notifications)} /><SettingRow title="登录时启动" copy="打开电脑后自动出现" checked={login} onChange={() => setLogin(!login)} /><div className="settings-footnote">只观察状态 · 不读取对话 · 不控制 Agent</div></div></section>;
 }
 
 const companionPets = [
@@ -120,6 +122,40 @@ function CompanionStage({ view, scene, selected, setSelected, selectedAgent, pet
   const pet = companionPets.find(p => p.name === name) ?? companionPets[0]!;
   useEffect(() => { if (view === 'home') setAsset(petBindings[selected] || '星星'); setPanel(null); setMotionsOpen(false); }, [view, selected]);
   useEffect(() => { const close = (e: KeyboardEvent) => { if (e.key === 'Escape') { setPanel(null); setMotionsOpen(false); } }; addEventListener('keydown', close); return () => removeEventListener('keydown', close); }, []);
+  useEffect(() => {
+    if (!panel) return;
+    const dialog = document.querySelector<HTMLElement>('.pet-panel-backdrop [role="dialog"]');
+    if (!dialog) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const blocked: { element: HTMLElement; inert: boolean }[] = [];
+    // Prevent pointer and keyboard interaction with the scene and persistent dock.
+    for (let node: HTMLElement | null = dialog; node && !node.classList.contains('game-shell'); node = node.parentElement) {
+      for (const sibling of node.parentElement?.children ?? []) {
+        if (sibling !== node && sibling instanceof HTMLElement) {
+          blocked.push({ element: sibling, inert: sibling.inert });
+          sibling.inert = true;
+        }
+      }
+    }
+    const controls = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]'));
+    (dialog.querySelector<HTMLInputElement>('input') ?? controls()[0])?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const items = controls();
+      const first = items[0], last = items.at(-1);
+      if (!first || !last) return;
+      if (!dialog.contains(document.activeElement) || (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
+    };
+    dialog.addEventListener('keydown', trap);
+    return () => {
+      dialog.removeEventListener('keydown', trap);
+      for (const entry of blocked) entry.element.inert = entry.inert;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [panel]);
   const step = (delta: number) => { const i = companionPets.findIndex(p => p.name === asset); setAsset(companionPets[(i + delta + companionPets.length) % companionPets.length]!.name); };
   const trigger = (value: string) => { setMotion(value); setPlay(n => n + 1); };
   const toggleAgentBinding = (agentId: string) => {
@@ -131,7 +167,7 @@ function CompanionStage({ view, scene, selected, setSelected, selectedAgent, pet
   return <section className="pet-stage shared-companion-stage" hidden={view !== 'home' && view !== 'pets'} aria-label="宠物场景">
     <div className="shared-scene" data-scene-instance="persistent"><div className="pet-stage-character"><div className={`pet-stage-orb tone-${pet.tone}`} /><div key={play} className={`motion-preview motion-${motion}`}><Pet tone={pet.tone} mood={motion === 'sleep' ? 'sleepy' : 'happy'} /></div><div className="pet-stage-shadow" /></div></div>
     <div className="pet-identity"><span className="identity-agent">{editing ? '我的宠物' : selectedAgent.name}</span><h1>{name}</h1>{editing ? <div className="pet-binding-tags" aria-label="使用这个宠物的 Agent">{agents.filter(agent => petBindings[agent.id] === asset).map(agent => <GlassSurface as="span" className="pet-binding-tag" key={agent.id}><i style={{ color: agent.color }}>{agent.icon}</i>{agent.name}<button aria-label={`解除 ${agent.name} 的宠物绑定`} onClick={() => { const next = { ...petBindings }; delete next[agent.id]; setPetBindings(next); }}><Icon name="close" /></button></GlassSurface>)}<GlassButton className="pet-tag-add" aria-label="配置使用此宠物的 Agent" title="配置 Agent" onClick={() => openPanel('agents')}><Icon name="plus" /></GlassButton></div> : <><span className="identity-status">{selectedAgent.connected ? ({welcome:'待命中',waiting:'待命中',working:'工作中',completed:'已完成',disconnected:'连接中断'}[scene]) : '未连接'}</span><div className="pet-binding-tags">{agents.map(agent => <GlassButton key={agent.id} className="pet-binding-tag" onClick={() => setSelected(agent.id)} aria-pressed={selected === agent.id}><i style={{color:agent.color}}>{agent.icon}</i>{agent.name}</GlassButton>)}</div></>}</div>
-    {editing && <><div className="pet-cycle"><GlassButton aria-label="上一个宠物" onClick={() => step(-1)}><Icon name="left" /></GlassButton><GlassButton className="pet-grid-open" title="所有宠物" aria-label="打开宠物收藏" onClick={() => openPanel('pets')}><Icon name="grid" /> <small>{companionPets.findIndex(p => p.name === asset) + 1} / {companionPets.length}</small></GlassButton><GlassButton aria-label="下一个宠物" onClick={() => step(1)}><Icon name="right" /></GlassButton></div><div className="pet-animation-picker"><GlassToolbar className="pet-animation-toolbar" aria-label="动画预览"><button title="重新播放" aria-label="重新播放当前动画" onClick={() => trigger(motion)}><Icon name="replay" /></button><button aria-label="选择动画" aria-expanded={motionsOpen} aria-controls="motion-palette" onClick={() => setMotionsOpen(open => !open)}><Icon name="play" /> {motions.find(m => m.id === motion)?.label} <Icon name={motionsOpen ? 'up' : 'down'} /></button></GlassToolbar>{motionsOpen && <GlassSurface as="section" material="panel" className="motion-palette" id="motion-palette" aria-label="选择动画"><header><strong>动作</strong><small>{motions.length}</small></header><input aria-label="搜索动画" placeholder="搜索动作" value={motionQuery} onChange={e => setMotionQuery(e.target.value)} /><div className="motion-list">{motions.filter(m => m.label.includes(motionQuery)).map(m => <button key={m.id} aria-pressed={motion === m.id} onClick={() => trigger(m.id)}><Icon name="play" />{m.label}<small>{motion === m.id ? '重播 ↻' : ''}</small></button>)}{!motions.some(m => m.label.includes(motionQuery)) && <p className="collection-empty">没有找到动作</p>}</div></GlassSurface>}</div></>}
+    {editing && <><GlassToolbar className="pet-cycle" aria-label="宠物切换"><GlassAction aria-label="上一个宠物" onClick={() => step(-1)}><Icon name="left" /></GlassAction><GlassAction className="pet-grid-open" title="所有宠物" aria-label="打开宠物收藏" onClick={() => openPanel('pets')}><Icon name="grid" /> <small>{companionPets.findIndex(p => p.name === asset) + 1} / {companionPets.length}</small></GlassAction><GlassAction aria-label="下一个宠物" onClick={() => step(1)}><Icon name="right" /></GlassAction></GlassToolbar><div className="pet-animation-picker"><GlassToolbar className="pet-animation-toolbar" aria-label="动画预览"><GlassAction title="重新播放" aria-label="重新播放当前动画" onClick={() => trigger(motion)}><Icon name="replay" /></GlassAction><GlassAction aria-label="选择动画" aria-expanded={motionsOpen} aria-controls="motion-palette" onClick={() => setMotionsOpen(open => !open)}><Icon name="play" /> {motions.find(m => m.id === motion)?.label} <Icon name={motionsOpen ? 'up' : 'down'} /></GlassAction></GlassToolbar>{motionsOpen && <GlassSurface as="section" material="panel" className="motion-palette" id="motion-palette" aria-label="选择动画"><header><strong>动作</strong><small>{motions.length}</small></header><label className="surface-search"><Icon name="search" /><input aria-label="搜索动画" placeholder="搜索动作" value={motionQuery} onChange={e => setMotionQuery(e.target.value)} /></label><div className="motion-list">{motions.filter(m => m.label.includes(motionQuery)).map(m => <button key={m.id} aria-pressed={motion === m.id} title={motion === m.id ? '点击重新播放' : '播放动作'} onClick={() => trigger(m.id)}><span>{m.label}</span><Icon name={motion === m.id ? 'check' : 'play'} /></button>)}{!motions.some(m => m.label.includes(motionQuery)) && <p className="collection-empty">没有找到动作</p>}</div></GlassSurface>}</div></>}
     {panel && <div className="pet-panel-backdrop" onClick={() => setPanel(null)}><GlassSurface material="panel" className={panel === 'pets' ? 'pet-collection-drawer' : 'pet-agent-dialog'} role="dialog" aria-modal="true" aria-label={panel === 'pets' ? '宠物收藏' : '配置 Agent'} onClick={e => e.stopPropagation()}><header><h2>{panel === 'pets' ? '宠物收藏' : '配置给 Agent'}</h2><button aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>{panel !== 'agents' && <label className="collection-search"><Icon name="search" /><input aria-label={panel === 'pets' ? '搜索宠物' : '搜索动画'} placeholder={panel === 'pets' ? '搜索宠物' : '搜索动画'} value={query} onChange={e => setQuery(e.target.value)} /></label>}{panel === 'pets' ? <div className="pet-avatar-grid">{companionPets.filter(p => p.name.includes(query)).map(p => <button key={p.name} aria-pressed={asset === p.name} onClick={() => { setAsset(p.name); setPanel(null); }}><span className={`pet-card-icon tone-${p.tone}`}>{p.icon}</span><span className="avatar-name">{p.name}</span></button>)}<button className="avatar-add" onClick={() => alert('原型演示：正式版将在这里选择宠物包')}><span className="pet-card-icon"><Icon name="plus" /></span><span className="avatar-name">添加</span></button>{!companionPets.some(p => p.name.includes(query)) && <p className="collection-empty">没有找到宠物</p>}</div> : <><div className="pet-agent-options">{agents.map(agent => <button key={agent.id} className={petBindings[agent.id] === asset ? 'is-configured' : ''} aria-pressed={petBindings[agent.id] === asset} onClick={() => toggleAgentBinding(agent.id)}><i style={{color:agent.color}}>{agent.icon}</i><span>{agent.name}</span><small>{petBindings[agent.id] === asset ? '已配置 ✓' : petBindings[agent.id] || '未配置'}</small></button>)}</div><button className="dialog-done" onClick={() => setPanel(null)}>完成</button></>}</GlassSurface></div>}
   </section>;
 }
@@ -146,7 +182,7 @@ function GameDock({ view }: { view: View }) {
   return <footer className="game-dock"><nav className="dock-tabs" role="tablist" aria-label="页面导航" style={{ '--dock-index': activeIndex } as CSSProperties}><span className="dock-tab-slider" aria-hidden="true" />{tabs.map(([id, icon, label]) => <button key={id} className={view === id ? 'dock-tab active' : 'dock-tab'} role="tab" aria-selected={view === id} onClick={() => goView(id)}><Icon name={icon} /><small>{label}</small></button>)}</nav>{view === 'home' && <button className="dock-primary" aria-label="查看连接" title="查看连接" onClick={() => goView('connections')}><span>查看连接</span><Icon name="right" /></button>}</footer>;
 }
 
-function SettingRow({ title, copy, checked, onChange }: { title: string; copy: string; checked: boolean; onChange: () => void }) { return <button className="setting-row" onClick={onChange}><span><strong>{title}</strong><small>{copy}</small></span><span className={checked ? 'toggle on' : 'toggle'}><i /></span></button>; }
+function SettingRow({ title, copy, checked, onChange }: { title: string; copy: string; checked: boolean; onChange: () => void }) { return <button className="setting-row" role="switch" aria-checked={checked} onClick={onChange}><span><strong>{title}</strong><small>{copy}</small></span><span className={checked ? 'toggle on' : 'toggle'}><i /></span></button>; }
 
 function VariantA({ selected, setSelected, selectedAgent, petBindings, scene }: ViewProps & { scene: Scene }) {
   const petBinding = petBindings[selectedAgent.id] ?? '星星';

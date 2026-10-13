@@ -94,3 +94,8 @@ export function GlassToolbar({ className, ...props }: ComponentPropsWithoutRef<'
   const { ref, optics } = useLens('control');
   return <div ref={node => { ref.current = node; }} role="group" className={`${classes('control', className)} glass-toolbar`} {...props}>{optics}{props.children}</div>;
 }
+
+/** Transparent native action inside one shared material; never another lens. */
+export function GlassAction({ className = '', type = 'button', ...props }: ComponentPropsWithoutRef<'button'>) {
+  return <button type={type} className={`glass-action ${className}`} {...props} />;
+}

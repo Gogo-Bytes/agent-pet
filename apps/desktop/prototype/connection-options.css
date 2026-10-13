@@ -34,3 +34,40 @@
 .co-paper .co-agent-name small,.co-prism .co-agent-name small,.co-paper .co-result > div > span,.co-prism .co-result > div > span { font-size:12px; }
 .co-paper .co-status,.co-prism .co-status { font-size:12px; }
 @media(max-width:720px) { .co-switcher { width:calc(100% - 24px);max-width:none; }.co-switcher button { padding-inline:6px; } }
+/* Selected C content inside the previously accepted persistent app frame. */
+.co-page.co-embedded { position:relative;z-index:2;display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;width:100%;padding:0; }
+.co-page.co-embedded[hidden] { display:none; }
+.co-embedded .co-main { flex:1;min-height:0;width:100%;max-width:none;margin:0;padding:24px 36px;overflow:auto;scrollbar-width:thin;scrollbar-color:#c8c5db transparent; }
+.co-embedded .co-library-head { margin-bottom:20px; }
+.co-embedded .co-library-head h1 { font-size:28px; }
+.co-embedded .co-agent { padding-block:12px;grid-template-columns:44px minmax(100px,1fr) 120px 130px 16px;gap:18px; }
+.co-embedded .co-agent .co-mark { width:44px;height:44px;font-size:26px;border-radius:13px; }
+.co-embedded .co-breadcrumb { margin-bottom:22px; }
+.co-embedded .co-detail-head { padding-bottom:24px; }
+.co-embedded .co-detail-head h1 { font-size:34px; }
+.co-embedded .co-detail-body { padding-top:24px;gap:30px; }
+.co-embedded .co-detail-config dl { gap:16px; }
+.co-embedded .co-setup { margin:20px auto;gap:40px;grid-template-columns:160px 1fr; }
+.co-embedded .co-setup-visual .co-mark { width:130px;height:130px;font-size:65px;border-radius:36px; }
+.co-embedded .co-setup-visual > span:last-child { top:110px;right:0; }
+.co-embedded .co-result { padding-block:13px; }
+.co-embedded .co-section-head h1,.co-embedded .co-setup h1 { font-size:30px; }
+.co-embedded .co-scan-stage { min-height:220px; }
+.co-embedded[hidden] * { animation:none; }
+.game-shell:has(.co-embedded:not([hidden])) > .game-topbar { flex-shrink:0; }
+@media(max-width:760px) {
+ .co-embedded .co-main { padding:22px 20px; }
+ .co-embedded .co-library-head { flex-direction:row;align-items:center!important;gap:18px;flex-wrap:wrap; }
+ .co-embedded .co-head-tools { width:100%;justify-content:space-between; }
+ .co-embedded .co-agent { grid-template-columns:44px minmax(90px,1fr) auto;gap:12px; }
+ .co-embedded .co-agent-activity,.co-embedded .co-agent > .ui-icon { display:none; }
+ .co-embedded .co-detail-body { grid-template-columns:1fr; }
+ .co-embedded .co-setup { grid-template-columns:1fr;gap:26px; }
+ .co-embedded .co-setup-visual .co-mark { width:92px;height:92px;font-size:48px;border-radius:28px; }
+ .co-embedded .co-setup-visual > span:last-child { top:70px;left:65px;right:auto; }
+}
+.co-embedded .co-library-head .co-kicker { display:none; }
+.co-embedded .co-library-head { margin-bottom:12px; }
+.co-embedded .co-library-label { margin-bottom:8px; }
+.co-embedded .co-agent { padding-block:9px; }
+@media(min-width:761px) { .co-embedded .co-main { padding-block:20px; } }

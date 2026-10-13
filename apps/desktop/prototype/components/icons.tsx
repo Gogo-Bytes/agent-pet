@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type IconName = 'home' | 'pet' | 'link' | 'settings' | 'grid' | 'left' | 'right' | 'plus' | 'close' | 'search' | 'play' | 'replay' | 'up' | 'down' | 'check';
+export type IconName = 'home' | 'pet' | 'link' | 'settings' | 'grid' | 'left' | 'right' | 'plus' | 'close' | 'search' | 'play' | 'replay' | 'up' | 'down' | 'check' | 'clock' | 'alert' | 'folder' | 'signal' | 'sleep';
 
 // Rounded silhouettes for navigation; simple strokes for directional actions.
 const glyphs: Record<IconName, ReactNode> = {
@@ -12,6 +12,11 @@ const glyphs: Record<IconName, ReactNode> = {
   search: <><circle cx="10.5" cy="10.5" r="7" opacity=".16"/><g fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.3"/><path d="m15.3 15.3 4.2 4.2"/></g></>,
   play: <path d="M7 5.8c0-1.4 1.5-2.2 2.7-1.5l10.2 6.2c1.1.7 1.1 2.3 0 3L9.7 19.7C8.5 20.4 7 19.6 7 18.2Z"/>,
   replay: <><circle cx="12" cy="12" r="8" opacity=".13"/><path d="M5 9a7.5 7.5 0 1 1 .7 7M4.5 4.5V9h4.7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/></>,
+  clock: <><circle cx="12" cy="12" r="9" opacity=".18"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></>,
+  alert: <><path d="M9.5 4.5a3 3 0 0 1 5 0l7 12a3 3 0 0 1-2.5 4.5H5a3 3 0 0 1-2.5-4.5Z" opacity=".2"/><path d="M12 8v6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><circle cx="12" cy="17.5" r="1.3"/></>,
+  folder: <><path d="M3 7a3 3 0 0 1 3-3h4l3 3h5a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z" opacity=".2"/><path d="M3 10h18v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z" opacity=".65"/></>,
+  signal: <><rect x="3" y="14" width="4" height="7" rx="2" opacity=".35"/><rect x="10" y="9" width="4" height="12" rx="2" opacity=".65"/><rect x="17" y="3" width="4" height="18" rx="2"/></>,
+  sleep: <><path d="M19 16.5A9 9 0 0 1 7.5 5a8.5 8.5 0 1 0 11.5 11.5Z" opacity=".7"/><path d="M15 3v4M13 5h4M20 8v3M18.5 9.5h3" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></>,
   left: null, right: null, plus: null, close: null, up: null, down: null, check: null,
 };
 const strokes: Partial<Record<IconName, string>> = {

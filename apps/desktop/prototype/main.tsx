@@ -4,6 +4,7 @@ import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from './componen
 import { Icon } from './components/icons.js';
 import './styles.css';
 import './glass-layout.css';
+import { ConnectionOptions } from './connection-options.js';
 import { ConnectionsView, type ConnectionDemo, type ConnectionHealths } from './connections.js';
 
 type Variant = 'a' | 'b' | 'c';
@@ -45,6 +46,8 @@ function goVariant(variant: Variant) {
 }
 
 function App() {
+  const [connectionOptions, setConnectionOptions] = useState(() => new URLSearchParams(location.search).has('connectionDesign'));
+  useEffect(() => { const sync = () => setConnectionOptions(new URLSearchParams(location.search).has('connectionDesign')); addEventListener('popstate', sync); return () => removeEventListener('popstate', sync); }, []);
   const [variant, setVariant] = useState<Variant>(currentVariant);
   const [scene, setScene] = useState<Scene>(currentScene);
   const [view, setView] = useState<View>(currentView);
@@ -54,10 +57,11 @@ function App() {
   const [connectionHealths, setConnectionHealths] = useState<ConnectionHealths>({ pi: 'online', codex: 'online', claude: 'waiting' });
   const [petBindings, setPetBindings] = useState<Record<string, string>>({ pi: '星星', codex: '云朵', claude: '小橘' });
   useEffect(() => { const onPop = () => { setVariant(currentVariant()); setScene(currentScene()); setView(currentView()); }; addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop); }, []);
-  useEffect(() => { const onKey = (event: KeyboardEvent) => { if (event.target instanceof HTMLElement && event.target.closest('input, select, textarea, button, [role=tablist]')) return; if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant); goVariant(order[(index + (event.key === 'ArrowRight' ? 1 : 2)) % 3]!); } }; addEventListener('keydown', onKey); return () => removeEventListener('keydown', onKey); }, [variant]);
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { if (event.target instanceof HTMLElement && event.target.closest('input, select, textarea, button, [role=tablist]')) return; if (new URLSearchParams(location.search).has('connectionDesign')) return; if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant); goVariant(order[(index + (event.key === 'ArrowRight' ? 1 : 2)) % 3]!); } }; addEventListener('keydown', onKey); return () => removeEventListener('keydown', onKey); }, [variant]);
   const selectedAgent = useMemo(() => { const agent = agents.find(agent => agent.id === selected) ?? agents[0]!; const health = connectionHealths[agent.id as keyof ConnectionHealths]; return { ...agent, connected: health === 'online', state: health === 'waiting' ? `等待 ${agent.name} 启动` : health === 'error' ? '连接需要检查' : health == null ? '未连接' : agent.state }; }, [selected, connectionHealths]);
   const connect = () => { setConnected(true); setSelected('pi'); };
   const props = { selected, setSelected, selectedAgent, connected, connect, petBindings, setPetBindings };
+  if (connectionOptions) return <ConnectionOptions />;
   return <div className="prototype-page">
     {variant === 'a' && <GameLayout {...props} view={view} scene={scene} onConfigured={setConnectionHealths} connectionDemo={connectionDemo} />}
     {variant === 'b' && <VariantB {...props} />}
@@ -218,7 +222,7 @@ function PrototypeSwitcher({ variant, scene, view, connectionDemo, setConnection
   const connectionView = variant === 'a' && view === 'connections';
   return <nav className="prototype-switcher" aria-label="原型方案切换"><span className="demo-label">{connectionView ? '模拟数据' : '界面演示'}</span>
     {connectionView ? <select aria-label="连接演示情境" value={connectionDemo} onChange={event => setConnectionDemo(event.target.value as ConnectionDemo)}><option value="normal">已有连接</option><option value="empty">首次添加</option><option value="missing">未找到</option><option value="waiting">等待启动</option><option value="error">连接异常</option></select> : variant === 'a' && <select aria-label="演示状态" value={scene} onChange={event => goScene(event.target.value as Scene)}><option value="welcome">首次使用</option><option value="waiting">等待 pi</option><option value="working">工作中</option><option value="completed">已完成</option><option value="disconnected">连接中断</option></select>}
-    <button onClick={() => goVariant(order[(index + 2) % 3]!)}>←</button><span>{connectionView ? '连接流程' : names[variant]}</span><button onClick={() => goVariant(order[(index + 1) % 3]!)}>→</button>
+    <>{connectionView && <button onClick={() => { const url = new URL(location.href); url.searchParams.set('connectionDesign', 'arcade'); url.hash = '/connections/library'; location.href = url.toString(); }}>新方案</button>}</><button onClick={() => goVariant(order[(index + 2) % 3]!)}>←</button><span>{connectionView ? '连接流程' : names[variant]}</span><button onClick={() => goVariant(order[(index + 1) % 3]!)}>→</button>
   </nav>;
 }
 

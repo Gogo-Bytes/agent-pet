@@ -3,9 +3,9 @@
 .identity-agent { font-size:14px; font-weight:650; color:#706779; letter-spacing:0; }
 .identity-status { font-size:16px; color:#514959; }
 .pet-binding-tags { gap:8px; margin-top:8px; max-width:min(360px,calc(100vw - 80px)); }
-.pet-binding-tag { min-height:44px; padding:6px 12px 6px 7px; gap:9px; font-size:14px; font-weight:600; color:var(--glass-ink); }
-.pet-binding-tag i { width:28px; height:28px; font-size:16px; background:#ffffff80; }
-.pet-binding-tag button { width:28px; min-height:28px; border-radius:50%; color:#696071; transition:opacity .16s,background .16s; }
+.pet-binding-tag { min-height:44px; padding:6px 12px 6px 7px; gap:9px; font-size:14px; font-weight:550; color:var(--glass-ink); }
+.pet-binding-tag i { width:28px; height:28px; font-size:16px; background:linear-gradient(145deg,#ffffffb0,#eee4f948); box-shadow:inset 0 1px 0 #fff,0 1px 3px #84639914; }
+.pet-binding-tag button { width:28px; min-height:28px; border-radius:50%; color:var(--glass-secondary-ink); transition:opacity .16s,background .16s; }
 .pet-binding-tag button:hover { background:#74608a14; }
 .pet-binding-tag button .ui-icon { width:14px; height:14px; }
 .pet-tag-add { width:44px; height:44px; min-height:44px; color:var(--glass-ink); }
@@ -26,34 +26,30 @@
 .surface-search { margin-bottom:10px; }
 .surface-search .ui-icon,.collection-search .ui-icon { width:20px; height:20px; color:var(--glass-secondary-ink); }
 .surface-search input,.collection-search input { width:100%; min-width:0; height:100%; padding:0; margin:0; background:transparent; border:0; border-radius:0; outline:none; color:var(--glass-ink); font:inherit; font-size:14px; }
-.surface-search input::placeholder,.collection-search input::placeholder { color:#776f80; }
+.surface-search input::placeholder,.collection-search input::placeholder { color:var(--glass-secondary-ink); }
 .surface-search:focus-within,.collection-search:focus-within { outline:2px solid #8871be; outline-offset:2px; }
 .surface-search input:focus-visible { outline:none; }
 .motion-palette .motion-list { gap:3px; }
 .motion-palette .motion-list button { min-height:44px; padding:0 12px; gap:12px; font-size:14px; font-weight:550; border-radius:12px; color:var(--glass-ink); flex-wrap:nowrap; }
-.motion-palette .motion-list button .ui-icon { width:18px; height:18px; margin-left:auto; color:#80758e; }
-.motion-palette .motion-list button[aria-pressed=true] { color:#563d85; background:#8b6dce18; }
-.motion-palette .motion-list button[aria-pressed=true] .ui-icon { color:#6d50a5; }
-.motion-palette .motion-list button:hover { background:#72668012; }
-.motion-palette .motion-list button[aria-pressed=true]:hover { background:#8b6dce29; }
+.motion-palette .motion-list button .ui-icon { width:18px; height:18px; margin-left:auto; color:var(--glass-secondary-ink); }
+.motion-palette .motion-list button[aria-pressed=true] { color:var(--glass-accent); }
+.motion-palette .motion-list button[aria-pressed=true] .ui-icon { color:var(--glass-accent); }
 .motion-list button:focus-visible { outline:2px solid #8871be; outline-offset:-2px; }
 .pet-collection-drawer { inset:14px 14px 14px auto; width:min(410px,calc(100% - 28px)); padding:24px; border-radius:30px; }
 .pet-agent-dialog { padding:24px; border-radius:30px; }
 .pet-panel-backdrop header { margin-bottom:20px; gap:16px; }
 .pet-panel-backdrop h2 { font-size:24px; font-weight:700; color:var(--glass-ink); letter-spacing:-.025em; }
-.pet-panel-backdrop header button { width:44px; height:44px; flex:none; background:#7266800b; color:var(--glass-ink); }
+.pet-panel-backdrop header button { width:44px; height:44px; flex:none; background:transparent; color:var(--glass-ink); }
 .pet-panel-backdrop header button .ui-icon { width:20px; height:20px; }
-.pet-panel-backdrop header button:hover { background:#72668019; color:var(--glass-ink); }
 .collection-search { margin-bottom:24px; }
 .pet-avatar-grid { gap:24px 14px; padding:7px; }
-.pet-avatar-grid button { gap:12px; color:#61586d; font-size:14px; font-weight:550; }
+.pet-avatar-grid button { gap:12px; color:var(--glass-ink); font-size:14px; font-weight:550; }
 .pet-avatar-grid .pet-card-icon { border-radius:16px; }
-.pet-avatar-grid button:hover .avatar-name { color:#302e3b; }
+.pet-avatar-grid button:hover .avatar-name { color:var(--glass-ink); }
 .pet-agent-options { gap:4px; }
 .pet-agent-options button { min-height:56px; padding:10px 12px; border-radius:16px; font-size:15px; background:transparent; color:var(--glass-ink); }
-.pet-agent-options button:hover { background:#72668012; }
-.pet-agent-options button.is-configured { border-color:transparent; background:#8b6dce18; color:#563d85; }
-.pet-agent-options i { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:#ffffff80; }
+.pet-agent-options button.is-configured { color:var(--glass-accent); }
+.pet-agent-options i { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:linear-gradient(145deg,#ffffffb0,#eee4f948); box-shadow:inset 0 1px 0 #fff,0 1px 3px #84639914; }
 .pet-agent-options small { font-size:12px; color:var(--glass-secondary-ink); }
 .dialog-done { min-height:44px; border-radius:22px; font-size:14px; }
 .radar-panel,.settings-board { background:#fcfbfdf2; backdrop-filter:none; border:1px solid #e9e4ef; box-shadow:0 12px 32px #5347620a; }

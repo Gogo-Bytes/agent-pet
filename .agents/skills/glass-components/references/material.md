@@ -43,8 +43,8 @@ These principles do not prescribe our pixel sizes. Agent Pet uses the following 
 
 | Anatomy | Project contract |
 | --- | --- |
-| Foreground | Neutral dark ink; 14px control labels, 18px palette heading, 24px drawer heading; secondary text remains readable |
-| Symbols | Consistent 24-unit viewBox, 1.9 stroke, generally 20px rendered size; no decorative repeated icon competing with the label |
+| Foreground | Muted violet ink (#725d89), deeper violet for selection; 14px control labels, 18px palette heading, 24px drawer heading; secondary text remains readable |
+| Symbols | Consistent 24-unit viewBox, rounded duotone silhouettes for navigation, 2.6-unit round strokes for directional actions, generally 20px rendered size; no decorative repeated icon competing with the label |
 | Targets | 44px principal controls; 28px nested tag removal, visible on hover/focus or touch |
 | Geometry | Group padding 5px, outer radius 28px, inner action radius 23px; larger panels use proportionate inset space |
 | Grouping | Pet navigation shares one surface; transparent native GlassAction children introduce no new filters |
@@ -52,3 +52,11 @@ These principles do not prescribe our pixel sizes. Agent Pet uses the following 
 | Content | Settings and scan result cards use ordinary reading surfaces; white footer and scene identity remain outside glass |
 
 A foreground redesign is required whenever the material changes. Inspect text weight, contrast, icon optical size, spacing, actionable grouping, state feedback, and expanded geometry together. Never accept a background-only replacement as complete. Our CSS approximation has no native automatic luminosity adaptation: test against the actual scene and revise when the 3D background arrives.
+
+## Inner material hierarchy (user revision)
+
+- [Apple Materials](https://developer.apple.com/design/human-interface-guidelines/materials): use thinner fills and effects to express content structure within the material. Do not apply another glass filter to every child.
+- [Apple Color](https://developer.apple.com/design/human-interface-guidelines/color): symbols and labels on glass can use color, especially to identify selection. Our muted violet palette is a product choice, not a native adaptive vibrancy implementation.
+- [Kube switch reference extracted by Chrome Labs](https://github.com/GoogleChromeLabs/css-web-ui-demos/blob/main/html-in-canvas/public/assets/liquid_glass_reference/index.html): the track and thumb have different roles; the thumb has its own specular and elevation treatment. Adapt this relationship, not the demo's dimensions or filter intensity.
+
+Use `glass-inset` for a shallow, lightly tinted search recess, `glass-choice` for transparent child actions that gain a pearl highlight and small shadow on selection, and transparent GlassAction children in a shared group. The inset and selection layers use shared rim/tint tokens, not independent backdrop filters. Keep text and icons crisp and colored consistently. Selected, hover, pressed, and keyboard focus must remain distinguishable. Do not flatten these layers with legacy page-specific background rules.

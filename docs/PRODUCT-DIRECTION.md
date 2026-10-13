@@ -215,3 +215,16 @@ PetAsset  <- AgentPetBinding ->  ConfiguredAgent
 - 不把技术实现细节放在首次使用的主流程中。
 - 不在没有真实 Adapter 能力和验收证据时虚构“支持”某个 Agent。
 - 不因为先做 Web 原型而绕过 Electron 的权限、IPC 和真实文件写入边界。
+
+## 12. 宠物页与共享场景（2026-10-13）
+
+本轮浏览器原型采用常驻 `GameLayout → CompanionStage → 场景 + HTML UI`。首页和宠物页切换仅改变 UI 与场景输入；不因 view 给场景加 key 或卸载 Canvas。正式 Three.js 接入时相机、渲染循环与动画 mixer 属于该常驻场景；模型切换才加载/释放模型资源。当前 CSS 宠物是占位，尚不构成真实 3D 无缝切换验收。
+
+- 宠物页铺满背景；名称与首页同一信息层级，下方显示已绑定 Agent tags。
+- 上一个/下一个快速浏览；矩阵收藏放在右侧抽屉，原型增加到六个演示宠物以检查矩阵结构。
+- tags 的加号打开 Agent 配置弹窗；支持多个 Agent 使用同一宠物。关闭 tag 仅解除该绑定，不停用或删除真实 Agent 连接。
+- 宠物页不呈现连接状态；配置弹窗展示当前宠物分配情况。
+- 动画预览入口读取模型能力的最终设计待接入；当前待机/工作/庆祝/睡觉是 CSS 交互演示。
+- 既有模型契约见 ARCHITECTURE-DESIGN.md：idle 必须，working/success/error/attention 可选，缺失动作确定性回退。正式宠物包须用 JSON 映射语义动作到 GLB 内实际 clip，并记录标签、循环方式；界面只列出实际支持动作。睡觉不是当前必需导出动作，不能将原型按钮当作艺术家格式规范。
+
+阶段仍是 UI 原型验证。GLB+JSON 导入、真实 clip 播放、Canvas 生命周期和相机过渡需要在真实模型阶段验收。

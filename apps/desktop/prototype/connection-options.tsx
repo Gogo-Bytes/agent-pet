@@ -5,8 +5,8 @@ import './connection-options.css';
 import type { ConnectionDemo, ConnectionHealths } from './connections.js';
 type Design = 'arcade' | 'paper' | 'prism';
 type Health = 'online' | 'waiting' | 'error';
-type AgentEntry = { id: string; name: string; symbol: string; color: string; alias: string; health: Health; activity: string; path: string };
-const catalog: AgentEntry[] = [
+export type AgentEntry = { id: string; name: string; symbol: string; color: string; alias: string; health: Health; activity: string; path: string };
+export const catalog: AgentEntry[] = [
  {id:'pi',name:'pi',symbol:'π',color:'#b29aff',alias:'个人配置',health:'online',activity:'待命中',path:'~/.pi/agent'},
  {id:'codex',name:'Codex',symbol:'⌘',color:'#8edbc4',alias:'个人配置',health:'online',activity:'工作中',path:'~/Agent-Demo/codex/personal'},
  {id:'claude',name:'Claude Code',symbol:'✳',color:'#ffb38b',alias:'个人配置',health:'waiting',activity:'尚未收到状态',path:'~/Agent-Demo/claude/personal'},

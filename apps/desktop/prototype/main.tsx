@@ -4,6 +4,7 @@ import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from './componen
 import { Icon } from './components/icons.js';
 import './styles.css';
 import './glass-layout.css';
+import { ConnectionsConfig } from './connections-config.js';
 import { ConnectionOptions } from './connection-options.js';
 import { type ConnectionDemo, type ConnectionHealths } from './connections.js';
 
@@ -173,7 +174,7 @@ function CompanionStage({ view, scene, selected, setSelected, selectedAgent, pet
 }
 
 function GameLayout(props: ViewProps & { view: View; scene: Scene; connectionDemo: ConnectionDemo; onConfigured: (healths: ConnectionHealths) => void }) {
-  return <main className="game-shell"><AppHeader view={props.view} /><CompanionStage {...props} /><ConnectionOptions embedded demo={props.connectionDemo} visible={props.view === 'connections'} onConfigured={props.onConfigured} />{props.view === 'settings' && <SettingsView {...props} />}<GameDock view={props.view} /></main>;
+  return <main className="game-shell"><AppHeader view={props.view} /><CompanionStage {...props} /><ConnectionsConfig demo={props.connectionDemo} visible={props.view === 'connections'} onConfigured={props.onConfigured} />{props.view === 'settings' && <SettingsView {...props} />}<GameDock view={props.view} /></main>;
 }
 
 function GameDock({ view }: { view: View }) {
@@ -221,7 +222,7 @@ function PrototypeSwitcher({ variant, scene, view, connectionDemo, setConnection
   const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant);
   const connectionView = variant === 'a' && view === 'connections';
   return <nav className="prototype-switcher" aria-label="原型方案切换"><span className="demo-label">{connectionView ? '模拟数据' : '界面演示'}</span>
-    {connectionView ? <select aria-label="连接演示情境" value={connectionDemo} onChange={event => setConnectionDemo(event.target.value as ConnectionDemo)}><option value="normal">已有连接</option><option value="empty">首次添加</option><option value="missing">未找到</option><option value="waiting">等待启动</option><option value="error">连接异常</option></select> : variant === 'a' && <select aria-label="演示状态" value={scene} onChange={event => goScene(event.target.value as Scene)}><option value="welcome">首次使用</option><option value="waiting">等待 pi</option><option value="working">工作中</option><option value="completed">已完成</option><option value="disconnected">连接中断</option></select>}
+    {connectionView ? <select aria-label="连接演示情境" value={connectionDemo} onChange={event => setConnectionDemo(event.target.value as ConnectionDemo)}><option value="normal">已有连接</option><option value="empty">首次添加</option><option value="missing">未找到</option><option value="waiting">尚未检查</option><option value="error">配置异常</option></select> : variant === 'a' && <select aria-label="演示状态" value={scene} onChange={event => goScene(event.target.value as Scene)}><option value="welcome">首次使用</option><option value="waiting">等待 pi</option><option value="working">工作中</option><option value="completed">已完成</option><option value="disconnected">连接中断</option></select>}
     <button onClick={() => goVariant(order[(index + 2) % 3]!)}>←</button><span>{connectionView ? '连接流程' : names[variant]}</span><button onClick={() => goVariant(order[(index + 1) % 3]!)}>→</button>
   </nav>;
 }

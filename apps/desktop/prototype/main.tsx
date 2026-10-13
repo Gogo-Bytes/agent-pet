@@ -4,7 +4,7 @@ import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from './componen
 import { Icon } from './components/icons.js';
 import './styles.css';
 import './glass-layout.css';
-import { ConnectionsView } from './connections.js';
+import { ConnectionsView, type ConnectionDemo } from './connections.js';
 
 type Variant = 'a' | 'b' | 'c';
 type Scene = 'welcome' | 'waiting' | 'working' | 'completed' | 'disconnected';
@@ -50,6 +50,7 @@ function App() {
   const [view, setView] = useState<View>(currentView);
   const [selected, setSelected] = useState('pi');
   const [connected, setConnected] = useState(true);
+  const [connectionDemo, setConnectionDemo] = useState<ConnectionDemo>('normal');
   const [piHealth, setPiHealth] = useState<'online' | 'waiting' | 'error' | null>('online');
   const [petBindings, setPetBindings] = useState<Record<string, string>>({ pi: '星星', codex: '云朵', claude: '小橘' });
   useEffect(() => { const onPop = () => { setVariant(currentVariant()); setScene(currentScene()); setView(currentView()); }; addEventListener('popstate', onPop); return () => removeEventListener('popstate', onPop); }, []);
@@ -58,10 +59,10 @@ function App() {
   const connect = () => { setConnected(true); setSelected('pi'); };
   const props = { selected, setSelected, selectedAgent, connected, connect, petBindings, setPetBindings };
   return <div className="prototype-page">
-    {variant === 'a' && <GameLayout {...props} view={view} scene={scene} onConfigured={setPiHealth} />}
+    {variant === 'a' && <GameLayout {...props} view={view} scene={scene} onConfigured={setPiHealth} connectionDemo={connectionDemo} />}
     {variant === 'b' && <VariantB {...props} />}
     {variant === 'c' && <VariantC {...props} />}
-    <PrototypeSwitcher variant={variant} scene={scene} />
+    <PrototypeSwitcher variant={variant} scene={scene} view={view} connectionDemo={connectionDemo} setConnectionDemo={setConnectionDemo} />
   </div>;
 }
 
@@ -167,8 +168,8 @@ function CompanionStage({ view, scene, selected, setSelected, selectedAgent, pet
   </section>;
 }
 
-function GameLayout(props: ViewProps & { view: View; scene: Scene; onConfigured: (health: 'online' | 'waiting' | 'error' | null) => void }) {
-  return <main className="game-shell"><AppHeader view={props.view} /><CompanionStage {...props} /><ConnectionsView visible={props.view === 'connections'} onConfigured={props.onConfigured} />{props.view === 'settings' && <SettingsView {...props} />}<GameDock view={props.view} /></main>;
+function GameLayout(props: ViewProps & { view: View; scene: Scene; connectionDemo: ConnectionDemo; onConfigured: (health: 'online' | 'waiting' | 'error' | null) => void }) {
+  return <main className="game-shell"><AppHeader view={props.view} /><CompanionStage {...props} /><ConnectionsView demo={props.connectionDemo} visible={props.view === 'connections'} onConfigured={props.onConfigured} />{props.view === 'settings' && <SettingsView {...props} />}<GameDock view={props.view} /></main>;
 }
 
 function GameDock({ view }: { view: View }) {
@@ -211,6 +212,14 @@ function VariantC({ selected, setSelected, selectedAgent, connected, connect }: 
   return <main className="shell variant-c"><header className="topbar"><div className="brand"><span className="brand-mark">✦</span><span>Agent Pet</span></div><button className="icon-button">⚙</button></header><section className="control-center"><div className="mood-card"><div><p className="eyebrow">现在的 Agent Pet</p><h1>{connected ? '陪伴中，状态不错' : '正在等一个伙伴'}</h1><p className="subcopy">{connected ? `${selectedAgent.name} 正在安静地做自己的事。` : '选一个 AI，让今天变得更有趣。'}</p></div><Pet mood={connected ? 'happy' : 'sleepy'} /></div><div className="section-heading"><span>我的 AI 伙伴</span><button className="text-button">管理连接 →</button></div><div className="agent-grid">{agents.map(agent => <button key={agent.id} className={selected === agent.id ? 'agent-tile selected' : 'agent-tile'} onClick={() => setSelected(agent.id)}><span className="tile-icon" style={{ color: agent.color }}>{agent.icon}</span><span className="tile-name">{agent.name}</span><span className={`tile-state ${selected === agent.id && connected ? 'online' : ''}`}>{selected === agent.id && connected ? '陪伴中' : agent.state}</span></button>)}</div><div className="activity-card"><div className="activity-icon">☀</div><div><strong>{connected ? '一切都好' : '还可以更热闹一点'}</strong><span>{connected ? '完成时我会轻轻提醒你。' : '挑一个 AI 伙伴，我就准备好了。'}</span></div><button className="primary small" onClick={connect}>{connected ? '查看状态' : '开始连接'}</button></div></section></main>;
 }
 
-function PrototypeSwitcher({ variant, scene }: { variant: Variant; scene: Scene }) { const names = { a: 'A · 宠物陪伴首页', b: 'B · 单步连接向导', c: 'C · 宠物控制中心' }; const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant); return <nav className="prototype-switcher" aria-label="原型方案切换"><span className="demo-label">界面演示</span>{variant === 'a' && <select aria-label="演示状态" value={scene} onChange={event => goScene(event.target.value as Scene)}><option value="welcome">首次使用</option><option value="waiting">等待 pi</option><option value="working">工作中</option><option value="completed">已完成</option><option value="disconnected">连接中断</option></select>}<button onClick={() => goVariant(order[(index + 2) % 3]!)}>←</button><span>{names[variant]}</span><button onClick={() => goVariant(order[(index + 1) % 3]!)}>→</button></nav>; }
+function PrototypeSwitcher({ variant, scene, view, connectionDemo, setConnectionDemo }: { variant: Variant; scene: Scene; view: View; connectionDemo: ConnectionDemo; setConnectionDemo: (value: ConnectionDemo) => void }) {
+  const names = { a: 'A · 宠物陪伴首页', b: 'B · 单步连接向导', c: 'C · 宠物控制中心' };
+  const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant);
+  const connectionView = variant === 'a' && view === 'connections';
+  return <nav className="prototype-switcher" aria-label="原型方案切换"><span className="demo-label">{connectionView ? '模拟数据' : '界面演示'}</span>
+    {connectionView ? <select aria-label="连接演示情境" value={connectionDemo} onChange={event => setConnectionDemo(event.target.value as ConnectionDemo)}><option value="normal">已有连接</option><option value="empty">首次添加</option><option value="missing">未找到</option><option value="waiting">等待启动</option><option value="error">连接异常</option></select> : variant === 'a' && <select aria-label="演示状态" value={scene} onChange={event => goScene(event.target.value as Scene)}><option value="welcome">首次使用</option><option value="waiting">等待 pi</option><option value="working">工作中</option><option value="completed">已完成</option><option value="disconnected">连接中断</option></select>}
+    <button onClick={() => goVariant(order[(index + 2) % 3]!)}>←</button><span>{connectionView ? '连接流程' : names[variant]}</span><button onClick={() => goVariant(order[(index + 1) % 3]!)}>→</button>
+  </nav>;
+}
 
 createRoot(document.getElementById('root')!).render(<App />);

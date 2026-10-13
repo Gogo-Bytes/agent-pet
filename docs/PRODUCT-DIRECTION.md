@@ -268,3 +268,7 @@ PetAsset  <- AgentPetBinding ->  ConfiguredAgent
 ### 收藏抽屉打开闪动修复（2026-10-13）
 
 抽屉进入动画期间默认 focus() 会滚动 overflow:hidden 的场景容器，使它先横移后复位。逐帧复现记录到 scrollLeft 从0跳到396px再回到0；抽屉初始聚焦、Tab循环与关闭返回统一使用 focus({ preventScroll: true })。同一逐帧复验记录全部 scrollLeft=0，抽屉x从1155单向滑到745，保留自动聚焦及原有滑入动画。临时逐帧探针已移除。
+
+### 收藏抽屉行为调整（2026-10-13）
+
+按用户确认，收藏抽屉取消外部空隙和圆角，上下右贴齐场景边界；点头像只切换宠物/选中态，不关闭面板。关闭按钮、遮罩与Esc进入220ms滑出状态，面板和焦点限制保留至动画结束后卸载；260ms清理计时器兜底并在取消时清理，减少动画偏好下直接完成关闭。主Agent实看选择云朵后面板仍展开，bounds上下右与场景一致、radius=0；点击关闭后读取到仍挂载、data-closing=true、animationName=drawer-out，结束后焦点回入口。仅Web原型调整。

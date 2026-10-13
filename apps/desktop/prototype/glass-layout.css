@@ -35,7 +35,7 @@
 .motion-palette .motion-list button[aria-pressed=true] { color:var(--glass-accent); }
 .motion-palette .motion-list button[aria-pressed=true] .ui-icon { color:var(--glass-accent); }
 .motion-list button:focus-visible { outline:2px solid #8871be; outline-offset:-2px; }
-.pet-collection-drawer { inset:14px 14px 14px auto; width:min(410px,calc(100% - 28px)); padding:24px; border-radius:30px; }
+.pet-collection-drawer { inset:0 0 0 auto; width:min(410px,100%); padding:24px; border-radius:0; }
 .pet-agent-dialog { padding:24px; border-radius:30px; }
 .pet-panel-backdrop header { margin-bottom:20px; gap:16px; }
 .pet-panel-backdrop h2 { font-size:24px; font-weight:700; color:var(--glass-ink); letter-spacing:-.025em; }
@@ -81,4 +81,12 @@
   .motion-palette .motion-list button { flex:0 0 auto; width:auto; min-width:68px; min-height:44px; padding:0 8px; gap:8px; }
   .motion-palette .motion-list button .ui-icon { width:16px; height:16px; }
   .motion-palette .collection-empty { margin:8px auto; }
+}
+
+.pet-collection-drawer[data-closing="true"] { animation:drawer-out .22s ease-in both; }
+.pet-panel-backdrop[data-closing="true"] { animation:drawer-backdrop-out .22s ease-in both; pointer-events:none; }
+@keyframes drawer-out { from { transform:translateX(0); } to { transform:translateX(100%); } }
+@keyframes drawer-backdrop-out { to { background:transparent; } }
+@media(prefers-reduced-motion:reduce) {
+  .pet-collection-drawer[data-closing="true"],.pet-panel-backdrop[data-closing="true"] { animation:none; }
 }

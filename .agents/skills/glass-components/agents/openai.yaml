@@ -1,0 +1,4 @@
+interface:
+  display_name: "Glass Components"
+  short_description: "Design restrained glass UI with reusable React components"
+  default_prompt: "Use $glass-components to build and visually verify glass controls for Agent Pet."

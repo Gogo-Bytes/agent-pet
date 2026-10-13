@@ -232,3 +232,13 @@ PetAsset  <- AgentPetBinding ->  ConfiguredAgent
 ### 动画试播交互修订
 
 动画选择使用锚定场景边缘的非模态动作浮层，无遮罩、不模糊背景。选择动作即试播，浮层保持展开，允许连续切换或重复点击重播；支持搜索与有界滚动。入口按钮或 Esc 收起，切页或打开其他配置面板时关闭。当前动画目录仍为演示数据，真实阶段从模型 clip 能力读取。
+
+### Glass 通用组件与视觉验收（2026-10-13）
+
+项目 skill：[glass-components](../.agents/skills/glass-components/SKILL.md)，研究来源和材质选择见其 `references/material.md`。原型通用实现位于 `apps/desktop/prototype/components/glass.tsx` / `glass.css`，提供 GlassSurface、GlassButton、GlassToolbar；材质与布局分开，独立控件和内容面板采用不同透明度。已替换 Agent tags、宠物切换、动画工具栏/浮层、收藏抽屉、配置弹窗及连接/设置面板。白色页脚、身份文字、头像保留原有层级。
+
+本轮采用 CSS 透光与边缘高光形成镜片观感，未实现 SVG 位移折射。动画浮层与工具栏同级，避免嵌套 backdrop root；抽屉遮罩只压暗背景。支持无 backdrop-filter 的实色底，以及减少透明、减少动画和系统强制颜色的回退。
+
+实看 1200×800 与 390×844：检查首页、宠物、连接、设置、头像 hover/选中/键盘焦点和连续动作切换；减少透明效果模拟确认浮层背景实色且 backdrop-filter 为 none。自评后修正外框高度造成的滚动裁顶、窄窗口动作列表遮脸，窄窗口采用更矮的双列动作盘。未验证旧浏览器实机和 Electron/Three.js GPU 成本，正式场景接入时重验。
+
+独立代码挑刺补充修正：交互态背景改为共享 token，使无模糊/减少透明回退覆盖 hover 与选中态；移除页面级重复过渡；GlassToolbar 使用 group 语义。

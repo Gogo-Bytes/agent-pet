@@ -228,3 +228,7 @@ PetAsset  <- AgentPetBinding ->  ConfiguredAgent
 - 既有模型契约见 ARCHITECTURE-DESIGN.md：idle 必须，working/success/error/attention 可选，缺失动作确定性回退。正式宠物包须用 JSON 映射语义动作到 GLB 内实际 clip，并记录标签、循环方式；界面只列出实际支持动作。睡觉不是当前必需导出动作，不能将原型按钮当作艺术家格式规范。
 
 阶段仍是 UI 原型验证。GLB+JSON 导入、真实 clip 播放、Canvas 生命周期和相机过渡需要在真实模型阶段验收。
+
+### 动画试播交互修订
+
+动画选择使用锚定场景边缘的非模态动作浮层，无遮罩、不模糊背景。选择动作即试播，浮层保持展开，允许连续切换或重复点击重播；支持搜索与有界滚动。入口按钮或 Esc 收起，切页或打开其他配置面板时关闭。当前动画目录仍为演示数据，真实阶段从模型 clip 能力读取。

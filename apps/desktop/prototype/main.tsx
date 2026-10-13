@@ -4,6 +4,7 @@ import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from './componen
 import { Icon } from './components/icons.js';
 import './styles.css';
 import './glass-layout.css';
+import { SettingsView } from './settings-view.js';
 import { ConnectionsConfig } from './connections-config.js';
 import { ConnectionOptions } from './connection-options.js';
 import { type ConnectionDemo, type ConnectionHealths } from './connections.js';
@@ -81,12 +82,6 @@ function AppHeader({ view }: { view: View }) { return <header className="game-to
 
 function FeatureHeader({ title, copy, view }: { title: string; copy: string; view: Exclude<View, 'home'> }) { return <><AppHeader view={view} /><div className="feature-heading"><p className="eyebrow">Agent Pet</p><h1>{title}</h1><p className="subcopy">{copy}</p></div></>; }
 
-
-function SettingsView({ connected }: ViewProps) {
-  const [notifications, setNotifications] = useState(true);
-  const [login, setLogin] = useState(false);
-  return <section className="game-feature-room settings-room"><div className="feature-kicker">设置</div><div className="settings-board"><h1>基本设置</h1><SettingRow title="完成提醒" copy="宠物提醒我查看结果" checked={notifications} onChange={() => setNotifications(!notifications)} /><SettingRow title="登录时启动" copy="打开电脑后自动出现" checked={login} onChange={() => setLogin(!login)} /><div className="settings-footnote">只观察状态 · 不读取对话 · 不控制 Agent</div></div></section>;
-}
 
 const companionPets = [
   { name: '星星', icon: '✦', tone: 'violet' as const },
@@ -174,7 +169,7 @@ function CompanionStage({ view, scene, selected, setSelected, selectedAgent, pet
 }
 
 function GameLayout(props: ViewProps & { view: View; scene: Scene; connectionDemo: ConnectionDemo; onConfigured: (healths: ConnectionHealths) => void }) {
-  return <main className="game-shell"><AppHeader view={props.view} /><CompanionStage {...props} /><ConnectionsConfig demo={props.connectionDemo} visible={props.view === 'connections'} onConfigured={props.onConfigured} />{props.view === 'settings' && <SettingsView {...props} />}<GameDock view={props.view} /></main>;
+  return <main className="game-shell"><AppHeader view={props.view} /><CompanionStage {...props} /><ConnectionsConfig demo={props.connectionDemo} visible={props.view === 'connections'} onConfigured={props.onConfigured} /><SettingsView visible={props.view === 'settings'} /><GameDock view={props.view} /></main>;
 }
 
 function GameDock({ view }: { view: View }) {
@@ -183,7 +178,7 @@ function GameDock({ view }: { view: View }) {
   return <footer className="game-dock"><nav className="dock-tabs" role="tablist" aria-label="页面导航" style={{ '--dock-index': activeIndex } as CSSProperties}><span className="dock-tab-slider" aria-hidden="true" />{tabs.map(([id, icon, label]) => <button key={id} className={view === id ? 'dock-tab active' : 'dock-tab'} role="tab" aria-selected={view === id} onClick={() => goView(id)}><Icon name={icon} /><small>{label}</small></button>)}</nav>{view === 'home' && <button className="dock-primary" aria-label="查看连接" title="查看连接" onClick={() => goView('connections')}><span>查看连接</span><Icon name="right" /></button>}</footer>;
 }
 
-function SettingRow({ title, copy, checked, onChange }: { title: string; copy: string; checked: boolean; onChange: () => void }) { return <button className="setting-row" role="switch" aria-checked={checked} onClick={onChange}><span><strong>{title}</strong><small>{copy}</small></span><span className={checked ? 'toggle on' : 'toggle'}><i /></span></button>; }
+
 
 function VariantA({ selected, setSelected, selectedAgent, petBindings, scene }: ViewProps & { scene: Scene }) {
   const petBinding = petBindings[selectedAgent.id] ?? '星星';
@@ -221,7 +216,7 @@ function PrototypeSwitcher({ variant, scene, view, connectionDemo, setConnection
   const names = { a: 'A · 宠物陪伴首页', b: 'B · 单步连接向导', c: 'C · 宠物控制中心' };
   const order: Variant[] = ['a', 'b', 'c']; const index = order.indexOf(variant);
   const connectionView = variant === 'a' && view === 'connections';
-  if (connectionView) return null;
+  if (connectionView || (variant === 'a' && view === 'settings')) return null;
   return <nav className="prototype-switcher" aria-label="原型方案切换"><span className="demo-label">{connectionView ? '模拟数据' : '界面演示'}</span>
     {connectionView ? <select aria-label="连接演示情境" value={connectionDemo} onChange={event => setConnectionDemo(event.target.value as ConnectionDemo)}><option value="normal">已有连接</option><option value="empty">首次添加</option><option value="missing">未找到</option><option value="waiting">尚未检查</option><option value="error">配置异常</option></select> : variant === 'a' && <select aria-label="演示状态" value={scene} onChange={event => goScene(event.target.value as Scene)}><option value="welcome">首次使用</option><option value="waiting">等待 pi</option><option value="working">工作中</option><option value="completed">已完成</option><option value="disconnected">连接中断</option></select>}
     <button onClick={() => goVariant(order[(index + 2) % 3]!)}>←</button><span>{connectionView ? '连接流程' : names[variant]}</span><button onClick={() => goVariant(order[(index + 1) % 3]!)}>→</button>

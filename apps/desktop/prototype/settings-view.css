@@ -59,7 +59,62 @@
 .preferences-reset{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .preferences-reset button:last-child{background:#e5d9f2;border-radius:9px;color:#77559b}
 @keyframes preference-breathe{50%{transform:translateY(-4px)}}
-@media(max-width:1020px){.preferences-page{grid-template-columns:110px minmax(0,1fr);gap:22px;padding:26px}.preferences-nav button{padding:12px;gap:9px}.preferences-layout{grid-template-columns:1fr}.preference-preview{max-width:440px}.preference-desktop{height:180px}}
+@media(max-width:1020px){.preferences-page{grid-template-columns:110px minmax(0,1fr);gap:22px;padding:26px}.preferences-nav button{padding:12px;gap:9px}.preferences-layout{grid-template-columns:1fr}.preference-preview{max-width:440px}.preference-desktop{height:220px}}
 @media(max-width:640px){.preferences-page{display:flex;flex-direction:column;padding:20px;gap:22px}.preferences-nav{flex-direction:row;gap:6px;padding:0;flex:none}.preferences-nav button{flex:1;justify-content:center;min-height:44px;padding:10px;font-size:13px}.preferences-heading{margin-bottom:18px}.preferences-heading h1{font-size:24px}.preferences-layout{gap:22px}.preference-preview{max-width:none}.preferences-footer{margin-top:22px}.preference-row{padding:17px 0;min-height:76px}}
 @media(prefers-reduced-motion:reduce){.preview-pet{animation:none}.preferences-page *{transition:none}}
 @media(forced-colors:active){.preferences-page,.preference-desktop,.preference-preview{background:Canvas;color:CanvasText}.preferences-nav button[aria-pressed=true],.preference-toggle.on{background:Highlight;color:HighlightText}.preference-toggle{border:1px solid ButtonText}.preference-toggle i{background:Canvas}.preferences-nav button{border:1px solid ButtonText}.preference-preview,.preview-app,.preview-console{border:1px solid CanvasText}}
+/* Rendering, application lifecycle, pet presentation, and project information. */
+.preferences-nav{position:sticky;top:0;align-self:start;background:#f7f4fb}
+.preferences-emblem.tone-app{background:#e0eee9;color:#739a8d}
+.preferences-emblem.tone-render{background:#dfe8f7;color:#758dab}
+.preferences-emblem.tone-about{background:#eee1f4;color:#9d7cac}
+.preference-preview{position:sticky;top:0;align-self:start}
+.preference-row:disabled{cursor:default}
+.preference-row:disabled strong{color:#9b8aaa}
+.preference-row:disabled .preference-toggle{opacity:.55}
+.render-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.render-presets button{display:grid;justify-items:center;gap:9px;border:1px solid #e0d5ec;background:#fff;border-radius:14px;padding:16px 6px;color:#8b779a;min-height:106px}
+.render-presets button:hover{background:#f0e9f7}
+.render-presets button[aria-pressed=true]{background:#e7dbf2;border-color:#a38bbc;color:#77569a}
+.render-presets .ui-icon{width:22px;height:22px}
+.render-presets strong{font-size:14px}
+.render-presets small{font-size:11px}
+.render-current{font-size:12px;color:#8a7897;margin:14px 0 20px}
+.render-advanced{border-top:1px solid #e6ddec;border-bottom:1px solid #e6ddec}
+.render-advanced summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:13px;font-weight:600;min-height:52px;gap:12px}
+.render-advanced summary::-webkit-details-marker{display:none}
+.render-advanced summary .ui-icon{width:16px;height:16px;transition:transform .16s}
+.render-advanced[open] summary .ui-icon{transform:rotate(180deg)}
+.render-advanced>div{padding-bottom:16px}
+.render-advanced p{font-size:11px;color:#8a7897;line-height:1.7;margin-bottom:0}
+.preference-select{display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:13px;padding:8px 0}
+.preference-select select{max-width:65%;padding:10px;border:1px solid #ddd1e8;border-radius:10px;background:#fff;color:#725d89;font-size:12px}
+.render-summary{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:24px 20px;background:#f3eff9;margin:0 12px 12px;border-radius:12px}
+.render-summary>div{display:grid;gap:10px;justify-items:start;color:#8b75a1}
+.render-summary .ui-icon{width:25px;height:25px}
+.render-summary strong{font-size:30px;font-weight:750;color:#795d91}
+.render-summary strong small{font-size:12px;font-weight:500}
+.render-summary span{font-size:12px}
+.render-summary p{grid-column:1/-1;border-top:1px solid #e0d5ec;padding-top:16px;margin:0;font-size:12px;color:#8a7897;line-height:1.5}
+.preview-menubar{position:absolute;inset:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#faf8fd;padding:6px 10px;font-size:9px;color:#8a7897;z-index:3}
+.preview-menubar>span:last-child{display:flex;align-items:center;gap:6px}
+.preview-menubar .ui-icon{width:12px;height:12px}
+.preview-dock{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);padding:5px 10px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#faf8fd;color:#8a7897;font-size:9px;z-index:3}
+.preview-dock .ui-icon{width:14px;height:14px}
+.preview-pet-name{position:absolute;right:39px;bottom:6px;color:#795d91;font-size:10px}
+.preferences-about{max-width:640px;padding:14px 0 20px}
+.about-brand{display:flex;align-items:center;gap:18px;margin-bottom:24px}
+.about-brand>span{display:grid;place-items:center;width:66px;height:66px;border-radius:22px;background:#9b80d3;color:#fff;font-size:34px}
+.about-brand h2{margin:0 0 8px;font-size:26px;letter-spacing:-.6px}
+.about-brand p{margin:0;color:#8a7897;font-size:13px}
+.about-intro{font-size:15px;line-height:1.8;max-width:430px}
+.preferences-about dl{display:grid;gap:22px;margin:28px 0}
+.preferences-about dl>div{display:grid;grid-template-columns:90px minmax(0,1fr);gap:12px;font-size:13px;line-height:1.7}
+.preferences-about dt{color:#8a7897}
+.preferences-about dd{margin:0}
+.about-github{display:inline-flex;align-items:center;gap:20px;min-height:46px;padding:12px 18px;border-radius:12px;background:#e5d9f2;color:#77559b;text-decoration:none;font-size:14px;font-weight:600}
+.about-github:hover{background:#dcd0eb}
+.about-github .ui-icon{width:16px;height:16px}
+@media(max-width:640px){.preferences-nav{position:static;overflow-x:auto;max-width:100%;padding-bottom:3px}.preferences-nav button{flex:0 0 78px;min-width:78px;gap:7px;white-space:nowrap}.preference-preview{position:static}.preferences-about dl>div{grid-template-columns:76px minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.render-advanced summary .ui-icon{transition:none}}
+@media(forced-colors:active){.render-presets button,.render-summary,.about-github{background:Canvas;color:CanvasText;border:1px solid ButtonText}.render-presets button[aria-pressed=true]{background:Highlight;color:HighlightText}.render-summary strong{color:CanvasText}}

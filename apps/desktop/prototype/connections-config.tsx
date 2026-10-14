@@ -1,10 +1,11 @@
 // Browser prototype: configuration validity is independent of live communication.
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, CircleHelp, Folder, FolderOpen, LoaderCircle, Pencil, Plus, RotateCcw, ScanLine, Trash2, TriangleAlert, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, CircleHelp, Folder, FolderOpen, LoaderCircle, Pencil, Plus, RotateCcw, ScanLine, ShieldCheck, Trash2, TriangleAlert, X } from 'lucide-react';
 import { catalog, type AgentEntry } from './connection-options.js';
 import type { ConnectionDemo, ConnectionHealths } from './connections.js';
 import { ManualConnectionDialog } from './manual-connection-dialog.js';
 import { AgentMark } from './menu-components.js';
+import { GlassButton } from './components/glass.js';
 import './connections-config.css';
 type Validity='usable'|'unchecked'|'missing'|'unreadable'|'invalid';
 type Config=AgentEntry & {validity:Validity};
@@ -14,7 +15,7 @@ const initial:Config[]=catalog.slice(0,5).map(a=>({...a,validity:a.id==='gemini'
 const candidates=catalog.filter(a=>a.id!=='gemini');
 function go(page:string){location.hash=`/connections/${page}`;}
 function currentPage(){return location.hash.replace(/^#\/connections\/?/,'')||'library';}
-function Status({value,checking=false}:{value:Validity;checking?:boolean}){const Glyph=checking?LoaderCircle:value==='usable'?CheckCircle2:value==='unchecked'?CircleHelp:TriangleAlert;return <span className={`cfg-status cfg-${value}`}><Glyph size={16} className={checking?'menu-spin':''}/>{checking?'检查中…':labels[value]}</span>;}
+function Status({value,checking=false}:{value:Validity;checking?:boolean}){const Glyph=checking?LoaderCircle:value==='usable'?ShieldCheck:value==='unchecked'?CircleHelp:TriangleAlert;return <span className={`cfg-status cfg-${value}`}><span className="cfg-status-emblem" aria-hidden="true"><Glyph size={23} className={checking?'menu-spin':''}/></span><strong>{checking?'检查中…':labels[value]}</strong></span>;}
 export function ConnectionsConfig({visible,demo,onConfigured}:{visible:boolean;demo:ConnectionDemo;onConfigured:(healths:ConnectionHealths)=>void}) {
  const requestedDemo=new URLSearchParams(location.search).get('configDemo');
  const sampleDemo:ConnectionDemo=requestedDemo&&['normal','empty','missing','waiting','error'].includes(requestedDemo)?requestedDemo as ConnectionDemo:demo;
@@ -32,24 +33,26 @@ export function ConnectionsConfig({visible,demo,onConfigured}:{visible:boolean;d
  useEffect(()=>{if(!visible)return;const row=browsing&&lastSelected.current?main.current?.querySelector<HTMLElement>(`[data-config="${lastSelected.current}"]`):null;const heading=detail&&matchMedia('(max-width:700px)').matches?main.current?.querySelector<HTMLElement>('.cfg-identity h2'):null;(heading??row??main.current?.querySelector<HTMLElement>('h1'))?.focus({preventScroll:true});main.current?.querySelector('.cfg-content-scroll')?.scrollTo({top:0});},[page,visible]);
  useEffect(()=>{if(renaming)setRenameValue(selected?.alias??'');},[page]);
  function scan(){setScanned(false);setScanning(true);go('discover');}
- function refresh(value:Config){if(timers.current.has(value.id))return;setRefreshing(ids=>[...ids,value.id]);const timer=setTimeout(()=>{setRecords(rs=>rs.map(r=>r.id===value.id?{...r,validity:r.validity==='unchecked'?'usable':r.validity}:r));setRefreshing(ids=>ids.filter(i=>i!==value.id));if(activePage.current==='library'||activePage.current===`agent/${value.id}`)setNotice(value.validity==='unchecked'?'配置检查通过。':reasons[value.validity]);timers.current.delete(value.id);},650);timers.current.set(value.id,timer);}
+ function refresh(value:Config){if(timers.current.has(value.id))return;setRefreshing(ids=>[...ids,value.id]);const timer=setTimeout(()=>{setRecords(rs=>rs.map(r=>r.id===value.id?{...r,validity:r.validity==='unchecked'?'usable':r.validity}:r));setRefreshing(ids=>ids.filter(i=>i!==value.id));if(activePage.current==='library'||activePage.current===`agent/${value.id}`)setNotice(`检查完成：${labels[value.validity==='unchecked'?'usable':value.validity]}。`);timers.current.delete(value.id);},650);timers.current.set(value.id,timer);}
  function allocateId(value:AgentEntry){return records.some(r=>r.id===value.id)?`${value.id.split('-')[0]}-config-${crypto.randomUUID()}`:value.id;}
  function saveDraft(){if(!target?.alias.trim())return;if(records.some(r=>r.path===target.path&&r.name===target.name)){setNotice('这个配置已添加，请返回我的连接查看。');return;}setRecords(rs=>[...rs,{...target,alias:target.alias.trim(),validity:'usable'}]);lastSelected.current=target.id;setDraft(null);go(`done/${target.id}`);}
- const addActions=<div className="cfg-add-actions"><button onClick={scan}><ScanLine/><span><strong>自动扫描</strong><small>查找本机配置</small></span><ArrowRight/></button><button onClick={()=>setManualTarget(null)}><FolderOpen/><span><strong>手动添加</strong><small>选择配置位置</small></span><Plus/></button></div>;
+ const addActions=<div className="cfg-add-actions"><button className="cfg-scan-button" onClick={scan}><ScanLine size={20}/><span>自动扫描</span><ArrowRight size={16}/></button><GlassButton className="cfg-manual-button" aria-label="手动添加" title="手动添加 · 选择配置位置" onClick={()=>setManualTarget(null)}><Plus size={23} strokeWidth={1.8}/></GlassButton></div>;
  const title=discover?'自动扫描':confirming?'命名与确认':done?'配置已添加':renaming?'重命名':'移除配置';
  return <section hidden={!visible} className="cfg-page co-embedded" aria-label="Agent 配置管理" data-page={section} onKeyDown={e=>{if(e.key.startsWith('Arrow'))e.stopPropagation();}}>
  <article ref={main} className={`cfg-menu ${browsing?'cfg-browsing':''}`}>
   {browsing?<>
    <header className="cfg-library-head"><div><h1 tabIndex={-1}>我的连接 <span>{records.length.toString().padStart(2,'0')}</span></h1><p>选择一个配置，查看或修改。</p></div>{addActions}</header>
    <div className="cfg-library-body">
-    <nav className="cfg-index" aria-label="已添加配置"><span className="cfg-index-label">已添加配置</span>{records.map(value=><button key={value.id} data-config={value.id} aria-pressed={current?.id===value.id} onClick={()=>{lastSelected.current=value.id;go(`agent/${value.id}`);}}><AgentMark agent={value}/><span><strong>{value.alias}</strong><small title={value.path}>{value.name} · {value.path.split('/').slice(-2).join('/')}</small></span><span className={`cfg-index-indicator cfg-${value.validity}`} aria-label={labels[value.validity]}>{value.validity==='usable'?<Check size={13}/>:value.validity==='unchecked'?<span>·</span>:<TriangleAlert size={14}/>}</span><ArrowRight className="cfg-index-arrow" size={16}/></button>)}</nav>
+    <nav className="cfg-index" aria-label="已添加配置"><span className="cfg-index-label">已添加配置</span>{records.map(value=><button key={value.id} data-config={value.id} aria-pressed={current?.id===value.id} onClick={()=>{lastSelected.current=value.id;go(`agent/${value.id}`);}}><AgentMark agent={value}/><span><strong>{value.alias}</strong><small>{value.name}</small></span><span className={`cfg-index-indicator cfg-${value.validity}`} aria-label={labels[value.validity]}>{value.validity==='usable'?<Check size={13}/>:value.validity==='unchecked'?<span>·</span>:<TriangleAlert size={14}/>}</span><ArrowRight className="cfg-index-arrow" size={16}/></button>)}</nav>
     <div className="cfg-content-scroll">
-     {current?<section className="cfg-detail" key={current.id}><button className="cfg-text-button cfg-mobile-back" onClick={()=>go('library')}><ArrowLeft size={17}/>我的连接</button><div className="cfg-identity"><AgentMark agent={current}/><div><span className="cfg-type">{current.name}</span><h2 tabIndex={-1}>{current.alias}</h2></div><button className="cfg-icon-button" aria-label="重命名" title="重命名" onClick={()=>go(`rename/${current.id}`)}><Pencil size={18}/></button></div>
-      <div className={`cfg-check cfg-${current.validity}`}><Status value={current.validity} checking={refreshing.includes(current.id)}/><p>{reasons[current.validity]}</p><button className="cfg-secondary" aria-disabled={refreshing.includes(current.id)} onClick={()=>refresh(current)}><RotateCcw size={16} className={refreshing.includes(current.id)?'menu-spin':''}/>{refreshing.includes(current.id)?'检查中':'刷新检查'}</button></div>
-      <div className="cfg-location"><div className="cfg-location-heading"><span className="cfg-section-label">配置位置</span><button className="cfg-text-button" onClick={()=>setManualTarget(current)}>更换位置<ArrowRight size={15}/></button></div><div className="cfg-location-path"><Folder size={20}/><code>{current.path}</code></div></div>
-      <div className="cfg-detail-end"><span>仅管理此配置的接入信息</span><button className="cfg-text-button cfg-delete" onClick={()=>go(`remove/${current.id}`)}><Trash2 size={15}/>移除配置</button></div>
+     {current?<section className="cfg-detail" key={current.id}><button className="cfg-text-button cfg-mobile-back" onClick={()=>go('library')}><ArrowLeft size={17}/>我的连接</button><div className="cfg-detail-panel">
+       <div className="cfg-identity"><div className="cfg-emblem"><AgentMark agent={current}/></div><div><span className="cfg-type">{current.name}</span><h2 tabIndex={-1}>{current.alias}</h2></div><button className="cfg-icon-button" aria-label="重命名" title="重命名" onClick={()=>go(`rename/${current.id}`)}><Pencil size={18}/></button></div>
+       <div className={`cfg-check cfg-${current.validity}`}><div><Status value={current.validity} checking={refreshing.includes(current.id)}/><p>{reasons[current.validity]}</p></div><button className="cfg-refresh-button" aria-disabled={refreshing.includes(current.id)} onClick={()=>refresh(current)}><RotateCcw size={17} className={refreshing.includes(current.id)?'menu-spin':''}/><span>{refreshing.includes(current.id)?'检查中':'刷新检查'}</span></button></div>
+       <div className="cfg-location"><span className="cfg-section-label">配置位置</span><button className="cfg-location-control" aria-label="更换位置" title="更换位置" onClick={()=>setManualTarget(current)}><span className="cfg-folder-emblem" aria-hidden="true"><Folder size={23} strokeWidth={1.6}/></span><code>{current.path}</code><span className="cfg-location-action"><span>更换位置</span><ArrowRight size={17}/></span></button></div>
+      </div>
+      <div className="cfg-detail-end"><span>移除后保留 Agent 程序和文件</span><button className="cfg-text-button cfg-delete" onClick={()=>go(`remove/${current.id}`)}><Trash2 size={15}/>移除配置</button></div>
      </section>:<div className="cfg-empty"><FolderOpen/><h2>{detail?'配置未找到':'从第一个连接开始'}</h2><p>{detail?'这条配置已移除，请选择其他配置。':'自动扫描本机，或选择已有配置位置。'}</p>{detail&&<button className="cfg-secondary" onClick={()=>go('library')}>返回列表</button>}</div>}
-     {notice&&<p className="cfg-notice" role="status"><CheckCircle2 size={16}/>{notice}</p>}
+     {notice&&<p className="cfg-notice" role="status">{notice}</p>}
     </div>
    </div>
   </>:<>

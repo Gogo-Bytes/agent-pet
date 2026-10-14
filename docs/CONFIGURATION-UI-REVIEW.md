@@ -71,8 +71,8 @@ Main 实看 1280×720、1280×800、1024×600、1280×480、390×844，以及最
 截图为实际浏览器页面，未拼接或用设计稿替代。模拟视口导出曾出现缩小、空白或重复画面，已排除无效文件；宽窗口采用正常视口直接截图，窄窗口保留已核对的原始截帧。Chrome 辅助验收入口打开超时，未重试或作为通过证据：
 
 - [连接宽窗口](screenshots/configuration-menu/connections-brand-wide.png)
-- [渲染设置宽窗口](screenshots/configuration-menu/settings-render.jpg)
-- [设置窄窗口](screenshots/configuration-menu/settings-narrow.png)
+- [渲染设置宽窗口](screenshots/configuration-menu/settings-brand-wide.png)
+- [设置窄窗口](screenshots/configuration-menu/settings-brand-narrow.png)
 - [手动错误](screenshots/configuration-menu/manual-error-wide.png)
 - [命名确认窄窗口](screenshots/configuration-menu/manual-confirm-narrow.png)
 - [长路径与矮窗口](screenshots/configuration-menu/manual-short.png)
@@ -126,3 +126,16 @@ Main 实际检查 825×1344、1280×720 与390×720。宽屏正文下沿577px、
 独立Product Test subagent本轮启动和一次有界重试均因模型容量不足失败，未产出审查意见，**本轮独立审查未完成**。Main的实际自评与验证不冒充独立审查；视觉验收仍待用户确认。无新依赖、真实接入或推送。
 
 本轮最终 `pnpm typecheck`、`pnpm exec vite build --config apps/desktop/vite.prototype.config.ts`、`git diff --check` 均通过。最终验收页浏览器error日志为空；临时响应式尺寸与媒体模拟均已清除。
+
+## 2026-10-14 · 设置配色与连接统一
+
+按用户要求仅调整设置页颜色：分类/画质选中使用连接页同款 `#7561d5`，开关、参数单选、大小滑块和恢复确认使用 `#7762de`；按钮、hover、焦点、图标和浅色表面统一为蓝紫色。绿色省电、蓝色清晰和气泡关闭时的必要提示色保留各自语义。没有改TSX、布局、字号、间距、圆角、动效或交互。
+
+Main对比1280×720实际页面：分类、正文、档位、开关、恢复入口的边界矩形与修改前完全一致；源码去除颜色字面量后与HEAD逐字相同。实看渲染/软件/宠物/提醒/关于、展开参数、恢复确认、开关关闭与入口保护；参数方向键、Space开关和确认恢复可操作。390×720窄屏文档宽390px、开关仍为52×32，开关下沿550px、正文下沿560px，临时尺寸已恢复。实际原始截图：
+
+- [设置统一配色宽屏](screenshots/configuration-menu/settings-brand-wide.png)
+- [设置统一配色窄屏](screenshots/configuration-menu/settings-brand-narrow.png)
+
+本轮为Main完成的颜色调整，既有独立审查记录不冒充本轮审查；仍等待用户视觉验收。首页、宠物、共享框架、连接页与真实行为未改。
+
+本轮 `pnpm typecheck`、原型Vite构建与 `git diff --check` 均通过；未推送。

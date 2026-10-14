@@ -171,3 +171,22 @@ Main实际复验1280px、905px、390px宽度：标题与控件同宽且header.bo
 本轮是Main完成的CSS小改，不新增独立审查结论；此前独立容量限制记录保留。用户视觉验收仍待确认。
 
 本轮 `pnpm typecheck`、原型Vite构建与 `git diff --check` 通过。无真实行为变更或推送。
+
+
+## 2026-10-14 · 连接详情按七条批注精简与原位编辑
+
+本轮仅改连接内容：列表撤掉状态勾号/警告图标和选中箭头，可用配置保持安静，异常用“需处理”或“未检查”短文字；辅助名称仍读出精确可用性。详情使用单层正向方形头像，撤掉倾斜、嵌套底座和装饰点。名称在当前详情中编辑，打开后聚焦并全选；Enter/保存提交，空白和超40字就地提示，Escape/取消回到编辑按钮；切换配置、返回列表或离开连接页丢弃未保存编辑。旧rename深链接回到对应详情，不再呈现独立重命名页。
+
+检查区采用小标题、明确状态文字、轻量竖向标记和横向刷新胶囊；检查中保留重复触发保护，检查失败仍指导更换位置或修复权限/格式。移除改为独立浅玫瑰色操作区与实体按钮，继续明确程序和文件保留，并保留独立确认。扫描入口移除右侧箭头。主菜单紫色、图标家族及手动添加glass入口沿用已确认方向；首页、宠物、设置、共享外框和底部导航没有修改。
+
+Main实际运行检查：宽/窄详情与列表；名称去空格、空名恢复、超40字阻止、Enter保存、Escape/取消与回焦、配置切换；未检查刷新变可用，失效刷新仍显示失效；位置弹窗Enter打开、Esc关闭并回焦；移除取消与确认、刷新恢复mock；扫描Space打开，结果添加第二套pi、确认和详情。390×720文档scrollWidth=390，正文PageDown滚动20px且window.scrollY=0。1280px布局可读；最终有效宽屏截图使用905×900。历史共享矮窗口限制继续适用，不外推所有尺寸无外层滚动。
+
+独立Product Test subagent本轮完成源码与新实际截图审查，指出38字名称在窄窗被头像和编辑按钮挤成多行。已修正：长名称/编辑表单跨满288px内容宽，头像、类型与编辑入口在上一行；38字身份区从约255px降至190px。独立Agent实看更新截图，确认该问题修复且未发现新增视觉问题。其独立浏览器创建失败（Browser is not available: iab），故未独立运行点击或键盘验收；这些行为由Main实际验证，不冒充独立覆盖。用户视觉验收仍待确认。
+
+- [连接详情宽窗口](screenshots/configuration-menu/connections-refined-wide.png)
+- [窄窗口列表](screenshots/configuration-menu/connections-refined-list-narrow.png)
+- [失效配置窄窗口](screenshots/configuration-menu/connections-refined-error-narrow.png)
+- [原位名称编辑](screenshots/configuration-menu/connections-inline-edit-narrow.png)
+- [长名称窄窗口](screenshots/configuration-menu/connections-long-name-narrow.png)
+
+以上均为实际页面原始截帧。超出浏览器实际宽度的模拟截图曾出现重复画面，已覆盖为有效905px截图；不拼接截图。本轮最终类型检查、原型构建与diff检查通过，临时尺寸已清除，无新依赖、真实配置行为或推送。

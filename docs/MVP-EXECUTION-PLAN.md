@@ -32,11 +32,11 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 本轮全量 **620 passed / 1 skipped / 65 files**、`pnpm typecheck`、desktop build 通过；最后手动保存详情入口增量另复验 **23 passed / 2 files**，类型检查与构建通过。Main 亲自启动隔离 profile 的实际 Electron 并记录首页空态；同一正式 Renderer 在测试边界中检查 1280×720、390×844、1000×480、模型点击与键盘、主要弹窗和滚动。独立 Review 的三个确切问题已修正并覆盖；独立 Product Test 检查实际截图和 DOM 行为测试，独立点击因 CUA 工具故障未完成。
 
-状态为 **IMPLEMENTED-NOT-ACCEPTED（正式 UI 用户验收及新多配置真实 pi 全链路未完成）**。现有 M2–M5 证据保持原范围；正式签名/公证/发布仍未验收，完整 D6 仍 BLOCKED。
+状态为 **IMPLEMENTED-NOT-ACCEPTED（正式 UI 用户验收未完成；新多配置真实连接与生命周期有界通过，模型任务矩阵未完成）**。现有 M2–M5 证据保持原范围；正式签名/公证/发布仍未验收，完整 D6 仍 BLOCKED。
 
 用户随后要求消除双层窗口，并采用其他 macOS 应用的样式：正式管理界面铺满窗口，macOS 使用原生 `hiddenInset` 标题栏及左上角系统按钮，共享顶部栏预留按钮空间；其他平台保留 HTML 操作回退。关闭仍遵循后台偏好。最新相关 **47 项测试**、类型检查、构建及打包通过；实际新包的原生 AX 确认关闭/最小化/全屏按钮，截图工具的紫色捕获提示遮挡按钮区域，颜色的截图检查有此限制。实际截图及检查边界见正式迁移验收记录。
 
-准确缺口：仅一只真实内置 starter 宠物，包导入尚未实现；其他 Provider 仅可保存非秘密元数据，不能连接；自动扫描仍是支持的 pi 安装候选，不能自动找遍项目配置或证明其活跃；手动类型识别不确定时必须用户选择。旧已部署位置更换须先选择性撤回/移除再添加。系统登录项/GPU性能及新界面真实多 pi TUI 还需精确范围的实际验收。映射、截图、运行方式和后续清单见 [正式迁移验收](MANAGEMENT-MIGRATION-ACCEPTANCE.md)。
+准确缺口：仅一只真实内置 starter 宠物，包导入尚未实现；其他 Provider 仅可保存非秘密元数据，不能连接；自动扫描仍是支持的 pi 安装候选，不能自动找遍项目配置或证明其活跃；手动类型识别不确定时必须用户选择。旧已部署位置更换须先选择性撤回/移除再添加。系统登录项/GPU性能及新界面真实模型任务矩阵仍需实际验收；多 pi TUI 的空闲连接与生命周期范围已通过。映射、截图、运行方式和后续清单见 [正式迁移验收](MANAGEMENT-MIGRATION-ACCEPTANCE.md)。
 
 ## 功能接入第 1 阶段：配置在线状态（2026-10-14）
 
@@ -44,7 +44,13 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 新增 5 项真实隔离 socket 回归和 1 项 Configurations → Application → 正式首页投影集成，覆盖无效 peer、重叠重连、同 Adapter 多 receiver、缓冲数据期间停止、配置离场与选择性移除。全量 **629 passed / 1 skipped / 67 files**，`pnpm typecheck`、desktop build、package:mac 通过。独立 subagent 审查 READY（19 项 focused 复验通过，新增缓冲数据用例另作只读复核）；未注入 server.close 故障。实际新包启动及范围见正式迁移验收记录；不算真实 pi TUI 通过。
 
-后续按已讨论顺序：一个真实 pi 配置 → 多配置/重启 → macOS 设置实机 → 资产选择与绑定、受约束导入分别交付 → 正式应用整体验收。真实操作待授权的精确范围见 [pi 实机操作预览](PI-LIVE-CONNECTION-PREVIEW.md)，不自动使用日常配置、复制凭据或发起模型请求。
+后续按已讨论顺序：一个真实 pi 配置 → 多配置/重启 → macOS 设置实机 → 资产选择与绑定、受约束导入分别交付 → 正式应用整体验收。真实操作已获用户精确授权，原范围见 [pi 实机操作预览](PI-LIVE-CONNECTION-PREVIEW.md)，不自动使用日常配置、复制凭据或发起模型请求。
+
+## 功能接入第 2 阶段：真实 pi 与多配置生命周期（2026-10-14）
+
+**VERIFIED（授权隔离范围）**：现有 pi 0.85.1 与源码外正式应用包实际走通 A/B 手动添加、预览确认、0600 独占部署、hello、多 peer 部分退出、两个同类独立宠物、原位命名、干净应用重启后明确恢复、停用保存和选择性撤回。最终配置为空，自有扩展已撤回、pi/应用正常退出；pi 生成资料保留。
+
+修复重启停用提示及刷新后准确性，保留具体失败原因。全量 **630 passed / 1 skipped / 67 files**，typecheck、desktop build（package 内）、package:mac、diff 检查通过，独立审查 READY。操作范围、截图、最新包及首次 pi 自动下载越界说明见 [实机证据](PI-LIVE-CONNECTION-ACCEPTANCE.md)。本轮未登录、未复制凭据、未发起模型请求；真实任务/取消/错误矩阵、正式 UI 用户认可和发布验收未通过。下一步为 macOS 非登录项设置实机，登录项变更需另外明确范围。
 
 ## 当前事实与证据
 

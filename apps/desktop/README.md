@@ -50,6 +50,18 @@ user/native evidence and pending acceptance. Windows, hardware GPU/power and the
 full native-window matrix remain unverified; a build or DOM test is not native
 acceptance.
 
+## Real pi connection verification (2026-10-14)
+
+The actual packaged app and installed pi 0.85.1 passed isolated A/B deployment,
+idle hello, concurrent peers, independent configurations, rename persistence,
+explicit resume after clean app restart, saved disablement and selective withdrawal.
+Persisted disabled copy stays accurate after explicit inspection and preserves
+resume errors. Full tests: 630 passed / 1 skipped; typecheck/build/package passed.
+See [real pi evidence](../../docs/PI-LIVE-CONNECTION-ACCEPTANCE.md) for actual screenshots,
+final package, retained data and the first pi startup tool-download scope violation.
+This does not accept real model-task/error matrices, login-item changes, GPU,
+imports, managed production safety or release.
+
 ## Formal management UI (2026-10-14)
 
 On macOS, management uses the native `hiddenInset` title bar with system traffic

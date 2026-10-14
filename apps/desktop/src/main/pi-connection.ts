@@ -70,7 +70,7 @@ export class PiConnection {
     for (const listener of this.listeners) listener(state);
     return state;
   }
-  // Legacy reports the latest validated hello/close, not managed auth/ack or aggregate peer health.
+  // The legacy receiver aggregates validated live peers; this is not managed auth/ack evidence.
   connectionChanged(state: 'connected' | 'degraded' | 'disconnected'): void {
     if (this.closed || (!this.options.developmentEnvironment && this.state.receiving !== 'active')) return;
     this.state.status = state === 'degraded' ? 'failed' : state;

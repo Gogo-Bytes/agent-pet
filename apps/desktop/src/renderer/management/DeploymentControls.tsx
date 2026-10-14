@@ -6,8 +6,11 @@ export function DeploymentControls({ record, api, run, busy }: { record: AgentCo
   const state = record.connection;
   if (!state) return <p className="cfg-notice">此 Agent 的接入尚未支持。配置可以保留，暂不能接收状态。</p>;
   const disabled = busy || state.busy;
+  const notice = state.notice === 'resume-required' && state.saved === 'disabled'
+    ? '已保存停用；当前未开始监听。点击恢复后会校验原目录与文件，再开始接收。'
+    : noticeText[state.notice];
   return <div className="cfg-deployment">
-    {state.notice !== 'none' && <p className="cfg-notice" role="status">{noticeText[state.notice]}</p>}
+    {state.notice !== 'none' && <p className="cfg-notice" role="status">{notice}</p>}
     {state.canConfigure && <>
       <p>接入前会预览读取范围和改动，确认后才写入。配置可用不表示 Agent 已在线。</p>
       <details><summary>读取与保存说明</summary><p>只检查所选目录及祖先 metadata、settings.json、extensions/package.json、固定入口和 ignore 的存在。不读取对话、Session 或登录凭据。确认后，仅新建 extensions/agent-pet.ts；私有接收凭据与所有权保存于本应用数据目录，重启需明确恢复。不改 settings、ignore 或 trust，不启动或重载 Agent。</p></details>

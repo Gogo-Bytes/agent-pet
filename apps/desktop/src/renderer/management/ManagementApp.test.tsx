@@ -8,6 +8,7 @@ import type { PreflightState } from '../../shared/pi-preflight.js';
 import { initialPreflight } from './test-preflight.js';
 import { ManagementApp } from './ManagementApp.js';
 import { configuration, managementBridge } from './test-management.js';
+import { initialConnection } from './test-connection.js';
 
 // Only Three/WebGL is substituted. Real page controls, dialogs, request owner and store execute.
 vi.mock('./CompanionScene.js', () => ({ CompanionScene: ({ children, page, onClips }: {
@@ -38,6 +39,27 @@ async function category(user: ReturnType<typeof userEvent.setup>, name: string) 
 const flush = async () => { await act(async () => {}); };
 
 describe('ManagementApp formal four-page interface', () => {
+  it('distinguishes persisted disablement after restart, resumes only explicitly and retains failure reasons', async () => {
+    const record = { ...configuration(), connection: { ...initialConnection, canConfigure: false, canResume: true, canRemove: true,
+      deployedPath: '/isolated/project-one/extensions/agent-pet.ts', status: 'disconnected' as const,
+      saved: 'disabled' as const, notice: 'resume-required' as const } };
+    const test = await mount([record]); await page(test.user, '连接');
+    expect(screen.getByText(/已保存停用；当前未开始监听/)).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '刷新检查' }));
+    expect(test.bridge.configurations.inspect).toHaveBeenCalledExactlyOnceWith(record.id);
+    expect(screen.getByText(/已保存停用；当前未开始监听/)).toBeTruthy();
+    expect(screen.queryByText(/尚未读取目标|仅点击恢复才校验/)).toBeNull();
+    expect(test.bridge.configurations.resume).not.toHaveBeenCalled();
+    await test.user.click(screen.getByRole('button', { name: '恢复已保存连接' }));
+    expect(test.bridge.configurations.resume).toHaveBeenCalledExactlyOnceWith(record.id);
+    await act(async () => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      saved: 'ready', notice: 'none', status: 'configured-waiting', receiving: 'active', canResume: false } }] }));
+    expect(screen.queryByText(/已保存停用/)).toBeNull();
+    await act(async () => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      notice: 'resume-refused', status: 'failed' } }] }));
+    expect(screen.getByText(/恢复被拒绝：原运行目录或扩展已缺失/)).toBeTruthy();
+    expect(screen.queryByText(/已保存停用/)).toBeNull();
+  });
   it('keeps page navigation accessible with native controls and omits duplicate HTML controls', async () => {
     const test = managementBridge(undefined, false, true);
     render(<ManagementApp bridge={test.bridge} />);

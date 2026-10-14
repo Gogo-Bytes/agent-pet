@@ -23,6 +23,7 @@ export function managementBridge(records: AgentConfiguration[] = [configuration(
   function pushConfigs(next: ConfigurationsState) { configs = next; configurations.forEach(listener => listener(next)); }
   function changed(nextRecords = configs.records) { pushConfigs({ ...configs, records: nextRecords, revision: configs.revision + 1 }); return configs; }
   const bridge = {
+    windowAction: vi.fn(async (_action: string) => {}),
     piPreflight: preflightBridge(), piConnection: connectionBridge(),
     locations: {
       choose: vi.fn(async (): Promise<string | null> => '/isolated/new-project'),

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ManagementWindowAction } from '../shared/window-controls.js';
 import type { SessionState } from '@agent-pet/domain';
 import type { ConfigurationsApi, ConfigurationsState } from '../shared/configurations.js';
 import type { ConfigurationLocationsApi } from '../shared/configuration-locations.js';
@@ -54,6 +55,7 @@ const locations: ConfigurationLocationsApi = {
 };
 const managementApi = {
   piPreflight, piConnection, configurations, locations,
+  windowAction(action: ManagementWindowAction): Promise<void> { return ipcRenderer.invoke('management:window-action', action); },
   getSessions(): Promise<SessionState> { return ipcRenderer.invoke('management:sessions'); },
   openProject(): Promise<void> { return ipcRenderer.invoke('management:project'); },
   subscribeSessions(listener: (sessions: SessionState) => void): () => void {

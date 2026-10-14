@@ -15,6 +15,7 @@ const native = vi.hoisted(() => {
     webContents, setBounds: vi.fn(), isDestroyed: () => false,
     setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
     loadFile: vi.fn(), loadURL: vi.fn(), once: vi.fn(), show: vi.fn(), hide: vi.fn(),
+    minimize: vi.fn(), maximize: vi.fn(), unmaximize: vi.fn(), isMaximized: vi.fn(() => false), close: vi.fn(),
     setIgnoreMouseEvents: vi.fn(), on: vi.fn(), focus: vi.fn(), isMinimized: () => false, restore: vi.fn(),
   };
   return {
@@ -50,7 +51,10 @@ vi.mock('electron', () => ({
       } : native.window;
       target.loadFile.mockImplementation((file: string) => { target.webContents.mainFrame.url = pathToFileURL(file).href; });
       target.loadURL.mockImplementation((url: string) => { target.webContents.mainFrame.url = url; });
-      if (management) native.management = target;
+      if (management) {
+        target.close = vi.fn(() => target.on.mock.calls.find(([event]) => event === 'close')?.[1]({ preventDefault: vi.fn() }));
+        native.management = target;
+      }
       return target;
     }
     static getAllWindows() { return [native.window]; }
@@ -357,7 +361,7 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
   it('creates distinct sandboxed entries and denies cross-window, subframe and navigated-frame capabilities', () => {
     expect(native.management).toBeDefined();
     expect(native.management!.webContents).not.toBe(native.webContents);
-    expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ title: 'Agent Pet', webPreferences: expect.objectContaining({ sandbox: true, contextIsolation: true, nodeIntegration: false }) }));
+    expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ title: 'Agent Pet', frame: false, webPreferences: expect.objectContaining({ sandbox: true, contextIsolation: true, nodeIntegration: false }) }));
     for (const channel of ['pet:request-snapshot', 'pet:interaction', 'pet:resize-window-by']) {
       expect(() => invoke(channel, true, managementEvent())).toThrow('Untrusted renderer');
     }
@@ -378,6 +382,22 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
       handler({ url: native.webContents.mainFrame.url, preventDefault }); expect(preventDefault).toHaveBeenCalledOnce();
     }
     expect(native.management!.webContents.setWindowOpenHandler.mock.calls[0]![0]()).toEqual({ action: 'deny' });
+  });
+  it('routes only trusted window actions and preserves close-to-background/quit behavior', () => {
+    const handler = native.handlers.get('management:window-action')!;
+    for (const event of [
+      { sender: native.webContents, senderFrame: native.webContents.mainFrame },
+      { sender: native.management!.webContents, senderFrame: {} },
+    ]) expect(() => handler(event, 'close')).toThrow('Untrusted renderer');
+    for (const action of ['quit', 'destroy', {}, null]) expect(() => handler(managementEvent(), action)).toThrow('Invalid window action');
+    handler(managementEvent(), 'minimize'); expect(native.management!.minimize).toHaveBeenCalledOnce();
+    handler(managementEvent(), 'toggle-maximize'); expect(native.management!.maximize).toHaveBeenCalledOnce();
+    native.management!.isMaximized.mockReturnValueOnce(true);
+    handler(managementEvent(), 'toggle-maximize'); expect(native.management!.unmaximize).toHaveBeenCalledOnce();
+    handler(managementEvent(), 'close'); expect(native.management!.hide).toHaveBeenCalledTimes(2);
+    expect(native.quit).not.toHaveBeenCalled();
+    invoke('management:update-preferences', { background: false }, managementEvent());
+    handler(managementEvent(), 'close'); expect(native.quit).toHaveBeenCalledOnce();
   });
   it('close hides, activate/second instance/tray reopens, and visibility and toolbar size persist together', () => {
     const close = native.management!.on.mock.calls.find(([event]) => event === 'close')![1];

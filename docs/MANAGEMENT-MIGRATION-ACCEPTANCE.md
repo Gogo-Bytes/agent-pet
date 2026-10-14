@@ -4,6 +4,16 @@
 
 正式代码状态：**IMPLEMENTED-NOT-ACCEPTED（本轮正式 UI 用户验收与新多配置真实 pi 接入尚未完成）**。以下只说明实际取得的证据；不升级既有 M2/M3/M4/D6 或正式发布状态。
 
+## 用户追加：将窗口操作并入顶部栏
+
+2026-10-14 用户指出外部系统窗口与内层界面形成重复外框，要求右上角操作放入内层。这一确认覆盖原型外层留白与卡片边界在 Electron 中的迁移方式。
+
+管理窗口改为 `frame:false`，正式 UI 去掉外层 padding/max-width/边框/阴影，铺满可用区域；最小化、最大化/还原、关闭在共享顶部栏右侧。顶部空白设为 native drag region，按钮排除拖动。窗口操作通过类型化 preload 与 trusted Main IPC，仅允许三个固定动作；关闭复用原 close handler，继续遵循后台保留/退出偏好并使预览失效。
+
+本次 `pnpm test apps/desktop/src/main/index.test.ts apps/desktop/src/preload/management.test.ts apps/desktop/src/renderer/management/ManagementApp.test.tsx` **46 passed / 3 files**；`pnpm typecheck`、desktop build、`pnpm package:mac` 和 diff check 通过。已启动新包的自有隔离 profile，AX 与实际截图确认不再有系统标题栏/外层留白。390×844 正式 Renderer 检查控件完整，scrollWidth=390；原生完整拖动/最小化矩阵不由此外推。
+
+[实际应用包窗口](evidence/management-migration/window-controls-native.png) · [窄窗顶部栏](evidence/management-migration/window-controls-narrow.jpg)。本次新包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-Oa1wCv/mac-arm64/Agent Pet.app`（未签名，临时目录）。下方原迁移截图保留为该阶段历史证据。
+
 ## 原型功能 → 正式模块/接口 → 缺口
 
 | 已确认功能 | 正式模块与接口 | 当前能力及缺口 |

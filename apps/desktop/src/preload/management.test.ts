@@ -13,7 +13,7 @@ describe('management preload capability boundary', () => {
     await import('./management.js');
     expect(native.expose).toHaveBeenCalledExactlyOnceWith('management', expect.any(Object));
     const api = native.expose.mock.calls[0]![1] as Window['management'];
-    expect(Object.keys(api).sort()).toEqual(['configurations', 'getSessions', 'getState', 'locations', 'openProject', 'piConnection', 'piPreflight', 'setLogin', 'subscribe', 'subscribeSessions', 'updatePreferences']);
+    expect(Object.keys(api).sort()).toEqual(['configurations', 'getSessions', 'getState', 'locations', 'openProject', 'piConnection', 'piPreflight', 'setLogin', 'subscribe', 'subscribeSessions', 'updatePreferences', 'windowAction']);
     await api.getState(); await api.updatePreferences({ petSize: 200 }); await api.setLogin(true);
     expect(native.invoke.mock.calls).toEqual([['management:get-state'], ['management:update-preferences', { petSize: 200 }], ['management:set-login', true]]);
     expect(Object.keys(api.piPreflight).sort()).toEqual(['chooseInstallation', 'chooseTarget', 'detect', 'getState', 'inspect', 'selectInstallation', 'useDefaultTarget']);
@@ -61,6 +61,11 @@ describe('management preload capability boundary', () => {
       ['management:configurations-rename', 'id', '项目'], ['management:configurations-pet', 'id', null],
       ['management:configurations-confirm', 'id', 'plan'], ['management:location-choose'],
       ['management:location-authorize', '/tmp/owned'], ['management:location-inspect', '/tmp/owned', 'pi'],
+    ]);
+    native.invoke.mockClear();
+    await api.windowAction('minimize'); await api.windowAction('toggle-maximize'); await api.windowAction('close');
+    expect(native.invoke.mock.calls).toEqual([
+      ['management:window-action', 'minimize'], ['management:window-action', 'toggle-maximize'], ['management:window-action', 'close'],
     ]);
     native.invoke.mockRejectedValueOnce(new Error('IPC unavailable'));
     await expect(api.getState()).rejects.toThrow('IPC unavailable');

@@ -23,6 +23,7 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [page, setPage] = useState('home');
   const [error, setError] = useState('');
+  const [windowError, setWindowError] = useState('');
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const mounted = useRef(false);
@@ -46,8 +47,18 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
   }
   const configError = error || (snapshot.configurations ? notices[snapshot.configurations.notice] : '');
   return <div className="management-page"><main className="game-shell" data-reduced={preferences.reduced}>
-    <header className="game-topbar"><button className="game-logo" onClick={() => setPage('home')}><span>✦</span>Agent Pet</button><span className="feature-page-label">{page === 'home' ? '' : pages.find(value => value[0] === page)?.[2]}</span></header>
-    {(snapshot.error || snapshot.state?.preferenceError) && <p className="app-alert" role="alert">{snapshot.error || snapshot.state?.preferenceError}<button onClick={() => void store.retry()}>重新读取</button></p>}
+    <header className="game-topbar">
+      <button className="game-logo" onClick={() => setPage('home')}><span>✦</span>Agent Pet</button>
+      <div className="game-titlebar-actions">
+        <span className="feature-page-label">{page === 'home' ? '' : pages.find(value => value[0] === page)?.[2]}</span>
+        <div className="window-controls" role="group" aria-label="窗口操作">
+          {([['minimize', '最小化窗口', 'minus'], ['toggle-maximize', '最大化或还原窗口', 'maximize'], ['close', '关闭窗口', 'close']] as const).map(([action, label, icon]) =>
+            <button key={action} className={`window-control window-control-${action}`} aria-label={label} title={label}
+              onClick={() => { setWindowError(''); void bridge.windowAction(action).catch(() => setWindowError('窗口操作失败，请重试。')); }}><Icon name={icon} size={16} /></button>)}
+        </div>
+      </div>
+    </header>
+    {(windowError || snapshot.error || snapshot.state?.preferenceError) && <p className="app-alert" role="alert">{windowError || snapshot.error || snapshot.state?.preferenceError}<button onClick={() => void store.retry()}>重新读取</button></p>}
     <div className="game-content">
       <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} onClips={onClips}>
         <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} name={preferences.petName} clips={clips} action={action} busy={busy} error={error}

@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 
-export type IconName = 'home' | 'pet' | 'link' | 'settings' | 'grid' | 'left' | 'right' | 'plus' | 'close' | 'search' | 'play' | 'replay' | 'up' | 'down' | 'check' | 'clock' | 'alert' | 'folder' | 'signal' | 'sleep' | 'monitor' | 'software' | 'gauge' | 'bell' | 'info' | 'leaf' | 'sparkles' | 'scan' | 'edit' | 'trash' | 'verified' | 'help' | 'loader' | 'command' | 'flower' | 'code' | 'diagonal' | 'pi';
+export type IconName = 'minus' | 'maximize' | 'home' | 'pet' | 'link' | 'settings' | 'grid' | 'left' | 'right' | 'plus' | 'close' | 'search' | 'play' | 'replay' | 'up' | 'down' | 'check' | 'clock' | 'alert' | 'folder' | 'signal' | 'sleep' | 'monitor' | 'software' | 'gauge' | 'bell' | 'info' | 'leaf' | 'sparkles' | 'scan' | 'edit' | 'trash' | 'verified' | 'help' | 'loader' | 'command' | 'flower' | 'code' | 'diagonal' | 'pi';
 
 // Rounded silhouettes for navigation; simple strokes for directional actions.
 const glyphs: Record<IconName, ReactNode> = {
@@ -36,10 +36,12 @@ const glyphs: Record<IconName, ReactNode> = {
   code: <><rect x="2" y="4" width="20" height="16" rx="5" opacity=".2"/><path d="m8 8-4 4 4 4M16 8l4 4-4 4m-2-10-4 12" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></>,
   diagonal: <><rect x="3" y="3" width="18" height="18" rx="5" opacity=".24"/><path d="m8 16 8-8M8 8h8v8" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></>,
   pi: <><rect x="3" y="4" width="18" height="5" rx="2.5" opacity=".3"/><path d="M4 7h16M8.5 7v12M15.5 7v10a2 2 0 0 0 2 2" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/></>,
+  minus: null, maximize: <rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />,
   left: null, right: null, plus: null, close: null, up: null, down: null, check: null,
 };
 const strokes: Partial<Record<IconName, string>> = {
   left: 'm14.5 6.5-5.5 5.5 5.5 5.5', right: 'm9.5 6.5 5.5 5.5-5.5 5.5',
+  minus: 'M5.5 12h13',
   plus: 'M12 5.5v13M5.5 12h13', close: 'm7 7 10 10M7 17 17 7',
   up: 'm7 14 5-5 5 5', down: 'm7 10 5 5 5-5', check: 'm5.5 12 4 4 9-10',
 };

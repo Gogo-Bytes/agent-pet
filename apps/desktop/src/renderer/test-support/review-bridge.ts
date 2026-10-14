@@ -26,6 +26,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   function subscribe<T>(listeners: Set<(value: T) => void>, listener: (value: T) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
   function record(id: string) { const value = configs.records.find(value => value.id === id); if (!value) throw new Error('Record missing'); return value; }
   return {
+    windowAction: async () => {},
     getState: async () => state,
     subscribe: listener => subscribe(stateListeners, listener),
     getSessions: async () => sessions, subscribeSessions: listener => subscribe(sessionListeners, listener), openProject: async () => {},

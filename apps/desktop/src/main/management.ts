@@ -93,7 +93,7 @@ export function createManagement(options: {
     windowRequested = true;
     if (!window || window.isDestroyed()) {
       window = new BrowserWindow({ width: 900, height: 680, minWidth: 400, minHeight: 400,
-        show: false, title: 'Agent Pet', backgroundColor: '#f5f7fa',
+        show: false, frame: false, title: 'Agent Pet', backgroundColor: '#f7f4ff',
         webPreferences: { preload: join(__dirname, '../preload/management.cjs'),
           contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true } });
       const current = window;
@@ -171,6 +171,15 @@ export function createManagement(options: {
   }
   applyEntrypoints();
   rebuildMenu();
+  ipcMain.handle('management:window-action', (event, action: unknown) => {
+    assertWindowSender(window, event);
+    if (typeof action !== 'string' || !['minimize', 'toggle-maximize', 'close'].includes(action)) throw new TypeError('Invalid window action');
+    if (quitting) return;
+    if (action === 'minimize') window!.minimize();
+    else if (action === 'toggle-maximize') {
+      if (window!.isMaximized()) window!.unmaximize(); else window!.maximize();
+    } else window!.close(); // Existing close handler owns background/quit and preview invalidation.
+  });
   ipcMain.handle('management:get-state', event => { assertWindowSender(window, event); return state(); });
   ipcMain.handle('management:update-preferences', (event, patch: unknown) => {
     assertWindowSender(window, event);

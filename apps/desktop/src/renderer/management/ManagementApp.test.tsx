@@ -38,6 +38,16 @@ async function category(user: ReturnType<typeof userEvent.setup>, name: string) 
 const flush = async () => { await act(async () => {}); };
 
 describe('ManagementApp formal four-page interface', () => {
+  it('places usable window controls in the shared titlebar and reports host failures', async () => {
+    const test = await mount();
+    const controls = screen.getByRole('group', { name: '窗口操作' });
+    await test.user.click(within(controls).getByRole('button', { name: '最小化窗口' }));
+    await test.user.click(within(controls).getByRole('button', { name: '最大化或还原窗口' }));
+    expect(test.bridge.windowAction.mock.calls).toEqual([['minimize'], ['toggle-maximize']]);
+    test.bridge.windowAction.mockRejectedValueOnce(new Error('IPC failed'));
+    await test.user.click(within(controls).getByRole('button', { name: '关闭窗口' }));
+    expect(screen.getByRole('alert').textContent).toContain('窗口操作失败');
+  });
   it('keeps four page owners and one shared state subscription, with honest empty and real asset collection states', async () => {
     const test = await mount([]);
     expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['首页', '宠物', '连接', '设置']);

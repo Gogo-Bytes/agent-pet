@@ -10,7 +10,7 @@
 
 连接桌面为“配置选择菜单 + 当前详情”，窄窗口选择后进入详情并提供返回。选择菜单显示名称、类型与检查图形；按用户后续批注删除短位置，完整位置及修复操作集中在当前详情。扫描与手动添加常驻，分别使用文字胶囊与圆形 glass 加号入口。扫描结果仍按目标区分安装/项目；添加保留命名确认、完成页和返回。
 
-设置为固定分类目录 + 独立滚动的内容区。画质用三档选择带，手调使用真实单选分段；大小使用数值与滑轨；布尔偏好使用无文字开关，功能名称与必要依赖说明位于控件外。软件入口并排比较，其他选项按目的分组。关于保留博客 / README 文章、版本、介绍、进展、使用方法、隐私和 GitHub 链接。
+设置为固定分类目录 + 独立滚动的内容区；分组采用内容上方的横向二级标题行。画质用三档选择带，手调使用真实单选分段；大小使用数值与滑轨；布尔偏好使用无文字开关，功能名称与必要依赖说明位于控件外。软件入口并排比较，其他选项按目的分组。关于保留博客 / README 文章、版本、介绍、进展、使用方法、隐私和 GitHub 链接。
 
 ## 实际研究来源
 
@@ -71,8 +71,8 @@ Main 实看 1280×720、1280×800、1024×600、1280×480、390×844，以及最
 截图为实际浏览器页面，未拼接或用设计稿替代。模拟视口导出曾出现缩小、空白或重复画面，已排除无效文件；宽窗口采用正常视口直接截图，窄窗口保留已核对的原始截帧。Chrome 辅助验收入口打开超时，未重试或作为通过证据：
 
 - [连接宽窗口](screenshots/configuration-menu/connections-icons-wide.png)
-- [渲染设置宽窗口](screenshots/configuration-menu/settings-icons-wide.png)
-- [设置窄窗口](screenshots/configuration-menu/settings-icons-narrow.png)
+- [设置分组标题](screenshots/configuration-menu/settings-headings-app.png)
+- [设置窄窗口](screenshots/configuration-menu/settings-headings-narrow.png)
 - [手动错误](screenshots/configuration-menu/manual-error-wide.png)
 - [命名确认窄窗口](screenshots/configuration-menu/manual-confirm-narrow.png)
 - [长路径与矮窗口](screenshots/configuration-menu/manual-short.png)
@@ -156,3 +156,18 @@ Main实看连接与设置的宽屏、390×720窄屏，以及扫描中/扫描结�
 独立Product Test subagent本轮启动仍因模型容量错误失败，未产出审查，按有界失败规则未继续重试。Main自评不冒充独立审查，独立审查未完成，用户视觉验收待确认。模拟视口检查以实际innerWidth核对，错误尺寸截图已覆盖；保留截图来自有效原始页面截帧，无拼接。临时视口已恢复，设置验收页error日志为空。
 
 本轮最终 `pnpm typecheck`、原型Vite构建、`git diff --check` 均通过；无新依赖，未推送。
+
+## 2026-10-14 · 设置分组标题横排置于内容上方
+
+按用户批注把“应用入口”“启动与退出”“资源使用”“桌面显示”“动作与气泡”“任务结果”统一为对应控件上方的横向标题行。图标与已有h2同排，必要的“至少保留一个”提示放在该行右侧；撤掉桌面的左侧窄标题列及1050px断点的列宽覆盖。仅修改settings-view.css，保留色彩、图标、控件响应式排列、语义和交互；关于文章原本就是段落上方标题，保持原样。
+
+Main实际复验1280px、905px、390px宽度：标题与控件同宽且header.bottom<=body.top；软件、渲染、宠物与提醒同类标题全部适用。390×720无横向溢出，标题width与scrollWidth均324px。905×1344（用户窗口尺寸）的宠物PageDown使正文scrollTop=22，window.scrollY=0，分类top始终128.14px；390×720软件PageDown正文scrollTop=220、window.scrollY=0、分类top89px。临时视口已清除。
+
+桌面905×720的PageDown曾使window.scrollY=14：旧共享外框有最低620px高度和100px底部留白（styles.css既有规则），本轮没有修改该外框；滚动固定结论限定于上述已验证尺寸，不外推为所有窗口和键盘情况通过。
+
+- [横向标题实际截图](screenshots/configuration-menu/settings-headings-app.png)
+- [窄屏实际截图](screenshots/configuration-menu/settings-headings-narrow.png)
+
+本轮是Main完成的CSS小改，不新增独立审查结论；此前独立容量限制记录保留。用户视觉验收仍待确认。
+
+本轮 `pnpm typecheck`、原型Vite构建与 `git diff --check` 通过。无真实行为变更或推送。

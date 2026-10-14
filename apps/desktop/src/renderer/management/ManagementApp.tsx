@@ -61,7 +61,7 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
     {(windowError || snapshot.error || snapshot.state?.preferenceError) && <p className="app-alert" role="alert">{windowError || snapshot.error || snapshot.state?.preferenceError}<button onClick={() => void store.retry()}>重新读取</button></p>}
     <div className="game-content">
       <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} onClips={onClips}>
-        <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} name={preferences.petName} clips={clips} action={action} busy={busy} error={error}
+        <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
           onName={petName => change(() => bridge.updatePreferences({ petName }))} onBind={(id, pet) => void change(() => bridge.configurations.bindPet(id, pet))}
           onAction={value => { setAction(value); setReplay(previous => previous + 1); }} />
       </CompanionScene>

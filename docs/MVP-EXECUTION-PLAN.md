@@ -52,6 +52,10 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 修复重启停用提示及刷新后准确性，保留具体失败原因。全量 **630 passed / 1 skipped / 67 files**，typecheck、desktop build（package 内）、package:mac、diff 检查通过，独立审查 READY。操作范围、截图、最新包及首次 pi 自动下载越界说明见 [实机证据](PI-LIVE-CONNECTION-ACCEPTANCE.md)。本轮未登录、未复制凭据、未发起模型请求；真实任务/取消/错误矩阵、正式 UI 用户认可和发布验收未通过。下一步为 macOS 非登录项设置实机，登录项变更需另外明确范围。
 
+## 用户反馈修复：宠物场景、名称与收藏（2026-10-14）
+
+已交付独立Renderer增量：首页/单宠物场景使用不同内容与镜头，保留单一R3F Canvas；宠物无地台并居中，名称从左上角直接编辑，收藏采用共享玻璃抽屉/进出动画/native modality/关闭回焦。宽窄矮、40字名称及动作条遮挡依据实图修正。全量 **639 passed / 1 skipped / 67 files**，最后微调focused **34 passed**、typecheck、desktop build与package通过，独立审查READY；最终包原生关闭与名称保存通过，捕获失败未升级为完整键盘矩阵通过。最新包、截图及边界见 [修订验收](PET-SCENE-REVISION-ACCEPTANCE.md)。未新增资产/Provider或日常pi目标操作；设置实机停点仍未完成。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

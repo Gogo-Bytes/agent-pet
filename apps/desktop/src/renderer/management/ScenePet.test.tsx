@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { Component, StrictMode, type ReactNode } from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { create, type ReactThreeTest } from '@react-three/test-renderer';
+import { act, create, type ReactThreeTest } from '@react-three/test-renderer';
 import { useGLTF } from '@react-three/drei';
 import { useThree, type RootState } from '@react-three/fiber';
-import { Box3, Mesh, type AnimationClip, type Group } from 'three';
+import { Box3, Mesh, Vector3, type AnimationClip, type Group } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ScenePet } from './ScenePet.js';
+import { HomeScene, PetPreviewScene } from './ManagementScenes.js';
 
 // Real bundled GLB, Three mixer/actions and R3F reconciler. Replace only asset URL loading.
 vi.mock('@react-three/drei', async original => ({ ...await original<typeof import('@react-three/drei')>(), useGLTF: vi.fn() }));
@@ -35,6 +36,44 @@ async function mount(instances: Instance[], clips = asset.animations) {
 }
 
 describe('ScenePet actual bundled asset and multi-instance lifecycle', () => {
+  it.each([[1280, 720], [390, 700], [1000, 360], [390, 350]])('switches home to a centered pet-only scene at %sx%s without replacing the R3F root', async (width, height) => {
+    vi.mocked(useGLTF).mockReturnValue(asset as ReturnType<typeof useGLTF>);
+    let state!: RootState;
+    function Probe() { state = useThree(); return null; }
+    const ready = vi.fn(); const focused = vi.fn();
+    const pets = ['a', 'b'].map(id => ({ id, agent: 'pi', name: id, configuration: id, status: '陪伴中', action: 'Idle' }));
+    const view = await create(<><Probe /><HomeScene pets={pets} focused={null} reduced onFocus={focused} onReady={ready} /></>, { camera: { position: [0, 4.5, 10], fov: 38 } });
+    mounted.push(view);
+    await act(async () => state.setSize(width, height));
+    const camera = state.camera, scene = state.scene;
+    await view.advanceFrames(1, .1);
+    expect(scene.getObjectByName('home-floor')).toBeTruthy();
+    await view.fireEvent(view.scene.findByProps({ name: 'a' }), 'click', { stopPropagation() {} });
+    expect(focused).toHaveBeenCalledWith('a');
+    await view.update(<><Probe /><PetPreviewScene action="Idle" replay={0} reduced onReady={ready} /></>);
+    await view.advanceFrames(1, .1);
+    expect(state.scene).toBe(scene); expect(state.camera).toBe(camera);
+    expect(scene.getObjectByName('home-floor')).toBeUndefined();
+    expect(scene.getObjectByName('a')).toBeUndefined();
+    expect(scene.getObjectByName('b')).toBeUndefined();
+    expect(scene.getObjectByName('pet-preview-scene')).toBeTruthy();
+    camera.updateMatrixWorld();
+    const center = new Vector3(0, 1.05, 0).project(camera);
+    expect(center.x).toBeCloseTo(0, 5); expect(center.y).toBeCloseTo(0, 5);
+    const bounds = new Box3().setFromObject(scene.getObjectByName('pet-preview-scene')!);
+    for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
+      const point = new Vector3(x, y, z).project(camera);
+      expect(Math.abs(point.x)).toBeLessThan(1); expect(Math.abs(point.y)).toBeLessThan(1);
+    }
+    expect(state.internal.subscribers).toHaveLength(2); // one camera rig and one actual mixer
+    await view.update(<><Probe /><HomeScene pets={pets} focused="b" reduced onFocus={focused} onReady={ready} /></>);
+    await view.advanceFrames(1, .1);
+    expect(scene.getObjectByName('home-floor')).toBeTruthy();
+    expect(scene.getObjectByName('pet-preview-scene')).toBeUndefined();
+    expect(state.internal.subscribers).toHaveLength(3); // one camera, two independent mixers
+    await view.unmount(); mounted.splice(mounted.indexOf(view), 1);
+    expect(state.internal.subscribers).toHaveLength(0);
+  });
   it('creates independent instances and one mixer per pet while preserving the shared cached asset', async () => {
     const test = await mount([{ id: 'a', action: 'Work' }, { id: 'b', action: 'Success' }]);
     const a = test.root('a'); const b = test.root('b');

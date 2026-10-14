@@ -39,6 +39,64 @@ async function category(user: ReturnType<typeof userEvent.setup>, name: string) 
 const flush = async () => { await act(async () => {}); };
 
 describe('ManagementApp formal four-page interface', () => {
+  it('edits the pet name at its outside heading with validation, failure recovery, Enter and Escape', async () => {
+    const test = await mount(); await page(test.user, '宠物');
+    const heading = screen.getByRole('heading', { name: '团子' });
+    const trigger = within(heading).getByRole('button', { name: '修改宠物名称' });
+    await test.user.click(trigger);
+    let input = screen.getByRole('textbox', { name: '宠物名称' });
+    expect(document.activeElement).toBe(input);
+    expect(input.getAttribute('maxlength')).toBe('40');
+    await test.user.clear(input);
+    expect(screen.getByRole('button', { name: '保存' }).hasAttribute('disabled')).toBe(true);
+    await test.user.type(input, '  新名字  ');
+    test.bridge.updatePreferences.mockRejectedValueOnce(new Error('isolated failure'));
+    await test.user.click(screen.getByRole('button', { name: '保存' }));
+    expect((screen.getByRole('textbox', { name: '宠物名称' }) as HTMLInputElement).value).toBe('  新名字  ');
+    expect(screen.getByRole('alert').textContent).toContain('请求失败');
+    await test.user.type(input, '{Enter}');
+    expect(test.bridge.updatePreferences).toHaveBeenLastCalledWith({ petName: '新名字' });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '修改宠物名称' })));
+    await test.user.click(screen.getByRole('button', { name: '修改宠物名称' }));
+    input = screen.getByRole('textbox', { name: '宠物名称' });
+    await test.user.clear(input); await test.user.type(input, '取消的名称{Escape}');
+    expect(screen.getByRole('heading', { name: '新名字' })).toBeTruthy();
+    expect(test.bridge.updatePreferences).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '修改宠物名称' })));
+    await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: '修改宠物名称' })).toBeNull();
+  });
+  it.each(['button', 'escape', 'backdrop'] as const)('keeps the glass collection modal until its %s exit completes, then restores focus', async method => {
+    const test = await mount(); await page(test.user, '宠物');
+    const opener = screen.getByRole('button', { name: '打开宠物收藏' });
+    await test.user.click(opener);
+    const dialog = screen.getByRole('dialog', { name: '宠物收藏' });
+    expect(document.activeElement).toBe(within(dialog).getByRole('textbox', { name: '搜索宠物' }));
+    const panel = dialog.querySelector('.glass-drawer-panel')!;
+    expect(panel.classList.contains('glass-panel')).toBe(true);
+    if (method === 'button') await test.user.click(within(dialog).getByRole('button', { name: '关闭弹窗' }));
+    else if (method === 'escape') fireEvent(dialog, new Event('cancel', { bubbles: true, cancelable: true }));
+    else fireEvent.click(dialog);
+    expect(dialog.getAttribute('data-closing')).toBe('true');
+    expect(dialog.hasAttribute('open')).toBe(true);
+    const end = new Event('animationend', { bubbles: true });
+    Object.defineProperty(end, 'animationName', { value: 'glass-drawer-out' });
+    fireEvent(panel, end);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+  it('closes collection immediately with reduced motion and falls back when animationend is lost', async () => {
+    const test = await mount(); await page(test.user, '宠物');
+    act(() => test.pushState({ ...test.state(), preferences: { ...test.state().preferences, reduced: true } }));
+    await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    await test.user.click(screen.getByRole('button', { name: '关闭弹窗' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    act(() => test.pushState({ ...test.state(), preferences: { ...test.state().preferences, reduced: false } }));
+    await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    await test.user.click(screen.getByRole('button', { name: '关闭弹窗' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '打开宠物收藏' }));
+  });
   it('distinguishes persisted disablement after restart, resumes only explicitly and retains failure reasons', async () => {
     const record = { ...configuration(), connection: { ...initialConnection, canConfigure: false, canResume: true, canRemove: true,
       deployedPath: '/isolated/project-one/extensions/agent-pet.ts', status: 'disconnected' as const,

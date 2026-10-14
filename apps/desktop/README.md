@@ -77,6 +77,13 @@ The production renderer never imports `prototype/` or a mock bridge.
 `createManagementStore` owns one subscription per settings/configurations/session
 channel. `CompanionScene` keeps one Canvas across home and pets, uses the real cached
 starter GLB, and separates instance transforms/mixers from shared asset resources.
+HomeScene owns the multi-configuration floor and selection; PetPreviewScene contains
+only the centered audition pet with responsive camera framing. Names edit directly
+at the upper-left heading. GlassDrawer uses shared material, scene bounds, native
+modality through exit, reduced-motion closure and opener focus restoration.
+See [revision evidence](../../docs/PET-SCENE-REVISION-ACCEPTANCE.md) for real screenshots,
+final package and limits.
+
 Home projection preserves configuration identities and only includes online pi
 connections. HTML keyboard focus and model clicks use the same projection.
 

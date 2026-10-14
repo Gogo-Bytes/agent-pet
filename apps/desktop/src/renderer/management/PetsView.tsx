@@ -3,13 +3,14 @@ import type { AgentConfiguration, PetBinding } from '../../shared/configurations
 import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from './components/glass.js';
 import { Icon } from './components/icons.js';
 import { Dialog } from './components/Dialog.js';
+import { GlassDrawer } from './components/GlassDrawer.js';
 import { petActions } from './ScenePet.js';
 import { providerLabels } from './home-projection.js';
 
-export function PetsView({ visible, records, name, clips, action, busy, onName, onBind, onAction, error }: {
+export function PetsView({ visible, records, name, clips, action, busy, onName, onBind, onAction, error, reduced }: {
   visible: boolean; records: AgentConfiguration[]; name: string; clips: string[]; action: string; busy: boolean;
   onName: (value: string) => Promise<boolean>; onBind: (id: string, pet: PetBinding | null) => void;
-  onAction: (value: string) => void; error: string;
+  onAction: (value: string) => void; error: string; reduced: boolean;
 }) {
   const [panel, setPanel] = useState<'pets' | 'agents' | null>(null);
   const [motionsOpen, setMotionsOpen] = useState(false);
@@ -18,6 +19,24 @@ export function PetsView({ visible, records, name, clips, action, busy, onName, 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const motionTrigger = useRef<HTMLButtonElement>(null);
+  const nameTrigger = useRef<HTMLButtonElement>(null);
+  const nameAttempt = useRef(0);
+  useEffect(() => () => { nameAttempt.current++; }, []);
+  function endNameEdit() {
+    nameAttempt.current++;
+    setEditing(false);
+    requestAnimationFrame(() => nameTrigger.current?.focus({ preventScroll: true }));
+  }
+  async function saveName() {
+    const value = draft.trim();
+    if (!value) { setNotice('名称不能为空。'); return; }
+    const attempt = ++nameAttempt.current;
+    try {
+      const saved = await onName(value);
+      if (attempt !== nameAttempt.current) return;
+      if (saved) { setNotice(''); endNameEdit(); }
+    } catch { if (attempt === nameAttempt.current) setNotice('名称保存失败，请重试。'); }
+  }
   const motions = petActions.filter(value => clips.includes(value.id));
   useEffect(() => { if (!visible) { setPanel(null); setMotionsOpen(false); setEditing(false); } }, [visible]);
   useEffect(() => {
@@ -28,10 +47,11 @@ export function PetsView({ visible, records, name, clips, action, busy, onName, 
   function openPanel(value: 'pets' | 'agents') { setPanel(value); setMotionsOpen(false); setQuery(''); }
   return <>
     <div className="pet-identity"><span className="identity-agent">我的宠物</span>
-      {editing ? <form className="pet-rename" onSubmit={event => { event.preventDefault(); if (draft.trim()) void onName(draft.trim()).then(saved => { if (saved) setEditing(false); }); }}>
-        <input autoFocus aria-label="宠物名称" value={draft} maxLength={40} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setEditing(false); } }} />
-        <button disabled={busy || !draft.trim()}>保存</button><button type="button" onClick={() => setEditing(false)}>取消</button>
-      </form> : <h1>{name}</h1>}
+      {editing ? <form className="pet-rename" onSubmit={event => { event.preventDefault(); if (!busy) void saveName(); }}>
+        <input autoFocus aria-label="宠物名称" value={draft} disabled={busy} maxLength={40} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); endNameEdit(); } }} />
+        <button disabled={busy || !draft.trim()}>保存</button><button type="button" onClick={endNameEdit}>取消</button>
+      </form> : <h1 aria-label={name}><button ref={nameTrigger} className="pet-name-edit" aria-label="修改宠物名称" title={name + ' · 点击修改名称'} disabled={busy}
+        onClick={() => { setDraft(name); setNotice(''); setEditing(true); }}>{name}</button></h1>}
       <div className="pet-binding-tags" aria-label="使用这个宠物的 Agent">
         {records.filter(record => record.pet?.assetId === 'starter').map(record => <GlassSurface as="span" className="pet-binding-tag" key={record.id}>
           <i><Icon name="pi" size={16} /></i><span>{record.name}</span><button disabled={busy} aria-label={`解除 ${record.name} 的宠物绑定`} onClick={() => onBind(record.id, null)}><Icon name="close" /></button>
@@ -50,15 +70,18 @@ export function PetsView({ visible, records, name, clips, action, busy, onName, 
       </GlassSurface>}
     </div>
     {(notice || error) && <p className="pet-notice" role={error ? 'alert' : 'status'}>{error || notice}</p>}
-    {panel && <Dialog label={panel === 'pets' ? '宠物收藏' : '配置 Agent'} className={`pet-dialog ${panel === 'pets' ? 'pet-collection-drawer' : ''}`} onClose={() => setPanel(null)}>
-      <header><h2>{panel === 'pets' ? '宠物收藏' : '配置给 Agent'}</h2><button aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>
-      {panel === 'pets' ? <><label className="collection-search"><Icon name="search" /><input autoFocus aria-label="搜索宠物" placeholder="搜索宠物" value={query} onChange={event => setQuery(event.target.value)} /></label>
-        <div className="pet-avatar-grid">{name.includes(query) && <button aria-pressed="true" onClick={() => setNotice('正在使用内置 starter.glb。')}><span className="pet-card-icon"><Icon name="pet" size={28} /></span><span className="avatar-name">{name}</span></button>}
-          <button className="avatar-add" aria-label="添加宠物（尚未支持）" onClick={() => setNotice('宠物包导入尚未实现，当前形象会保留。')}><span className="pet-card-icon"><Icon name="plus" /></span><span className="avatar-name">添加</span></button></div>
-        <button className="dialog-done" aria-label="修改宠物名称" onClick={() => { setDraft(name); setPanel(null); setEditing(true); }}>修改宠物名称</button><p className="collection-empty">内置 starter.glb · 已接入实际模型与动作<br />宠物包导入尚未支持。</p><p role="status">{notice}</p></> : <>
-          <div className="pet-agent-options">{records.map(record => <button key={record.id} disabled={busy} aria-pressed={record.pet?.assetId === 'starter'} onClick={() => onBind(record.id, record.pet ? null : { assetId: 'starter', name })}><Icon name="link" /><span>{record.name}<br /><small>{providerLabels[record.provider]}</small></span><small>{record.pet ? '已配置 ✓' : '默认宠物'}</small></button>)}</div>
-          {!records.length && <p className="collection-empty">还没有配置。可以从底部「连接」添加。</p>}<button className="dialog-done" onClick={() => setPanel(null)}>完成</button>{error && <p role="alert">{error}</p>}
-        </>}
+    {panel === 'pets' && <GlassDrawer label="宠物收藏" reduced={reduced} onClose={() => setPanel(null)}>
+      <label className="collection-search glass-inset"><Icon name="search" /><input autoFocus aria-label="搜索宠物" placeholder="搜索宠物" value={query} onChange={event => setQuery(event.target.value)} /></label>
+      <div className="pet-avatar-grid">{name.includes(query) && <button aria-pressed="true" onClick={() => setNotice('正在使用内置 starter.glb。')}><span className="pet-card-icon"><Icon name="pet" size={28} /></span><span className="avatar-name">{name}</span></button>}
+        <button className="avatar-add" aria-label="添加宠物（尚未支持）" onClick={() => setNotice('宠物包导入尚未实现，当前形象会保留。')}><span className="pet-card-icon"><Icon name="plus" /></span><span className="avatar-name">添加</span></button></div>
+      {!name.includes(query) && <p className="collection-empty">没有找到宠物</p>}
+      <p className="collection-empty">内置 starter.glb · 已接入实际模型与动作<br />宠物包导入尚未支持。</p><p role="status">{notice}</p>
+    </GlassDrawer>}
+    {panel === 'agents' && <Dialog label="配置 Agent" className="pet-dialog" onClose={() => setPanel(null)}>
+      <header><h2>配置给 Agent</h2><button type="button" aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>
+      <div className="pet-agent-options">{records.map(record => <button key={record.id} disabled={busy} aria-pressed={record.pet?.assetId === 'starter'} onClick={() => onBind(record.id, record.pet ? null : { assetId: 'starter', name })}><Icon name="link" /><span>{record.name}<br /><small>{providerLabels[record.provider]}</small></span><small>{record.pet ? '已配置 ✓' : '默认宠物'}</small></button>)}</div>
+      {!records.length && <p className="collection-empty">还没有配置。可以从底部「连接」添加。</p>}
+      <button className="dialog-done" onClick={() => setPanel(null)}>完成</button>{error && <p role="alert">{error}</p>}
     </Dialog>}
   </>;
 }

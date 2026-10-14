@@ -1,0 +1,15 @@
+.glass-drawer { position:fixed;inset:auto;margin:0;padding:0;border:0;max-width:none;max-height:none;background:#49365b26;overflow:hidden;color:var(--glass-ink);animation:glass-drawer-shade-in .26s ease-out both; }
+.glass-drawer::backdrop { background:transparent; }
+.glass-drawer .glass-drawer-panel { position:absolute;inset:0 0 0 auto;width:min(410px,100%);height:100%;border-radius:0;border-width:0 0 0 1px;overflow:auto;animation:glass-drawer-in .3s cubic-bezier(.22,.8,.24,1) both; }
+.glass-drawer-content { padding:24px; }
+.glass-drawer-content>header { display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px; }
+.glass-drawer-content h2 { margin:0;font-size:24px; }
+.glass-drawer-content>header button { display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%;background:transparent;color:inherit; }
+.glass-drawer[data-closing=true] { animation:glass-drawer-shade-out .22s ease-in both; }
+.glass-drawer-panel[data-closing=true] { animation:glass-drawer-out .22s ease-in both; }
+@keyframes glass-drawer-in { from { transform:translateX(100%); } to { transform:translateX(0); } }
+@keyframes glass-drawer-out { from { transform:translateX(0); } to { transform:translateX(100%); } }
+@keyframes glass-drawer-shade-in { from { background:transparent; } }
+@keyframes glass-drawer-shade-out { to { background:transparent; } }
+@media(max-width:700px) { .glass-drawer-content { padding:20px; } }
+@media(prefers-reduced-motion:reduce) { .glass-drawer,.glass-drawer .glass-drawer-panel { animation:none; } }

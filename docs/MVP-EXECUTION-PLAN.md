@@ -28,6 +28,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 连接、设置内容区完成菜单结构重构，处于 **IMPLEMENTED-NOT-ACCEPTED（用户视觉验收）**。Main 已实际检查正常/错误/空状态、添加与配置修改、全部设置选项、依赖、键盘及宽/窄/矮窗口；独立 Product Test subagent 的具体意见已修复。研究、范围、截图和验收入口见 [配置 UI 检查](CONFIGURATION-UI-REVIEW.md)，产品决策见 [产品方向](PRODUCT-DIRECTION.md)。
 
+本轮另按用户六条浏览器批注精简设置文案、重复层级和开关，更新恢复入口；仍等待视觉验收，具体证据见上述 UI 检查。
+
 本阶段仅浏览器 mock，不读取真实配置、不修改系统偏好，不改变首页、宠物或共享框架，不推送。本轮 UI 检查不改变下列真实 MVP、安全和分发阶段的状态。
 
 ## 当前事实与证据

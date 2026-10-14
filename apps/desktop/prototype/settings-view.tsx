@@ -36,7 +36,7 @@ export function SettingsView({visible}:{visible:boolean}) {
  ]:[];
  const preset=presets.find(item=>item.fps===values.fps&&item.resolution===values.resolution);
  const selectedSection=sections.find(item=>item.id===section)!;
- return <section id="page-panel-settings" role="tabpanel" aria-labelledby="page-tab-settings" hidden={!visible} className="preferences-page" aria-label="应用偏好">
+ return <section hidden={!visible} className="preferences-page" aria-label="应用偏好">
   <nav className="preferences-nav" aria-label="设置分类">{sections.map(item=><button key={item.id} aria-pressed={section===item.id} onClick={event=>{setSection(item.id);setResetting(false);scrollArea.current?.scrollTo({top:0});event.currentTarget.scrollIntoView({block:'nearest',inline:'nearest'});}}><Icon name={item.icon}/><span>{item.label}</span></button>)}</nav>
   <div ref={scrollArea} className="preferences-content">
    {section!=='about'&&<header className="preferences-heading"><span className={`preferences-emblem tone-${section}`}><Icon name={selectedSection.icon}/></span><h1>{selectedSection.title}</h1></header>}

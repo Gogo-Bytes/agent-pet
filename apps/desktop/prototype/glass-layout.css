@@ -101,3 +101,48 @@
 .content-panel .pet-agent-options button[aria-pressed="true"] { background:#e8def5;border-color:#a38abc;color:#72519b; }
 .content-panel button:focus-visible { outline:2px solid #9774ba;outline-offset:3px; }
 @media(forced-colors:active) { .content-panel { background:Canvas;color:CanvasText;border:1px solid CanvasText; }.content-panel .pet-agent-options button[aria-pressed="true"] { border-color:Highlight;color:Highlight; } }
+/* Cross-page review: bounded selectors, readable empty states, one visual palette. */
+.pet-identity h1{color:#72558d}
+.identity-agent{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-agent-picker{display:flex;align-items:center;gap:8px;position:relative;margin-top:12px;max-width:min(350px,calc(100vw - 72px))}
+.home-agent-toggle{display:flex;align-items:center;gap:9px;min-height:44px;padding:6px 12px;color:var(--glass-ink);min-width:0;max-width:280px}
+.home-agent-toggle i{display:grid;place-items:center;width:28px;height:28px;background:#f7f2fc;border-radius:50%;font-style:normal;flex:none}
+.home-agent-toggle>span:not(.glass-optics){overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:14px;font-weight:550}
+.home-agent-toggle small{font-size:11px;color:#9a83aa;margin-left:auto}
+.home-agent-toggle>.ui-icon{width:16px;height:16px}
+.home-agent-list{position:absolute;left:0;top:calc(100% + 10px);width:min(340px,calc(100vw - 72px));padding:14px;border-radius:18px;z-index:12}
+.home-agent-list .collection-search{margin-bottom:10px}
+.home-agent-list>div{overflow:auto;max-height:min(260px,35dvh)}
+.home-agent-list button{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:9px 10px;border:1px solid transparent;border-radius:12px;background:none;color:#725d89;text-align:left}
+.home-agent-list button:hover{background:#eee6f6}
+.home-agent-list button[aria-pressed=true]{background:#e8def5;border-color:#d2bee7}
+.home-agent-list button>i{font-style:normal;width:28px;text-align:center;flex:none}
+.home-agent-list button>span{display:grid;gap:4px;flex:1;min-width:0}
+.home-agent-list strong{font-size:14px;overflow-wrap:anywhere}
+.home-agent-list small{font-size:11px;color:#8a7897}
+.home-agent-list button:focus-visible{outline:2px solid #9774ba;outline-offset:-2px}
+.pet-binding-tags{max-height:120px;overflow:auto;padding:3px;align-content:start}
+.pet-binding-tag{max-width:100%;overflow-wrap:anywhere}
+.scene-empty{display:grid;justify-items:center;gap:18px;color:#9b85ad;font-size:14px;pointer-events:auto}
+.scene-empty>.ui-icon{width:64px;height:64px;color:#c2acda}
+.scene-empty button{display:flex;align-items:center;gap:8px;min-height:44px;padding:10px 18px;border:0;border-radius:12px;background:#e5d9f2;color:#77559b;font-size:14px;font-weight:600}
+.scene-empty button:focus-visible{outline:2px solid #9774ba;outline-offset:3px}
+.content-panel .pet-agent-options{max-height:min(360px,48dvh);overflow:auto}
+.pet-agent-options span{display:grid;gap:4px;min-width:0}
+.pet-agent-options strong{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.pet-agent-options em{font-style:normal;font-size:11px;color:#8a7897}
+.pet-agent-options small{flex:none;max-width:85px;overflow-wrap:anywhere}
+.pet-import-info{grid-column:1/-1;padding:16px;border-radius:12px;background:#eee7f6;color:#725d89}
+.pet-import-info strong{font-size:14px}
+.pet-import-info p{font-size:12px;line-height:1.7;margin:10px 0;color:#8a7897}
+.pet-avatar-grid .pet-import-info button{width:auto;min-height:36px;display:inline-block;color:#805ca3;text-decoration:underline;font-size:12px}
+@media(max-width:720px){.identity-agent{max-width:calc(100vw - 64px)}.home-agent-list>div{max-height:190px}.pet-binding-tags{max-height:108px}}
+@media(forced-colors:active){.home-agent-list,.scene-empty button,.pet-import-info{background:Canvas;color:CanvasText;border:1px solid CanvasText}.home-agent-list button[aria-pressed=true]{border-color:Highlight;background:Canvas;color:Highlight}}
+.home-agent-toggle{border-radius:28px}
+.home-agent-list{display:flex;flex-direction:column;overflow:hidden}
+.home-agent-list .collection-search{flex:none}
+.home-agent-list>div{min-height:0;flex:1;max-height:none}
+.game-dock .dock-primary{background:#805d9f;border:0;border-radius:14px;box-shadow:none;color:#fff}
+.game-dock .dock-primary:hover{background:#72518f}
+.dialog-done{background:#805d9f;box-shadow:none;border-radius:14px}
+.dock-tab,.game-dock .dock-primary{min-height:44px}

@@ -9,7 +9,7 @@ import { bundledAnimationBounds } from './bundled-animation-bounds.js';
 const animations = { idle: 'Idle', working: 'Work', success: 'Success', error: 'Error' };
 const statuses = { working: 'working', success: 'completed-unread', error: 'error-unread' } as const;
 
-export function PetModel({ motion, onReady }: { motion: PetMotion; onReady: (message: string) => void }) {
+export function PetModel({ motion, reduced = false, onReady }: { reduced?: boolean; motion: PetMotion; onReady: (message: string) => void }) {
   // No decoder/CDN needed by this local, uncompressed asset.
   const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(starterUrl, false, false);
   if (!gltf.animations.some(clip => clip.name === animations.idle)) throw new Error('Required Idle clip is missing');
@@ -30,10 +30,11 @@ export function PetModel({ motion, onReady }: { motion: PetMotion; onReady: (mes
     const name = motion === 'idle' ? animations.idle : animationForStatus(statuses[motion], animations);
     const action = actions[name] ?? actions[animations.idle]!;
     action.reset().play();
+    action.paused = reduced;
     // Exactly one action owns the pose; rapid transitions never accumulate
     // fading actions. Drei alone advances this mixer in R3F's frame loop.
     return () => { action.stop(); };
-  }, [actions, motion]);
+  }, [actions, motion, reduced]);
   useEffect(() => {
     onReady('');
   }, [onReady]);

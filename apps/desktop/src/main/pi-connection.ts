@@ -54,6 +54,13 @@ export class PiConnection {
     }
   }
   snapshot(): PiConnectionState { return structuredClone(this.state); }
+  /** Explicit Main-side availability refresh only; validates exact owned identity/content without mutations. */
+  async matchesDeployment(): Promise<boolean> {
+    const owned = this.owned;
+    if (this.closed || this.state.busy || !owned) return false;
+    const matches = await owned.deployment.matches(owned.receipt);
+    return matches && !this.closed && !this.state.busy && this.owned === owned;
+  }
   subscribe(listener: (state: PiConnectionState) => void): () => void {
     this.listeners.add(listener); return () => { this.listeners.delete(listener); };
   }

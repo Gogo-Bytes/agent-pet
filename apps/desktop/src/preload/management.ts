@@ -1,4 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { SessionState } from '@agent-pet/domain';
+import type { ConfigurationsApi, ConfigurationsState } from '../shared/configurations.js';
+import type { ConfigurationLocationsApi } from '../shared/configuration-locations.js';
 import type { ManagementState, PreferencePatch } from '../shared/preferences.js';
 import type { PiPreflightApi } from '../shared/pi-preflight.js';
 import type { PiConnectionApi, PiConnectionState } from '../shared/pi-connection.js';
@@ -25,8 +28,39 @@ const piPreflight: PiPreflightApi = {
   useDefaultTarget: () => ipcRenderer.invoke('management:pi-default-target'),
   inspect: () => ipcRenderer.invoke('management:pi-inspect'),
 };
+const configurations: ConfigurationsApi = {
+  getState: () => ipcRenderer.invoke('management:configurations-state'),
+  create: input => ipcRenderer.invoke('management:configurations-create', input),
+  rename: (id, name) => ipcRenderer.invoke('management:configurations-rename', id, name),
+  changeTarget: (id, path) => ipcRenderer.invoke('management:configurations-target', id, path),
+  bindPet: (id, pet) => ipcRenderer.invoke('management:configurations-pet', id, pet),
+  inspect: id => ipcRenderer.invoke('management:configurations-inspect', id),
+  preview: id => ipcRenderer.invoke('management:configurations-preview', id),
+  cancel: id => ipcRenderer.invoke('management:configurations-cancel', id),
+  confirm: (id, planId) => ipcRenderer.invoke('management:configurations-confirm', id, planId),
+  resume: id => ipcRenderer.invoke('management:configurations-resume', id),
+  disable: id => ipcRenderer.invoke('management:configurations-disable', id),
+  remove: id => ipcRenderer.invoke('management:configurations-remove', id),
+  subscribe(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, state: ConfigurationsState) => listener(state);
+    ipcRenderer.on('management:configurations-state', handler);
+    return () => ipcRenderer.removeListener('management:configurations-state', handler);
+  },
+};
+const locations: ConfigurationLocationsApi = {
+  choose: () => ipcRenderer.invoke('management:location-choose'),
+  authorize: path => ipcRenderer.invoke('management:location-authorize', path),
+  inspect: (path, provider) => ipcRenderer.invoke('management:location-inspect', path, provider),
+};
 const managementApi = {
-  piPreflight, piConnection,
+  piPreflight, piConnection, configurations, locations,
+  getSessions(): Promise<SessionState> { return ipcRenderer.invoke('management:sessions'); },
+  openProject(): Promise<void> { return ipcRenderer.invoke('management:project'); },
+  subscribeSessions(listener: (sessions: SessionState) => void): () => void {
+    const handler = (_event: Electron.IpcRendererEvent, sessions: SessionState) => listener(sessions);
+    ipcRenderer.on('management:sessions', handler);
+    return () => ipcRenderer.removeListener('management:sessions', handler);
+  },
   getState(): Promise<ManagementState> { return ipcRenderer.invoke('management:get-state'); },
   updatePreferences(patch: PreferencePatch): Promise<ManagementState> { return ipcRenderer.invoke('management:update-preferences', patch); },
   setLogin(enabled: boolean): Promise<ManagementState> { return ipcRenderer.invoke('management:set-login', enabled); },

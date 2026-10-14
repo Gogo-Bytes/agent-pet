@@ -28,6 +28,7 @@ window.pet = {
     for (const listener of snapshots) listener(application.snapshot());
     for (const listener of layouts) listener(layout);
   },
+  subscribePreferences: () => () => {},
   subscribeSnapshot: listener => {
     const wrapped = (value: SessionState) => listener(value);
     snapshots.add(wrapped);

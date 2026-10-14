@@ -7,6 +7,7 @@ import { createManagement } from './management.js';
 import { assertWindowSender, loadTrustedEntry } from './window-trust.js';
 import { createPetWindowOptions } from './window-options.js';
 import { readPiBridgeConfig } from './pi-config.js';
+import { defaultPreferences, type Preferences } from '../shared/preferences.js';
 
 import { layoutOverlay } from './overlay-layout.js';
 import type { Rect, OverlayLayout } from '../shared/overlay-layout.js';
@@ -17,6 +18,15 @@ else startPrimaryInstance();
 function startPrimaryInstance(): void {
   let management: ReturnType<typeof createManagement> | undefined;
   let petVisible = true;
+  let petOnline = false;
+  let currentPreferences: Preferences = { ...defaultPreferences };
+  function applyPetVisibility(): void {
+    const visible = currentPreferences.petVisible && (currentPreferences.offline || petOnline);
+    if (visible !== petVisible || !preferencesApplied) {
+      petVisible = visible;
+      if (visible) petWindow?.show(); else petWindow?.hide();
+    }
+  }
   let preferencesApplied = false;
   let adapterStart: Promise<void> = Promise.resolve();
   let petWindow: BrowserWindow | undefined;
@@ -61,6 +71,7 @@ function startPrimaryInstance(): void {
   const developmentEnvironment = process.env.AGENT_PET_PI_ENDPOINT !== undefined ||
     process.env.AGENT_PET_PI_TOKEN !== undefined || piConfig !== undefined;
   application.subscribe((snapshot) => {
+    management?.publishSessions(snapshot);
     if (petWindow && !petWindow.isDestroyed()) {
       petWindow.webContents.send('pet:snapshot', snapshot);
     }
@@ -69,6 +80,7 @@ function startPrimaryInstance(): void {
   ipcMain.handle('pet:request-snapshot', (event) => {
     assertTrustedRenderer(event);
     event.sender.send('pet:snapshot', application.snapshot());
+    event.sender.send('pet:preferences', currentPreferences);
     updateOverlay();
   });
 
@@ -167,7 +179,7 @@ if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, {
     }
     try {
       piHandle = await piAdapter.start(piConfig, {
-        publish: observation => application.observe(observation),
+        publish: observation => { management?.configurations.registerLegacySession(observation.sessionId); application.observe(observation); },
         connectionChanged: state => {
           management?.connection.connectionChanged(state);
         },
@@ -187,42 +199,25 @@ if (process.platform === 'darwin') window.setVisibleOnAllWorkspaces(true, {
     const hitTimer = setInterval(updateHitPolicy, 50);
     hitTimer.unref();
     app.once('will-quit', () => clearInterval(hitTimer));
-    let demoRun = 0;
-    function demo(status: 'working' | 'completed' | 'error'): void {
-      if (status === 'working' || demoRun === 0) demoRun++;
-      for (const provider of ['codex', 'pi', 'claude'] as const) {
-        application.observe({
-          provider,
-          sessionId: `demo-${provider}-${demoRun}`,
-          agentName: `模拟 · ${provider} · ${demoRun}`,
-          status,
-          observedAt: new Date().toISOString(),
-        });
-      }
-    }
     management = createManagement({
+      sessions: () => application.snapshot(),
       pi: { adapter: piAdapter, publish: observation => application.observe(observation), developmentEnvironment },
+      onlineChanged: online => { petOnline = online; applyPetVisibility(); },
       applyPreferences: preferences => {
-        const visibilityChanged = !preferencesApplied || petVisible !== preferences.petVisible;
+        currentPreferences = preferences;
+        applyPetVisibility();
         preferencesApplied = true;
-        petVisible = preferences.petVisible;
         anchor.width = preferences.petSize;
         anchor.height = preferences.petSize;
         updateOverlay();
-        if (visibilityChanged) {
-          if (petVisible) petWindow?.show(); else petWindow?.hide();
-        }
+        petWindow?.setAlwaysOnTop(preferences.topmost, 'screen-saver');
+        petWindow?.webContents.send('pet:preferences', preferences);
       },
       stop: async () => {
         clearInterval(hitTimer);
         await adapterStart;
         await piHandle?.stop();
       },
-      developmentMenu: !app.isPackaged ? [{ label: '模拟 Session（开发专用）', submenu: [
-        { label: '新建三个工作 Session', click: () => demo('working') },
-        { label: '当前模拟任务完成', click: () => demo('completed') },
-        { label: '当前模拟任务出错', click: () => demo('error') },
-      ] }] : [],
     });
     adapterStart = startConfiguredAdapters();
   });

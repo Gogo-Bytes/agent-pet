@@ -7,6 +7,7 @@ import { rectStyle } from '../../shared/rect-style.js';
 import { useWindowGesture } from '../../shared/use-window-gesture.js';
 import { selectPetMotion } from '../../pet-motion.js';
 import styles from './PetCanvas.module.css';
+import { PreferenceRenderLoop } from '../../shared/PreferenceRenderLoop.js';
 import { PetModel } from './PetModel.js';
 
 function subscribeVisibility(listener: () => void) {
@@ -30,7 +31,7 @@ class PetErrorBoundary extends Component<{ children: ReactNode; onNotice: (messa
 export function PetCanvas({ store, rect, onNotice }: {
   store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void;
 }) {
-  const { sessions } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const { sessions, preferences } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const visible = useSyncExternalStore(subscribeVisibility, isVisible);
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
   // Canvas adds its own sizing divs. Keep Main's absolute pixel region and the
@@ -38,14 +39,15 @@ export function PetCanvas({ store, rect, onNotice }: {
   return <div className={`pet-canvas ${styles.surface}${drag.active ? ` pet-canvas--dragging ${styles.dragging}` : ''}`}
     style={rectStyle(rect)} {...drag.handlers}>
     <PetErrorBoundary onNotice={onNotice}>
-      <Canvas flat dpr={[1, 2]} gl={{ alpha: true, antialias: true }}
+      <Canvas flat dpr={preferences.resolution / 100} gl={{ alpha: true, antialias: true }}
         camera={{ fov: 35, position: [0, 0, 5] }}
-        frameloop={visible ? 'always' : 'never'}>
+        frameloop="never">
+        <PreferenceRenderLoop active={visible || !preferences.pauseHidden} fps={preferences.fps} />
         <ambientLight intensity={2} />
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel motion={selectPetMotion(sessions.bubbles)} onReady={onNotice} />
+            <PetModel motion={selectPetMotion(sessions.bubbles)} reduced={preferences.reduced} onReady={onNotice} />
           </Bounds>
         </Suspense>
       </Canvas>

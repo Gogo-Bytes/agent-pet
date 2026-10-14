@@ -10,6 +10,7 @@ import { App } from './App.js';
 import { createPetStore } from './bridge/pet-store.js';
 import { createPetBridgeDouble } from '../test-support/pet-bridge-double.js';
 import { baselineLayout, piBaselineObservations, piObservation } from '../test-support/pi-fixtures.js';
+import { defaultPreferences } from '../../shared/preferences.js';
 import { PetModel } from '../features/pet/PetModel.js';
 
 // Only the WebGL boundary is substituted; PetCanvas, native DOM gestures,
@@ -19,6 +20,7 @@ vi.mock('@react-three/fiber', () => ({
     <canvas />{Children.toArray(children).filter(child => isValidElement(child) && typeof child.type !== 'string')}
   </div>,
 }));
+vi.mock('../shared/PreferenceRenderLoop.js', () => ({ PreferenceRenderLoop: ({ active }: { active: boolean }) => <span data-loop-active={String(active)} /> }));
 vi.mock('@react-three/drei', () => ({ Bounds: ({ children }: { children: ReactNode }) => children }));
 vi.mock('../features/pet/PetModel.js', () => ({ PetModel: vi.fn(() => null) }));
 const asyncWrapper = getConfig().asyncWrapper;
@@ -179,24 +181,36 @@ describe('App lifecycle and notices', () => {
     expect(screen.getByRole('button', { name: '显示气泡' })).toBeTruthy();
   });
 
-  it('selects never while hidden and always on resume, retaining one visibility subscription through StrictMode', async () => {
+  it('pauses the preference render loop while hidden and resumes it, retaining one visibility subscription through StrictMode', async () => {
     let hidden = false;
     vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
     const add = vi.spyOn(document, 'addEventListener');
     const remove = vi.spyOn(document, 'removeEventListener');
     const { container, unmount } = await mount();
-    const loop = () => container.querySelector('[data-frameloop]')?.getAttribute('data-frameloop');
-    expect(loop()).toBe('always');
+    const loop = () => container.querySelector('[data-loop-active]')?.getAttribute('data-loop-active');
+    expect(loop()).toBe('true');
     act(() => { hidden = true; document.dispatchEvent(new Event('visibilitychange')); });
-    expect(loop()).toBe('never');
+    expect(loop()).toBe('false');
     act(() => { hidden = false; document.dispatchEvent(new Event('visibilitychange')); });
-    expect(loop()).toBe('always');
+    expect(loop()).toBe('true');
     const count = (calls: typeof add.mock.calls) => calls.filter(([event]) => event === 'visibilitychange').length;
     expect(count(add.mock.calls) - count(remove.mock.calls)).toBe(1);
     unmount();
     expect(count(add.mock.calls)).toBe(count(remove.mock.calls));
   });
 
+  it('applies bubble and reminder dependencies without acknowledging suppressed results', async () => {
+    const { bridge } = await mount({ observations: piBaselineObservations() });
+    act(() => bridge.publishPreferences({ ...defaultPreferences, bubbles: false, completed: false }));
+    await act(async () => {});
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(bridge.api.acknowledgeAndOpen).not.toHaveBeenCalled();
+    act(() => bridge.publishPreferences({ ...defaultPreferences, completed: false, error: false, petName: '小团子' }));
+    await act(async () => {});
+    expect(screen.queryByRole('button', { name: /已完成|发生错误/ })).toBeNull();
+    expect(screen.getByText('小团子')).toBeTruthy();
+    expect(bridge.snapshot().bubbles).toHaveLength(5);
+  });
   it('subscribes before the initial request, keeps one StrictMode listener pair, and cleans up on unmount', async () => {
     const { bridge, unmount, container } = await mount();
     expect(bridge.api.requestSnapshot).toHaveBeenCalledTimes(1);

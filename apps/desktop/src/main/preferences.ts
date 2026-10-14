@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { defaultPreferences, parsePreferencePatch, type Preferences } from '../shared/preferences.js';
+import { defaultPreferences, parsePreferencePatch, parseStoredPreferences, validatePreferences, type Preferences } from '../shared/preferences.js';
 
 // Main-only, small non-secret preference file. Never persists Session state.
 export class PreferenceStore {
@@ -18,11 +18,7 @@ export class PreferenceStore {
       const buffer = Buffer.alloc(4097);
       const count = fs.readSync(fd, buffer, 0, buffer.length, 0);
       if (count > 4096) throw new Error('Oversized preferences');
-      const parsed = JSON.parse(buffer.subarray(0, count).toString('utf8')) as Record<string, unknown>;
-      if (!parsed || parsed.schemaVersion !== 1 || Object.keys(parsed).length !== 3 ||
-          !('petVisible' in parsed) || !('petSize' in parsed)) throw new Error('Invalid preference schema');
-      const { schemaVersion: _, ...patch } = parsed;
-      this.value = { schemaVersion: 1, ...parsePreferencePatch(patch) } as Preferences;
+      this.value = parseStoredPreferences(JSON.parse(buffer.subarray(0, count).toString('utf8')));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         this.error = '偏好无法读取，已使用默认值。下次保存将替换原偏好文件。';
@@ -33,8 +29,8 @@ export class PreferenceStore {
   }
   snapshot(): Preferences { return { ...this.value }; }
   update(value: unknown): boolean {
-    const next = { ...this.value, ...parsePreferencePatch(value) };
-    if (!this.error && next.petSize === this.value.petSize && next.petVisible === this.value.petVisible) return true;
+    const next = validatePreferences({ ...this.value, ...parsePreferencePatch(value) });
+    if (!this.error && JSON.stringify(next) === JSON.stringify(this.value)) return true;
     const temp = `${this.path}.${randomUUID()}.tmp`;
     let fd: number | undefined;
     try {

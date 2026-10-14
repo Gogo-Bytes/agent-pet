@@ -1,3 +1,4 @@
+import { defaultPreferences } from '../shared/preferences.js';
 import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { baselineLayout, piBaselineObservations } from '../renderer/test-support/pi-fixtures.js';
@@ -62,6 +63,14 @@ describe('preload public renderer bridge', () => {
     } finally { bridge.dispose(); }
   });
 
+  it('delivers preferences without IPC metadata and cleans its exact subscription', () => {
+    const listener = vi.fn();
+    const off = api.subscribePreferences(listener);
+    events.emit('pet:preferences', { sender: 'private' }, defaultPreferences);
+    expect(listener).toHaveBeenCalledExactlyOnceWith(defaultPreferences);
+    off(); off();
+    expect(events.listenerCount('pet:preferences')).toBe(0);
+  });
   it('forwards public controls and screen-coordinate deltas to the expected IPC channels', async () => {
     await api.bubblesExpanded(true);
     await api.bubblesVisible(false);

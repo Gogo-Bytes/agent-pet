@@ -1,0 +1,145 @@
+:root {
+  --glass-ink: #725d89;
+  --glass-accent: #6b51af;
+  --glass-hover-fill: #fff;
+  --glass-selected-fill: #e8def6;
+  --glass-fill: #f9f7fc;
+  --glass-active-fill: #e8def6;
+  --glass-elevation: 0 3px 6px #392b5012, 0 10px 24px #392b5010;
+  --glass-rim: inset 0 0 0 1px #ffffff55, inset 2px 3px 1px -2px #fffffffa, inset -2px -3px 1px -2px #ffffffd9, inset -1px -1px 3px #49365b24, inset 1px 4px 5px -4px #49365b38;
+}
+.glass-surface { position:relative; isolation:isolate; }
+.glass-surface.glass-control, .glass-surface.glass-panel {
+  border: 1px solid #7b658126;
+  background: transparent;
+  color: var(--glass-ink);
+  box-shadow: var(--glass-rim), var(--glass-elevation);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.glass-filter-defs { position:absolute; width:0; height:0; pointer-events:none; }
+.glass-surface > .glass-optics {
+  position:absolute; inset:0; z-index:-1; border-radius:inherit;
+  background:var(--glass-fill); pointer-events:none;
+}
+.glass-surface.glass-panel {
+  --glass-elevation: 0 6px 12px #392b500a, 0 20px 46px #392b501a;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-surface.glass-control {
+    --glass-fill: linear-gradient(145deg,#ffffff30,#f6f0ff14);
+    --glass-active-fill:#d8caeb66;
+    --glass-hover-fill: linear-gradient(145deg,#ffffff66,#f7efff30);
+    --glass-selected-fill: linear-gradient(145deg,#faf6ff70,#b8a0e744);
+  }
+  .glass-surface.glass-panel { --glass-fill: linear-gradient(145deg,#ffffffb8,#f9f5ff9e); }
+  .glass-control > .glass-optics {
+    -webkit-backdrop-filter: blur(.6px) saturate(135%);
+    backdrop-filter: var(--glass-filter,blur(.6px)) saturate(135%);
+  }
+  .glass-panel > .glass-optics {
+    -webkit-backdrop-filter: blur(8px) saturate(120%);
+    backdrop-filter: blur(8px) saturate(120%);
+  }
+}
+/* Rim lighting is separate from the refracted backdrop and readable content. */
+.glass-surface::after {
+  content:''; position:absolute; inset:0; z-index:-1; pointer-events:none; border-radius:inherit;
+  background:linear-gradient(125deg,#ffffff52 0%,transparent 24%,transparent 76%,#ffffff30 100%);
+  box-shadow:var(--glass-rim);
+}
+.glass-button { transition:border-color .16s,box-shadow .16s; }
+.glass-button.glass-surface:hover:not(:disabled) { --glass-fill:var(--glass-hover-fill); border-color:#ffffffa8; }
+.glass-button.glass-surface:is([aria-pressed="true"],[aria-expanded="true"]):not(:disabled) {
+  --glass-fill:var(--glass-selected-fill); border-color:#8f77ba99; color:var(--glass-accent);
+  box-shadow:var(--glass-rim),0 0 0 2px #937ac214,var(--glass-elevation);
+}
+.glass-button.glass-surface:active:not(:disabled) { --glass-fill:var(--glass-active-fill); }
+.glass-button:disabled { color:#8b8195; box-shadow:none; cursor:default; }
+.glass-button:focus-visible,.glass-toolbar>button:focus-visible { outline:3px solid #7460b0; outline-offset:3px; }
+.glass-toolbar>button { border:1px solid transparent; background:transparent; backdrop-filter:none; }
+.glass-toolbar>button:hover { background:#ffffff52; }
+.glass-toolbar>button[aria-expanded="true"] { background:#b69cde30; color:var(--glass-accent); }
+@media(prefers-reduced-transparency:reduce) {
+  .glass-surface.glass-control,.glass-surface.glass-panel {
+    --glass-fill:#f9f7fc; --glass-active-fill:#e8def6; --glass-hover-fill:#fff; --glass-selected-fill:#e8def6;
+  }
+  .glass-surface > .glass-optics { backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .glass-button.glass-surface:active:not(:disabled) { --glass-fill:#e8def6; }
+}
+@media(prefers-reduced-motion:reduce) { .glass-button { transition:none; } }
+@media(forced-colors:active) {
+  .glass-surface.glass-control,.glass-surface.glass-panel { border-color:ButtonText; color:CanvasText; box-shadow:none; }
+  .glass-surface > .glass-optics { background:Canvas; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .glass-surface::after { display:none; }
+  .glass-button.glass-surface:is([aria-pressed="true"],[aria-expanded="true"]):not(:disabled) { border-color:Highlight; outline:2px solid Highlight; color:CanvasText; }
+}
+
+/* Control anatomy: readable foreground, generous targets, concentric geometry. */
+:root {
+  --glass-label-size: 14px;
+  --glass-control-height: 44px;
+  --glass-icon-size: 20px;
+  --glass-group-padding: 5px;
+  --glass-group-radius: 28px;
+  --glass-action-radius: calc(var(--glass-group-radius) - var(--glass-group-padding));
+  --glass-secondary-ink: #776280;
+}
+.glass-button, .glass-action {
+  font: inherit; font-size:var(--glass-label-size); font-weight:600; line-height:1.25;
+  min-height:var(--glass-control-height); color:var(--glass-ink);
+}
+.glass-toolbar { gap:2px; padding:var(--glass-group-padding); border-radius:var(--glass-group-radius); }
+.glass-toolbar > .glass-action {
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  min-width:var(--glass-control-height); padding:0 12px;
+  border-radius:var(--glass-action-radius); color:var(--glass-ink);
+  transition:background .16s, color .16s;
+}
+.glass-toolbar > .glass-action:active { background:#a499bd32; }
+.glass-action .ui-icon, .glass-button .ui-icon { width:var(--glass-icon-size); height:var(--glass-icon-size); }
+@media(prefers-reduced-motion:reduce) { .glass-action { transition:none; } }
+@media(forced-colors:active) {
+  .glass-toolbar > .glass-action { color:ButtonText; }
+  .glass-toolbar > .glass-action[aria-expanded="true"] { outline:2px solid Highlight; color:ButtonText; }
+}
+
+/* Inner surfaces share the outer material's light; no nested backdrop filters. */
+:root {
+  --glass-inner-rim: inset 0 1px 0 #ffffffd9, inset 0 -1px 0 #7f659018;
+  --glass-inner-lift: 0 2px 5px #6d508b14;
+  --glass-inner-selected: linear-gradient(145deg,#ffffffb8,#ece1fa6b);
+  --glass-inner-hover: linear-gradient(145deg,#ffffff73,#f2eafb33);
+}
+.glass-surface .glass-choice,.glass-toolbar > .glass-action {
+  border:1px solid transparent; box-shadow:none; background:transparent;
+  color:var(--glass-ink); transition:background .18s,box-shadow .18s,border-color .18s;
+}
+.glass-surface .glass-choice:hover,.glass-toolbar > .glass-action:hover {
+  background:var(--glass-inner-hover); box-shadow:var(--glass-inner-rim);
+}
+.glass-surface .glass-choice[aria-pressed="true"],.glass-toolbar > .glass-action[aria-expanded="true"] {
+  background:var(--glass-inner-selected); border-color:#ffffffa3;
+  color:var(--glass-accent); box-shadow:var(--glass-inner-rim),var(--glass-inner-lift);
+}
+.glass-surface .glass-choice:active,.glass-toolbar > .glass-action:active {
+  box-shadow:inset 0 1px 3px #7653901a; background:#c7b5dc26;
+}
+.glass-surface .glass-inset {
+  background:linear-gradient(160deg,#a38aba0d,#ffffff33); border:1px solid #8a709815;
+  box-shadow:inset 0 1px 3px #7859910e,0 1px 0 #ffffff9c;
+}
+.glass-surface .glass-inset:focus-within { outline:none; border-color:#ffffff80; box-shadow:inset 0 1px 3px #7859910e,0 0 0 2px #8871be; }
+@media(prefers-reduced-transparency:reduce) {
+  .glass-surface .glass-choice[aria-pressed="true"],.glass-toolbar > .glass-action[aria-expanded="true"] { background:#eee5f7; }
+}
+@media(prefers-reduced-motion:reduce) { .glass-surface .glass-choice,.glass-toolbar > .glass-action { transition:none; } }
+@media(forced-colors:active) {
+  .glass-surface .glass-choice,.glass-toolbar > .glass-action { color:ButtonText; box-shadow:none; }
+  .glass-surface .glass-choice[aria-pressed="true"],.glass-toolbar > .glass-action[aria-expanded="true"] { border-color:Highlight; color:ButtonText; background:Canvas; }
+}
+
+@media(forced-colors:active) {
+  .glass-surface .glass-inset { border-color:CanvasText; background:Canvas; box-shadow:none; }
+  .glass-surface .glass-inset:focus-within { outline:2px solid Highlight; outline-offset:2px; border-color:CanvasText; box-shadow:none; }
+}

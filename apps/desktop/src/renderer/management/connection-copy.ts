@@ -1,0 +1,22 @@
+import type { PiConnectionState } from '../../shared/pi-connection.js';
+export const noticeText: Record<PiConnectionState['notice'], string> = {
+  none: '', 'choose-target': '请先用上方原生选择器选择现有 pi 配置目录；默认候选不能直接部署。',
+  busy: '前一操作尚未结束。', 'invalid-plan': '预览已失效，请重新预览；未开始本次部署。',
+  'preview-failed': '无法完成预览；未写入或启动连接。', 'stale-plan': '目标在预览后变化；未部署。请检查目标，重启应用后重新选择。',
+  'deploy-failed-preserved': '部署失败，可能存在不确定的文件或目录；已保留，不自动删除或重试。',
+  'start-failed': '桥接启动失败；若已部署，文件和本次撤回凭证仍保留。',
+  'runtime-failed': '无法创建私有运行目录；未部署或启动连接，不会删除已有对象。',
+  removed: '本次扩展文件已移除；不确定、非空或外部修改的目录可能保留。运行中的扩展未卸载。',
+  'retained-changed': '文件已变化，保留原状；接收已停止，运行中的扩展未卸载。',
+  'retained-unknown': '没有可用的本次所有权凭证；不会移除未知文件。',
+  'failed-preserved': '撤回未完成；接收已停止，文件与可用凭证保留，可重试。运行中的扩展未卸载。',
+  'saved-invalid': '私有保存记录无效、权限不安全或有未完成写入；已拒绝恢复，不会修复、覆盖或删除。',
+  'save-failed': '保存结果不确定；保留文件与所有权，未确认持久化成功。若接收已停止，下次启动也不会自动恢复。',
+  'resume-required': '已读取私有保存记录；尚未读取目标或开始监听。仅点击恢复才校验原目录与文件。',
+  'resume-refused': '恢复被拒绝：原运行目录或扩展已缺失/变化，或端点已存在。不会重建目录、删除 socket 或重新部署。',
+  disabled: '已停止接收并保存停用状态；扩展文件保留，运行中的扩展未卸载。',
+  'stop-failed': '停止接收失败；不能保证接收已停止。保存结果见下方；重启不会自动恢复。',
+  'stop-save-failed': '停止接收和保存停用状态均未确认成功；文件与所有权保留，重启不会自动恢复。',
+  'removed-save-failed': '扩展文件已移除，但保存移除结果失败；不能声称记录已清除，禁止重配。',
+  stopped: '本次接收已停止；配置文件不会随退出自动删除。',
+};

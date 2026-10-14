@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, realpathSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { defaultPreferences } from '../shared/preferences.js';
 import type { SessionObservation } from '@agent-pet/domain';
 import type { OverlayLayout, Rect } from '../shared/overlay-layout.js';
 import { piObservation } from '../renderer/test-support/pi-fixtures.js';
@@ -20,6 +21,7 @@ const native = vi.hoisted(() => {
     handlers: new Map<string, (event: unknown, value?: unknown) => unknown>(),
     appEvents: new Map<string, (event?: { preventDefault(): void }) => void>(),
     path: '', lock: true, envConfigured: true, quit: vi.fn(), stop: vi.fn(), start: vi.fn(), loginSet: vi.fn(), loginGet: vi.fn(() => ({ openAtLogin: false })),
+    dockShow: vi.fn(async () => {}), dockHide: vi.fn(),
     pick: vi.fn(async () => ({ canceled: true, filePaths: [] as string[] })),
     management: undefined as typeof window | undefined,
     tray: { setContextMenu: vi.fn(), setToolTip: vi.fn(), on: vi.fn(), destroy: vi.fn() },
@@ -30,6 +32,7 @@ const native = vi.hoisted(() => {
 });
 vi.mock('electron', () => ({
   app: {
+    dock: { show: native.dockShow, hide: native.dockHide },
     requestSingleInstanceLock: () => native.lock, getPath: () => native.path,
     getLoginItemSettings: native.loginGet, setLoginItemSettings: native.loginSet,
     whenReady: () => Promise.resolve(), get isPackaged() { return native.isPackaged; },
@@ -254,7 +257,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     native.publish!(piObservation());
     native.webContents.send.mockClear();
     invoke('pet:request-snapshot');
-    expect(native.webContents.send.mock.calls.map(([channel]) => channel)).toEqual(['pet:snapshot', 'pet:layout']);
+    expect(native.webContents.send.mock.calls.map(([channel]) => channel)).toEqual(['pet:snapshot', 'pet:preferences', 'pet:layout']);
     expect(native.webContents.send.mock.calls[0]?.[1].bubbles[0]).toMatchObject({ status: 'working' });
   });
 
@@ -380,7 +383,7 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     const close = native.management!.on.mock.calls.find(([event]) => event === 'close')![1];
     const preventDefault = vi.fn();
     close({ preventDefault });
-    expect(preventDefault).toHaveBeenCalledOnce(); expect(native.management!.hide).toHaveBeenCalledOnce();
+    expect(preventDefault).toHaveBeenCalledOnce(); expect(native.management!.hide).toHaveBeenCalledTimes(2);
     expect(native.stop).not.toHaveBeenCalled(); expect(native.quit).not.toHaveBeenCalled();
     native.appEvents.get('activate')!(); native.appEvents.get('second-instance')!();
     native.tray.on.mock.calls.find(([event]) => event === 'click')![1]();
@@ -393,7 +396,7 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     invoke('pet:resize-window-by', { x: 10, y: 10 });
     expect(native.window.show).not.toHaveBeenCalled(); expect(native.window.hide).not.toHaveBeenCalled();
     const saved = JSON.parse(readFileSync(join(native.path, 'preferences.json'), 'utf8'));
-    expect(saved).toEqual({ schemaVersion: 1, petVisible: false, petSize: 230 });
+    expect(saved).toEqual({ ...defaultPreferences, petVisible: false, petSize: 230 });
     invoke('management:update-preferences', { petVisible: true }, managementEvent());
     expect(native.window.show).toHaveBeenCalled();
     native.appEvents.get('window-all-closed')!(); expect(native.quit).not.toHaveBeenCalled();
@@ -411,6 +414,26 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     expect(() => invoke('management:update-preferences', { path: '/tmp/no' }, managementEvent())).toThrow(TypeError);
     expect(() => invoke('management:set-login', 'yes', managementEvent())).toThrow(TypeError);
     expect(native.loginSet).not.toHaveBeenCalled();
+  });
+  it('applies native entries and topmost, rejects removal of the last entry, and obeys close-to-quit', () => {
+    invoke('management:update-preferences', { dock: false, topmost: false }, managementEvent());
+    if (process.platform === 'darwin') expect(native.dockHide).toHaveBeenCalledOnce();
+    expect(native.window.setAlwaysOnTop).toHaveBeenLastCalledWith(false, 'screen-saver');
+    expect(() => invoke('management:update-preferences', { tray: false }, managementEvent())).toThrow('至少保留');
+    expect(native.tray.destroy).not.toHaveBeenCalled();
+    invoke('management:update-preferences', { background: false }, managementEvent());
+    const close = native.management!.on.mock.calls.find(([event]) => event === 'close')![1];
+    close({ preventDefault: vi.fn() });
+    expect(native.quit).toHaveBeenCalledOnce();
+  });
+  it('preserves an available entry and reports asynchronous Dock failure', async () => {
+    if (process.platform !== 'darwin') return;
+    native.dockShow.mockRejectedValueOnce(Error('OS failure'));
+    invoke('management:update-preferences', { dock: false }, managementEvent());
+    invoke('management:update-preferences', { tray: false, dock: true }, managementEvent());
+    await Promise.resolve(); await Promise.resolve();
+    expect(invoke('management:get-state', undefined, managementEvent())).toMatchObject({ preferenceError: expect.stringContaining('Dock') });
+    expect(native.tray.on).toHaveBeenCalledWith('click', expect.any(Function));
   });
   it('never registers login items at startup; dev refuses opt-in without calling OS login APIs', async () => {
     expect(native.loginSet).not.toHaveBeenCalled();

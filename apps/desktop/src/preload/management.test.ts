@@ -13,7 +13,7 @@ describe('management preload capability boundary', () => {
     await import('./management.js');
     expect(native.expose).toHaveBeenCalledExactlyOnceWith('management', expect.any(Object));
     const api = native.expose.mock.calls[0]![1] as Window['management'];
-    expect(Object.keys(api).sort()).toEqual(['getState', 'piConnection', 'piPreflight', 'setLogin', 'subscribe', 'updatePreferences']);
+    expect(Object.keys(api).sort()).toEqual(['configurations', 'getSessions', 'getState', 'locations', 'openProject', 'piConnection', 'piPreflight', 'setLogin', 'subscribe', 'subscribeSessions', 'updatePreferences']);
     await api.getState(); await api.updatePreferences({ petSize: 200 }); await api.setLogin(true);
     expect(native.invoke.mock.calls).toEqual([['management:get-state'], ['management:update-preferences', { petSize: 200 }], ['management:set-login', true]]);
     expect(Object.keys(api.piPreflight).sort()).toEqual(['chooseInstallation', 'chooseTarget', 'detect', 'getState', 'inspect', 'selectInstallation', 'useDefaultTarget']);
@@ -44,6 +44,24 @@ describe('management preload capability boundary', () => {
     events.emit('management:state', { secretEvent: true }, state);
     expect(callback).toHaveBeenCalledExactlyOnceWith(state);
     off(); off(); expect(events.listenerCount('management:state')).toBe(0);
+    for (const [channel, subscribe] of [
+      ['management:configurations-state', api.configurations.subscribe],
+      ['management:sessions', api.subscribeSessions],
+    ] as const) {
+      const callback = vi.fn(); const stop = subscribe(callback);
+      events.emit(channel, { secretEvent: true }, { public: true });
+      expect(callback).toHaveBeenCalledExactlyOnceWith({ public: true });
+      stop(); stop(); expect(events.listenerCount(channel)).toBe(0);
+    }
+    native.invoke.mockClear();
+    await api.configurations.rename('id', '项目'); await api.configurations.bindPet('id', null);
+    await api.configurations.confirm('id', 'plan'); await api.locations.choose();
+    await api.locations.authorize('/tmp/owned'); await api.locations.inspect('/tmp/owned', 'pi');
+    expect(native.invoke.mock.calls).toEqual([
+      ['management:configurations-rename', 'id', '项目'], ['management:configurations-pet', 'id', null],
+      ['management:configurations-confirm', 'id', 'plan'], ['management:location-choose'],
+      ['management:location-authorize', '/tmp/owned'], ['management:location-inspect', '/tmp/owned', 'pi'],
+    ]);
     native.invoke.mockRejectedValueOnce(new Error('IPC unavailable'));
     await expect(api.getState()).rejects.toThrow('IPC unavailable');
   });

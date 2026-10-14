@@ -27,18 +27,18 @@ beforeAll(async () => {
 afterAll(() => vi.unstubAllGlobals());
 afterEach(async () => { for (const view of mounted.splice(0)) await view.unmount(); vi.restoreAllMocks(); });
 
-async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.animations) {
+async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.animations, reduced = false) {
   vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: clips } as ReturnType<typeof useGLTF>);
   let state!: RootState;
   function Probe() { state = useThree(); return null; }
   const ready = vi.fn();
   const tree = (value: PetMotion, visible = true) => <StrictMode><Activity mode={visible ? 'visible' : 'hidden'}><Probe /><Bounds margin={1.2} maxDuration={0}>
-    <PetModel motion={value} onReady={ready} />
+    <PetModel motion={value} reduced={reduced} onReady={ready} />
   </Bounds></Activity></StrictMode>;
   const view = await create(tree(motion), { width: size, height: size, camera: { fov: 35, position: [0, 0, 5] } });
   mounted.push(view);
   const root = state.scene.getObjectByName('Pet')!;
-  return { view, root, state, ready, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)) };
+  return { view, root, state, ready, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
 }
 
 describe('PetModel bundled animation behavior', () => {
@@ -52,6 +52,21 @@ describe('PetModel bundled animation behavior', () => {
     expect(vi.mocked(useGLTF)).toHaveBeenCalledWith(expect.stringContaining('starter.glb'), false, false);
   });
 
+  it('pauses continuous GLB movement when reduced animation is selected, then resumes from the chosen state', async () => {
+    const { view, root, reduce, switchMotion } = await mount('working', 140, asset.animations, true);
+    await view.advanceFrames(1, .1); // Evaluate the selected clip at its static initial pose.
+    const position = root.position.clone();
+    await view.advanceFrames(8, .1);
+    expect(root.position.equals(position)).toBe(true);
+    await switchMotion('error');
+    await view.advanceFrames(1, .1);
+    const errorPosition = root.position.clone();
+    await view.advanceFrames(8, .1);
+    expect(root.position.equals(errorPosition)).toBe(true);
+    await reduce(false);
+    await view.advanceFrames(3, .1);
+    expect(root.position.equals(position)).toBe(false);
+  });
   it('stops prior actions on quick switches and releases the pose/frame subscription on unmount without disposing cache assets', async () => {
     const cachedPet = asset.scene.getObjectByName('Pet')!;
     const cachedHead = asset.scene.getObjectByName('Head') as Mesh;

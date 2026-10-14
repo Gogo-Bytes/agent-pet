@@ -12,9 +12,9 @@ import { useReducedMotionPreference } from '../../shared/use-reduced-motion.js';
 import styles from './BubbleStack.module.css';
 
 const labels = { working: '正在工作', 'completed-unread': '已完成', 'error-unread': '发生错误' };
-export function BubbleStack({ bridge, state, layout, hidden, onOpen }: {
+export function BubbleStack({ bridge, state, layout, hidden, reducedMotion = false, onOpen }: {
   bridge: PetBridge; state: SessionState; layout: OverlayLayout | null;
-  hidden: boolean; onOpen: (session: SessionRef) => Promise<void>;
+  hidden: boolean; reducedMotion?: boolean; onOpen: (session: SessionRef) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hovered = useRef(false);
@@ -23,7 +23,8 @@ export function BubbleStack({ bridge, state, layout, hidden, onOpen }: {
   const present = !hidden && bubbles.length > 0;
   const wantExpanded = present && expanded;
   const [ack, setAck] = useState({ present: false, expanded: false });
-  const reduced = useReducedMotionPreference();
+  const systemReduced = useReducedMotionPreference();
+  const reduced = reducedMotion || systemReduced;
   const shown = present && ack.present;
   const isExpanded = shown && wantExpanded && ack.expanded;
   // Grow/reveal only after Main has installed the hit policy. Shrink/removal

@@ -9,8 +9,14 @@ const channels = {
   snapshot: 'pet:snapshot',
 } as const;
 
+import type { Preferences } from '../shared/preferences.js';
 import type { OverlayLayout } from '../shared/overlay-layout.js';
 const petApi = {
+  subscribePreferences(listener: (preferences: Preferences) => void): () => void {
+    const handler = (_event: Electron.IpcRendererEvent, preferences: Preferences) => listener(preferences);
+    ipcRenderer.on('pet:preferences', handler);
+    return () => ipcRenderer.removeListener('pet:preferences', handler);
+  },
   bubblesExpanded(expanded: boolean): Promise<void> { return ipcRenderer.invoke('pet:bubbles-expanded', expanded); },
   // Actual committed bubble presence. Main retains the region until DOM removal,
   // and the renderer waits for true acknowledgement before revealing content.

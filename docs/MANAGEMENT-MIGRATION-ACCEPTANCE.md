@@ -4,6 +4,14 @@
 
 正式代码状态：**IMPLEMENTED-NOT-ACCEPTED（本轮正式 UI 用户验收与新多配置真实 pi 接入尚未完成）**。以下只说明实际取得的证据；不升级既有 M2/M3/M4/D6 或正式发布状态。
 
+## 功能接入：同配置多 peer 的在线状态
+
+已按源码确认并修正：任意有效 peer 断开原先会直接将整个配置标为离线。现在只有第一个 token-validated hello 与最后一个有效 peer 关闭产生状态转换；重复 hello 和重叠重连不制造离线，未验证/无效 socket 不计为在线。每次 receiver start 的集合独立；停用禁止缓冲数据和旧关闭回调继续发布，重复 stop 共享排空结果。原有独立 Session、未读保留和 PiConnection epoch 防护不变。
+
+新增 `packages/adapter-pi/src/connections.test.ts` 5 项真实 socket 回归，以及 `apps/desktop/src/main/configurations-socket.test.ts` 1 项实际部署/receiver → Configurations → Application → 正式 home projection 集成。两条配置保留独立身份，部分断开不离场，最后断开才离场，移除 A 不影响 B。仅使用自建临时根和测试边界消息，不是运行中的真实 pi。全量 **629 passed / 1 skipped / 67 files**、类型检查、desktop build、打包通过。独立审查 READY，19 项 focused 独立复验通过，缓冲数据停止用例另作只读复核；未做 server.close 错误注入。
+
+新包 `/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-8Izmcb/mac-arm64/Agent Pet.app` 已用自有 `--user-data-dir` 启动，90 秒有界 smoke 退出码 0，stderr 为空。实际 AX 和[首页空态截图](evidence/management-migration/peer-state-package.png)确认正式页面、原生系统控件和四项导航存在。该 smoke 未部署或启动真实 pi，不把空态截图当作多 peer 行为证据。包未签名，未触及日常 HOME/pi、登录项或历史 fixtures。新建实机隔离目录目前只作空态 smoke 和后续操作准备，授权预览见 [下一阶段范围](PI-LIVE-CONNECTION-PREVIEW.md)。
+
 ## 用户追加：macOS 原生窗口样式（当前实现）
 
 用户进一步要求采用其他 macOS 应用的窗口样式，覆盖下方右上角 HTML 控件的历史迭代。Main 使用 Electron 原生 `titleBarStyle: 'hiddenInset'`；系统提供左上角关闭、最小化、全屏/缩放按钮，正式 HTML 不重复绘制。顶部栏铺满窗口并预留 88px 系统按钮空间，宽窄与矮窗保持同样的位置；保留原有拖动区域和后台关闭契约。其他平台保留已有 HTML 操作回退，不扩大平台验收范围。Renderer 通过 preload 的只读布尔能力识别 native chrome，不直接使用系统 API。

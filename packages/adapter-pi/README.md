@@ -25,6 +25,13 @@ transport authentication data, not a pi/provider credential.
 pipe. Its endpoint and token are supplied by explicit development environment
 configuration, not managed authorization; this package does not create or write
 pi configuration.
+
+Each receiver reports online only after a token-validated `hello`. Multiple peers
+can share one configuration: closing one peer keeps the receiver online while
+another validated peer remains. Only the first/last peer changes online status;
+Session observations remain independent. Separate `start()` calls own separate
+peer sets. `stop()` blocks buffered observations and late close callbacks, drains
+the server, and reports one final disconnect if online; repeated stops share completion.
 `openSession()` intentionally returns `unsupported` until a reliable mapping to
 the original terminal window exists.
 

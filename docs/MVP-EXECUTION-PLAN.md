@@ -38,6 +38,14 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 准确缺口：仅一只真实内置 starter 宠物，包导入尚未实现；其他 Provider 仅可保存非秘密元数据，不能连接；自动扫描仍是支持的 pi 安装候选，不能自动找遍项目配置或证明其活跃；手动类型识别不确定时必须用户选择。旧已部署位置更换须先选择性撤回/移除再添加。系统登录项/GPU性能及新界面真实多 pi TUI 还需精确范围的实际验收。映射、截图、运行方式和后续清单见 [正式迁移验收](MANAGEMENT-MIGRATION-ACCEPTANCE.md)。
 
+## 功能接入第 1 阶段：配置在线状态（2026-10-14）
+
+本阶段已完成代码与隔离验证：legacy receiver 只计入有效 hello 的 socket，同配置部分 peer 退出不误报离线，最后一个退出才离场；每次 start 独立维护连接集合。停止先禁止新数据/旧回调，再排空服务并发布一次断开，重复停止共享完成结果。Session 业务状态、未读结果、managed guard 与部署/数据保留契约不变。
+
+新增 5 项真实隔离 socket 回归和 1 项 Configurations → Application → 正式首页投影集成，覆盖无效 peer、重叠重连、同 Adapter 多 receiver、缓冲数据期间停止、配置离场与选择性移除。全量 **629 passed / 1 skipped / 67 files**，`pnpm typecheck`、desktop build、package:mac 通过。独立 subagent 审查 READY（19 项 focused 复验通过，新增缓冲数据用例另作只读复核）；未注入 server.close 故障。实际新包启动及范围见正式迁移验收记录；不算真实 pi TUI 通过。
+
+后续按已讨论顺序：一个真实 pi 配置 → 多配置/重启 → macOS 设置实机 → 资产选择与绑定、受约束导入分别交付 → 正式应用整体验收。真实操作待授权的精确范围见 [pi 实机操作预览](PI-LIVE-CONNECTION-PREVIEW.md)，不自动使用日常配置、复制凭据或发起模型请求。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

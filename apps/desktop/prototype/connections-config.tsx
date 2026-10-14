@@ -29,7 +29,7 @@ function ConfigIdentity({config,context,visible,onRename}:{config:Config;context
   </form>:<h2 tabIndex={-1}>{config.alias}</h2>}
  </div>{!editing&&<button ref={trigger} className="cfg-icon-button" aria-label="重命名" title="重命名" onClick={()=>{setValue(config.alias);setError('');setEditing(true);}}><Icon name="edit" size={18}/></button>}</div>;
 }
-export function ConnectionsConfig({visible,demo,onConfigured}:{visible:boolean;demo:ConnectionDemo;onConfigured:(healths:ConnectionHealths)=>void}) {
+export function ConnectionsConfig({visible,demo,onConfigured,onConfigurations}:{onConfigurations?:(records:AgentEntry[])=>void;visible:boolean;demo:ConnectionDemo;onConfigured:(healths:ConnectionHealths)=>void}) {
  const requestedDemo=new URLSearchParams(location.search).get('configDemo');
  const sampleDemo:ConnectionDemo=requestedDemo&&['normal','empty','missing','waiting','error'].includes(requestedDemo)?requestedDemo as ConnectionDemo:demo;
  const [page,setPage]=useState(currentPage);const [records,setRecords]=useState<Config[]>(initial);const [scanning,setScanning]=useState(false);const [scanned,setScanned]=useState(false);const [refreshing,setRefreshing]=useState<string[]>([]);const [notice,setNotice]=useState('');
@@ -41,7 +41,7 @@ export function ConnectionsConfig({visible,demo,onConfigured}:{visible:boolean;d
  useEffect(()=>{const sync=()=>{activePage.current=currentPage();setPage(currentPage());setNotice('');};addEventListener('hashchange',sync);addEventListener('popstate',sync);return()=>{removeEventListener('hashchange',sync);removeEventListener('popstate',sync);};},[]);
  useEffect(()=>()=>{for(const timer of timers.current.values())clearTimeout(timer);},[]);
  useEffect(()=>{if(lastDemo.current!==sampleDemo){go('library');lastDemo.current=sampleDemo;lastSelected.current='';}setManualTarget(undefined);setRecords(sampleDemo==='empty'||sampleDemo==='missing'?[]:sampleDemo==='error'?[{...initial[0]!,validity:'invalid'}]:sampleDemo==='waiting'?[{...initial[0]!,validity:'unchecked'}]:initial);setScanning(false);setScanned(false);setRefreshing([]);for(const timer of timers.current.values())clearTimeout(timer);timers.current.clear();},[sampleDemo]);
- useEffect(()=>{const healths:ConnectionHealths={};for(const record of records){const key=record.id.split('-')[0] as keyof ConnectionHealths;if(healths[key]!=='online')healths[key]=record.health;}onConfigured(healths);},[records,onConfigured]);
+ useEffect(()=>{const healths:ConnectionHealths={};for(const record of records){const key=record.id.split('-')[0] as keyof ConnectionHealths;if(healths[key]!=='online')healths[key]=record.health;}onConfigured(healths);onConfigurations?.(records);},[records,onConfigured,onConfigurations]);
  useEffect(()=>{if(!scanning)return;const timer=setTimeout(()=>{setScanning(false);setScanned(true);},900);return()=>clearTimeout(timer);},[scanning]);
  useEffect(()=>{if(!visible)return;const row=browsing&&lastSelected.current?main.current?.querySelector<HTMLElement>(`[data-config="${lastSelected.current}"]`):null;const heading=detail&&matchMedia('(max-width:700px)').matches?main.current?.querySelector<HTMLElement>('.cfg-identity h2'):null;(heading??row??main.current?.querySelector<HTMLElement>('h1'))?.focus({preventScroll:true});main.current?.querySelector('.cfg-content-scroll')?.scrollTo({top:0});},[page,visible]);
  function scan(){setScanned(false);setScanning(true);go('discover');}

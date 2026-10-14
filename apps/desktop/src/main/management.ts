@@ -93,7 +93,8 @@ export function createManagement(options: {
     windowRequested = true;
     if (!window || window.isDestroyed()) {
       window = new BrowserWindow({ width: 900, height: 680, minWidth: 400, minHeight: 400,
-        show: false, frame: false, title: 'Agent Pet', backgroundColor: '#f7f4ff',
+        show: false, frame: process.platform === 'darwin', title: 'Agent Pet', backgroundColor: '#f7f4ff',
+        ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
         webPreferences: { preload: join(__dirname, '../preload/management.cjs'),
           contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true } });
       const current = window;

@@ -4,7 +4,17 @@
 
 正式代码状态：**IMPLEMENTED-NOT-ACCEPTED（本轮正式 UI 用户验收与新多配置真实 pi 接入尚未完成）**。以下只说明实际取得的证据；不升级既有 M2/M3/M4/D6 或正式发布状态。
 
-## 用户追加：将窗口操作并入顶部栏
+## 用户追加：macOS 原生窗口样式（当前实现）
+
+用户进一步要求采用其他 macOS 应用的窗口样式，覆盖下方右上角 HTML 控件的历史迭代。Main 使用 Electron 原生 `titleBarStyle: 'hiddenInset'`；系统提供左上角关闭、最小化、全屏/缩放按钮，正式 HTML 不重复绘制。顶部栏铺满窗口并预留 88px 系统按钮空间，宽窄与矮窗保持同样的位置；保留原有拖动区域和后台关闭契约。其他平台保留已有 HTML 操作回退，不扩大平台验收范围。Renderer 通过 preload 的只读布尔能力识别 native chrome，不直接使用系统 API。
+
+`pnpm test apps/desktop/src/main/index.test.ts apps/desktop/src/preload/management.test.ts apps/desktop/src/renderer/management/ManagementApp.test.tsx`：**47 passed / 3 files**；`pnpm typecheck`、desktop build、`pnpm package:mac` 通过。新增行为测试覆盖原生控件下不重复绘制 HTML 按钮、设置导航与品牌返回首页；原有 native 操作校验与后台关闭测试保留。
+
+已启动最终应用包的自有 `--user-data-dir`。实际 AX 明确列出系统关闭、最小化、全屏按钮；[实际窗口截图](evidence/management-migration/macos-native-titlebar.png) 确认单层外框和品牌避让，但 macOS/工具的紫色捕获提示覆盖按钮区域，不能用该图宣称按钮颜色通过视觉检查。一次自定义位置检查后已改为系统默认 inset；未绕过捕获权限或伪造按钮截图。原生 HTML 点击检查未产生 AX 变化，完整原生点击矩阵仍未完成。此前自定义位置包的系统缩放 AX 动作实际扩大窗口，但截图捕获到尚未完成重绘的内容，不能算最终包的完整缩放验收。
+
+最终包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-XKIxyD/mac-arm64/Agent Pet.app`（未签名、临时目录）。仅使用自有隔离 profile，无日常 HOME/pi 配置读写、实际登录项变更或新依赖安装；正式 UI 用户验收、真实 pi 接入与发布状态不变。
+
+## 用户追加：将窗口操作并入顶部栏（历史迭代）
 
 2026-10-14 用户指出外部系统窗口与内层界面形成重复外框，要求右上角操作放入内层。这一确认覆盖原型外层留白与卡片边界在 Electron 中的迁移方式。
 

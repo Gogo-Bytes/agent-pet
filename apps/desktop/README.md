@@ -52,6 +52,11 @@ acceptance.
 
 ## Formal management UI (2026-10-14)
 
+On macOS, management uses the native `hiddenInset` title bar with system traffic
+lights at the upper left. The shared header reserves their space and fills the
+window without a second outer frame. Native close keeps the existing background
+preference behavior. Other platforms retain the HTML window-control fallback.
+
 `management.html` / `management/main.tsx` now render the approved four-page companion
 interface: home, pets, connections and settings. The former Radix admin layout is
 replaced; shared controls, Icons and glass materials live in `management/components`.

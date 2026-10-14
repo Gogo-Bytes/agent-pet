@@ -54,6 +54,7 @@ const locations: ConfigurationLocationsApi = {
   inspect: (path, provider) => ipcRenderer.invoke('management:location-inspect', path, provider),
 };
 const managementApi = {
+  nativeWindowControls: process.platform === 'darwin',
   piPreflight, piConnection, configurations, locations,
   windowAction(action: ManagementWindowAction): Promise<void> { return ipcRenderer.invoke('management:window-action', action); },
   getSessions(): Promise<SessionState> { return ipcRenderer.invoke('management:sessions'); },

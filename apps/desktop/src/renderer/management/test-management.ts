@@ -10,7 +10,7 @@ export function configuration(id = 'pi-one', targetPath = '/isolated/project-one
     pet: { assetId: 'starter', name: '团子' }, availability: 'available', inspection: null, connection: null };
 }
 /** Test-only typed bridge. No file, system preference, socket, or Agent operations. */
-export function managementBridge(records: AgentConfiguration[] = [configuration()], supported = false) {
+export function managementBridge(records: AgentConfiguration[] = [configuration()], supported = false, nativeWindowControls = false) {
   let state: ManagementState = { preferences: { ...defaultPreferences, petName: '团子' }, preferenceError: null,
     login: { supported, enabled: false, error: null } };
   let configs: ConfigurationsState = { revision: 0, records, notice: 'none', busy: false, sessionConfigurations: {} };
@@ -23,6 +23,7 @@ export function managementBridge(records: AgentConfiguration[] = [configuration(
   function pushConfigs(next: ConfigurationsState) { configs = next; configurations.forEach(listener => listener(next)); }
   function changed(nextRecords = configs.records) { pushConfigs({ ...configs, records: nextRecords, revision: configs.revision + 1 }); return configs; }
   const bridge = {
+    nativeWindowControls,
     windowAction: vi.fn(async (_action: string) => {}),
     piPreflight: preflightBridge(), piConnection: connectionBridge(),
     locations: {

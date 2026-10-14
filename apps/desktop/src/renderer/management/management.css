@@ -4,6 +4,8 @@
 .game-shell { height:100%;width:100%;display:flex;flex-direction:column;overflow:hidden;background:#f7f4ff; }
 .game-topbar { display:flex;align-items:center;justify-content:space-between;min-height:76px;flex:none;padding:18px 32px;background:#fffdfbf5;border-bottom:1px solid #e5e1ed;-webkit-app-region:drag; }
 .game-topbar button { -webkit-app-region:no-drag; }
+/* Reserve the system's inset traffic lights at every window size. */
+.game-shell[data-native-chrome=true] .game-topbar { min-height:52px;padding:9px 24px 9px 88px; }
 .game-titlebar-actions { display:flex;align-items:center;gap:24px; }
 .window-controls { display:flex;gap:4px;flex:none;-webkit-app-region:no-drag; }
 .window-control { display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:transparent;color:#90829e; }

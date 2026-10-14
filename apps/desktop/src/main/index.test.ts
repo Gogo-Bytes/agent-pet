@@ -361,7 +361,9 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
   it('creates distinct sandboxed entries and denies cross-window, subframe and navigated-frame capabilities', () => {
     expect(native.management).toBeDefined();
     expect(native.management!.webContents).not.toBe(native.webContents);
-    expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ title: 'Agent Pet', frame: false, webPreferences: expect.objectContaining({ sandbox: true, contextIsolation: true, nodeIntegration: false }) }));
+    expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ title: 'Agent Pet', frame: process.platform === 'darwin',
+      ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
+      webPreferences: expect.objectContaining({ sandbox: true, contextIsolation: true, nodeIntegration: false }) }));
     for (const channel of ['pet:request-snapshot', 'pet:interaction', 'pet:resize-window-by']) {
       expect(() => invoke(channel, true, managementEvent())).toThrow('Untrusted renderer');
     }

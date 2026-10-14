@@ -38,6 +38,18 @@ async function category(user: ReturnType<typeof userEvent.setup>, name: string) 
 const flush = async () => { await act(async () => {}); };
 
 describe('ManagementApp formal four-page interface', () => {
+  it('keeps page navigation accessible with native controls and omits duplicate HTML controls', async () => {
+    const test = managementBridge(undefined, false, true);
+    render(<ManagementApp bridge={test.bridge} />);
+    await act(async () => {});
+    expect(screen.queryByRole('group', { name: '窗口操作' })).toBeNull();
+    const user = userEvent.setup();
+    await page(user, '设置');
+    expect(screen.getByRole('navigation', { name: '设置分类' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /Agent Pet/ }));
+    expect(screen.getByRole('tab', { name: '首页' }).getAttribute('aria-selected')).toBe('true');
+    expect(test.bridge.windowAction).not.toHaveBeenCalled();
+  });
   it('places usable window controls in the shared titlebar and reports host failures', async () => {
     const test = await mount();
     const controls = screen.getByRole('group', { name: '窗口操作' });

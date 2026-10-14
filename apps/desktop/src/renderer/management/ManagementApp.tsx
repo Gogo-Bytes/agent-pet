@@ -46,16 +46,16 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
     finally { pending.current = false; if (mounted.current) setBusy(false); }
   }
   const configError = error || (snapshot.configurations ? notices[snapshot.configurations.notice] : '');
-  return <div className="management-page"><main className="game-shell" data-reduced={preferences.reduced}>
+  return <div className="management-page"><main className="game-shell" data-reduced={preferences.reduced} data-native-chrome={bridge.nativeWindowControls}>
     <header className="game-topbar">
       <button className="game-logo" onClick={() => setPage('home')}><span>✦</span>Agent Pet</button>
       <div className="game-titlebar-actions">
         <span className="feature-page-label">{page === 'home' ? '' : pages.find(value => value[0] === page)?.[2]}</span>
-        <div className="window-controls" role="group" aria-label="窗口操作">
+        {!bridge.nativeWindowControls && <div className="window-controls" role="group" aria-label="窗口操作">
           {([['minimize', '最小化窗口', 'minus'], ['toggle-maximize', '最大化或还原窗口', 'maximize'], ['close', '关闭窗口', 'close']] as const).map(([action, label, icon]) =>
             <button key={action} className={`window-control window-control-${action}`} aria-label={label} title={label}
               onClick={() => { setWindowError(''); void bridge.windowAction(action).catch(() => setWindowError('窗口操作失败，请重试。')); }}><Icon name={icon} size={16} /></button>)}
-        </div>
+        </div>}
       </div>
     </header>
     {(windowError || snapshot.error || snapshot.state?.preferenceError) && <p className="app-alert" role="alert">{windowError || snapshot.error || snapshot.state?.preferenceError}<button onClick={() => void store.retry()}>重新读取</button></p>}

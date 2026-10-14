@@ -1,11 +1,11 @@
 // Opaque, flat menu artwork scoped to the connection and preference prototypes.
-import { Aperture, ArrowUpRight, CodeXml, Command, Flower2, Sparkles, type LucideIcon } from 'lucide-react';
+import { Icon, type IconName } from './components/icons.js';
 import type { KeyboardEvent } from 'react';
 import type { AgentEntry } from './connection-options.js';
-const glyphs: Record<string, LucideIcon> = {Codex:Command,'Claude Code':Flower2,'Gemini CLI':Sparkles,OpenCode:CodeXml,Cursor:ArrowUpRight};
+const glyphs: Record<string, IconName> = {pi:'pi',Codex:'command','Claude Code':'flower','Gemini CLI':'sparkles',OpenCode:'code',Cursor:'diagonal'};
 export function AgentMark({agent}:{agent:AgentEntry}) {
- const Glyph=glyphs[agent.name]??Aperture;
- return <span className={`menu-agent-mark agent-${agent.id.split('-')[0]}`} aria-hidden="true">{agent.name==='pi'?<span>π</span>:<Glyph strokeWidth={1.8}/>}</span>;
+ const glyph=glyphs[agent.name]??'software';
+ return <span className={`menu-agent-mark agent-${agent.id.split('-')[0]}`} aria-hidden="true"><Icon name={glyph}/></span>;
 }
 
 export function trapMenuFocus(event:KeyboardEvent<HTMLDialogElement>) {

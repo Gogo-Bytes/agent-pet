@@ -70,9 +70,9 @@ Main 实看 1280×720、1280×800、1024×600、1280×480、390×844，以及最
 
 截图为实际浏览器页面，未拼接或用设计稿替代。模拟视口导出曾出现缩小、空白或重复画面，已排除无效文件；宽窗口采用正常视口直接截图，窄窗口保留已核对的原始截帧。Chrome 辅助验收入口打开超时，未重试或作为通过证据：
 
-- [连接宽窗口](screenshots/configuration-menu/connections-brand-wide.png)
-- [渲染设置宽窗口](screenshots/configuration-menu/settings-brand-wide.png)
-- [设置窄窗口](screenshots/configuration-menu/settings-brand-narrow.png)
+- [连接宽窗口](screenshots/configuration-menu/connections-icons-wide.png)
+- [渲染设置宽窗口](screenshots/configuration-menu/settings-icons-wide.png)
+- [设置窄窗口](screenshots/configuration-menu/settings-icons-narrow.png)
 - [手动错误](screenshots/configuration-menu/manual-error-wide.png)
 - [命名确认窄窗口](screenshots/configuration-menu/manual-confirm-narrow.png)
 - [长路径与矮窗口](screenshots/configuration-menu/manual-short.png)
@@ -139,3 +139,20 @@ Main对比1280×720实际页面：分类、正文、档位、开关、恢复入�
 本轮为Main完成的颜色调整，既有独立审查记录不冒充本轮审查；仍等待用户视觉验收。首页、宠物、共享框架、连接页与真实行为未改。
 
 本轮 `pnpm typecheck`、原型Vite构建与 `git diff --check` 均通过；未推送。
+
+## 2026-10-14 · 连接与设置图标统一为导航风格
+
+用户要求后两个页面的图标与底部一致。本轮移除这两个菜单及AgentMark的Lucide引用，复用 `components/icons.tsx` 的Icon；新增显示器、软件、表盘、铃铛、信息、叶片、星光、扫描、编辑、移除、验证、帮助、加载及Agent标识。采用24-unit视框、圆角双色轮廓、浅色块与实色主体；方向/勾选沿用现有粗圆端笔画。设置的宠物分类直接复用底部同一个pet glyph。
+
+原home/pet/link/settings以及其他既有glyph/stroke定义逐行核对，17条定义行完全保留；默认Icon调用不新增style或class，首页、宠物、共享外框、顶部与底部导航源码未改。Icon新增可选size/className，尺寸变量仅在两个菜单的CSS中消费；保持响应式原图标尺寸、按钮辅助名称、hover/focus和减少动画规则。没有布局、配色、文案、状态逻辑或真实行为变更。
+
+Main实看连接与设置的宽屏、390×720窄屏，以及扫描中/扫描结果、失效配置、格式错误弹窗、恢复确认、宠物和提醒分类。实际尺寸：Agent选择标识23px、设置宽屏分类19px、窄屏分类14px/恢复15px、扫描36px且scan-breathe动画存在、弹窗错误21px/步骤13px。两个内容区DOM中的lucide数量均为0。位置整行Enter、弹窗Esc及返回焦点、分类切换和恢复取消可操作。自评调整了均衡表盘轮廓，避免小尺寸下细节散开。实际原始截图：
+
+- [连接宽屏图标](screenshots/configuration-menu/connections-icons-wide.png)
+- [连接窄屏错误图标](screenshots/configuration-menu/connections-icons-narrow.png)
+- [设置宽屏图标](screenshots/configuration-menu/settings-icons-wide.png)
+- [设置窄屏图标](screenshots/configuration-menu/settings-icons-narrow.png)
+
+独立Product Test subagent本轮启动仍因模型容量错误失败，未产出审查，按有界失败规则未继续重试。Main自评不冒充独立审查，独立审查未完成，用户视觉验收待确认。模拟视口检查以实际innerWidth核对，错误尺寸截图已覆盖；保留截图来自有效原始页面截帧，无拼接。临时视口已恢复，设置验收页error日志为空。
+
+本轮最终 `pnpm typecheck`、原型Vite构建、`git diff --check` 均通过；无新依赖，未推送。

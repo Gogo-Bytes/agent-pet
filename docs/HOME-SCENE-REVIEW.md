@@ -1,6 +1,6 @@
 # 首页多 Agent 宠物场景原型 · 2026-10-14
 
-状态：IMPLEMENTED-NOT-ACCEPTED，等待用户体验与视觉验收。仅浏览器内存 mock，无真实扫描、Agent控制或桌面行为。
+当前状态：用户已验收原型基线 `3b2f0cd`，覆盖本页历史等待验收记录。下文为浏览器 mock 原型证据；正式 GLB、多配置与桌面行为见 [正式迁移验收](MANAGEMENT-MIGRATION-ACCEPTANCE.md)，不由原型认可外推。
 
 ## 本轮决定
 

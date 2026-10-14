@@ -41,8 +41,7 @@ Canvas, and feature CSS Modules with shared tokens. The former imperative
 window-layout and hit-policy authority; Application owns Session/unread state.
 
 The renderer loads the bundled project-authored `starter.glb` robot with embedded
-animations. The opt-in pi Adapter is wired to Main; without valid configuration
-or development simulation, the initial Session snapshot is empty. No other Agent
+animations. The opt-in pi Adapter is wired to Main; without valid configuration, the initial Session snapshot is empty. No other Agent
 is connected. Tests exercise the actual pi extension over isolated local sockets,
 not a running pi TUI.
 
@@ -51,27 +50,55 @@ user/native evidence and pending acceptance. Windows, hardware GPU/power and the
 full native-window matrix remain unverified; a build or DOM test is not native
 acceptance.
 
-## Management UI components
+## Formal management UI (2026-10-14)
 
-The separate `management.html` / `management/main.tsx` entry imports
-`@radix-ui/themes/styles.css`; `ManagementApp` owns its root `Theme`. All management
-pages use pinned `@radix-ui/themes@3.3.0` components for navigation, buttons,
-checkboxes, candidate radios, size slider, cards, feedback, typography and layout.
-The transparent pet renderer and its controls do not load this theme or stylesheet.
+`management.html` / `management/main.tsx` now render the approved four-page companion
+interface: home, pets, connections and settings. The former Radix admin layout is
+replaced; shared controls, Icons and glass materials live in `management/components`.
+The production renderer never imports `prototype/` or a mock bridge.
 
-Connection and pet pages remain mounted behind hidden/inert boundaries so pending
-requests survive navigation. The size slider still previews locally and saves only
-on release (or keyboard commit), preserving P1 cancellation and stale-reply safety.
-See `../../docs/MANAGEMENT-UI-COMPONENTS.md` for the full before/after inventory,
-Themes thumb accessibility adaptation, keyboard behavior, automated evidence and
-outstanding browser/native checks. That restyle was not native or release acceptance.
-The M2 opt-in deployment entry below adds a separate Main/preload consent boundary.
+`createManagementStore` owns one subscription per settings/configurations/session
+channel. `CompanionScene` keeps one Canvas across home and pets, uses the real cached
+starter GLB, and separates instance transforms/mixers from shared asset resources.
+Home projection preserves configuration identities and only includes online pi
+connections. HTML keyboard focus and model clicks use the same projection.
+
+Main's `Configurations` + bounded non-secret `ConfigurationsStore` hold independent
+named configurations; pi uses separate existing PiConnection/PiConnectionStore
+instances with configuration-scoped Session IDs. Legacy saved deployments remain
+explicitly represented. Availability, peer connection and task status are distinct.
+Native-selected or separately approved pasted locations are canonicalized without
+following symbolic links; duplicate targets are blocked. Deployed targets cannot be
+silently retargeted. Removal selectively withdraws only unchanged owned files and
+keeps changed/unknown data and retryable records.
+
+Preferences schema v2 migrates v1 on read, saves atomically, and applies rendering,
+entry/lifecycle, pet and reminder options. Main enforces at least one Tray/Dock entry;
+failed Dock show retains Tray. Login remains an explicit system API operation.
+Restore defaults preserves configurations, assets, bindings and pet name. Size
+changes save the final release/keyboard value rather than dropping a drag mid-save.
+
+Run formal Electron with `pnpm --filter @agent-pet/desktop dev`; default startup keeps
+the console closed, so use the Tray/Dock entry. Build with
+`pnpm --filter @agent-pet/desktop build`. For isolated browser UI checks only:
+
+```sh
+pnpm exec vite --config apps/desktop/vite.management-review.config.ts
+# http://127.0.0.1:4175/management-review.html?case=online  (empty/error also supported)
+```
+
+That entry imports actual formal components/CSS/GLB but injects a test-only in-memory
+bridge; it cannot deploy or start a receiver and is excluded from Electron rollup.
+See [formal migration evidence](../../docs/MANAGEMENT-MIGRATION-ACCEPTANCE.md) for
+screenshots, commands, native interaction limitations and remaining capabilities.
+Only pi and one bundled pet are truly implemented; imports/new Providers and
+automatic project-configuration discovery remain gaps, accurately shown in UI.
 
 ## pi detection and read-only preflight (P2a)
 
-The management connection page now offers explicit detect/rescan, a Main-owned
-installation-package directory picker, a separate configuration-directory picker,
-and an explicit **inspect selected target** action. Selecting a directory alone
+Historical P2a APIs expose detect/rescan, installation and target pickers and explicit
+inspection. The current formal page uses **自动扫描** for supported installation
+candidates and **手动添加** for native-selected or explicitly approved pasted targets. Selecting a directory alone
 does not read its settings. The default `~/.pi/agent` is only a candidate, not a
 claim about the active terminal's configuration. These P2a controls install or change nothing.
 
@@ -80,8 +107,8 @@ it never runs pi, wrappers or shell profiles, scans processes/sessions, or calls
 pi's package resolver. Only standard `@earendil-works/pi-coding-agent` **0.85.1**
 package metadata is recognized as verified; other versions remain unverified.
 This is metadata identification, not signature validation or proof of a running
-Agent. Manual installation selection expects the package directory containing
-`package.json`, not the agentDir.
+Agent. The retained historical installation-picker API expects the package directory
+containing `package.json`; it is not a control in the current four-page UI.
 
 Read-only inspection reports root-entry/manifest and same-name conflicts, unsafe
 paths/files and bounded-read failures. Existing ignore files and nonempty or
@@ -93,16 +120,17 @@ The P2a section itself makes no deployment or online claim; the separate M2 sect
 below supplies explicit consent and connection status. Existing env opt-in remains. See
 `../../docs/DESKTOP-P2A-PREFLIGHT.md` for exact budgets, automated evidence and
 remaining native picker, ACL, filesystem-race and release gaps. Native dialogs
-have not been accepted through mocks. The accepted P1 Dock recovery remains;
-the separate top menu-bar issue is still open.
+are not accepted through mocks. Main now provides Tray/Dock entry controls and a
+last-entry guard; actual native settings and full recovery acceptance remain separate.
 
 ## Explicit desktop pi deployment (M2 partial)
 
 The connection page now offers a bounded local opt-in flow:
 
-1. Use **选择配置目录** to choose an existing pi agentDir through the native picker.
-   Selection does not read settings; the default candidate cannot be deployed directly.
-2. **同意读取所选目标并预览部署** authorizes bounded reads of fixed configuration and
+1. Use **手动添加 → 选择位置** to choose an existing pi agentDir; pasted absolute paths
+   require a native exact-scope approval. Verify type/location and name the configuration.
+   Selection alone does not read settings; no default candidate deploys automatically.
+2. **预览接入改动** authorizes bounded reads of fixed configuration and
    metadata only. Review the precise `extensions/agent-pet.ts` path, directories,
    conflicts and loading conditions. Cancel writes nothing and opens no listener.
 3. **确认部署并开始接收** exclusively creates the private extension (0600) and starts
@@ -124,18 +152,19 @@ userData/TMPDIR socket path. Startup never unlinks an unknown socket or configur
 Quit waits for pending operations and Adapter stop, retaining the original runtime directory,
 configuration and ownership for a **clean desktop restart**. No target is read and no desktop
 listener starts automatically at startup: Main only reads bounded private metadata at
-`userData/pi-connection/connection.json` (0700 directory / 0600 file). The confirmation
+`userData/pi-connection/connection.json` for legacy, or per-record
+`userData/configuration-<UUID>/pi-connection/connection.json` (0700 directory / 0600 file). The confirmation
 preview discloses this persistence policy before deployment. Credentials never enter ordinary
 preferences, IPC, logs, Renderer or the application bundle.
 
 After restarting, choose **恢复已保存连接** to validate the original runtime directory,
 absence of any existing endpoint, and the installed file's identity/metadata/content digest.
 Resume uses the identical endpoint/token and the same installed extension, without environment
-exports or redeployment. **停用接收并保存（保留文件）** stops the listener and persists disabled
+exports or redeployment. **停用接收并保留文件** stops the listener and persists disabled
 state. Even when saving fails, the next launch never auto-listens. The UI separately reports
 receiving state, saved state and partial failures; failed stop does not claim disabled reception.
 
-**停用接收并撤回本次文件…** stops receiving, saves disabled state, then selectively removes
+**移除配置 → 确认移除** stops receiving, saves disabled state, then selectively removes
 only the matching owned file. Edits, replacements, unknown entries and nonempty directories
 are retained; failed-preserved withdrawal remains retryable. Successful removal and metadata
 publication allow selecting/previewing a new setup in the same process. A failed publication
@@ -159,22 +188,18 @@ the generated target file and private Main metadata contain the capability.
 
 Automated evidence includes controller-applied artifact → isolated Node synthetic
 hooks → real socket/Adapter/Application, trusted IPC, cancellation/staleness, receipt
-withdrawal, quit, RTL and source-independent built template checks. No real target/pi,
-Electron default profile or visual QA was run. M2 remains PARTIAL; see the current plan
-for exact test counts. Restart persistence is implemented but not manually accepted; see
-[the new unchecked restart checklist](../../docs/MVP-RESTART-CHECKLIST.md). Prior manually checked
-results remain historical evidence for their original process-local implementation.
+withdrawal, quit, RTL and source-independent built template checks. The original
+implementation-only stage did not perform real-target or visual QA. Later accepted
+M2/M5 and restart evidence keep their own ranges; this UI migration has new formal
+screenshot checks but has not repeated the new multi-target real pi matrix. See the
+[current plan](../../docs/MVP-EXECUTION-PLAN.md) and
+[restart checklist](../../docs/MVP-RESTART-CHECKLIST.md) for exact scopes.
 
-## Development session simulation
+## Session test boundaries
 
-Use the application menu `模拟 Session（开发专用）` to create three working sessions
-and change the current simulated run to completed or error. All names are prefixed
-with `模拟`; this is not a real Agent integration and does not open Agent windows.
-
-Check that working bubbles survive clicks, completed/error bubbles disappear on
-click with an unsupported-opening notice, and hiding bubbles preserves the pet.
-Reloading the renderer requests the current in-memory snapshot. Restarting the
-application resets it. The simulation menu is excluded from packaged apps.
+The former development simulation menu was removed. Session fixtures and doubles
+remain only in isolated tests and `renderer/test-support`; neither is a production
+entry. Real Agent state continues to originate from Adapter → Application snapshots.
 
 ## Bundled 3D pet
 
@@ -187,9 +212,10 @@ This trusted fixture path is not user import validation.
 The prototype animation priority is working > unread error > unread completed >
 idle, independent of bubble order. Hiding bubbles does not change activity.
 The model uses Work, Error, Success and Idle clips respectively; the precise
-multi-session animation policy remains a product-tuning choice. R3F Canvas owns
-the single render loop (display cadence, DPR capped at 2),
-pausing it while the document is hidden. Drei useGLTF loads the bundled local URL;
+multi-session animation policy remains a product-tuning choice. PreferenceRenderLoop owns one cancellable RAF scheduler per Canvas, enforcing the
+selected 30/60/120 FPS and 75/100/150% DPR settings. Hidden management scenes stop
+drawing; document-hidden pause follows preferences and reduced animation pauses
+continuous poses while retaining the selected state. Drei useGLTF loads the bundled local URL;
 useAnimations owns the instance mixer. Cloned transforms are instance-owned,
 while geometry/materials remain cache-owned and are not disposed on remount.
 Bounds frames the complete bundled animation envelope, including the success
@@ -203,7 +229,7 @@ socket and does not simulate native movement. See `../../docs/RENDERER-R2-R3F.md
 for historical R2 lifecycle/dependency evidence and `../../patches/README.md` for
 the pinned Fiber initialization-error patch and its removal gate.
 
-Manual check: changing simulated Session states should change motion, and
+Controlled test-fixture check: changing Session states should change motion, and
 acknowledging all terminal bubbles should
 return it to Idle. Missing optional clips fall back to Idle; missing required Idle
 is a loading error.

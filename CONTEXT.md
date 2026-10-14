@@ -2,7 +2,7 @@
 
 ## Product purpose
 
-Agent Pet is an entertaining desktop companion for using multiple AI Agents. It visualizes selected Agent session states through one 3D pet and its session bubbles, with a low-friction, non-technical user experience. pi is the first local macOS adapter, not the product boundary. The current MVP is read-only toward the Agent; authorized observation setup is distinct from Agent control.
+Agent Pet is an entertaining desktop companion for using multiple AI Agents. It visualizes Agent session states through pets and session bubbles, with a low-friction, non-technical user experience. pi is the first local macOS adapter, not the product boundary. The current MVP is read-only toward the Agent; authorized observation setup is distinct from Agent control.
 
 Current scope and acceptance: [MVP execution plan](docs/MVP-EXECUTION-PLAN.md).
 
@@ -27,7 +27,7 @@ A completed or failed Session result that has not been acknowledged by the user 
 A compact visual representation of one Session. It follows the Pet, shows the Session name and status, and can be clicked independently to acknowledge the Session and request opening the originating Agent window.
 
 ### Pet
-One 3D avatar rendered by the desktop application. Multiple Sessions are represented by multiple bubbles around the same Pet; the product does not create one Pet per Session.
+A 3D avatar associated with a Configured Agent in the shared management scene. The desktop overlay has one Pet with multiple independent Session bubbles; a Pet is not created per Session.
 
 ### Pet asset
 A 3D GLB model plus the animation metadata needed by the Pet. The current MVP uses the bundled asset; future user-imported assets require explicit complexity and safety limits.
@@ -52,7 +52,7 @@ A local, validated directory containing a Pet asset model and its descriptive me
 
 ### Configured Agent
 
-An Agent provider instance that the user has discovered, authorized and connected. It can have multiple Sessions and can be assigned a specific Pet asset.
+A user-registered Agent configuration with its own identity, name and location. Configuration availability, observation connection health and Session activity are separate facts; a configuration can be offline or unsupported and can have its own Pet binding.
 
 ### Agent-Pet binding
 
@@ -70,7 +70,7 @@ Session bubble -> one Open Session action
 
 ## First-release rules
 
-- One Pet represents many independent Sessions.
+- The desktop Pet represents many independent Sessions; the management home represents each online configuration with a separate Pet, including multiple configurations of the same Provider.
 - The Pet and all visible bubbles move together.
 - Bubbles can be hidden without necessarily hiding the Pet; Pet visibility and bubble visibility are separate controls.
 - A working Session remains visible while working.

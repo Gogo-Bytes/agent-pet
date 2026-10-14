@@ -3,7 +3,8 @@ import { chmod, link, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, sy
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { detectInstallations, identifyInstallation, inspectTarget, limits, ReadBudget, scanPaths } from './pi-preflight-files.js';
+import { PiPreflight } from './pi-preflight.js';
+import { detectInstallations, discoverScanPaths, identifyInstallation, inspectTarget, limits, ReadBudget, scanPaths } from './pi-preflight-files.js';
 
 let root: string;
 beforeEach(async () => { root = await realpath(await mkdtemp(join(tmpdir(), 'pet-p2a-files-'))); });
@@ -26,6 +27,58 @@ async function tree(path: string): Promise<unknown> {
 }
 
 describe('bounded installation metadata identity on synthetic files', () => {
+  it('finds an NVM pi installation when Finder PATH contains no NVM bin, without executing it or reading configuration', async () => {
+    const node = join(root, '.nvm/versions/node/v22.22.3');
+    const pkg = join(node, 'lib/node_modules/@earendil-works/pi-coding-agent');
+    await put(join(pkg, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '0.85.1',
+      bin: { pi: 'dist/bundle/cli.js' }, piConfig: { configDir: '.pi' } }));
+    await put(join(pkg, 'dist/bundle/cli.js'), 'throw new Error("MUST NOT EXECUTE");');
+    await mkdir(join(node, 'bin')); await symlink('../lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js', join(node, 'bin/pi'));
+    const original = ReadBudget.prototype.stat;
+    vi.spyOn(ReadBudget.prototype, 'stat').mockImplementation(function(this: ReadBudget, path) {
+      if (['/opt/homebrew/bin/pi', '/usr/local/bin/pi', '/usr/bin/pi', '/bin/pi'].includes(path)) return Promise.resolve(null);
+      return original.call(this, path);
+    });
+    const reads = vi.spyOn(ReadBudget.prototype, 'json');
+    const check = new PiPreflight({ home: root, guiPath: '/usr/bin:/bin', pick: async () => null });
+    const state = await check.detect(); check.close();
+    expect(state.installations).toContainEqual(expect.objectContaining({ path: join(node, 'bin/pi'), version: '0.85.1', compatibility: 'verified-0.85.1' }));
+    expect(reads.mock.calls.every(([path]) => path.endsWith('pi-coding-agent/package.json'))).toBe(true);
+  });
+  it('keeps NVM candidates after a full GUI PATH and bounds excess version directories', async () => {
+    const versions = join(root, '.nvm/versions/node');
+    await mkdir(versions, { recursive: true, mode: 0o700 });
+    for (let n = 0; n < limits.nodeVersions + 1; n++) await mkdir(join(versions, `v22.0.${n}`));
+    const guiPath = Array.from({ length: limits.pathEntries }, (_, n) => join(root, `bin-${n}`)).join(':');
+    const result = await discoverScanPaths(root, guiPath);
+    expect(result.limited).toBe(true);
+    expect(result.paths).toHaveLength(limits.pathEntries + 3 + limits.nodeVersions);
+    expect(result.paths).toContain(join(versions, 'v22.0.16/bin/pi'));
+    expect(result.paths).not.toContain(join(versions, 'v22.0.0/bin/pi'));
+    const identify = vi.spyOn(ReadBudget.prototype, 'stat').mockResolvedValue(null);
+    expect((await detectInstallations(result.paths)).scan).toBe('complete');
+    expect(identify.mock.calls.some(([path]) => path === join(versions, 'v22.0.16/bin/pi'))).toBe(true);
+  });
+  it('bounds all directory entries and reports cancelled discovery as limited', async () => {
+    const versions = join(root, '.nvm/versions/node');
+    await mkdir(versions, { recursive: true, mode: 0o700 });
+    for (let n = 0; n < limits.directoryEntries + 1; n++) await writeFile(join(versions, `ignored-${n}`), '');
+    expect(await discoverScanPaths(root, '')).toEqual({ paths: scanPaths(root, ''), limited: true });
+    const controller = new AbortController(); controller.abort();
+    expect(await discoverScanPaths(root, '', new ReadBudget(controller.signal))).toEqual({ paths: scanPaths(root, ''), limited: true });
+  });
+  it('does not follow an NVM root symlink or enumerate an unsafe version directory', async () => {
+    const actual = join(root, 'actual'); await mkdir(actual);
+    await mkdir(join(root, '.nvm/versions'), { recursive: true, mode: 0o700 });
+    await symlink(actual, join(root, '.nvm/versions/node'));
+    const reads = vi.spyOn(ReadBudget.prototype, 'json');
+    expect(await discoverScanPaths(root, '')).toEqual({ paths: scanPaths(root, ''), limited: true });
+    expect(reads).not.toHaveBeenCalled();
+    await rm(join(root, '.nvm/versions/node'));
+    await mkdir(join(root, '.nvm/versions/node'), { mode: 0o777 });
+    await chmod(join(root, '.nvm/versions/node'), 0o777);
+    expect((await discoverScanPaths(root, '')).limited).toBe(true);
+  });
   it('recognizes only the standard metadata and bin, without executing the CLI', async () => {
     const path = await packageFixture();
     await mkdir(join(root, 'bin')); await symlink('../lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js', join(root, 'bin/pi'));

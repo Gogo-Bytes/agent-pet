@@ -158,6 +158,17 @@ it('failed save before listen retains receipt; stop/save failure and failed remo
   expect(fs.existsSync(next.path)).toBe(false);
 });
 
+it('does not report absent-artifact removal as saved when clearing private ownership fails', async () => {
+  const f = fixture(); const first = await f.deploy(); await first.connection.stop();
+  fs.unlinkSync(first.path);
+  const second = f.controller();
+  vi.spyOn(second.store, 'save').mockReturnValueOnce(true).mockReturnValueOnce(false);
+  expect(await second.connection.remove()).toMatchObject({ notice: 'removed-save-failed', saved: 'uncertain',
+    receiving: 'stopped', canConfigure: false, canRemove: false, deployedPath: null });
+  expect(fs.existsSync(f.target)).toBe(true);
+  expect(fs.existsSync(f.record)).toBe(true);
+});
+
 it('serializes resume/disable; late callbacks cannot resurrect stopped state or publish observations', async () => {
   const f = fixture(); const first = await f.deploy(); await first.connection.stop();
   const second = f.controller();

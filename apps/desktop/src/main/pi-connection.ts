@@ -230,9 +230,10 @@ export class PiConnection {
       if (!await this.disableReceiving()) return;
       const result = await this.owned.deployment.withdraw(this.owned.receipt);
       this.state.notice = result.file;
-      this.state.status = result.file === 'removed' ? 'not-configured' : 'disconnected';
+      const withdrawn = result.file === 'removed' || result.file === 'already-absent';
+      this.state.status = withdrawn ? 'not-configured' : 'disconnected';
       // A failed unlink remains retryable; edited artifacts also keep their durable evidence.
-      if (result.file === 'removed') {
+      if (withdrawn) {
         this.owned = undefined; this.state.canRemove = false; this.state.canResume = false; this.state.deployedPath = null;
         if (this.options.store && !this.options.store.save(null)) {
           this.state.saved = 'uncertain'; this.state.notice = 'removed-save-failed'; this.state.canConfigure = false;

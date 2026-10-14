@@ -21,7 +21,7 @@ export interface PiConnectionState {
   receiving: 'active' | 'stopped' | 'unknown';
   saved: 'none' | 'ready' | 'disabled' | 'invalid' | 'uncertain';
   notice: 'none' | 'choose-target' | 'busy' | 'invalid-plan' | 'preview-failed' | 'stale-plan' |
-    'deploy-failed-preserved' | 'start-failed' | 'runtime-failed' | 'removed' | 'retained-changed' |
+    'deploy-failed-preserved' | 'start-failed' | 'runtime-failed' | 'removed' | 'already-absent' | 'retained-changed' |
     'retained-unknown' | 'failed-preserved' | 'stopped' | 'saved-invalid' | 'save-failed' | 'resume-required' |
     'resume-refused' | 'disabled' | 'stop-failed' | 'stop-save-failed' | 'removed-save-failed';
 }

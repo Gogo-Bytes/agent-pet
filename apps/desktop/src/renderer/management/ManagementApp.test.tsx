@@ -302,6 +302,14 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getByRole('heading', { name: '选择你的配置位置' })).toBeTruthy();
     expect((screen.getByRole('textbox', { name: '配置文件夹' }) as HTMLInputElement).value).toBe('');
   });
+  it('reports limited discovery without implying the entire machine has been scanned', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'limited', installations: [] });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    expect(screen.getByText('扫描范围受限，结果可能不完整。可以重新扫描或手动选择配置位置。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '重新扫描' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '手动添加' })).toBeTruthy();
+  });
   it('keeps pending discovery alive across page navigation and discards an explicitly canceled scan reply', async () => {
     const test = await mount(); await page(test.user, '连接');
     let finish!: (state: PreflightState) => void;

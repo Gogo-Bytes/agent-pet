@@ -64,6 +64,17 @@ imports, managed production safety or release.
 
 ## Formal management UI (2026-10-14)
 
+Finder-launched installation discovery includes the fixed `$HOME/.nvm/versions/node`
+directory (64 entries, newest 16 version directories) as well as the bounded GUI
+PATH and standard bins. It reads installation metadata only, never executes pi,
+loads shell profiles or reads daily `.pi` credentials. Partial scans remain visible.
+Discovery produces installation candidates; users still choose and authorize a
+configuration target separately. Missing owned extensions now yield `already-absent`:
+clear the validated private receipt and product configuration without deleting target
+directories or unknown files. Unreadable, replaced and edited paths retain safeguards;
+failed persistence cannot report successful removal. See
+[discovery/removal verification](../../docs/PI-DISCOVERY-REMOVAL-ACCEPTANCE.md).
+
 On macOS, management uses the native `hiddenInset` title bar with system traffic
 lights at the upper left. The shared header reserves their space and fills the
 window without a second outer frame. Native close keeps the existing background

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { PreflightState } from '../shared/pi-preflight.js';
-import { detectInstallations, identifyInstallation, inspectTarget, limits, ReadBudget, scanPaths } from './pi-preflight-files.js';
+import { detectInstallations, discoverScanPaths, identifyInstallation, inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
 
 export class PiPreflight {
   private state: PreflightState;
@@ -39,7 +39,11 @@ export class PiPreflight {
     const generation = this.begin();
     if (this.reading) { this.state.notice = 'busy'; return this.snapshot(); }
     try {
-      const result = await this.read(budget => detectInstallations(scanPaths(this.options.home, this.options.guiPath), budget));
+      const result = await this.read(async budget => {
+        const candidates = await discoverScanPaths(this.options.home, this.options.guiPath, budget);
+        const result = await detectInstallations(candidates.paths, budget);
+        return { ...result, scan: candidates.limited ? 'limited' as const : result.scan };
+      });
       if (generation === this.generation) {
         this.state.installations = result.installations.map((candidate, index) => ({ ...candidate, id: `scan-${generation}-${index}` }));
         this.state.selectedInstallation = null;

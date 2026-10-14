@@ -6,6 +6,7 @@ import type { ObservationSink } from '@agent-pet/adapter-core';
 import { Configurations } from './configurations.js';
 import { ConfigurationsStore } from './configurations-store.js';
 import { PiConnection } from './pi-connection.js';
+import { PiConnectionStore } from './pi-connection-store.js';
 import * as preflightFiles from './pi-preflight-files.js';
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -134,6 +135,28 @@ it('returns save failure without optimistically renaming and blocks subsequent m
   vi.spyOn(ConfigurationsStore.prototype, 'save').mockReturnValueOnce(false);
   expect((await f.collection.rename(id, '新名称')).notice).toBe('save-failed');
   expect(f.collection.snapshot().records[0]!.name).toBe('第一个 pi');
+});
+
+it('removes an obsolete restored legacy entry whose target is absent, and does not recreate it after restart', async () => {
+  const f = await fixture();
+  const store = new PiConnectionStore(f.directory);
+  const target = () => ({ revision: 1, installations: [], selectedInstallation: null,
+    target: { path: f.target, source: 'chosen' as const }, inspection: null, scan: 'not-run' as const, notice: 'none' as const });
+  const connection = new PiConnection({ target, adapter: { start: f.start }, publish: f.publish, developmentEnvironment: false, store });
+  const preview = await connection.preview(); await connection.confirm(preview.preview!.id); await connection.stop();
+  const restored = new PiConnection({ target, adapter: { start: f.start }, publish: f.publish, developmentEnvironment: false,
+    store: new PiConnectionStore(f.directory) });
+  const legacy = new Configurations({ directory: f.directory, adapter: () => ({ start: f.start }), publish: f.publish,
+    legacy: { connection: restored, targetPath: f.target } });
+  cleanups.push(async () => legacy.stop());
+  await legacy.rename('legacy-pi', '旧测试配置');
+  await rm(f.target, { recursive: true });
+  expect((await legacy.remove('legacy-pi')).records).toEqual([]);
+  expect(new PiConnectionStore(f.directory).snapshot()).toBeNull();
+  const restart = new Configurations({ directory: f.directory, adapter: () => ({ start: f.start }), publish: f.publish });
+  cleanups.push(async () => restart.stop());
+  expect(restart.snapshot().records).toEqual([]);
+  expect((await readFile(join(f.directory, 'configurations.json'), 'utf8'))).not.toContain('legacy-pi');
 });
 
 it('represents the old connection by stable id, persists a binding, and never rewrites its credential store', async () => {

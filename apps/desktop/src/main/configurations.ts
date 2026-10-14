@@ -212,7 +212,7 @@ export class Configurations {
       const before = entry.connection?.snapshot();
       if (before?.deployedPath || before?.canRemove) {
         const removed = await entry.connection!.remove();
-        if (removed.deployedPath || removed.notice !== 'removed' || removed.saved === 'uncertain') {
+        if (removed.deployedPath || !['removed', 'already-absent'].includes(removed.notice) || removed.saved === 'uncertain') {
           this.notice = 'retained'; return this.snapshotAfterRemoval();
         }
       } else if (before && (before.receiving !== 'stopped' || before.saved === 'invalid' || before.saved === 'uncertain' ||

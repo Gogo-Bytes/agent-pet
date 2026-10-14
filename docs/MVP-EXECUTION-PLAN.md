@@ -56,6 +56,12 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 已交付独立Renderer增量：首页/单宠物场景使用不同内容与镜头，保留单一R3F Canvas；宠物无地台并居中，名称从左上角直接编辑，收藏采用共享玻璃抽屉/进出动画/native modality/关闭回焦。宽窄矮、40字名称及动作条遮挡依据实图修正。全量 **639 passed / 1 skipped / 67 files**，最后微调focused **34 passed**、typecheck、desktop build与package通过，独立审查READY；最终包原生关闭与名称保存通过，捕获失败未升级为完整键盘矩阵通过。最新包、截图及边界见 [修订验收](PET-SCENE-REVISION-ACCEPTANCE.md)。未新增资产/Provider或日常pi目标操作；设置实机停点仍未完成。
 
+## 用户反馈修复：pi 安装扫描与失效连接（2026-10-14）
+
+固定 pi 经原生页面确认为当前自身 profile 的历史部署记录；旧目录不存在，却因撤回把缺失路径误判为变更而无法移除。修复为有效私有 receipt + 安全祖先 + 明确缺失的 `already-absent` 结果，先停用保存，再清产品记录；目标/未知文件不删除，读取或保存失败仍保留。Finder GUI PATH 漏扫 NVM，现增加固定一层版本目录的有界 metadata 搜索（64 项/16 版本/51 候选），受限结果在正式 UI 明示。
+
+全量 **652 passed / 1 skipped / 67 files**、typecheck、desktop build、最终 package 通过，独立 Review READY（110 项），最终文案 focused **28 passed**。已更新并启动 `/Users/gan/Desktop/🥷/Agent Pet.app`，实际管理页的移除预览/取消通过；未自动移除当前历史记录。此前授权的精确本机 CLI metadata 识别为 pi 0.85.1；完整本机扫描另行请求精确只读授权，不执行 pi/读取日常配置。截图、红测试和具体边界见 [本轮证据](PI-DISCOVERY-REMOVAL-ACCEPTANCE.md)。设置实机停点、真实任务矩阵和发布验收保持未完成。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

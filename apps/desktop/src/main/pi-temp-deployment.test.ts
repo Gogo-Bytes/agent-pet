@@ -28,6 +28,39 @@ async function apply(deploy: PiTemporaryDeployment) {
   return { preview, receipt: applied.receipt };
 }
 
+it.each(['file', 'target'] as const)('withdraws obsolete ownership when the %s is already absent without deleting directories or unrelated files', async kind => {
+  const { deploy, path, target, root } = await fixture(true);
+  const { receipt } = await apply(deploy);
+  await writeFile(join(root, 'unrelated.txt'), 'keep');
+  if (kind === 'file') await unlink(path);
+  else await rm(target, { recursive: true });
+  expect(await deploy.withdraw(receipt)).toEqual({ file: 'already-absent', directories: 'retained', runtime: 'not-unloaded' });
+  expect(await readFile(join(root, 'unrelated.txt'), 'utf8')).toBe('keep');
+  if (kind === 'file') expect((await lstat(dirname(path))).isDirectory()).toBe(true);
+});
+
+it.each(['linked-parent', 'dangling-leaf', 'unsafe-parent'] as const)('does not treat %s as an absent owned artifact', async change => {
+  const { deploy, path, target, root } = await fixture(true);
+  const { receipt } = await apply(deploy);
+  await unlink(path);
+  if (change === 'linked-parent') {
+    const actual = join(root, 'actual'); await mkdir(actual);
+    await rm(dirname(path), { recursive: true }); await symlink(actual, dirname(path));
+  }
+  if (change === 'dangling-leaf') await symlink(join(root, 'missing'), path);
+  if (change === 'unsafe-parent') await chmod(target, 0o777);
+  expect(['failed-preserved', 'retained-changed']).toContain((await deploy.withdraw(receipt)).file);
+  expect((await deploy.withdraw({ ...receipt })).file).toBe('retained-unknown');
+});
+
+it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('preserves ownership after permission denial rather than treating the path as absent', async () => {
+  const { deploy, path } = await fixture(true); const { receipt } = await apply(deploy);
+  await unlink(path); await chmod(dirname(path), 0o000);
+  try { expect((await deploy.withdraw(receipt)).file).toBe('failed-preserved'); }
+  finally { await chmod(dirname(path), 0o700); }
+  expect((await deploy.withdraw(receipt)).file).toBe('already-absent');
+});
+
 it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('retains ownership after denied unlink so a validated retry can remove only the file', async () => {
   const { deploy, path } = await fixture();
   const { receipt } = await apply(deploy);

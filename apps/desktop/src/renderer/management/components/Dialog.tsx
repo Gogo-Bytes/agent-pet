@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 
 /** Native modality keeps the persistent navigation inert and restores its trigger. */
-export function Dialog({ label, className = '', onClose, children }: {
+export function Dialog({ label, className = '', onClose, children, initialFocusRef }: {
   label: string; className?: string; onClose: () => void; children: ReactNode;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const previous = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -10,6 +11,7 @@ export function Dialog({ label, className = '', onClose, children }: {
   useEffect(() => {
     const dialog = ref.current!;
     dialog.showModal();
+    initialFocusRef?.current?.focus({ preventScroll: true });
     return () => {
       dialog.close();
       const trigger = previous.current;
@@ -18,7 +20,7 @@ export function Dialog({ label, className = '', onClose, children }: {
       // Cancelling asynchronous work can re-enable the opener in the next React commit.
       if (document.activeElement !== trigger) requestAnimationFrame(() => { if (trigger.isConnected) trigger.focus({ preventScroll: true }); });
     };
-  }, []);
+  }, [initialFocusRef]);
   return <dialog ref={ref} aria-label={label} className={className}
     onCancel={event => { event.preventDefault(); close.current(); }}
     onClick={event => { if (event.target === ref.current) close.current(); }}>{children}</dialog>;

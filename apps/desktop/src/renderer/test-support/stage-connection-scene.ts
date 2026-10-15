@@ -17,7 +17,7 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
   async function click(label: string) {
     const button = await find(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(value =>
       !value.closest('[hidden]') && !value.disabled && (value.getAttribute('aria-label') === label || value.textContent?.trim() === label)));
-    button.click();
+    button.focus({ preventScroll: true }); button.click();
   }
   async function input(selector: string, value: string) {
     const element = await find(() => document.querySelector<HTMLInputElement | HTMLSelectElement>(selector));
@@ -78,7 +78,7 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
       (await find(() => document.querySelector<HTMLButtonElement>('[data-config="demo-pi"]'))).click();
       await find(() => document.querySelector('.cfg-detail'));
     }
-    if (scene.startsWith('rename')) { await click('重命名'); await find(() => document.querySelector('#config-name')); if (scene === 'rename-empty') { await input('#config-name', ''); await find(() => document.querySelector('.cfg-rename-error')); } }
+    if (scene.startsWith('rename')) { await click('重命名'); await find(() => document.querySelector('#config-name')); if (scene === 'rename-empty') { await input('#config-name', ''); await find(() => document.querySelector('.cfg-inline-name .cfg-field-error')); } }
     if (scene.startsWith('preview')) { await click('设置连接'); await find(() => document.querySelector('.cfg-preview')); }
     if (scene.startsWith('remove')) { (await find(() => document.querySelector<HTMLDetailsElement>('.cfg-more-options'))).open = true; await click('移除连接'); await find(() => document.querySelector('.cfg-removal')); if (scene === 'remove-error') { await click('确认移除'); await find(() => document.querySelector('.cfg-removal [role="alert"]')); } }
   }

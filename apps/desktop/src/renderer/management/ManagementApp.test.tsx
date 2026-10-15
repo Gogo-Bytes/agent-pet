@@ -167,16 +167,17 @@ describe('ManagementApp formal four-page interface', () => {
     const test = await mount([record]); await page(test.user, '连接');
     const review = screen.getByRole('region', { name: '连接设置预览' });
     expect(review.textContent).toContain(preview.path);
-    expect(review.textContent).toContain('不会覆盖已有文件');
+    expect(review.textContent).toContain('不覆盖文件或改动 pi 设置');
     expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
     await test.user.click(within(review).getByRole('button', { name: '确认并连接' }));
     expect(test.bridge.configurations.confirm).toHaveBeenCalledExactlyOnceWith(record.id, preview.id);
     act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
       preview: { ...preview, action: 'blocked', findings: ['existing-extension'] } } }] }));
-    expect(screen.getByText(/这里已有同名连接文件/)).toBeTruthy();
-    const blocked = screen.getByRole('button', { name: '确认并连接' });
-    expect(blocked.hasAttribute('disabled')).toBe(true);
-    await test.user.click(blocked);
+    expect(screen.getByRole('heading', { name: '已有同名文件' })).toBeTruthy();
+    expect(screen.getByText('原文件会保留，请先确认它的来源。')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '确认并连接' })).toBeNull();
+    await test.user.click(screen.getByRole('button', { name: '返回详情' }));
+    expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith(record.id);
     expect(test.bridge.configurations.confirm).toHaveBeenCalledTimes(1);
   });
   it('gives a real recovery route after receiver start failure and scopes stale-preview wording to this attempt', async () => {
@@ -408,7 +409,7 @@ describe('ManagementApp formal four-page interface', () => {
     expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
     await test.user.click(screen.getByRole('button', { name: '一键配置' }));
     expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: '配置检测到的 pi' }).textContent).toContain(initialPreflight.automaticTarget!.path);
+    expect(screen.getByRole('dialog', { name: '连接 pi' }).textContent).toContain(initialPreflight.automaticTarget!.path);
     await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
     expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledExactlyOnceWith('node22', expect.any(String));
     expect(test.bridge.locations.choose).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).toBeNull();
@@ -503,19 +504,56 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getByRole('heading', { name: /我的连接/ })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: '未找到安装' })).toBeNull();
   });
-  it('requires explicit removal confirmation for one configuration and preserves all others', async () => {
+  it('dismisses removal without a write, restores focus and only removes the explicitly confirmed configuration', async () => {
     const test = await mount([configuration('one'), configuration('two')]); await page(test.user, '连接');
     await test.user.click(screen.getByText('更多操作', { exact: true }));
-    await test.user.click(screen.getByRole('button', { name: '移除连接' }));
-    expect(screen.getByText('这条连接会从 Agent Pet 中移除。Agent 程序和你的文件都会保留。')).toBeTruthy();
-    await test.user.click(screen.getByRole('button', { name: '取消' }));
-    expect(test.bridge.configurations.remove).not.toHaveBeenCalled();
-    await test.user.click(screen.getByText('更多操作', { exact: true }));
-    await test.user.click(screen.getByRole('button', { name: '移除连接' }));
+    const opener = screen.getByRole('button', { name: '移除连接' });
+    for (const dismissal of ['cancel', 'escape', 'backdrop']) {
+      await test.user.click(opener);
+      const dialog = screen.getByRole('dialog', { name: '移除此连接？' });
+      expect(within(dialog).getByText('不会删除 Agent 程序或你的文件。')).toBeTruthy();
+      expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: '取消' }));
+      expect(test.bridge.configurations.remove).not.toHaveBeenCalled();
+      if (dismissal === 'cancel') await test.user.click(within(dialog).getByRole('button', { name: '取消' }));
+      else if (dismissal === 'escape') fireEvent(dialog, new Event('cancel', { cancelable: true }));
+      else await test.user.click(dialog);
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(document.activeElement).toBe(opener);
+      expect(test.configs().records.map(record => record.id)).toEqual(['one', 'two']);
+    }
+    await test.user.click(opener);
     await test.user.click(screen.getByRole('button', { name: '确认移除' }));
     expect(test.bridge.configurations.remove).toHaveBeenCalledExactlyOnceWith('one');
     expect(test.configs().records.map(record => record.id)).toEqual(['two']);
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(test.bridge.piConnection.remove).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: /我的连接/ })));
+  });
+  it('keeps pending removal modal and preserves a failed result for retry or cancellation', async () => {
+    const record = { ...configuration(), connection: { ...initialConnection, canRemove: true, deployedPath: '/isolated/project-one/extensions/agent-pet.ts' } };
+    const test = await mount([record]); await page(test.user, '连接');
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
+    await test.user.click(screen.getByRole('button', { name: '移除连接' }));
+    const dialog = screen.getByRole('dialog', { name: '移除此连接？' });
+    await test.user.click(within(dialog).getByText('会移除什么？'));
+    expect(dialog.textContent).toContain(record.connection.deployedPath);
+    expect(dialog.textContent).toContain('被修改过或不能确认来源的文件会保留');
+    let finish!: () => void;
+    test.bridge.configurations.remove.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => { finish = resolve; });
+      return { ...test.configs(), notice: 'retained' as const };
+    });
+    await test.user.click(within(dialog).getByRole('button', { name: '确认移除' }));
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    expect(screen.getByRole('dialog', { name: '移除此连接？' })).toBe(dialog);
+    expect(within(dialog).getByRole('button', { name: '取消' }).hasAttribute('disabled')).toBe(true);
+    await act(async () => finish());
+    expect(within(dialog).getByRole('alert').textContent).toContain('连接还没有移除');
+    expect(test.configs().records).toEqual([record]);
+    expect(within(dialog).getByRole('button', { name: '确认移除' }).hasAttribute('disabled')).toBe(false);
+    await test.user.click(within(dialog).getByRole('button', { name: '取消' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(test.bridge.configurations.remove).toHaveBeenCalledExactlyOnceWith(record.id);
   });
   it('closes manual configuration on navigation and releases all subscriptions without accepting late callbacks', async () => {
     const test = await mount(); await page(test.user, '连接');

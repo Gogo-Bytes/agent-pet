@@ -1,0 +1,7 @@
+.cfg-text-field{width:100%;min-width:0}
+.cfg-field-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:12px;line-height:1.5;color:#665c76}
+.cfg-field-label label{font-weight:600}.cfg-field-label>span{font-size:11px;color:#968ca3;font-variant-numeric:tabular-nums}
+.cfg-page .cfg-text-field input{display:block;width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #cfc7dd;border-radius:9px;background:#fff;color:#393452;font:inherit;font-size:16px;line-height:1.5;box-shadow:0 1px 2px #30223d05}
+.cfg-page .cfg-text-field input:focus-visible{outline:0;border-color:#8a73db;box-shadow:0 0 0 3px #8973db20}
+.cfg-text-field input[aria-invalid=true]{border-color:#ae526b}.cfg-text-field .cfg-field-error,.cfg-text-field .cfg-field-hint{margin:7px 0 0;font-size:11px;line-height:1.7;color:#8a7f98}.cfg-text-field .cfg-field-error{color:#a14a5d}
+@media(forced-colors:active){.cfg-page .cfg-text-field input:focus-visible{outline:2px solid Highlight;box-shadow:none}.cfg-text-field .cfg-field-error,.cfg-field-label,.cfg-field-label>span{color:CanvasText}}

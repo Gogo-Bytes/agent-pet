@@ -84,3 +84,17 @@ Main亲自打开正式页面的隔离示例：1200×850待重新连接/等待pi/
 - 更换受部署保护的位置仍禁用并说明原因；暂停不关闭 pi、移除仍需独立确认、预览/取消/确认与文件保留契约不变。测试适配真实的新入口，不删除原回归。jsdom 对折叠 details 的角色查询与浏览器不同，测试检查原生 open 状态；浏览器另确认折叠后暂停按钮不可见，并实点展开→暂停→已暂停。
 - 42 个目录场景全部重新打开通过；388px 下长路径为 nowrap/ellipsis，页面 scrollWidth/clientWidth 均为 388。另检查窄窗更多操作可用。管理页 **32 tests**、`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build` 通过。
 - 实际正式组件配合示例数据：[空态居中](screenshots/connection-scenes/empty-centered.png)、[详情层级](screenshots/connection-scenes/detail-hierarchy.png)。没有重启/替换当前应用、没有真实 pi 操作或新打包；正式视觉认可仍由用户逐页反馈，不升级为接入/发布验收。
+
+### Demo 五处反馈：编辑、扫描、短文案与移除弹窗（2026-10-15）
+
+- **14/15 名称编辑**：头像/Agent 类型/编辑标题为稳定一行，输入表单另占完整一行，标签与 40 字计数分开，取消/保存右对齐；编辑时隐藏多余铅笔。新原生 TextField 保留 label、maxlength、错误描述与 Enter/Escape，单一 focus ring。1021px 演示窗中类型/输入均为 16px，表单 445px；窄窗表单 348px，页面宽度与 scrollWidth 均 388px。
+- **18 扫描**：同心环、旋转扫描扇区、装饰点；不显示虚假的发现数量、进度或成功结果。不再重复展示扫描标题和不可用的重新扫描按钮。实际检查 animationName 为 cfg-radar-turn；在设置中点击减少动画，再返回扫描，确认为 none。480px 场景中取消按钮底部 376.1px、内容底部 423px，按钮完整可见。
+- **23/24/25 读取确认**：默认只显示一行“先检查配置文件夹，不会改动 pi 文件”、精确路径和检查范围入口，仍需点击检查并预览。原精确读取范围、不读凭据/会话、不改设置/不启动或重载 pi 的说明保留在展开内容中，取消请求与迟到响应处理不变。
+- **26/27 文件预览**：创建时默认显示文件与不覆盖/不改设置承诺；冲突时先显示“已有同名文件”与保留提示，只有返回详情操作。创建目录仍单独列出精确路径；原因、权限/持久化、扩展信任与加载要求合并在可展开说明中，未删除。确认写入仍是单独按钮；同名冲突不提供可执行确认。
+- **41/42 移除**：由整页改成约 480px 宽的原生 dialog，默认仅名称/单行路径、文件保留承诺和确认/取消；准确的选择性清理范围可展开。新增可选初始焦点 ref，showModal 后才聚焦取消（避免 React autofocus 被原生初始聚焦覆盖）。实际浏览器确认取消为初始焦点、真实点击→Escape 后回到移除入口；356px 窄弹窗无横向溢出。确认期间不能 Escape/背景误关闭；失败保留弹窗、记录与重试；成功后回到列表标题。
+
+Main亲自重开 **42/42** 场景，并实测窄窗、480px 矮窗、取消、Escape、回焦、减少动画。RTL 新增待定移除/失败恢复行为，原移除回归扩展为取消/Escape/背景零写入及显式确认单目标，部署冲突回归仍验证零新增确认调用。最终管理页 **33 passed**；全量 **692 passed / 1 skipped / 71 files**；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、独立 demo build、diff check 通过。
+
+首轮全量中，未改动的 managed/frames.test.ts 在 performance.now()+500 的令牌补充边界断言失败。隔离该文件 **20 passed**，有界全量复验通过；没有为通过 UI 阶段更改限流/guard 代码或删减测试。原失败与最终结果分别保留 `/tmp/agent-pet-connection-feedback-tests.log`、`/tmp/agent-pet-connection-feedback-tests-final.log`。此处只记录证据，不宣称已修复该潜在时钟精度问题。
+
+实际正式 React 组件 + 独立示例数据截图：[编辑](screenshots/connection-polish/rename-wide.png)、[窄窗编辑](screenshots/connection-polish/rename-narrow.png)、[雷达](screenshots/connection-polish/radar.png)、[读取确认](screenshots/connection-polish/detected.png)、[文件冲突](screenshots/connection-polish/preview-blocked.png)、[移除弹窗](screenshots/connection-polish/removal.png)。没有日常 pi 读写、部署、重载、依赖安装、实际应用切换或新打包；用户视觉确认、真实接入及发布仍分开验收。

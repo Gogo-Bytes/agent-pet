@@ -195,6 +195,12 @@ Deployment review and removal confirmation retain their existing semantics. See 
 responsive checks, staged package and native verification limits. The user's
 currently connected app was kept running; switching to the new package is pending.
 
+The demo's rename form now uses a labeled TextField with a character count and a
+single focus ring. Scanning uses a decorative radar respecting reduced motion.
+Read consent and deployment previews show brief summaries with expandable scope;
+blocked previews offer a return action. Removal uses a compact native dialog,
+initially focuses Cancel, retains failures and requires a separate confirmation.
+
 ## pi detection and read-only preflight (P2a)
 
 Historical P2a APIs expose detect/rescan, installation and target pickers and explicit

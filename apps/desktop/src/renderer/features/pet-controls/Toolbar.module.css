@@ -1,14 +1,14 @@
-.toolbar {
+.toolbar:global(.glass-toolbar) {
   position: absolute; display: flex; justify-content: center; align-items: center;
-  gap: 5px; padding: 4px; border-radius: 23px; box-sizing: border-box;
+  --glass-elevation: var(--glass-compact-elevation);
+  --glass-group-padding: 4px; --glass-group-radius: 23px; --glass-control-height: 36px;
+  gap: 5px; padding: var(--glass-group-padding); border-radius: 23px; box-sizing: border-box;
   color: #6554a6; opacity: 0; pointer-events: none;
   transition: opacity var(--duration-feedback) ease;
 }
 .toolbar[data-visible='true'] { opacity: 1; pointer-events: auto; }
-.toolbar > button { width: 36px; height: 36px; border-radius: 18px; }
+.toolbar:global(.glass-toolbar) > :global(.glass-action) { width: 36px; height: 36px; min-width: 36px; padding: 0; border-radius: 18px; }
 .toolbar > button svg { width: 18px; height: 18px; stroke-width: 1.8; }
-.toolbar > button[aria-pressed='true'] { color: #6248bd; background: #a795e527; }
 .divider { width: 1px; height: 16px; flex: none; background: #8d7bb42b; }
 .resize { cursor: nwse-resize; touch-action: none; }
-@media (prefers-reduced-motion: reduce) { .toolbar { transition: none; } }
-@media (forced-colors: active) { .toolbar { background: Canvas; color: ButtonText; border-color: ButtonText; } }
+@media (prefers-reduced-motion: reduce) { .toolbar:global(.glass-toolbar) { transition: none; } }

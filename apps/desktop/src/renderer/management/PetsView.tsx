@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentConfiguration, PetBinding } from '../../shared/configurations.js';
-import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from './components/glass.js';
+import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from '../shared/ui/Glass.js';
 import { Icon } from './components/icons.js';
 import { Dialog } from './components/Dialog.js';
 import { GlassDrawer } from './components/GlassDrawer.js';

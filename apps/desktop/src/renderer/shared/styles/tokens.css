@@ -1,18 +1,6 @@
 :root {
-  --glass-ink: #393452;
-  --glass-muted: #746b8b;
-  --glass-fill: rgb(251 249 255 / 88%);
-  --glass-fill-hover: rgb(250 252 255 / 96%);
-  --glass-fill-active: rgb(214 225 245 / 96%);
-  --glass-rim: rgb(255 255 255 / 65%);
-  --glass-shadow: inset 0 1px 0 #ffffffc9, inset 0 -1px 0 #9e8ac514, 0 3px 12px #31214f12;
-  --control-fill: rgb(250 247 255 / 78%);
-  --control-ink: #6a57ab;
   --focus: #6951b0;
   --radius-surface: 16px;
   --radius-control: 24px;
   --duration-feedback: 140ms;
-}
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  :root { --glass-fill: #f0f4fc; --control-fill: #f6f1ff; }
 }

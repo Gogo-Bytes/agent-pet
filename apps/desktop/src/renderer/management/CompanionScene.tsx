@@ -1,7 +1,7 @@
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Icon } from './components/icons.js';
-import { GlassButton } from './components/glass.js';
+import { GlassButton } from '../shared/ui/Glass.js';
 import { HomeScene, PetPreviewScene, type HomePet } from './ManagementScenes.js';
 export type { HomePet } from './ManagementScenes.js';
 import { PreferenceRenderLoop } from '../shared/PreferenceRenderLoop.js';

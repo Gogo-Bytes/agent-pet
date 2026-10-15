@@ -92,6 +92,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 全量 **682 passed / 1 skipped / 70 files**、typecheck、desktop build（package内）、最终package通过，独立工程Review READY、独立截图复核无确定阻塞。正式Renderer已实看远处/透明角不触发、直接模型命中与气泡开关；隔离原生包启动/GLB/无名称/正常退出通过，原生坐标工具一次恢复后仍不能可靠证明操作条交接及跨应用/全屏层级，保持待验。当前用户应用与pi接收未切换/中断；新包与截图见 [本轮证据](DESKTOP-OVERLAY-REFINEMENT-ACCEPTANCE.md)。没有日常pi读写、部署、重载、依赖安装或推送；原设置停点和发布门槛不变。
 
+用户随后要求统一使用glass组件：管理页玻璃实现已提取为正式`shared/ui/Glass.tsx`/`glass.css`，桌宠采用GlassToolbar/GlassAction/GlassButton，删除简化磨砂版本，加入适合桌面浅/深背景的对比变体及紧凑阴影。全量 **684 passed / 1 skipped / 71 files**，最终相关 **60 passed**，typecheck、desktop build、原型build、package通过；正式Renderer实看浅/深/线条、媒体回退及管理收藏回焦。新包尚未切换，原生层级和真实pi验收边界不变。截图与最新包见上述本轮证据的后续修订。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

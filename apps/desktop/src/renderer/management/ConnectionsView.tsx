@@ -4,7 +4,7 @@ import type { PreflightState } from '../../shared/pi-preflight.js';
 import { findingText } from '../../shared/pi-preflight.js';
 import type { ManagementBridge } from './management-store.js';
 import { Icon, type IconName } from './components/icons.js';
-import { GlassButton } from './components/glass.js';
+import { GlassButton } from '../shared/ui/Glass.js';
 import { ManualConnectionDialog } from './ManualConnectionDialog.js';
 import { DeploymentControls } from './DeploymentControls.js';
 import { DetectedSetupDialog } from './DetectedSetupDialog.js';

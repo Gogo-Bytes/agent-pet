@@ -5,7 +5,7 @@ import { BubbleStack } from '../features/session-bubbles/BubbleStack.js';
 import { Toolbar } from '../features/pet-controls/Toolbar.js';
 import { useSessionNotice } from '../features/notifications/use-session-notice.js';
 
-import { glassSurfaceClass } from '../shared/ui/GlassSurface.js';
+import { GlassSurface } from '../shared/ui/Glass.js';
 import noticeStyles from '../features/notifications/Notice.module.css';
 
 function subscribeVisibility(listener: () => void) {
@@ -28,11 +28,12 @@ export function App({ store }: { store: PetStore }) {
     top: above ? 'auto' : layout.bubbles.y + 4,
     bottom: above ? layout.bounds.height - layout.bubbles.y - layout.bubbles.height + 4 : 'auto',
   } : {};
+  const notice = message ?? (error || modelNotice);
   return <>
     <PetCanvas visible={visible} store={store} rect={layout?.pet} onNotice={setModelNotice} onHover={setPetHovered} />
     <BubbleStack bridge={store.bridge} state={{ ...sessions, bubbles: sessions.bubbles.filter(bubble => bubble.status === 'working' || (bubble.status === 'completed-unread' ? preferences.completed : preferences.error)) }} layout={layout} hidden={hidden || !preferences.bubbles} reducedMotion={preferences.reduced} onOpen={openSession} />
     <Toolbar pageVisible={visible} bridge={store.bridge} layout={layout} engaged={petHovered || !!modelNotice} hidden={hidden} onToggle={() => setHidden(value => !value)} />
 
-    <p className={`pet-notice ${noticeStyles.notice} ${glassSurfaceClass}`} role="status" style={noticeStyle}>{message ?? (error || modelNotice)}</p>
+    <p className={`pet-notice ${noticeStyles.notice}`} role="status" style={noticeStyle}>{notice && <GlassSurface as="span" material="panel" data-contrast="high">{notice}</GlassSurface>}</p>
   </>;
 }

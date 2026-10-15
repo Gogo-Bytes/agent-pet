@@ -6,7 +6,9 @@
 
 Desktop App uses one R3F Canvas with mesh hover events. The overlay has no pet-name
 label; the legacy stored `names` key remains readable for schema compatibility.
-The compact glass toolbar waits for Main's native mouse-region acknowledgement,
+The canonical material is `src/renderer/shared/ui/Glass.tsx`/`glass.css`, shared
+with management. The overlay uses GlassToolbar/GlassAction and panel GlassButton,
+with a high-contrast variant and compact shared elevation. The compact glass toolbar waits for Main's native mouse-region acknowledgement,
 keeps a short model-to-controls handoff, and releases on blur/hide/unmount.
 Main owns hit testing and applies the macOS nonactivating panel/workspace/topmost
 policy on show/restore. Other apps' full-screen/Spaces behavior needs native acceptance.

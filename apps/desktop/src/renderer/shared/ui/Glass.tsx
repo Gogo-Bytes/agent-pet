@@ -1,4 +1,4 @@
-import { type ComponentPropsWithoutRef, type CSSProperties, useId, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, type ForwardedRef, type ComponentPropsWithoutRef, type CSSProperties, useId, useLayoutEffect, useRef, useState } from 'react';
 import './glass.css';
 
 type Material = 'control' | 'panel';
@@ -41,7 +41,7 @@ function useLens(material: Material) {
   const [map, setMap] = useState<LensMap | null>(null);
   useLayoutEffect(() => {
     const element = ref.current;
-    if (!element || material !== 'control') { setMap(null); return; }
+    if (!element || material !== 'control' || typeof ResizeObserver === 'undefined') { setMap(null); return; }
     let frame = 0;
     let previous = '';
     const observer = new ResizeObserver(() => {
@@ -84,18 +84,24 @@ export function GlassSurface({ as: Element = 'div', material = 'control', classN
   return <Element ref={node => { ref.current = node; }} className={classes(material, className)} {...props}>{optics}{props.children}</Element>;
 }
 
-export function GlassButton({ className, type = 'button', ...props }: ComponentPropsWithoutRef<'button'>) {
-  const { ref, optics } = useLens('control');
-  return <button ref={node => { ref.current = node; }} type={type} className={`${classes('control', className)} glass-button`} {...props}>{optics}{props.children}</button>;
+function assignRef<T>(ref: ForwardedRef<T>, node: T | null) {
+  if (typeof ref === 'function') ref(node);
+  else if (ref) ref.current = node;
 }
+
+type ButtonProps = ComponentPropsWithoutRef<'button'> & { material?: Material };
+export const GlassButton = forwardRef<HTMLButtonElement, ButtonProps>(function GlassButton({ material = 'control', className, type = 'button', ...props }, forwardedRef) {
+  const { ref, optics } = useLens(material);
+  return <button ref={node => { ref.current = node; assignRef(forwardedRef, node); }} type={type} className={`${classes(material, className)} glass-button`} {...props}>{optics}{props.children}</button>;
+});
 
 /** Children use transparent native buttons, so this group filters the backdrop once. */
-export function GlassToolbar({ className, ...props }: ComponentPropsWithoutRef<'div'>) {
+export const GlassToolbar = forwardRef<HTMLDivElement, ComponentPropsWithoutRef<'div'>>(function GlassToolbar({ className, ...props }, forwardedRef) {
   const { ref, optics } = useLens('control');
-  return <div ref={node => { ref.current = node; }} role="group" className={`${classes('control', className)} glass-toolbar`} {...props}>{optics}{props.children}</div>;
-}
+  return <div ref={node => { ref.current = node; assignRef(forwardedRef, node); }} role="group" className={`${classes('control', className)} glass-toolbar`} {...props}>{optics}{props.children}</div>;
+});
 
 /** Transparent native action inside one shared material; never another lens. */
-export function GlassAction({ className = '', type = 'button', ...props }: ComponentPropsWithoutRef<'button'>) {
-  return <button type={type} className={`glass-action ${className}`} {...props} />;
-}
+export const GlassAction = forwardRef<HTMLButtonElement, ComponentPropsWithoutRef<'button'>>(function GlassAction({ className = '', type = 'button', ...props }, ref) {
+  return <button ref={ref} type={type} className={`glass-action ${className}`} {...props} />;
+});

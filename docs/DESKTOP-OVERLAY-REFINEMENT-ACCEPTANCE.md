@@ -47,3 +47,22 @@ Electron版本源码依据：[panel选项](https://github.com/electron/electron/
 `/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-SEqavc/mac-arm64/Agent Pet.app`
 
 未替换、退出或重启当前`/Users/gan/Desktop/🥷/Agent Pet.app`，保持其pi接收。打开新包不会强制替代已有单实例；日常运行切换与已保存接收恢复应另按现有明确范围操作。未访问pi设置/凭据/会话、未部署或reload pi、未改系统登录项。正式UI用户反馈、完整OS窗口矩阵和发布验收仍独立记录。
+
+
+## 后续修订：统一正式 glass 组件（2026-10-15）
+
+用户明确建议使用项目glass组件。上一阶段桌宠仍是简化磨砂GlassSurface；现在将管理页已采用的玻璃实现提取为唯一正式入口`apps/desktop/src/renderer/shared/ui/Glass.tsx`/`glass.css`，删除桌宠简化版本和旧CSS重复token。管理页同步引用共享实现，没有将整个原型或多轮覆盖CSS塞入正式代码。
+
+- 操作条使用`GlassToolbar`和透明`GlassAction`子按钮，只有一层背景折射；气泡使用`GlassButton material="panel"`，提示用`GlassSurface material="panel"`。前向ref保留Radix、Motion及DOM焦点语义。
+- 共享`data-contrast="high"`变体供桌面浮层在浅/深壁纸上阅读，紧凑elevation token避免原生窗口边缘裁切阴影；管理页默认材质不变。没有独立子按钮滤镜。
+- Lens仍仅尺寸变化时生成、256,000像素面积上限，清理ResizeObserver/RAF；无ResizeObserver时使用柔化背景。新增StrictMode清理、前向ref、面积上限清除旧map和无observer可用性回归。不是物理光学或原生NSVisualEffectView。
+- 全量`pnpm test` **684 passed / 1 skipped / 71 files**，最后相关5文件 **60 passed**，`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、原型build和`pnpm package:mac`通过。日志分别位于`/tmp/agent-pet-glass-{full-tests,focused-final,build,prototype-build,package}.log`。类型检查首次暴露遗漏Drawer路径和测试getContext重载类型，修复后通过；没有弱化原行为测试。
+- 正式Renderer320×430实看浅色、深色、线条背景的玻璃边缘，真实GLB模型触发、气泡隐藏/显示及aria-pressed选中表面可用；线条样例中可见边缘改变，不能据此宣传为物理折射或OS壁纸采样。CDP仅临时模拟媒体偏好：减少透明时背景实色且backdrop-filter=none，减少动画时工具条和子按钮transition均为0s；强制颜色为系统色及黑色边框，检查后全部恢复。管理页宠物场景及收藏打开/关闭回焦另实看，未做新原生运行或连接验收。
+
+![正式共享glass：浅色](screenshots/desktop-overlay-glass/light.png)
+
+![正式共享glass：深色](screenshots/desktop-overlay-glass/dark.png)
+
+![正式共享glass：背景线条检查](screenshots/desktop-overlay-glass/lines.png)
+
+最新包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-Y29Hre/mac-arm64/Agent Pet.app`。仅打包，不替换当前稳定应用或中断pi接收。上一阶段原生层级/全屏待验状态不变；本轮没有pi或系统设置操作，没有推送。

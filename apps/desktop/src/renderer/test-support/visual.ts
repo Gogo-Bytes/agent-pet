@@ -45,4 +45,6 @@ window.pet = {
 };
 window.addEventListener('beforeunload', unsubscribe, { once: true });
 await import('../main.js');
-document.body.style.background = params.get('theme') === 'dark' ? '#111827' : '#f1f5f9';
+document.body.style.background = params.get('theme') === 'lines'
+  ? 'repeating-linear-gradient(90deg, #9c8aae 0, #9c8aae 1px, #f8f5fc 1px, #f8f5fc 10px)'
+  : params.get('theme') === 'dark' ? '#111827' : '#f1f5f9';

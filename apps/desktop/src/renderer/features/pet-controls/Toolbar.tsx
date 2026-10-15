@@ -4,8 +4,7 @@ import type { OverlayLayout } from '../../../shared/overlay-layout.js';
 import type { PetBridge } from '../../app/bridge/pet-store.js';
 import { rectStyle } from '../../shared/rect-style.js';
 import { useWindowGesture } from '../../shared/use-window-gesture.js';
-import { GlassSurface } from '../../shared/ui/GlassSurface.js';
-import { IconButton } from '../../shared/ui/IconButton.js';
+import { GlassToolbar, GlassAction } from '../../shared/ui/Glass.js';
 import { Tooltip } from '../../shared/ui/Tooltip.js';
 import styles from './Toolbar.module.css';
 
@@ -51,22 +50,22 @@ export function Toolbar({ bridge, layout, engaged, hidden, onToggle, pageVisible
   useLayoutEffect(() => () => { void bridge.controlsVisible(false).catch(() => {}); }, [bridge]);
   const visible = requested && acknowledged;
   const label = hidden ? '显示气泡' : '隐藏气泡';
-  return <GlassSurface ref={element} role="toolbar" aria-label="桌宠快捷操作" data-visible={visible}
+  return <GlassToolbar data-contrast="high" ref={element} role="toolbar" aria-label="桌宠快捷操作" data-visible={visible}
     className={`pet-toolbar ${styles.toolbar}`} style={rectStyle(layout?.toolbar)}
     onPointerEnter={() => { setSuspended(false); setHovered(true); }} onPointerLeave={() => setHovered(false)}
     onFocusCapture={() => { setSuspended(false); setFocused(true); }} onBlurCapture={() => queueMicrotask(() => {
       if (element.current && !element.current.contains(document.activeElement)) setFocused(false);
     })}>
     <Tooltip label={label} rect={layout?.pet} disabled={!visible}>
-      <IconButton className="bubble-toggle" aria-label={label} aria-pressed={hidden} onClick={onToggle}>
+      <GlassAction className="bubble-toggle" aria-label={label} aria-pressed={hidden} onClick={onToggle}>
         {hidden ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-      </IconButton>
+      </GlassAction>
     </Tooltip>
     <span className={styles.divider} aria-hidden="true" />
     <Tooltip label="调整大小（方向键）" rect={layout?.pet} disabled={!visible}>
-      <IconButton className={`resize-handle ${styles.resize}`} aria-label="调整宠物窗口大小" {...resize.handlers}>
+      <GlassAction className={`resize-handle ${styles.resize}`} aria-label="调整宠物窗口大小" {...resize.handlers}>
         <MoveDiagonal2 aria-hidden="true" />
-      </IconButton>
+      </GlassAction>
     </Tooltip>
-  </GlassSurface>;
+  </GlassToolbar>;
 }

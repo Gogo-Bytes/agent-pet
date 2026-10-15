@@ -7,11 +7,12 @@ import type { PetBridge } from '../../app/bridge/pet-store.js';
 import { rectStyle } from '../../shared/rect-style.js';
 
 import { motion, type MotionStyle } from 'motion/react';
-import { glassSurfaceClass } from '../../shared/ui/GlassSurface.js';
+import { GlassButton } from '../../shared/ui/Glass.js';
 import { useReducedMotionPreference } from '../../shared/use-reduced-motion.js';
 import styles from './BubbleStack.module.css';
 import { Icon } from '../../management/components/icons.js';
 
+const MotionGlassButton = motion.create(GlassButton);
 const labels = { working: '正在工作', 'completed-unread': '已完成', 'error-unread': '发生错误' };
 export function BubbleStack({ bridge, state, layout, hidden, reducedMotion = false, onOpen }: {
   bridge: PetBridge; state: SessionState; layout: OverlayLayout | null;
@@ -73,10 +74,10 @@ export function BubbleStack({ bridge, state, layout, hidden, reducedMotion = fal
       onBlur={() => queueMicrotask(() => {
         if (deck.current && !hovered.current && !deck.current.contains(document.activeElement)) setExpanded(false);
       })}>
-      {bubbles.map((bubble, index) => <motion.button key={bubble.sessionId}
+      {bubbles.map((bubble, index) => <MotionGlassButton material="panel" data-contrast="high" key={bubble.sessionId}
         initial={reduced ? false : { opacity: 0 }} animate={reduced ? 'still' : 'enter'}
         variants={{ still: { opacity: 1 }, enter: { opacity: [0, 1] } }} transition={{ duration: reduced ? 0 : 0.14 }}
-        className={`session-bubble ${styles.bubble} ${glassSurfaceClass}`} data-status={bubble.status} type="button"
+        className={`session-bubble ${styles.bubble}`} data-status={bubble.status} type="button"
         style={{ '--depth': Math.min(index, 2), '--order': bubbles.length - index } as MotionStyle}
         data-stacked-hidden={index > 2}
         onClick={() => {
@@ -84,7 +85,7 @@ export function BubbleStack({ bridge, state, layout, hidden, reducedMotion = fal
           if (session) void onOpen({ provider: session.provider, sessionId: session.sessionId });
         }}>
         <span className={styles.statusIcon} aria-hidden="true"><Icon name={bubble.status === 'working' ? 'clock' : bubble.status === 'completed-unread' ? 'check' : 'alert'} /></span><span className={styles.copy}><strong>{bubble.name}</strong><span>{labels[bubble.status]}</span></span>
-      </motion.button>)}
+      </MotionGlassButton>)}
     </motion.div>
   </div>;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { GlassAction, GlassSurface } from './glass.js';
+import { GlassAction, GlassSurface } from '../../shared/ui/Glass.js';
 import { Icon } from './icons.js';
 import './drawer.css';
 

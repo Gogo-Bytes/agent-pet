@@ -10,12 +10,6 @@ import styles from './PetCanvas.module.css';
 import { PreferenceRenderLoop } from '../../shared/PreferenceRenderLoop.js';
 import { PetModel } from './PetModel.js';
 
-function subscribeVisibility(listener: () => void) {
-  document.addEventListener('visibilitychange', listener);
-  return () => document.removeEventListener('visibilitychange', listener);
-}
-const isVisible = () => !document.hidden;
-
 function LoadingNotice({ onNotice }: { onNotice: (message: string) => void }) {
   useEffect(() => { onNotice('正在加载内置 GLB 宠物…'); }, [onNotice]);
   return null;
@@ -28,11 +22,10 @@ class PetErrorBoundary extends Component<{ children: ReactNode; onNotice: (messa
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-export function PetCanvas({ store, rect, onNotice }: {
-  store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void;
+export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
+  visible: boolean; store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void; onHover: (hovered: boolean) => void;
 }) {
   const { sessions, preferences } = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const visible = useSyncExternalStore(subscribeVisibility, isVisible);
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
   // Canvas adds its own sizing divs. Keep Main's absolute pixel region and the
   // native pointer handlers on this outer surface, never on a Three mesh.
@@ -47,7 +40,7 @@ export function PetCanvas({ store, rect, onNotice }: {
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel motion={selectPetMotion(sessions.bubbles)} reduced={preferences.reduced} onReady={onNotice} />
+            <PetModel motion={selectPetMotion(sessions.bubbles)} reduced={preferences.reduced} onReady={onNotice} onHover={onHover} />
           </Bounds>
         </Suspense>
       </Canvas>

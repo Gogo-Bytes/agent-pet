@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '../test-support/dom-platform.js';
 import { Children, StrictMode, isValidElement, useEffect, type ReactNode } from 'react';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { configure, getConfig } from '@testing-library/dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -51,6 +51,27 @@ async function mount(options: Parameters<typeof createPetBridgeDouble>[0] = {}) 
 }
 
 describe('App session interactions', () => {
+  it('reveals controls only from model hits, not the transparent Canvas rectangle, and clears the region after leaving', async () => {
+    const user = userEvent.setup();
+    const { bridge, container } = await mount();
+    const toolbar = screen.getByRole('toolbar', { name: '桌宠快捷操作' });
+    await user.hover(container.querySelector('canvas')!);
+    expect(toolbar.getAttribute('data-visible')).toBe('false');
+    expect(bridge.api.controlsVisible).toHaveBeenLastCalledWith(false);
+    await act(async () => { vi.mocked(PetModel).mock.calls.at(-1)![0].onHover?.(true); });
+    expect(toolbar.getAttribute('data-visible')).toBe('true');
+    await user.hover(toolbar);
+    await act(async () => { vi.mocked(PetModel).mock.calls.at(-1)![0].onHover?.(false); });
+    expect(toolbar.getAttribute('data-visible')).toBe('true');
+    await user.unhover(toolbar);
+    await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('false'));
+    expect(bridge.api.controlsVisible).toHaveBeenLastCalledWith(false);
+  });
+  it('does not render the standalone desktop pet name even with legacy names enabled', async () => {
+    await mount();
+    expect(screen.queryByText(defaultPreferences.petName)).toBeNull();
+  });
+
   it('confirms only the clicked completed/error bubble, retains working and shows explicit unsupported outcome', async () => {
     const user = userEvent.setup();
     const { bridge } = await mount({ observations: [
@@ -208,7 +229,7 @@ describe('App lifecycle and notices', () => {
     act(() => bridge.publishPreferences({ ...defaultPreferences, completed: false, error: false, petName: '小团子' }));
     await act(async () => {});
     expect(screen.queryByRole('button', { name: /已完成|发生错误/ })).toBeNull();
-    expect(screen.getByText('小团子')).toBeTruthy();
+    expect(screen.queryByText('小团子')).toBeNull();
     expect(bridge.snapshot().bubbles).toHaveLength(5);
   });
   it('subscribes before the initial request, keeps one StrictMode listener pair, and cleans up on unmount', async () => {

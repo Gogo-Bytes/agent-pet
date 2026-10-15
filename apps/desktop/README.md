@@ -2,6 +2,19 @@
 
 当前范围、进度与下一步见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。此页开发命令不是安装许可；完整真实端到端仍待验收，managed 入口仍关闭。
 
+## Desktop overlay refinement (2026-10-15)
+
+Desktop App uses one R3F Canvas with mesh hover events. The overlay has no pet-name
+label; the legacy stored `names` key remains readable for schema compatibility.
+The compact glass toolbar waits for Main's native mouse-region acknowledgement,
+keeps a short model-to-controls handoff, and releases on blur/hide/unmount.
+Main owns hit testing and applies the macOS nonactivating panel/workspace/topmost
+policy on show/restore. Other apps' full-screen/Spaces behavior needs native acceptance.
+
+The new package is staged, not substituted for the running user app, so its pi
+receiver stays intact. Commands, screenshots and native automation limits:
+[overlay evidence](../../docs/DESKTOP-OVERLAY-REFINEMENT-ACCEPTANCE.md).
+
 ## Local macOS packaging (M5)
 
 The authorized local packaging path uses `electron-builder@26.15.3` and the existing

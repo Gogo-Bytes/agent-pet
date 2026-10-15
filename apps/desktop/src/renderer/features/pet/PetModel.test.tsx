@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { create, act, type ReactThreeTest } from '@react-three/test-renderer';
 import { Bounds, useGLTF } from '@react-three/drei';
 import { useThree, type RootState } from '@react-three/fiber';
-import { Box3, Mesh, Vector3, type Group, type AnimationClip } from 'three';
+import { Box3, Mesh, Raycaster, Vector2, Vector3, type Group, type AnimationClip } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PetModel } from './PetModel.js';
 import { bundledAnimationBounds } from './bundled-animation-bounds.js';
@@ -32,16 +32,35 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
   let state!: RootState;
   function Probe() { state = useThree(); return null; }
   const ready = vi.fn();
+  const hover = vi.fn();
   const tree = (value: PetMotion, visible = true) => <StrictMode><Activity mode={visible ? 'visible' : 'hidden'}><Probe /><Bounds margin={1.2} maxDuration={0}>
-    <PetModel motion={value} reduced={reduced} onReady={ready} />
+    <PetModel motion={value} reduced={reduced} onReady={ready} onHover={hover} />
   </Bounds></Activity></StrictMode>;
   const view = await create(tree(motion), { width: size, height: size, camera: { fov: 35, position: [0, 0, 5] } });
   mounted.push(view);
   const root = state.scene.getObjectByName('Pet')!;
-  return { view, root, state, ready, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
+  return { view, root, state, ready, hover, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
 }
 
 describe('PetModel bundled animation behavior', () => {
+  it('raycasts the real GLB instead of its transparent canvas corners and clears hover on teardown', async () => {
+    const { view, state, hover } = await mount();
+    await view.advanceFrames(2, .016);
+    state.scene.updateMatrixWorld(true); state.camera.updateMatrixWorld();
+    const ray = new Raycaster();
+    ray.setFromCamera(new Vector2(0, 0), state.camera);
+    expect(ray.intersectObjects(state.scene.children, true).length).toBeGreaterThan(0);
+    ray.setFromCamera(new Vector2(.99, .99), state.camera);
+    expect(ray.intersectObjects(state.scene.children, true)).toHaveLength(0);
+    const target = view.scene.findByProps({ name: 'pet-pointer-target' });
+    await view.fireEvent(target, 'pointerOver', { stopPropagation: vi.fn() });
+    expect(hover).toHaveBeenLastCalledWith(true);
+    await view.fireEvent(target, 'pointerOut', {});
+    expect(hover).toHaveBeenLastCalledWith(false);
+    await view.unmount(); mounted.splice(mounted.indexOf(view), 1);
+    expect(hover).toHaveBeenLastCalledWith(false);
+  });
+
   it.each([
     ['idle', 0, .01], ['working', .06, .08], ['success', 0, .225], ['error', .05, 0],
   ] as const)('plays %s using the actual GLB clip', async (motion, x, y) => {

@@ -49,6 +49,7 @@ export function createPetBridgeDouble(options: Options = {}) {
       layoutListeners.add(registration);
       return () => { layoutListeners.delete(registration); };
     }),
+    controlsVisible: vi.fn(async (_visible: boolean) => {}),
     bubblesExpanded: vi.fn(async (_expanded: boolean) => {}),
     bubblesVisible: vi.fn(async (_visible: boolean) => {}),
     interaction: vi.fn(async (_active: boolean) => {}),

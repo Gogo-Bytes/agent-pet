@@ -12,8 +12,8 @@ export function layoutOverlay(anchor: Rect, area: Rect): OverlayLayout {
   const onTop = above >= 72 || above >= below;
   const height = Math.max(0, Math.min(204, onTop ? above : below));
   const bubbles = { x, y: onTop ? pet.y - height - 12 : pet.y + size + 12, width, height };
-  const toolbar = { x: clamp(pet.x + (size - 116) / 2, area.x, area.x + area.width - 116),
-    y: onTop ? pet.y + size + 6 : pet.y - 44, width: 116, height: 38 };
+  const toolbar = { x: clamp(pet.x + (size - 96) / 2, area.x, area.x + area.width - 96),
+    y: onTop ? pet.y + size + 6 : pet.y - 50, width: 96, height: 44 };
   const left = Math.max(area.x, Math.floor(Math.min(pet.x, bubbles.x, toolbar.x)) - 6);
   const top = Math.max(area.y, Math.floor(Math.min(pet.y, bubbles.y, toolbar.y)) - 6);
   const right = Math.min(area.x + area.width, Math.ceil(Math.max(pet.x + size, bubbles.x + width, toolbar.x + toolbar.width)) + 6);

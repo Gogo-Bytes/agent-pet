@@ -39,6 +39,7 @@ window.pet = {
     layouts.add(wrapped);
     return () => { layouts.delete(wrapped); };
   },
+  controlsVisible: async () => {},
   bubblesExpanded: async () => {}, bubblesVisible: async () => {},
   interaction: async () => {}, moveWindowBy: async () => {}, resizeWindowBy: async () => {},
 };

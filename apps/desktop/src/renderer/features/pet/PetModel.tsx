@@ -9,7 +9,7 @@ import { bundledAnimationBounds } from './bundled-animation-bounds.js';
 const animations = { idle: 'Idle', working: 'Work', success: 'Success', error: 'Error' };
 const statuses = { working: 'working', success: 'completed-unread', error: 'error-unread' } as const;
 
-export function PetModel({ motion, reduced = false, onReady }: { reduced?: boolean; motion: PetMotion; onReady: (message: string) => void }) {
+export function PetModel({ motion, reduced = false, onReady, onHover }: { reduced?: boolean; motion: PetMotion; onReady: (message: string) => void; onHover?: (hovered: boolean) => void }) {
   // No decoder/CDN needed by this local, uncompressed asset.
   const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(starterUrl, false, false);
   if (!gltf.animations.some(clip => clip.name === animations.idle)) throw new Error('Required Idle clip is missing');
@@ -38,5 +38,8 @@ export function PetModel({ motion, reduced = false, onReady }: { reduced?: boole
   useEffect(() => {
     onReady('');
   }, [onReady]);
-  return <primitive object={root} dispose={null} />;
+  useEffect(() => () => onHover?.(false), [onHover]);
+  return <group name="pet-pointer-target" onPointerOver={event => { event.stopPropagation(); onHover?.(true); }} onPointerOut={() => onHover?.(false)}>
+    <primitive object={root} dispose={null} />
+  </group>;
 }

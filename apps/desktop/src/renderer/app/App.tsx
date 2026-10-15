@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import type { PetStore } from './bridge/pet-store.js';
 import { PetCanvas } from '../features/pet/PetCanvas.js';
 import { BubbleStack } from '../features/session-bubbles/BubbleStack.js';
@@ -8,10 +8,19 @@ import { useSessionNotice } from '../features/notifications/use-session-notice.j
 import { glassSurfaceClass } from '../shared/ui/GlassSurface.js';
 import noticeStyles from '../features/notifications/Notice.module.css';
 
+function subscribeVisibility(listener: () => void) {
+  document.addEventListener('visibilitychange', listener);
+  return () => document.removeEventListener('visibilitychange', listener);
+}
+const isVisible = () => !document.hidden;
+
 export function App({ store }: { store: PetStore }) {
   const { sessions, layout, error, preferences } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const visible = useSyncExternalStore(subscribeVisibility, isVisible);
   const [hidden, setHidden] = useState(false);
+  const [petHovered, setPetHovered] = useState(false);
   const [modelNotice, setModelNotice] = useState('');
+  useEffect(() => { if (!visible) setPetHovered(false); }, [visible]);
   const { message, openSession } = useSessionNotice(store.bridge);
   const above = layout && layout.bubbles.y < layout.pet.y;
   const noticeStyle: CSSProperties = layout ? {
@@ -20,10 +29,10 @@ export function App({ store }: { store: PetStore }) {
     bottom: above ? layout.bounds.height - layout.bubbles.y - layout.bubbles.height + 4 : 'auto',
   } : {};
   return <>
-    <PetCanvas store={store} rect={layout?.pet} onNotice={setModelNotice} />
+    <PetCanvas visible={visible} store={store} rect={layout?.pet} onNotice={setModelNotice} onHover={setPetHovered} />
     <BubbleStack bridge={store.bridge} state={{ ...sessions, bubbles: sessions.bubbles.filter(bubble => bubble.status === 'working' || (bubble.status === 'completed-unread' ? preferences.completed : preferences.error)) }} layout={layout} hidden={hidden || !preferences.bubbles} reducedMotion={preferences.reduced} onOpen={openSession} />
-    <Toolbar bridge={store.bridge} layout={layout} hidden={hidden} onToggle={() => setHidden(value => !value)} />
-    {preferences.names && <span style={{ position: 'absolute', left: layout?.pet.x, top: (layout?.pet.y ?? 0) + (layout?.pet.height ?? 140) - 16, width: layout?.pet.width, textAlign: 'center', fontSize: 12, color: '#575277', pointerEvents: 'none' }}>{preferences.petName}</span>}
+    <Toolbar pageVisible={visible} bridge={store.bridge} layout={layout} engaged={petHovered || !!modelNotice} hidden={hidden} onToggle={() => setHidden(value => !value)} />
+
     <p className={`pet-notice ${noticeStyles.notice} ${glassSurfaceClass}`} role="status" style={noticeStyle}>{message ?? (error || modelNotice)}</p>
   </>;
 }

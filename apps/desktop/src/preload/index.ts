@@ -17,6 +17,7 @@ const petApi = {
     ipcRenderer.on('pet:preferences', handler);
     return () => ipcRenderer.removeListener('pet:preferences', handler);
   },
+  controlsVisible(visible: boolean): Promise<void> { return ipcRenderer.invoke('pet:controls-visible', visible); },
   bubblesExpanded(expanded: boolean): Promise<void> { return ipcRenderer.invoke('pet:bubbles-expanded', expanded); },
   // Actual committed bubble presence. Main retains the region until DOM removal,
   // and the renderer waits for true acknowledgement before revealing content.

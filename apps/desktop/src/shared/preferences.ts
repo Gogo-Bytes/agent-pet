@@ -13,6 +13,7 @@ export type Preferences = {
   startConsole: boolean;
   background: boolean;
   offline: boolean;
+  /** Legacy stored preference; desktop overlay no longer renders a name label. */
   names: boolean;
   topmost: boolean;
   bubbles: boolean;

@@ -13,7 +13,7 @@ const native = vi.hoisted(() => {
   const webContents = { mainFrame: frame, send: vi.fn(), setWindowOpenHandler: vi.fn(), on: vi.fn() };
   const window = {
     webContents, setBounds: vi.fn(), isDestroyed: () => false,
-    setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
+    isVisible: vi.fn(() => true), moveTop: vi.fn(), showInactive: vi.fn(), setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
     loadFile: vi.fn(), loadURL: vi.fn(), once: vi.fn(), show: vi.fn(), hide: vi.fn(),
     minimize: vi.fn(), maximize: vi.fn(), unmaximize: vi.fn(), isMaximized: vi.fn(() => false), close: vi.fn(),
     setIgnoreMouseEvents: vi.fn(), on: vi.fn(), focus: vi.fn(), isMinimized: () => false, restore: vi.fn(),
@@ -257,6 +257,21 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     expect(native.window.setBounds).toHaveBeenLastCalledWith(latestLayout().bounds);
   });
 
+  it('reapplies the current topmost choice on show and restore without focusing the pet', () => {
+    const show = native.window.on.mock.calls.find(([name]) => name === 'show')![1];
+    const restore = native.window.on.mock.calls.find(([name]) => name === 'restore')![1];
+    native.window.focus.mockClear(); native.window.moveTop.mockClear();
+    show(); restore();
+    expect(native.window.moveTop).toHaveBeenCalledTimes(2);
+    expect(native.window.focus).not.toHaveBeenCalled();
+    invoke('management:update-preferences', { topmost: false }, {
+      sender: native.management!.webContents, senderFrame: native.management!.webContents.mainFrame,
+    });
+    native.window.moveTop.mockClear(); show(); restore();
+    expect(native.window.setAlwaysOnTop).toHaveBeenLastCalledWith(false, 'screen-saver');
+    expect(native.window.moveTop).not.toHaveBeenCalled();
+  });
+
   it('returns snapshot and authoritative layout through request-snapshot', () => {
     native.publish!(piObservation());
     native.webContents.send.mockClear();
@@ -268,7 +283,9 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
   it('hits pet/toolbar, only visible populated bubbles, and reserves the expanded region', async () => {
     const layout = latestLayout();
     pointAt(layout.pet); expectHit(true);
-    pointAt(layout.toolbar); expectHit(true);
+    pointAt(layout.toolbar); expectHit(false);
+    invoke('pet:controls-visible', true); expectHit(true);
+    invoke('pet:controls-visible', false); expectHit(false);
     pointAt(layout.bubbles); expectHit(false); // no session bubbles
     native.publish!(piObservation({ status: 'completed' }));
     invoke('pet:bubbles-visible', true); // renderer has prepared presentation
@@ -320,6 +337,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     invoke('pet:bubbles-visible', true);
     invoke('pet:bubbles-expanded', true);
     invoke('pet:interaction', true);
+    invoke('pet:controls-visible', true);
     const listener = native.webContents.on.mock.calls.find(([name]) => name === event)?.[1];
     expect(listener).toBeTypeOf('function');
     listener();
@@ -333,7 +351,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     for (const event of [{ sender: {}, senderFrame: native.webContents.mainFrame },
       { sender: native.webContents, senderFrame: {} }]) {
       expect(() => invoke('pet:move-window-by', { x: 1, y: 1 }, event)).toThrow('Untrusted renderer');
-      for (const channel of ['pet:bubbles-visible', 'pet:bubbles-expanded', 'pet:interaction']) {
+      for (const channel of ['pet:bubbles-visible', 'pet:bubbles-expanded', 'pet:controls-visible', 'pet:interaction']) {
         expect(() => invoke(channel, true, event)).toThrow('Untrusted renderer');
       }
     }
@@ -342,7 +360,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
         expect(() => invoke(channel, value)).toThrow('Invalid delta');
       }
     }
-    for (const channel of ['pet:bubbles-expanded', 'pet:bubbles-visible', 'pet:interaction']) {
+    for (const channel of ['pet:bubbles-expanded', 'pet:bubbles-visible', 'pet:controls-visible', 'pet:interaction']) {
       expect(() => invoke(channel, 'true')).toThrow(TypeError);
     }
     expect(latestLayout()).toBe(layout);
@@ -414,13 +432,13 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     expect(native.start).toHaveBeenCalledOnce();
     invoke('management:update-preferences', { petVisible: false, petSize: 220 }, managementEvent());
     expect(native.window.hide).toHaveBeenCalled(); expect(latestLayout().pet.width).toBe(220);
-    native.window.show.mockClear(); native.window.hide.mockClear();
+    native.window.showInactive.mockClear(); native.window.hide.mockClear();
     invoke('pet:resize-window-by', { x: 10, y: 10 });
-    expect(native.window.show).not.toHaveBeenCalled(); expect(native.window.hide).not.toHaveBeenCalled();
+    expect(native.window.showInactive).not.toHaveBeenCalled(); expect(native.window.hide).not.toHaveBeenCalled();
     const saved = JSON.parse(readFileSync(join(native.path, 'preferences.json'), 'utf8'));
     expect(saved).toEqual({ ...defaultPreferences, petVisible: false, petSize: 230 });
     invoke('management:update-preferences', { petVisible: true }, managementEvent());
-    expect(native.window.show).toHaveBeenCalled();
+    expect(native.window.showInactive).toHaveBeenCalled();
     native.appEvents.get('window-all-closed')!(); expect(native.quit).not.toHaveBeenCalled();
   });
   it('does not reshow management when closed before ready-to-show', () => {
@@ -499,7 +517,7 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     await import('./index.js');
     expect(latestLayout().pet.width).toBe(260);
     native.window.once.mock.calls.find(([event]) => event === 'ready-to-show')![1]();
-    expect(native.window.show).not.toHaveBeenCalled(); expect(native.window.hide).toHaveBeenCalled();
+    expect(native.window.showInactive).not.toHaveBeenCalled(); expect(native.window.hide).toHaveBeenCalled();
     expect(invoke('management:get-state', undefined, managementEvent())).toMatchObject({ preferences: { petVisible: false, petSize: 260 } });
   });
   it('failed toolbar persistence retains geometry and opens management with the error', () => {

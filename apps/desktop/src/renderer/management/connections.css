@@ -37,7 +37,9 @@
 .cfg-detail{width:100%;min-width:0;animation:menu-appear .2s ease-out}
 .cfg-identity{display:grid;grid-template-columns:48px minmax(0,1fr) 36px;align-items:center;gap:12px 14px;padding:0 0 12px;position:relative}
 .cfg-identity>.menu-agent-mark{width:48px;height:48px;border-radius:12px}.cfg-identity>.menu-agent-mark>.ui-icon{width:26px;height:26px}
-.cfg-identity-name{min-width:0}.cfg-type{display:block;color:#7561b3;font-size:16px;line-height:1.5;margin-bottom:4px;font-weight:650}
+.cfg-identity-name{min-width:0}.cfg-type{display:block;color:#7561b3;font-size:16px;line-height:1.5;margin:0;font-weight:650}
+.cfg-identity-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px}.cfg-identity-meta .cfg-status-badge{flex:none}
+.cfg-receiving:has(>.cfg-deployment[data-quiet=true]){padding:0}
 .cfg-identity h2{margin:0;font-size:24px;font-weight:750;letter-spacing:-.5px;line-height:1.35;overflow-wrap:anywhere}
 .cfg-icon-button{display:grid;place-items:center;width:40px;height:40px;border:1px solid transparent;background:transparent;color:#8a76b7;border-radius:10px;flex:none}.cfg-icon-button:hover{background:#e6ddff;border-color:#a38be0;color:var(--menu-accent)}
 .cfg-icon-button[hidden]{display:none}.cfg-identity.is-editing .cfg-identity-name h2{font-size:21px}.cfg-inline-name{grid-column:1/-1;min-width:0;width:min(520px,100%);margin:6px 0 12px}
@@ -121,11 +123,11 @@
 /* Identity and status lead; maintenance actions stay behind one disclosure. */
 .cfg-connection-status{display:flex;align-items:center;justify-content:space-between;gap:24px;width:100%}
 .cfg-connection-status>div{min-width:0;flex:1}
-.cfg-connection-status h3{display:inline-flex;align-items:center;gap:7px;margin:0;padding:4px 9px;border-radius:6px;background:#eeebf5;font-size:12px;line-height:1.5;font-weight:600;color:#797087}
+.cfg-status-badge{display:inline-flex;align-items:center;gap:7px;margin:0;padding:4px 9px;border-radius:6px;background:#eeebf5;font-size:12px;line-height:1.5;font-weight:600;color:#797087}
 .cfg-status-dot{width:6px;height:6px;flex:none;border-radius:50%;background:currentColor}
 .cfg-connection-status p{margin:10px 0 0;color:var(--menu-muted);font-size:12px;line-height:1.8;max-width:660px}
 .cfg-connection-status>.cfg-primary{flex:none;min-width:108px;white-space:nowrap}
-.cfg-connection-online h3{color:#437a61;background:#e5efe9}.cfg-connection-waiting h3{color:#867043;background:#f3efdf}.cfg-connection-error h3{color:#9d4b6b;background:#f5e8ee}
+.cfg-status-badge.cfg-connection-online{color:#437a61;background:#e5efe9}.cfg-status-badge.cfg-connection-waiting{color:#867043;background:#f3efdf}.cfg-status-badge.cfg-connection-error{color:#9d4b6b;background:#f5e8ee}
 .cfg-connection-notice{width:100%;color:#8c4e68;font-size:12px;line-height:1.8}.cfg-connection-notice details{margin-top:8px}
 .cfg-operation-help{width:100%;color:var(--menu-muted)}.cfg-operation-help summary,.cfg-connection-notice summary{cursor:pointer;color:#76658f;font-size:12px}.cfg-operation-help p{margin-top:10px}
 .cfg-more-options{border-top:1px solid var(--menu-line)}
@@ -140,7 +142,7 @@
 .cfg-options-body>.cfg-option-row:not(:first-child){border-top:1px solid var(--menu-line)}
 .cfg-options-body .cfg-delete{background:transparent;border-color:transparent;font-size:12px;min-height:36px;padding:7px 12px}.cfg-options-body .cfg-delete:hover{background:#f4e2ec;border-color:#dfbbcf}
 @media(max-width:700px){.cfg-connection-status{align-items:flex-start;flex-direction:column;gap:16px}.cfg-connection-status>.cfg-primary{min-height:44px}.cfg-option-row{gap:14px}.cfg-option-row strong{flex-wrap:wrap;gap:4px 8px}.cfg-location-path code{font-size:11px}}
-@media(forced-colors:active){.cfg-connection-status h3,.cfg-connection-status p,.cfg-connection-notice,.cfg-more-options>summary,.cfg-option-row strong,.cfg-option-row p,.cfg-position-result,.cfg-location-path code{color:CanvasText}.cfg-connection-status h3{background:Canvas;border:1px solid CanvasText}}
+@media(forced-colors:active){.cfg-status-badge,.cfg-connection-status p,.cfg-connection-notice,.cfg-more-options>summary,.cfg-option-row strong,.cfg-option-row p,.cfg-position-result,.cfg-location-path code{color:CanvasText}.cfg-status-badge{background:Canvas;border:1px solid CanvasText}}
 
 /* Short confirmations size to their contents; only the body scrolls when necessary. */
 .cfg-compact-dialog{width:min(480px,calc(100vw - 32px))}.cfg-compact-dialog .cfg-dialog-body{height:auto;flex:0 1 auto;padding:20px 26px 24px;font-size:13px}.cfg-compact-dialog .cfg-dialog-body>p:first-child{margin-top:0}.cfg-compact-dialog .cfg-dialog-body>details{margin-top:16px}.cfg-compact-dialog .cfg-dialog-title h2{font-size:20px}

@@ -98,3 +98,9 @@ Main亲自重开 **42/42** 场景，并实测窄窗、480px 矮窗、取消、Es
 首轮全量中，未改动的 managed/frames.test.ts 在 performance.now()+500 的令牌补充边界断言失败。隔离该文件 **20 passed**，有界全量复验通过；没有为通过 UI 阶段更改限流/guard 代码或删减测试。原失败与最终结果分别保留 `/tmp/agent-pet-connection-feedback-tests.log`、`/tmp/agent-pet-connection-feedback-tests-final.log`。此处只记录证据，不宣称已修复该潜在时钟精度问题。
 
 实际正式 React 组件 + 独立示例数据截图：[编辑](screenshots/connection-polish/rename-wide.png)、[窄窗编辑](screenshots/connection-polish/rename-narrow.png)、[雷达](screenshots/connection-polish/radar.png)、[读取确认](screenshots/connection-polish/detected.png)、[文件冲突](screenshots/connection-polish/preview-blocked.png)、[移除弹窗](screenshots/connection-polish/removal.png)。没有日常 pi 读写、部署、重载、依赖安装、实际应用切换或新打包；用户视觉确认、真实接入及发布仍分开验收。
+
+### 类型与连接状态同行（2026-10-15）
+
+名称为主标题，下一行并列 Agent 类型与连接状态；不在下方再次渲染同一个状态标签。Identity 与 DeploymentControls 消费原 connectionSummary，同一状态节点 ref 用于预览结束后的回焦，不新增业务状态。没有可执行操作的在线说明区不占视觉留白。
+
+正式 Renderer 示例中，宽窗和 388px 窄窗的类型/状态中心差均为 0；状态标题只出现一次。实际点击预览确认后，焦点落到同行的“等待 pi”；管理页 **33 tests**、typecheck、desktop build（本轮 package 内）通过。截图：[同行信息](screenshots/bubble-shape/connection-meta.png)。未操作真实 pi、重启应用或扩大接入范围；用户视觉确认继续按 demo 反馈。

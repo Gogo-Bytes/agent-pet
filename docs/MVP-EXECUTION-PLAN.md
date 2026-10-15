@@ -110,6 +110,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 用户继续标注的 14/18/23/27/41 场景已修订：名称编辑采用独立输入区域/计数/单一焦点样式，类型字号增大；扫描为可减少动画的装饰雷达；读取确认和文件冲突默认短文案，完整范围可展开；移除改为有界确认弹窗，取消回焦、失败保留、确认中不误关闭。42 个演示场景复验、全量 **692 passed / 1 skipped / 71 files**、最终管理页 **33 tests**、typecheck、desktop build 和 demo build 通过。截图、首轮无关时钟边界失败及复验记录见 [详情记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 最新修订。未修改 Main/Adapter/guard、未替换运行中应用或操作真实 pi；正式 UI 仍由用户逐页确认。
 
+按用户标注，连接名称下方的 Agent 类型与在线状态已合为一行，状态只渲染一次；预览结束回焦仍指向同一个真实状态节点。宽/窄同排居中差为 0，浏览器实际确认后焦点落在“等待 pi”；管理页 33 tests、typecheck、desktop build（package 内）通过。详见 [连接页记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 最新修订，当前应用与真实 pi 未操作。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

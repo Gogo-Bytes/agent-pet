@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { AgentConfiguration, ConfigurationsState } from '../../shared/configurations.js';
 import type { PreflightState } from '../../shared/pi-preflight.js';
 import { findingText } from '../../shared/pi-preflight.js';
-import { findingSummary } from './connection-copy.js';
+import { connectionSummary, findingSummary } from './connection-copy.js';
 import type { ManagementBridge } from './management-store.js';
 import { Icon, type IconName } from './components/icons.js';
 import { GlassButton } from '../shared/ui/Glass.js';
@@ -34,13 +34,14 @@ function DetectedPiResult({ path, installations, existing, busy, onSelect }: {
   </article>;
 }
 
-function Identity({ record, onRename, busy }: { record: AgentConfiguration; onRename: (name: string) => Promise<boolean>; busy: boolean }) {
+function Identity({ record, onRename, busy, statusRef }: { record: AgentConfiguration; onRename: (name: string) => Promise<boolean>; busy: boolean; statusRef: RefObject<HTMLHeadingElement | null> }) {
   const [editing, setEditing] = useState(false);
+  const summary = connectionSummary(record.connection);
   const [name, setName] = useState(record.name);
   const trigger = useRef<HTMLButtonElement>(null);
   function cancel() { setEditing(false); requestAnimationFrame(() => trigger.current?.focus()); }
   return <div className={`cfg-identity ${editing ? 'is-editing' : ''} ${record.name.length > 18 ? 'is-long' : ''}`}>
-    <AgentMark record={record} /><div className="cfg-identity-name"><span className="cfg-type">{providerLabels[record.provider]}</span><h2 tabIndex={-1}>{editing ? '修改名称' : record.name}</h2></div>
+    <AgentMark record={record} /><div className="cfg-identity-name"><h2 tabIndex={-1}>{editing ? '修改名称' : record.name}</h2><div className="cfg-identity-meta"><span className="cfg-type">{providerLabels[record.provider]}</span><h3 ref={statusRef} tabIndex={-1} className={`cfg-status-badge cfg-connection-${summary.tone}`}><span className="cfg-status-dot" aria-hidden="true" />{summary.title}</h3></div></div>
     <button ref={trigger} hidden={editing} className="cfg-icon-button" aria-label="重命名" disabled={busy} onClick={() => { setName(record.name); setEditing(true); }}><Icon name="edit" /></button>
     {editing && <form className="cfg-inline-name" onSubmit={event => { event.preventDefault(); if (name.trim() && !busy) void onRename(name).then(saved => { if (saved) cancel(); }); }}>
       <TextField autoFocus id="config-name" label="配置名称" maxLength={40} value={name} error={!name.trim() ? '请输入名称，最多 40 个字。' : undefined} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); cancel(); } }} />
@@ -63,6 +64,7 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
   const [setupConsent, setSetupConsent] = useState<{ installationId: string; targetPath: string } | null>(null);
   const generation = useRef(0);
   const main = useRef<HTMLElement>(null);
+  const statusHeadingRef = useRef<HTMLHeadingElement>(null);
   const removedFocus = useRef(false);
   const records = state?.records ?? [];
   const detected = scan?.installations.filter(value => value.compatibility === 'verified-0.85.1') ?? [];
@@ -96,8 +98,8 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
         <header className="cfg-library-head"><div><h1 tabIndex={-1}>我的连接 <span>{records.length.toString().padStart(2, '0')}</span></h1><p>添加或管理你的 Agent。</p></div><div className="cfg-add-actions"><button className="cfg-scan-button" disabled={busy} onClick={() => void detect()}><Icon name="scan" />自动扫描</button><GlassButton className="cfg-manual-button" aria-label="手动添加" disabled={busy} onClick={() => setManual(null)}><Icon name="plus" size={23} /></GlassButton></div></header>
         <div className="cfg-library-body"><nav className="cfg-index" aria-label="已添加连接"><span className="cfg-index-label">已添加</span>{records.map(record => <button key={record.id} data-config={record.id} aria-label={`${record.name} ${providerLabels[record.provider]}，${labels[record.availability]}`} aria-pressed={current?.id === record.id} onClick={() => { setSelected(record.id); setPage('agent'); }}><AgentMark record={record} /><span><strong>{record.name}</strong><small>{providerLabels[record.provider]}</small></span>{['attention', 'unsupported'].includes(record.availability) && <span className={`cfg-index-state ${record.availability === 'unchecked' ? 'cfg-unchecked' : ''}`}>{record.availability === 'unsupported' ? '未支持' : '需处理'}</span>}</button>)}</nav>
           <div className="cfg-content-scroll">{current ? <section className="cfg-detail" key={current.id}><button className="cfg-text-button cfg-mobile-back" onClick={() => setPage('library')}><Icon name="left" />我的连接</button>
-            <Identity record={current} busy={busy} onRename={name => run(() => bridge.configurations.rename(current.id, name))} />
-            <section className="cfg-receiving" aria-label="连接状态"><DeploymentControls visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} /></section>
+            <Identity record={current} statusRef={statusHeadingRef} busy={busy} onRename={name => run(() => bridge.configurations.rename(current.id, name))} />
+            <section className="cfg-receiving" aria-label="连接状态"><DeploymentControls statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} /></section>
             <section className="cfg-location" aria-label="配置位置"><span className="cfg-section-label">配置文件夹</span><div className="cfg-location-path"><span className="cfg-folder-emblem"><Icon name="folder" size={20} /></span><code id="config-target-path" title={current.targetPath}>{current.targetPath}</code></div></section>
             <details className="cfg-more-options" open={current.availability === 'attention' || current.connection?.status === 'failed'}>
               <summary>更多操作<Icon name="down" /></summary>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { AgentConfiguration, ConfigurationsState, ConfigurationsApi } from '../../shared/configurations.js';
 import { type Finding, findingText } from '../../shared/pi-preflight.js';
 import { connectionNoticeText, connectionSummary, findingSummary, noticeText } from './connection-copy.js';
@@ -11,13 +11,13 @@ const previewProblems: Record<Finding, string> = {
   budget: '检查未完成', 'platform-unknown': '暂不支持这个系统',
 };
 
-export function DeploymentControls({ record, api, run, busy, visible = true }: { visible?: boolean; record: AgentConfiguration; api: ConfigurationsApi; run: (action: () => Promise<ConfigurationsState>) => Promise<boolean>; busy: boolean }) {
+export function DeploymentControls({ record, api, run, busy, visible = true, statusHeadingRef }: { statusHeadingRef: RefObject<HTMLHeadingElement | null>; visible?: boolean; record: AgentConfiguration; api: ConfigurationsApi; run: (action: () => Promise<ConfigurationsState>) => Promise<boolean>; busy: boolean }) {
   const state = record.connection;
   const summary = connectionSummary(state);
   const disabled = busy || !!state?.busy;
   const configureButton = useRef<HTMLButtonElement>(null);
   const previewHeading = useRef<HTMLHeadingElement>(null);
-  const statusHeading = useRef<HTMLHeadingElement>(null);
+  const statusHeading = statusHeadingRef;
   const previousPreview = useRef<string | null>(null);
   const previewId = state?.preview?.id ?? null;
   const pendingFocus = useRef<'preview' | 'return' | null>(null);
@@ -36,9 +36,10 @@ export function DeploymentControls({ record, api, run, busy, visible = true }: {
   }, [previewId, visible, disabled]);
   const resumeLabel = state?.saved === 'disabled' ? '继续连接' : '重新连接';
   const routineNotice = !state || ['none', 'resume-required', 'disabled', 'stopped'].includes(state.notice);
-  return <div className="cfg-deployment">
+  const quiet = summary.tone === 'online' && routineNotice && !state?.canResume && !state?.canConfigure && !state?.preview;
+  return <div className="cfg-deployment" data-quiet={quiet}>
     <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>
-      <div><h3 ref={statusHeading} tabIndex={-1}><span className="cfg-status-dot" aria-hidden="true" />{summary.title}</h3><p className={summary.tone === 'online' || state?.preview ? 'cfg-sr-only' : undefined}>{summary.description}</p></div>
+      <div><p className={summary.tone === 'online' || state?.preview ? 'cfg-sr-only' : undefined}>{summary.description}</p></div>
       {state?.canResume && <button className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{disabled ? '请稍候…' : resumeLabel}</button>}
       {state?.canConfigure && !state.preview && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>设置连接</button>}
     </div>

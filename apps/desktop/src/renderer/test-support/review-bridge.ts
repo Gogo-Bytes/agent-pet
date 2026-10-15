@@ -13,7 +13,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   const stateListeners = new Set<(value: ManagementState) => void>();
   const configListeners = new Set<(value: ConfigurationsState) => void>();
   const sessionListeners = new Set<(value: SessionState) => void>();
-  const paths = scenario === 'scan-saved' ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
+  const paths = scenario === 'detail-long-path' ? [`/test/AgentPet/${'a-very-long-project-directory/'.repeat(12)}pi-config`] : scenario === 'scan-saved' ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
   if (scenario !== 'empty' && scenario !== 'scan-new') paths.forEach((path, index) => {
     const id = `review-${index}`;
     const record: ConfigurationMetadata = { id, name: scenario === 'scan-saved' ? 'pi 默认配置' : index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };

@@ -37,3 +37,12 @@
 `/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-3Rj8PS/mac-arm64/Agent Pet.app`
 
 源码和新版包已完成，当前运行版本尚未切换；切换时需正常退出旧 Agent Pet、替换并重开，再在连接页明确恢复已保存接收。原型认可、此次正式 UI 检查、用户实际在线反馈及发布验收保持各自范围。设置实机停点仍未完成，无新增依赖、Provider 或资产。
+
+## 后续路径显示修订（2026-10-15）
+
+用户明确要求此处配置路径不要换行。现在详情中的配置路径使用单行末尾省略，右侧“更换位置”保持完整；完整384字符测试路径保留在 DOM、原生 title 和按钮 aria-describedby 中。当前规则覆盖前文历史截图中的路径换行表现，不改变真实路径或提交参数。
+
+正式 Renderer/test bridge 在390×844及1280×800实测：路径高度分别约19.2/20.8px，与单行行高相等；scrollWidth大于clientWidth并呈省略号，文档宽度等于窗口宽度，操作按钮完整可见。悬停提示通过完整title属性核对，未将其当原生系统tooltip的截图验收。既有28项管理页测试、typecheck和desktop build通过。此次增量没有重新打包，前述3Rj8PS包属于平铺布局阶段，尚不包含此路径修订；当前运行应用保持不变。
+
+- [窄窗单行路径](screenshots/connection-detail-flat/renderer-path-ellipsis-narrow.png)
+- [宽窗单行路径](screenshots/connection-detail-flat/renderer-path-ellipsis-wide.png)

@@ -46,3 +46,33 @@
 
 - [窄窗单行路径](screenshots/connection-detail-flat/renderer-path-ellipsis-narrow.png)
 - [宽窗单行路径](screenshots/connection-detail-flat/renderer-path-ellipsis-wide.png)
+
+
+## 后续修订：先看连接，文案说清下一步（2026-10-15）
+
+用户反馈连接页文字过于专业、操作不好理解。本轮保留平铺详情、四页外框、单行路径及原有连接规则，调整信息顺序和连接相关页面/弹窗文案。
+
+- 页面先显示真正的连接状态与下一步。“位置未检查”不再作为醒目警告或挤占左侧名称；位置检查默认收起，有检查问题时展开。检查文件夹可用不会把连接显示为在线。
+- 主操作改为“重新连接”“继续连接”“暂停连接”。等待pi时说明打开pi或空闲时输入`/reload`；暂停不会关闭pi，连接文件保留。已暂停时不再重复显示暂停按钮。
+- “监听、私有保存记录、部署关系、选择性撤回”等实现用语移出默认阅读内容，普通说明直接解释文件保留、是否影响pi和下一步。完整检查范围、文件权限、技术原因及重启限制仍可展开查看。
+- 新文件仍须经过独立预览和“确认并连接”；精确路径、要创建的文件夹、不覆盖已有文件、不更改pi设置和不自动启动/重载仍明示。无法确认或被改动的文件仍受原Main规则保护。
+- 已有连接文件的位置暂不能直接更换：按钮明确不可用，提示先移除此连接再添加新位置，路径正文保持可读。移除仍单独确认，解释只处理本产品连接文件及未知/改动文件保留，不删除Agent程序或用户文件。
+- 打开预览后焦点进入标题，取消回到设置按钮；确认后回到连接状态。Main可能先推送取消结果、稍后返回操作结果，回焦会等按钮可用，隐藏页面和已卸载节点不抢焦点。
+
+验证：全量`pnpm test` **691 passed / 1 skipped / 71 files**；`pnpm typecheck`和`pnpm package:mac`（含`pnpm --filter @agent-pet/desktop build`）通过。日志`/tmp/agent-pet-connection-friendly-{full-tests,package}.log`。单独相关39项与最终管理页32项曾分别通过，最终全量覆盖全部新增行为；没有更改或删除pi部署/撤回/数据保留/managed guard测试。
+
+新增回归覆盖：保存的连接在未检查位置时仍显示重新连接、不会打开页面就恢复；接收等待/在线/未知与位置可用分别表达；暂停API仅作用于当前配置；独立写入确认、同名文件阻止；启动失败提供重启或移除的实际入口；过期预览只说明本次未新增，不否定已有文件；取消状态先推送、操作回复延迟时仍能回焦。原取消double已按真实行为清除当前ID的preview，未以修改断言掩盖错误。
+
+独立Review发现启动失败“重试”缺实际入口、过期提示否定已有文件及取消回复延迟回焦三处问题，均修正并覆盖；最终只读Review READY，不冒充独立全量运行或真实pi验收。
+
+Main亲自打开正式页面的隔离示例：1200×850待重新连接/等待pi/错误页；390×844详情入口、按钮、路径和默认折叠；1200×480内容滚动（scrollTop286.5，底部导航仍在431–475px）。位置检查后“位置可用”与“等待重新连接”保持独立；设置预览/取消实际AX确认焦点往返。384字符路径在390px下仍为nowrap+ellipsis，正文scrollWidth390，无页面横向溢出。示例路径均为`/test/AgentPet`，没有扫描或操作真实pi。
+
+![新版默认连接页](screenshots/connection-friendly/reconnect-wide.png)
+
+![窄窗口](screenshots/connection-friendly/reconnect-narrow.png)
+
+![等待pi时说明如何继续](screenshots/connection-friendly/waiting-wide.png)
+
+![错误提示及处理入口](screenshots/connection-friendly/error-wide.png)
+
+最新未签名arm64包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-jjC0hq/mac-arm64/Agent Pet.app`。本轮只生成新包，没有替换或重启正在运行的应用，没有读写日常pi配置/凭据、部署、重载、依赖安装或推送。正式UI用户认可、真实接入、原生窗口层级及发布仍分别验收。

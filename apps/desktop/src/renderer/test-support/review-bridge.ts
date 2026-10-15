@@ -13,14 +13,21 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   const stateListeners = new Set<(value: ManagementState) => void>();
   const configListeners = new Set<(value: ConfigurationsState) => void>();
   const sessionListeners = new Set<(value: SessionState) => void>();
-  const paths = scenario === 'detail-long-path' ? [`/test/AgentPet/${'a-very-long-project-directory/'.repeat(12)}pi-config`] : scenario === 'scan-saved' ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
+  const paths = scenario === 'detail-long-path' ? [`/test/AgentPet/${'a-very-long-project-directory/'.repeat(12)}pi-config`] : ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
   if (scenario !== 'empty' && scenario !== 'scan-new') paths.forEach((path, index) => {
     const id = `review-${index}`;
-    const record: ConfigurationMetadata = { id, name: scenario === 'scan-saved' ? 'pi 默认配置' : index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };
+    const record: ConfigurationMetadata = { id, name: ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? 'pi 默认配置' : index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };
     configs.records.push({ ...record, availability: 'available', inspection: { target: { path, source: 'chosen' }, findings: [] }, connection: { ...base, status: 'connected', receiving: 'active', saved: 'ready', canConfigure: false, canRemove: true, deployedPath: `${path}/extensions/agent-pet.ts` } });
     const sessionId = `${id}:pi:process:session`; configs.sessionConfigurations[sessionId] = id;
     sessions = applyObservation(sessions, { provider: 'pi', sessionId, status: index ? 'completed' : 'working', observedAt: '2026-10-14T00:00:00Z', agentName: record.name });
   });
+  if (['detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario)) {
+    configs.records = configs.records.map(record => ({ ...record, availability: 'unchecked', inspection: null,
+      connection: { ...record.connection!, status: scenario === 'detail-waiting' ? 'configured-waiting' : 'disconnected',
+        receiving: scenario === 'detail-waiting' ? 'active' : 'stopped', saved: scenario === 'detail-paused' ? 'disabled' : 'ready',
+        canResume: scenario !== 'detail-waiting', notice: scenario === 'detail-waiting' ? 'none' : 'resume-required' } }));
+    sessions = createSessionState();
+  }
   if (scenario === 'detail-error') configs.records = configs.records.map(record => ({ ...record, availability: 'attention',
     inspection: { target: { path: record.targetPath, source: 'chosen' }, findings: ['unreadable'] },
     connection: { ...base, status: 'failed', notice: 'preview-failed' } }));

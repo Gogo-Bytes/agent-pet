@@ -14,8 +14,8 @@ const notices: Record<ConfigurationsState['notice'], string> = {
   none: '', invalid: '输入无效，请检查名称和位置。', duplicate: '这个配置已添加，请选择其他位置。',
   'not-found': '配置已移除，请返回列表。', busy: '前一操作尚未完成，请稍后重试。',
   'save-failed': '配置保存失败，未确认更改。请检查应用数据目录权限与可用空间后重试。',
-  'saved-invalid': '保存记录无法安全读取，已停止操作。请保留原文件，查看桌面说明中的恢复边界。',
-  'withdraw-first': '请先选择性撤回并移除此配置，再添加新位置。', retained: '撤回未完成，配置与受保护文件已保留。返回详情查看原因，再重试或保留。',
+  'saved-invalid': '无法读取保存的连接信息，已停止操作。请保留原文件，重新打开应用后检查。',
+  'withdraw-first': '请先移除此连接，再重新添加新的文件夹。', retained: '连接还没有移除，记录和文件都已保留。请返回详情查看原因后重试。',
   unsupported: '此 Agent 接入尚未支持。', limit: '已达到配置数量上限，请移除不需要的配置。',
 };
 export function ManagementApp({ bridge = window.management }: { bridge?: ManagementBridge }) {

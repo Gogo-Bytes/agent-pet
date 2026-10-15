@@ -41,7 +41,7 @@ export function managementBridge(records: AgentConfiguration[] = [configuration(
       changeTarget: vi.fn(async (id: string, path: string) => changed(configs.records.map(record => record.id === id ? { ...record, targetPath: path } : record))),
       bindPet: vi.fn(async (id: string, pet: PetBinding | null) => changed(configs.records.map(record => record.id === id ? { ...record, pet } : record))),
       inspect: vi.fn(async (_id: string) => changed()), preview: vi.fn(async (_id: string) => changed()),
-      cancel: vi.fn(async (_id: string) => changed()), confirm: vi.fn(async (_id: string, _plan: string) => changed()),
+      cancel: vi.fn(async (id: string) => changed(configs.records.map(record => record.id === id && record.connection ? { ...record, connection: { ...record.connection, preview: null } } : record))), confirm: vi.fn(async (_id: string, _plan: string) => changed()),
       resume: vi.fn(async (_id: string) => changed()), disable: vi.fn(async (_id: string) => changed()),
       remove: vi.fn(async (id: string) => changed(configs.records.filter(record => record.id !== id))),
       subscribe: vi.fn((listener: (state: ConfigurationsState) => void) => { configurations.add(listener); return () => { configurations.delete(listener); offConfigs(); }; }),

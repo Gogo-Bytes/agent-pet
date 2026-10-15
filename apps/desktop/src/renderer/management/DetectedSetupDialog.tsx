@@ -41,15 +41,15 @@ export function DetectedSetupDialog({ installationId, targetPath, state, bridge,
     if (pending.current === job) pending.current = null;
     if (cancelled) return;
     setChecking(false);
-    if (timedOut) setError('检查超时，尚未部署。可以取消或稍后重试。');
+    if (timedOut) setError('检查花的时间太长了，还没有添加文件。可以取消或稍后重试。');
     else if (saved && configurationId) onPrepared(configurationId);
     else if (!saved) setError('检查未完成，尚未确认结果。请重试或取消后重新扫描。');
   }
   return <Dialog label="配置检测到的 pi" className="cfg-page cfg-dialog" onClose={close}>
     <div className="cfg-dialog-shell"><header className="cfg-dialog-header"><div className="cfg-dialog-title"><span className="cfg-dialog-emblem"><Icon name="pi" /></span><h2>配置检测到的 pi</h2></div><button className="cfg-dialog-close" aria-label="取消配置检查" onClick={close}><Icon name="close" /></button></header>
-      <section className="cfg-dialog-body"><h3>已找到你的 pi 默认配置</h3><p className="cfg-dialog-path">{targetPath}</p><p>无需选择文件夹。允许后检查此目录和现有扩展规则，再展示部署预览。</p>
-        <details><summary>检查范围</summary><p>只读目录及祖先的安全 metadata、settings.json、extensions/package.json 和固定入口、ignore 的存在。不读取会话、对话或登录凭据，不修改现有配置，不启动或重载 pi。</p></details>
-        <p>另行确认部署后，才新增本产品扩展并开始接收。</p>{checking && <p role="status">正在检查，取消可立即返回；尚未部署扩展。</p>}{error && <p role="alert">{error}</p>}
+      <section className="cfg-dialog-body"><h3>已找到你的 pi 默认配置</h3><p className="cfg-dialog-path">{targetPath}</p><p>不用再选文件夹。先检查这里是否可以使用，再由你确认需要添加的文件。</p>
+        <details><summary>检查范围</summary><p>只检查这个文件夹及上级文件夹的安全性，读取 settings.json、extensions/package.json，并查看扩展入口和忽略规则。不读取对话、会话或登录信息，不更改原有设置，也不会启动或重新加载 pi。</p></details>
+        <p>你确认后才会添加 Agent Pet 的连接组件，并开始等待 pi。</p>{checking && <p role="status">正在检查，还没有添加文件；随时可以取消。</p>}{error && <p role="alert">{error}</p>}
       </section><footer className="cfg-dialog-footer"><div><button className="co-secondary" onClick={close}>{checking ? '取消检查' : '取消'}</button><button className="co-primary" disabled={checking} onClick={() => void prepare()}>检查并预览<Icon name="right" /></button></div></footer>
     </div>
   </Dialog>;

@@ -20,6 +20,12 @@ The new package is staged, not substituted for the running user app, so its pi
 receiver stays intact. Commands, screenshots and native automation limits:
 [overlay evidence](../../docs/DESKTOP-OVERLAY-REFINEMENT-ACCEPTANCE.md).
 
+## Connection page (2026-10-15)
+
+连接页先显示实际连接状态与“重新连接／暂停连接／继续连接”。位置检查默认收起，文件夹可用不会表示Agent在线；完整检查范围、文件改动和技术原因仍可查看，写入和移除都保留独立确认。设置预览与取消支持键盘回焦，隐藏页不抢焦点。
+
+本轮使用正式页面的隔离示例验证宽/窄/矮窗口、等待/错误及单行长路径，没有操作真实pi或重启用户应用。截图、测试和最新包见 [连接页记录](../../docs/CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 的最新修订。
+
 ## Local macOS packaging (M5)
 
 The authorized local packaging path uses `electron-builder@26.15.3` and the existing

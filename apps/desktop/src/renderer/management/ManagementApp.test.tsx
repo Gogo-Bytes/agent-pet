@@ -102,21 +102,90 @@ describe('ManagementApp formal four-page interface', () => {
       deployedPath: '/isolated/project-one/extensions/agent-pet.ts', status: 'disconnected' as const,
       saved: 'disabled' as const, notice: 'resume-required' as const } };
     const test = await mount([record]); await page(test.user, '连接');
-    expect(screen.getByText(/已保存停用；当前未开始监听/)).toBeTruthy();
-    await test.user.click(screen.getByRole('button', { name: '刷新检查' }));
+    expect(screen.getByRole('heading', { name: '已暂停' })).toBeTruthy();
+    await test.user.click(screen.getByText('位置检查', { exact: true }));
+    await test.user.click(screen.getByRole('button', { name: '检查位置' }));
     expect(test.bridge.configurations.inspect).toHaveBeenCalledExactlyOnceWith(record.id);
-    expect(screen.getByText(/已保存停用；当前未开始监听/)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '已暂停' })).toBeTruthy();
     expect(screen.queryByText(/尚未读取目标|仅点击恢复才校验/)).toBeNull();
     expect(test.bridge.configurations.resume).not.toHaveBeenCalled();
-    await test.user.click(screen.getByRole('button', { name: '恢复已保存连接' }));
+    await test.user.click(screen.getByRole('button', { name: '继续连接' }));
     expect(test.bridge.configurations.resume).toHaveBeenCalledExactlyOnceWith(record.id);
     await act(async () => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
       saved: 'ready', notice: 'none', status: 'configured-waiting', receiving: 'active', canResume: false } }] }));
     expect(screen.queryByText(/已保存停用/)).toBeNull();
     await act(async () => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
       notice: 'resume-refused', status: 'failed' } }] }));
+    expect(screen.getByRole('alert').textContent).toContain('暂时无法重新连接');
+    await test.user.click(screen.getByText('查看详细原因'));
     expect(screen.getByText(/恢复被拒绝：原运行目录或扩展已缺失/)).toBeTruthy();
     expect(screen.queryByText(/已保存停用/)).toBeNull();
+  });
+  it('leads with reconnect rather than an unchecked location and never resumes on page open', async () => {
+    const record = { ...configuration(), name: 'pi 默认配置', availability: 'unchecked' as const,
+      connection: { ...initialConnection, canConfigure: false, canResume: true, canRemove: true,
+        deployedPath: '/isolated/project-one/extensions/agent-pet.ts', saved: 'ready' as const,
+        status: 'disconnected' as const, notice: 'resume-required' as const } };
+    const test = await mount([record]); await page(test.user, '连接');
+    expect(screen.getByRole('heading', { name: '等待重新连接' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '重新连接' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '暂停连接' })).toBeNull();
+    expect(test.container.querySelector('.cfg-position-check')?.hasAttribute('open')).toBe(false);
+    expect(test.container.querySelector('.cfg-index-state')).toBeNull();
+    expect(screen.getByRole('button', { name: '更换位置' }).hasAttribute('disabled')).toBe(true);
+    expect(test.bridge.configurations.resume).not.toHaveBeenCalled();
+    expect(test.bridge.configurations.inspect).not.toHaveBeenCalled();
+    await test.user.click(screen.getByRole('button', { name: '重新连接' }));
+    expect(test.bridge.configurations.resume).toHaveBeenCalledExactlyOnceWith(record.id);
+  });
+  it('shows actual connection, loading guidance and uncertain errors independently of location availability', async () => {
+    const record = { ...configuration(), connection: { ...initialConnection, canConfigure: false, canRemove: true,
+      status: 'configured-waiting' as const, receiving: 'active' as const, saved: 'ready' as const } };
+    const test = await mount([record]); await page(test.user, '连接');
+    expect(screen.getByRole('heading', { name: '等待 pi' })).toBeTruthy();
+    expect(screen.getByText(/如果它已经在运行，请在空闲时输入 \/reload/)).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '暂停连接' }));
+    expect(test.bridge.configurations.disable).toHaveBeenCalledExactlyOnceWith(record.id);
+    act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection, status: 'connected' } }] }));
+    expect(screen.getByRole('heading', { name: '已连接' })).toBeTruthy();
+    act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      status: 'connected', receiving: 'unknown', notice: 'stop-failed' } }] }));
+    expect(screen.queryByRole('heading', { name: '已连接' })).toBeNull();
+    expect(screen.getByRole('heading', { name: '连接需要处理' })).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('未能确认连接是否暂停');
+    expect(screen.getByRole('button', { name: '尝试暂停连接' })).toBeTruthy();
+  });
+  it('keeps a separate write confirmation and blocks same-name files after the copy change', async () => {
+    const preview = { id: 'review-plan', path: '/isolated/project-one/extensions/agent-pet.ts',
+      target: { path: '/isolated/project-one', source: 'chosen' as const }, action: 'create' as const, findings: [], createDirectories: [] };
+    const record = { ...configuration(), connection: { ...initialConnection, preview } };
+    const test = await mount([record]); await page(test.user, '连接');
+    const review = screen.getByRole('region', { name: '连接设置预览' });
+    expect(review.textContent).toContain(preview.path);
+    expect(review.textContent).toContain('不会覆盖已有文件');
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+    await test.user.click(within(review).getByRole('button', { name: '确认并连接' }));
+    expect(test.bridge.configurations.confirm).toHaveBeenCalledExactlyOnceWith(record.id, preview.id);
+    act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      preview: { ...preview, action: 'blocked', findings: ['existing-extension'] } } }] }));
+    expect(screen.getByText(/这里已有同名连接文件/)).toBeTruthy();
+    const blocked = screen.getByRole('button', { name: '确认并连接' });
+    expect(blocked.hasAttribute('disabled')).toBe(true);
+    await test.user.click(blocked);
+    expect(test.bridge.configurations.confirm).toHaveBeenCalledTimes(1);
+  });
+  it('gives a real recovery route after receiver start failure and scopes stale-preview wording to this attempt', async () => {
+    const record = { ...configuration(), connection: { ...initialConnection, status: 'failed' as const,
+      canConfigure: false, canResume: false, canRemove: true, receiving: 'stopped' as const, notice: 'start-failed' as const,
+      deployedPath: '/isolated/project-one/extensions/agent-pet.ts' } };
+    const test = await mount([record]); await page(test.user, '连接');
+    expect(screen.getByRole('alert').textContent).toContain('重新打开 Agent Pet 后重试，或移除此连接');
+    expect(screen.queryByRole('button', { name: '重新连接' })).toBeNull();
+    expect(screen.getByRole('button', { name: '移除连接' })).toBeTruthy();
+    act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      status: 'connected', receiving: 'active', saved: 'ready', notice: 'invalid-plan' } }] }));
+    expect(screen.getByRole('heading', { name: '已连接' })).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('本次没有添加新的连接文件');
   });
   it('keeps page navigation accessible with native controls and omits duplicate HTML controls', async () => {
     const test = managementBridge(undefined, false, true);
@@ -274,14 +343,14 @@ describe('ManagementApp formal four-page interface', () => {
     await test.user.click(within(dialog).getByRole('button', { name: '选择位置' }));
     await test.user.click(within(dialog).getByRole('button', { name: '验证配置' }));
     await test.user.selectOptions(within(dialog).getByRole('combobox', { name: 'Agent 类型' }), 'codex');
-    expect(within(dialog).getByRole('status').textContent).toContain('无法接收 Agent 状态');
+    expect(within(dialog).getByRole('status').textContent).toContain('暂时还不能连接');
     await test.user.click(within(dialog).getByRole('button', { name: '下一步' }));
     await test.user.clear(within(dialog).getByRole('textbox', { name: '配置名称' }));
     await test.user.type(within(dialog).getByRole('textbox', { name: '配置名称' }), '工作 Codex');
     await test.user.click(within(dialog).getByRole('button', { name: '添加配置' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(test.bridge.configurations.create).toHaveBeenCalledExactlyOnceWith({ name: '工作 Codex', provider: 'codex', targetPath: '/isolated/new-project' });
-    expect(screen.getByText('配置已保存，此类型接入尚未支持。')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '暂不支持连接' })).toBeTruthy();
     expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
   });
   it('discards a manual verification response after cancellation and opens a clean wizard on retry', async () => {
@@ -338,10 +407,24 @@ describe('ManagementApp formal four-page interface', () => {
     await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
     expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledExactlyOnceWith('node22', expect.any(String));
     expect(test.bridge.locations.choose).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('region', { name: '部署预览' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '连接设置预览' })).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: '确认连接设置' })));
     expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
-    await test.user.click(screen.getByRole('button', { name: '取消预览' }));
+    let finishCancel!: () => void;
+    test.bridge.configurations.cancel.mockImplementationOnce(async () => {
+      test.pushConfigs({ ...test.configs(), revision: test.configs().revision + 1, records: test.configs().records.map(value => ({ ...value,
+        connection: value.connection ? { ...value.connection, preview: null } : null })) });
+      await new Promise<void>(resolve => { finishCancel = resolve; });
+      return test.configs();
+    });
+    await test.user.click(screen.getByRole('button', { name: '取消' }));
     expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith('default');
+    // Main can push cleared preview before the invoke reply; wait through a frame
+    // with the return button disabled, then release the reply.
+    await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); });
+    expect(screen.getByRole('button', { name: '设置连接' }).hasAttribute('disabled')).toBe(true);
+    await act(async () => finishCancel());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '设置连接' })));
   });
   it('cancels consent without calling Main, recovers errors and opens existing configuration without duplicates', async () => {
     const existing = configuration('saved', initialPreflight.automaticTarget!.path);
@@ -417,11 +500,11 @@ describe('ManagementApp formal four-page interface', () => {
   });
   it('requires explicit removal confirmation for one configuration and preserves all others', async () => {
     const test = await mount([configuration('one'), configuration('two')]); await page(test.user, '连接');
-    await test.user.click(screen.getByRole('button', { name: '移除配置' }));
-    expect(screen.getByText('只处理 Agent Pet 中的这条配置。Agent 程序和用户文件都会保留。')).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '移除连接' }));
+    expect(screen.getByText('这条连接会从 Agent Pet 中移除。Agent 程序和你的文件都会保留。')).toBeTruthy();
     await test.user.click(screen.getByRole('button', { name: '取消' }));
     expect(test.bridge.configurations.remove).not.toHaveBeenCalled();
-    await test.user.click(screen.getByRole('button', { name: '移除配置' }));
+    await test.user.click(screen.getByRole('button', { name: '移除连接' }));
     await test.user.click(screen.getByRole('button', { name: '确认移除' }));
     expect(test.bridge.configurations.remove).toHaveBeenCalledExactlyOnceWith('one');
     expect(test.configs().records.map(record => record.id)).toEqual(['two']);

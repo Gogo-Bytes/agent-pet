@@ -23,7 +23,7 @@ describe('home pet projection from shared configuration and Session state', () =
     expect(projected.map(pet => [pet.id, pet.agent, pet.name, pet.configuration])).toEqual([
       ['one', 'pi', '宠物 one', '项目 one'], ['two', 'pi', '宠物 two', '项目 two'],
     ]);
-    expect(projected.every(pet => pet.action === 'Idle' && pet.status === '陪伴中')).toBe(true);
+    expect(projected.every(pet => pet.action === 'idle' && pet.status === '陪伴中')).toBe(true);
   });
   it('filters waiting, disconnected, failed and absent connections even when their configuration is available', () => {
     const statuses = ['connected', 'configured-waiting', 'disconnected', 'failed', 'not-configured'] as const;
@@ -36,14 +36,14 @@ describe('home pet projection from shared configuration and Session state', () =
       'one-work': 'one', 'two-error': 'two', orphan: 'removed-config',
     }), state, '默认');
     expect(projected.map(pet => [pet.id, pet.action, pet.status])).toEqual([
-      ['one', 'Work', '工作中'], ['two', 'Error', '出错了'], ['three', 'Idle', '陪伴中'],
+      ['one', 'working', '工作中'], ['two', 'error', '出错了'], ['three', 'idle', '陪伴中'],
     ]);
   });
   it.each([
-    [['working', 'error', 'completed'], 'Work', '工作中'],
-    [['error', 'completed'], 'Error', '出错了'],
-    [['completed'], 'Success', '已完成'],
-    [['idle', 'offline'], 'Idle', '陪伴中'],
+    [['working', 'error', 'completed'], 'working', '工作中'],
+    [['error', 'completed'], 'error', '出错了'],
+    [['completed'], 'success', '已完成'],
+    [['idle', 'offline'], 'idle', '陪伴中'],
   ] as const)('prioritizes observable motion for %j without treating a connection failure as a task error', (statuses, action, status) => {
     const values = statuses.map((value, index) => [`session-${index}`, value] as [string, SessionObservation['status']]);
     const map = Object.fromEntries(values.map(([id]) => [id, 'one']));
@@ -52,7 +52,7 @@ describe('home pet projection from shared configuration and Session state', () =
   it('uses the persisted default pet name when unbound and removes departing configurations without changing business state', () => {
     const state = sessions([['completed', 'completed']]);
     const source = collection([{ ...config('one'), pet: null }], { completed: 'one' });
-    expect(projectHomePets(source, state, '团子')[0]).toMatchObject({ id: 'one', name: '团子', action: 'Success' });
+    expect(projectHomePets(source, state, '团子')[0]).toMatchObject({ id: 'one', name: '团子', action: 'success' });
     expect(projectHomePets({ ...source, records: [] }, state, '团子')).toEqual([]);
     expect(state.bubbles).toHaveLength(1);
     expect(source.records).toHaveLength(1);

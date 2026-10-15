@@ -1,9 +1,9 @@
-import type { SessionStatus } from '@agent-pet/domain';
+import { activityKinds, occurrenceKinds, type CompanionFacts, type ObservationCapabilities, type SessionStatus } from '@agent-pet/domain';
 
 export type PiBridgeStatus = Extract<SessionStatus, 'working' | 'completed' | 'error' | 'idle' | 'offline'>;
 
 type Common = {
-  type: 'hello' | 'lifecycle' | 'session_info_changed' | 'heartbeat';
+  type: 'hello' | 'lifecycle' | 'session_info_changed' | 'heartbeat' | 'companion';
   schemaVersion: 1;
   token: string;
   seq: number;
@@ -19,10 +19,13 @@ export type PiBridgeMessage =
       status: PiBridgeStatus;
       sessionName?: string;
       projectName?: string;
+      capabilities?: ObservationCapabilities;
+      facts?: CompanionFacts;
     })
-  | (Common & { type: 'lifecycle'; status: PiBridgeStatus; workId?: string })
+  | (Common & { type: 'lifecycle'; status: PiBridgeStatus; workId?: string; facts?: CompanionFacts; capabilities?: ObservationCapabilities })
   | (Common & { type: 'session_info_changed'; sessionName?: string })
-  | (Common & { type: 'heartbeat' });
+  | (Common & { type: 'heartbeat' })
+  | (Common & { type: 'companion'; facts: CompanionFacts; capabilities?: ObservationCapabilities });
 
 export type PiSessionMessage = PiBridgeMessage extends infer M ? M extends PiBridgeMessage ? Omit<M, 'token'> : never : never;
 
@@ -36,10 +39,11 @@ const commonFields = new Set([
 ]);
 const statuses = new Set<PiBridgeStatus>(['working', 'completed', 'error', 'idle', 'offline']);
 const fieldsByType: Record<PiBridgeMessage['type'], readonly string[]> = {
-  hello: ['status', 'sessionName', 'projectName', 'workId'],
-  lifecycle: ['status', 'workId'],
+  hello: ['status', 'sessionName', 'projectName', 'workId', 'capabilities', 'facts'],
+  lifecycle: ['status', 'workId', 'facts', 'capabilities'],
   session_info_changed: ['sessionName'],
   heartbeat: [],
+  companion: ['facts', 'capabilities'],
 };
 
 export function parsePiBridgeMessage(input: unknown): ParseResult {
@@ -56,7 +60,7 @@ function parseMessage(input: unknown, withToken: boolean): ParseResult {
     return { ok: false, reason: 'message-must-be-object' };
   }
   const value = input as Record<string, unknown>;
-  if (typeof value.type !== 'string' || !fieldsByType[value.type as PiBridgeMessage['type']]) {
+  if (typeof value.type !== 'string' || !Object.hasOwn(fieldsByType, value.type)) {
     return { ok: false, reason: 'invalid-type' };
   }
   const type = value.type as PiBridgeMessage['type'];
@@ -69,7 +73,7 @@ function parseMessage(input: unknown, withToken: boolean): ParseResult {
   if (withToken && (typeof value.token !== 'string' || value.token.length < 16 || value.token.length > 256)) {
     return { ok: false, reason: 'invalid-token' };
   }
-  if (typeof value.seq !== 'number' || !Number.isSafeInteger(value.seq) || value.seq < 1) {
+  if (typeof value.seq !== 'number' || !Number.isSafeInteger(value.seq) || value.seq < 1 || value.seq > Math.floor(Number.MAX_SAFE_INTEGER / 2)) {
     return { ok: false, reason: 'invalid-sequence' };
   }
   for (const field of ['processInstanceId', 'providerSessionId'] as const) {
@@ -93,5 +97,27 @@ function parseMessage(input: unknown, withToken: boolean): ParseResult {
   if ((type === 'hello' || type === 'lifecycle') && typeof value.status !== 'string') {
     return { ok: false, reason: 'status-required' };
   }
+  if ('capabilities' in value && !validCapabilities(value.capabilities)) return { ok: false, reason: 'invalid-capabilities' };
+  if (('facts' in value && !validFacts(value.facts)) || (type === 'companion' && !('facts' in value))) return { ok: false, reason: 'invalid-facts' };
   return { ok: true, value: value as PiBridgeMessage };
+}
+
+function object(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+function validCapabilities(value: unknown): boolean {
+  const kinds: readonly string[] = [...activityKinds, ...occurrenceKinds, 'waiting_input'];
+  return object(value) && Object.keys(value).every(key => kinds.includes(key) && typeof value[key] === 'string' && ['supported', 'unsupported', 'unknown'].includes(value[key]));
+}
+function validFacts(value: unknown): boolean {
+  if (!object(value) || Object.keys(value).some(key => !['activities', 'waitingForInput', 'occurrence'].includes(key))) return false;
+  if (typeof value.waitingForInput !== 'boolean' || !Array.isArray(value.activities) || value.activities.length > activityKinds.length ||
+    !value.activities.every(kind => typeof kind === 'string' && (activityKinds as readonly string[]).includes(kind)) || new Set(value.activities).size !== value.activities.length) return false;
+  if (value.occurrence !== undefined) {
+    const event = value.occurrence;
+    if (!object(event) || Object.keys(event).some(key => !['id', 'kind'].includes(key)) ||
+      typeof event.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(event.id) ||
+      typeof event.kind !== 'string' || !(occurrenceKinds as readonly string[]).includes(event.kind)) return false;
+  }
+  return true;
 }

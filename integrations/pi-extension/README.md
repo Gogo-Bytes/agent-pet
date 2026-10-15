@@ -8,9 +8,14 @@ self-contained and does not depend on the Agent Pet npm workspace.
 ## What it does
 
 - Sends only Session/process identity, a display-name/project fallback, coarse
-  lifecycle status, work id, sequence number and timestamp.
+  lifecycle status, work id, sequence number, timestamp, enum-only companion facts
+  and observation capabilities. Fine capabilities start unknown and become supported
+  only when their native hook is actually observed; runtime version is not guessed.
 - Observes `session_start`, `agent_start`, `message_end`, `agent_settled`,
-  `session_info_changed` and `session_shutdown`.
+  `session_info_changed` and `session_shutdown`, plus stream phase, tool, extension
+  UI-prompt and compaction start/end/abort hooks verified against pi 0.85.1.
+  Tool failures remain transient, cancellation remains distinct, and automatic retry
+  is unknown (not an Extension API event here). See the [event matrix and evidence](../../docs/PET-ACTIONS-ACCEPTANCE.md).
 - Treats `agent_settled` plus `ctx.isIdle()` as the point at which a work cycle
   may become completed/error.
 - Sends no prompt, response, thinking, tool input/output, transcript path,
@@ -90,7 +95,10 @@ Each socket connection starts with a fresh `hello` containing the current workin
 or idle baseline and work identity. Connection failures retry from 250 ms up to
 5 seconds; retries and sockets do not keep pi alive. Pending socket writes are
 bounded; there is no historical event queue. Work that finishes while disconnected
-is not replayed as a new unread notification. Shutdown cancels retries. This
+is not replayed as a new unread notification. Existing unread results held by the
+same Application survive a reconnect baseline and metadata updates. Current
+activities clear on transport loss and restore only from a new baseline; historical
+one-shot occurrences are never included in hello. Shutdown cancels retries. This
 behavior is covered using real sockets and synthetic pi callbacks, not a live TUI.
 Only TUI mode enables observation.
 

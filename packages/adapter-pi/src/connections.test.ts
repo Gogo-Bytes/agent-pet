@@ -129,6 +129,21 @@ it('drops already buffered events when an observation causes the receiver to sto
     processInstanceId: 'stopping-process', providerSessionId: 'session', sentAt: '2026-10-14T00:00:00Z', status,
   })).join('\n') + '\n');
   await vi.waitFor(() => expect(stopped).toBeDefined()); await stopped;
-  expect(r.observations.map(value => value.status)).toEqual(['idle']);
+  expect(r.observations.filter(value => value.connected !== false).map(value => value.status)).toEqual(['idle']);
+  expect(r.observations.filter(value => value.connected === false)).toHaveLength(1);
+  expect(r.observations.at(-1)?.facts).toEqual({ activities: [], waitingForInput: false });
   expect(r.states).toEqual(['connected', 'disconnected']);
+});
+
+it('releases every peer when a disconnect observer throws and reports a bounded stop failure', async () => {
+  let broken = false;
+  const r = await receiver(undefined, () => { if (broken) throw Error('private callback detail'); });
+  const first = await r.peer('throw-first'), second = await r.peer('throw-second');
+  const firstClosed = once(first.socket, 'close'), secondClosed = once(second.socket, 'close');
+  broken = true;
+  await expect(r.stop()).rejects.toThrow('pi observer cleanup failed');
+  await Promise.all([firstClosed, secondClosed]);
+  expect(r.observations.filter(value => value.connected === false)).toHaveLength(2);
+  expect(r.states).toEqual(['connected', 'disconnected']);
+  await expect(r.stop()).rejects.toThrow('pi observer cleanup failed');
 });

@@ -5,7 +5,7 @@ import type { Rect } from '../../../shared/overlay-layout.js';
 import type { PetStore } from '../../app/bridge/pet-store.js';
 import { rectStyle } from '../../shared/rect-style.js';
 import { useWindowGesture } from '../../shared/use-window-gesture.js';
-import { selectPetMotion } from '../../pet-motion.js';
+import { projectPetPresentation } from '@agent-pet/pet-runtime';
 import styles from './PetCanvas.module.css';
 import { PreferenceRenderLoop } from '../../shared/PreferenceRenderLoop.js';
 import { PetModel } from './PetModel.js';
@@ -26,6 +26,7 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
   visible: boolean; store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void; onHover?: (hovered: boolean) => void;
 }) {
   const { sessions, preferences } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const presentation = projectPetPresentation(sessions);
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
   // Canvas adds its own sizing divs. Keep Main's absolute pixel region and the
   // native pointer handlers on this outer surface, never on a Three mesh.
@@ -40,7 +41,7 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel motion={selectPetMotion(sessions.bubbles)} reduced={preferences.reduced} onReady={onNotice} {...(onHover ? { onHover } : {})} />
+            <PetModel motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} {...(onHover ? { onHover } : {})} />
           </Bounds>
         </Suspense>
       </Canvas>

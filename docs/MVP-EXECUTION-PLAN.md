@@ -30,6 +30,14 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 验证：全量 **705 passed / 1 skipped / 72 files**，`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、模板一致性检查通过；独立subagent复验76项、无阻塞。4175 dev测试边界使用正式ScenePet和真实GLB，实看无动画映射、无Idle及单次动作回退；零clip与清理由实际Three.js测试覆盖。[静态截图](evidence/pet-actions/static.jpg)、[艺术家说明](PET-ARTIST-GUIDE.md)。未打包、未部署/启动/重载真实pi；下一阶段是pi细分事件与能力事实适配。
 
+## 动作第2阶段：pi细分事件与统一投影（2026-10-15）
+
+已实现：domain独立能力/活动/等待/单次事件事实，保留原Session生命周期与未读；pi只提取流式类别、工具类别、扩展UI等待、整理上下文、取消和回答中断，按实际收到事件确认能力，不猜运行版本/自动重试。桌宠与首页共用动作投影，正式播放器按资产能力回退；单次业务反馈不随重命名/等待结束/场景重挂而重播，主动试播可重播。新接收器兼容旧粗略扩展，严格嵌套字段校验保留。
+
+真实隔离socket与无环境生成扩展子进程覆盖并行、正文不读取、整批settled、压缩取消/旧signal、断开清活动/重连保未读、旧peer close与stop重入/发布异常清理；Main本地清理保留epoch保护，旧peer不能覆盖新记录，发布失败可重试。最终全量 **736 passed / 1 skipped / 74 files**；typecheck、desktop build、模板一致性与diff检查通过。独立重点复验 **86 passed**，Main最终修正另复验 **31 passed**，无确定阻塞。未削弱managed/部署/撤回/数据保留测试。默认/managed mapper契约保持，断开清理仅启用在本机legacy receiver。
+
+Electron dev隔离profile已启动，原生管理首页启动实看，AX确认宠物页及试播入口；动作盘点击/截图工具恢复后仍有故障，未标完整原生交互通过。4175正式播放器测试边界已实看活动→已有动画、能力未知与静态回退。[证据与截图](PET-ACTIONS-ACCEPTANCE.md)。没有打包、依赖安装、日常pi配置读取/写入、部署、启动或reload；真实已加载扩展不会自动升级，新增细分TUI任务矩阵尚未实机验收。其他Provider/外部资产导入/发布保持未完成。
+
 ## 本机菜单栏图标恢复（2026-10-15）
 
 **VERIFIED（当前 dev 可见，用户确认）**：系统日志证明图标被 ControlCenter 阻止。当前开发实例归于 ChatGPT 启动链，Agent Pet 的系统开关已开，但 ChatGPT 项关闭；经用户精确授权只打开 ChatGPT 项，同代码/隔离配置 dev 的日志恢复正常接收，用户确认“能看到了”。按授权保留开关开启，菜单栏功能继续保留，没有修改图标实现或重新打包。底层受保护映射未读取，不把坐标/创建成功当可见证明。正式包重开、菜单点击、其他设置与发布范围未验；完整证据见 [菜单栏恢复记录](DESKTOP-MENU-BAR-ACCEPTANCE.md)。

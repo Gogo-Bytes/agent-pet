@@ -36,6 +36,8 @@ A 3D GLB model with optional animations and descriptive metadata. A Pet asset wi
 
 A Session fact that an Agent integration can reliably report in its current version, mode and connection. An unsupported or unknown observation capability is not evidence that the corresponding activity is absent.
 
+Implementation vocabulary: `ObservationCapabilities` is supported/unsupported/unknown by signal; `CompanionFacts` holds bounded activity enums, a waiting flag and an optional occurrence identity. They supplement `SessionStatus`, never replace work/unread lifecycle. pi confirms fine support on actual native events rather than registration or a guessed runtime version. `baseline` preserves already held unread results on reconnect without reconstructing historical results in a fresh Application.
+
 ### Pet action
 
 A named presentation intent, such as working, waiting for input or celebrating, independent of any Agent's native event names and any artist's animation names. Every Pet action is optional for an individual Pet asset.

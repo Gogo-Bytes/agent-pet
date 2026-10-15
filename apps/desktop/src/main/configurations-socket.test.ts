@@ -18,13 +18,16 @@ it('keeps home pets online for remaining peers and isolates configuration depart
   const collection = new Configurations({ directory, adapter: () => adapter, publish: app.observe });
   const peers: net.Socket[] = [], ids: string[] = [], configs: PiBridgeConfig[] = [];
   const pets = () => projectHomePets(collection.snapshot(), app.snapshot(), '小伙伴');
-  async function connect(config: PiBridgeConfig, processInstanceId: string) {
+  async function connect(config: PiBridgeConfig, processInstanceId: string, initialSeq = 0) {
     const socket = net.connect(config.endpoint); peers.push(socket); socket.on('error', () => {});
     await once(socket, 'connect');
-    let seq = 0;
-    function send(status: 'idle' | 'working' | 'completed') {
-      socket.write(JSON.stringify({ type: seq ? 'lifecycle' : 'hello', schemaVersion: 1, token: config.token,
-        seq: ++seq, processInstanceId, providerSessionId: 'same-session', status, sentAt: '2026-10-14T00:00:00Z' }) + '\n');
+    let seq = initialSeq;
+    let greeted = false;
+    function send(status: 'idle' | 'working' | 'completed', waiting = false) {
+      socket.write(JSON.stringify({ type: greeted ? 'lifecycle' : 'hello', schemaVersion: 1, token: config.token,
+        seq: ++seq, processInstanceId, providerSessionId: 'same-session', status, sentAt: '2026-10-14T00:00:00Z',
+        ...(waiting ? { capabilities: { waiting_input: 'supported' }, facts: { activities: [], waitingForInput: true } } : {}) }) + '\n');
+      greeted = true;
     }
     send('idle'); return { socket, send };
   }
@@ -50,7 +53,7 @@ it('keeps home pets online for remaining peers and isolates configuration depart
     await disconnect(first.socket);
     second.send('completed');
     await vi.waitFor(() => expect(app.snapshot().sessions[`${ids[0]}:pi:second-process:same-session`]?.status).toBe('completed'));
-    expect(pets().map(pet => [pet.id, pet.action])).toEqual([[ids[0], 'Success'], [ids[1], 'Work']]);
+    expect(pets().map(pet => [pet.id, pet.action])).toEqual([[ids[0], 'success'], [ids[1], 'working']]);
     await disconnect(second.socket);
     await vi.waitFor(() => expect(pets().map(pet => pet.id)).toEqual([ids[1]]));
     expect(app.snapshot().bubbles.filter(bubble => bubble.status === 'error-unread')).toEqual([]);
@@ -58,9 +61,22 @@ it('keeps home pets online for remaining peers and isolates configuration depart
     expect((await collection.remove(ids[0]!)).notice).toBe('none');
     expect(pets().map(pet => pet.id)).toEqual([ids[1]]);
     other.send('completed');
-    await vi.waitFor(() => expect(pets()[0]?.action).toBe('Success'));
+    await vi.waitFor(() => expect(pets()[0]?.action).toBe('success'));
     expect(collection.snapshot().sessionConfigurations).toEqual({ [`${ids[1]}:pi:same-process:same-session`]: ids[1] });
+    other.send('working', true);
+    const otherId = `${ids[1]}:pi:same-process:same-session`;
+    await vi.waitFor(() => expect(app.snapshot().sessions[otherId]?.facts?.waitingForInput).toBe(true));
+    // Same process/session overlaps, but the replacement has a newer global seq.
+    const replacement = await connect(configs[1]!, 'same-process', 100);
+    replacement.send('working', true);
+    await vi.waitFor(() => expect(app.snapshot().sessions[otherId]?.revision).toBe(204));
     await disconnect(other.socket);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(app.snapshot().sessions[otherId]?.connected).toBe(true);
+    const otherClosed = once(replacement.socket, 'close');
+    await collection.disable(ids[1]!); await otherClosed;
+    expect(app.snapshot().sessions[otherId]).toMatchObject({ connected: false, facts: { activities: [], waitingForInput: false } });
+    expect(app.snapshot().bubbles.some(bubble => bubble.status === 'working')).toBe(false);
     await vi.waitFor(() => expect(pets()).toEqual([]));
   } finally {
     for (const socket of peers) socket.destroy();

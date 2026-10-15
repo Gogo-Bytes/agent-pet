@@ -38,3 +38,46 @@ describe('pi bridge protocol', () => {
     }
   });
 });
+
+const fine = { type: 'hello', schemaVersion: 1, token: '0123456789abcdef', seq: 1,
+  processInstanceId: 'p', providerSessionId: 's', status: 'working', sentAt: '2026-01-01T00:00:00Z',
+  capabilities: { thinking: 'supported', retrying: 'unknown' }, facts: { activities: ['thinking'], waitingForInput: false } };
+it('accepts bounded enum-only capabilities and companion facts on authenticated and managed paths', async () => {
+  const { parsePiSessionMessage } = await import('./protocol.js');
+  expect(parsePiBridgeMessage(fine).ok).toBe(true);
+  const { token: _token, ...managed } = fine;
+  expect(parsePiSessionMessage(managed).ok).toBe(true);
+  expect(parsePiBridgeMessage({ ...fine, type: 'companion', status: undefined, capabilities: undefined }).ok).toBe(false);
+  const { status: _status, capabilities: _cap, ...companion } = fine;
+  expect(parsePiBridgeMessage({ ...companion, type: 'companion' }).ok).toBe(true);
+});
+it.each([
+  { facts: { activities: ['future'], waitingForInput: false } },
+  { facts: { activities: ['thinking', 'thinking'], waitingForInput: false } },
+  { facts: { activities: [], waitingForInput: 'yes' } },
+  { facts: { activities: [], waitingForInput: false, content: 'secret' } },
+  { facts: { activities: [], waitingForInput: false, occurrence: { id: 'x', kind: 'tool_error', output: 'secret' } } },
+  { facts: { activities: [], waitingForInput: false, occurrence: { id: 'x'.repeat(65), kind: 'cancelled' } } },
+  { facts: { activities: [], waitingForInput: false, occurrence: { id: 'x', kind: 'terminal_error' } } },
+  { facts: null }, { capabilities: [] }, { capabilities: { thinking: ['supported'] } },
+  { capabilities: { future: 'supported' } }, { capabilities: { thinking: true } },
+  { seq: Math.floor(Number.MAX_SAFE_INTEGER / 2) + 1 }, { type: '__proto__' }, { type: 'constructor' },
+])('rejects malformed or content-bearing fine observations %#', patch => {
+  expect(parsePiBridgeMessage({ ...fine, ...patch }).ok).toBe(false);
+});
+
+it('ignores a late close from an older peer after a newer baseline and safely clears the current peer', async () => {
+  const { PiBridgeSession } = await import('./index.js');
+  const { createApplication } = await import('../../application/src/index.js');
+  const app = createApplication([]), publish = app.observe;
+  const old = new PiBridgeSession({ token: fine.token, publish, publishDisconnected: publish });
+  const replacement = new PiBridgeSession({ token: fine.token, publish, publishDisconnected: publish });
+  old.handle(fine);
+  replacement.handle({ ...fine, seq: 2, facts: { activities: ['reading'], waitingForInput: false }, capabilities: { reading: 'supported' } });
+  old.disconnected();
+  const current = () => Object.values(app.snapshot().sessions)[0]!;
+  expect(current()).toMatchObject({ connected: true, revision: 4, facts: { activities: ['reading'] } });
+  replacement.disconnected();
+  expect(current()).toMatchObject({ connected: false, revision: 5, facts: { activities: [], waitingForInput: false } });
+  expect(app.snapshot().bubbles).toEqual([]);
+});

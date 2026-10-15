@@ -1,3 +1,5 @@
+import type { CompanionFacts, ObservationCapabilities } from './companion.js';
+export * from './companion.js';
 export type Provider = 'codex' | 'pi' | 'claude';
 
 export type SessionStatus =
@@ -21,6 +23,10 @@ export type SessionObservation = {
   processInstanceId?: string;
   workId?: string;
   revision?: number;
+  connected?: boolean;
+  baseline?: boolean;
+  capabilities?: ObservationCapabilities;
+  facts?: CompanionFacts;
 };
 
 export type SessionRecord = SessionObservation & {
@@ -57,12 +63,20 @@ export function applyObservation(
   const previousMeta = state.sessionMeta?.[observation.sessionId];
   if (isStale(previousMeta, observation)) return state;
 
+  // A reconnect baseline cannot invent history or erase an unread result already
+  // held by this Application. A fresh process with no result stays idle.
+  const previous = state.sessions[observation.sessionId];
+  if (observation.baseline && observation.status === 'idle' && previous &&
+    state.bubbles.some(bubble => bubble.sessionId === observation.sessionId && bubble.unread)) {
+    observation = { ...observation, status: previous.status, ...(previous.workId ? { workId: previous.workId } : {}) };
+  }
   const name = getSessionName(observation);
   const sessions = {
     ...state.sessions,
     [observation.sessionId]: { ...observation, name },
   };
-  const displayStatus = toDisplayStatus(observation.status);
+  const displayStatus = observation.connected === false && observation.status === 'working'
+    ? undefined : toDisplayStatus(observation.status);
   const meta = {
     ...state.sessionMeta,
     [observation.sessionId]: nextMeta(previousMeta, observation),

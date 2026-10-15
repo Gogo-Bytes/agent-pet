@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { MathUtils, Vector3 } from 'three';
 import { ScenePet } from './ScenePet.js';
 
-export type HomePet = { id: string; agent: string; name: string; configuration: string; status: string; action: string };
+export type HomePet = { id: string; agent: string; name: string; configuration: string; status: string; action: string; replay?: number | string; restAction?: string };
 export type Point = [number, number, number];
 export function petPosition(index: number, count: number): Point {
   const columns = Math.min(count, 3) || 1;
@@ -52,7 +52,7 @@ export function HomeScene({ pets, focused, reduced, onFocus, onReady }: {
     </mesh>
     <Suspense fallback={null}>{pets.map((pet, index) =>
       <group key={pet.id} name={pet.id} position={petPosition(index, pets.length)} onClick={event => { event.stopPropagation(); onFocus(pet.id); }}>
-        <ScenePet action={pet.action} reduced={reduced} onReady={onReady} />
+        <ScenePet action={pet.action} replay={pet.replay ?? 0} restAction={pet.restAction ?? 'idle'} reduced={reduced} onReady={onReady} />
       </group>)}</Suspense>
   </group>;
 }

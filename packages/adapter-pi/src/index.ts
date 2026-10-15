@@ -15,6 +15,7 @@ const MAX_LINE_BYTES = 64 * 1024;
 type BridgeSessionOptions = {
   token: string;
   publish(observation: SessionObservation): void;
+  publishDisconnected?(observation: SessionObservation): void;
   connectionChanged?(state: 'connected' | 'degraded' | 'disconnected'): void;
 };
 
@@ -42,6 +43,7 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
     }
 
     const sockets = new Set<net.Socket>();
+    const bridges = new Set<PiBridgeSession>();
     // TCP/socket acceptance is not online evidence. Only a validated hello counts,
     // and each start() owns its peers independently even when the adapter is shared.
     const connectedSockets = new Set<net.Socket>();
@@ -53,6 +55,7 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
       let buffer = '';
       const bridge = new PiBridgeSession({
         token,
+        publishDisconnected: observation => sink.publish(observation),
         publish: observation => { if (!stopping && !socket.destroyed) sink.publish(observation); },
         connectionChanged: state => {
           if (stopping) return;
@@ -65,6 +68,7 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
           }
         },
       });
+      bridges.add(bridge);
       socket.setEncoding('utf8');
       socket.on('data', chunk => {
         if (stopping || socket.destroyed) return;
@@ -89,7 +93,8 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
       });
       socket.on('close', () => {
         sockets.delete(socket);
-        bridge.disconnected();
+        try { bridge.disconnected(); } catch { /* observer failures cannot retain a closed peer */ }
+        bridges.delete(bridge);
       });
       socket.on('error', () => socket.destroy());
     });
@@ -107,9 +112,17 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
         stopping = true;
         const wasOnline = connectedSockets.size > 0;
         connectedSockets.clear();
-        for (const socket of sockets) socket.destroy();
+        let cleanupFailed = false;
+        // Install the shared promise before publishing cleanup: sinks may reenter stop().
         stopPromise = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
-          .then(() => { if (wasOnline) sink.connectionChanged('disconnected'); });
+          .then(() => {
+            if (wasOnline) sink.connectionChanged('disconnected');
+            if (cleanupFailed) throw new Error('pi observer cleanup failed');
+          });
+        for (const bridge of bridges) {
+          try { bridge.disconnected(); } catch { cleanupFailed = true; }
+        }
+        for (const socket of sockets) socket.destroy();
         return stopPromise;
       },
     };

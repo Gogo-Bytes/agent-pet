@@ -322,10 +322,12 @@ asset and advance Drei-managed animation tracks; the build emits the GLB as a
 local asset.
 This trusted fixture path is not user import validation.
 
-The prototype animation priority is working > unread error > unread completed >
-idle, independent of bubble order. Hiding bubbles does not change activity.
-The model uses Work, Error, Success and Idle clips respectively; the precise
-multi-session animation policy remains a product-tuning choice. PreferenceRenderLoop owns one cancellable RAF scheduler per Canvas, enforcing the
+The shared presentation projection uses current supported activity within working
+Sessions, then unread error > unread completed > idle, independent of bubble order.
+Transient tool failures do not end work; one-shot cues do not replay on rename or
+scene remount. See [event coverage and acceptance](../../docs/PET-ACTIONS-ACCEPTANCE.md). Hiding bubbles does not change activity.
+The bundled model still has only Work, Error, Success and Idle clips. Fine activity
+falls back to compatible existing animation/static; no new artwork is implied. PreferenceRenderLoop owns one cancellable RAF scheduler per Canvas, enforcing the
 selected 30/60/120 FPS and 75/100/150% DPR settings. Hidden management scenes stop
 drawing; document-hidden pause follows preferences and reduced animation pauses
 continuous poses while retaining the selected state. Drei useGLTF loads the bundled local URL;

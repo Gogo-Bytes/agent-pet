@@ -8,7 +8,7 @@ import { Box3, Mesh, Raycaster, Vector2, Vector3, type Group, type AnimationClip
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PetModel } from './PetModel.js';
 import { bundledAnimationBounds } from './bundled-animation-bounds.js';
-import type { PetMotion } from '@agent-pet/pet-runtime';
+import type { PetMotion, PetAnimations } from '@agent-pet/pet-runtime';
 
 // Real parsed asset, R3F reconciler, Drei Bounds/useAnimations, Three actions.
 // Only network/cache access is substituted; this test does not claim WebGL.
@@ -31,15 +31,16 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
   vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: clips } as ReturnType<typeof useGLTF>);
   let state!: RootState;
   function Probe() { state = useThree(); return null; }
+  let presentation: { replay?: string; restAction?: PetMotion; animations?: PetAnimations } = {};
   const ready = vi.fn();
   const hover = vi.fn();
   const tree = (value: PetMotion, visible = true) => <StrictMode><Activity mode={visible ? 'visible' : 'hidden'}><Probe /><Bounds margin={1.2} maxDuration={0}>
-    <PetModel motion={value} reduced={reduced} onReady={ready} onHover={hover} />
+    <PetModel {...presentation} motion={value} reduced={reduced} onReady={ready} onHover={hover} />
   </Bounds></Activity></StrictMode>;
   const view = await create(tree(motion), { width: size, height: size, camera: { fov: 35, position: [0, 0, 5] } });
   mounted.push(view);
   const root = state.scene.getObjectByName('Pet')!;
-  return { view, root, state, ready, hover, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
+  return { view, root, state, ready, hover, present: (value: typeof presentation) => { presentation = value; return view.update(tree(motion)); }, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
 }
 
 describe('PetModel bundled animation behavior', () => {
@@ -156,6 +157,40 @@ describe('PetModel bundled animation behavior', () => {
     expect(root.position.toArray()).toEqual([0, 0, 0]);
     await view.advanceFrames(12, .1);
     expect(root.position.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it('continues current work when a transient animation is missing', async () => {
+    const { view, root, present } = await mount('tool_error');
+    await present({ restAction: 'working', replay: 'missing-tool-1' });
+    await view.advanceFrames(3, .1);
+    expect(root.position.x).toBeCloseTo(.06, 4);
+    expect(root.position.y).toBeCloseTo(.08, 4);
+  });
+
+  it('plays a transient once, does not replay it when the resume action changes, then resumes the latest activity', async () => {
+    const { view, root, present } = await mount('tool_error');
+    const animations = { tool_error: 'Success', working: 'Work', reading: 'Work' };
+    await present({ animations, restAction: 'working', replay: 'tool-1' });
+    await view.advanceFrames(3, .1); expect(root.position.y).toBeCloseTo(.225, 4);
+    await present({ animations, restAction: 'reading', replay: 'tool-1' });
+    await view.advanceFrames(1, .1); expect(root.position.y).toBeCloseTo(.3, 4);
+    await view.advanceFrames(8, .1); await view.advanceFrames(3, .1);
+    expect(root.position.x).toBeCloseTo(.06, 4); expect(root.position.y).toBeCloseTo(.08, 4);
+  });
+
+  it('does not replay an already observed business result after waiting or remount, but plays a new work result', async () => {
+    const { view, root, present, switchMotion } = await mount('success');
+    await present({ replay: 'business-success-one' });
+    await view.advanceFrames(3, .1); expect(root.position.y).toBeCloseTo(.225, 4);
+    await switchMotion('waiting_input'); await view.advanceFrames(2, .1);
+    await switchMotion('success'); await view.advanceFrames(3, .1);
+    expect(root.position.y).toBeLessThan(.05);
+    await view.unmount(); mounted.splice(mounted.indexOf(view), 1);
+    const other = await mount('success');
+    await other.present({ replay: 'business-success-one' });
+    await other.view.advanceFrames(3, .1); expect(other.root.position.y).toBeLessThan(.05);
+    await other.present({ replay: 'business-success-two' });
+    await other.view.advanceFrames(3, .1); expect(other.root.position.y).toBeCloseTo(.225, 4);
   });
 
   it('refits after an authoritative size change without replacing the animated instance', async () => {

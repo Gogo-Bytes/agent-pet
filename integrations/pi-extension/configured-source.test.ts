@@ -89,7 +89,7 @@ async function fixture(placement: 'rendered' | 'deployed' = 'rendered') {
         // Observe settlement immediately; teardown never removes a live child's root.
         closed = new Promise<void>(resolve => child!.once('close', () => resolve()));
         const ready = await reply(child);
-        expect(ready).toEqual({ kind: 'ready', count: 6, cleanEnv: true });
+        expect(ready).toEqual({ kind: 'ready', count: 14, cleanEnv: true });
         return child;
       },
       async cleanup() {
@@ -151,6 +151,15 @@ it.each(['rendered', 'deployed'] as const)('runs the %s temporary configured ext
       await vi.waitFor(() => expect(app.snapshot().bubbles[0]?.status).toBe('working'));
       expect(await app.acknowledgeAndOpen({ provider: 'pi', sessionId: id })).toEqual({ status: 'unsupported' });
       expect(app.snapshot().bubbles[0]?.status).toBe('working');
+      await callback(child, 'message_update', { assistantMessageEvent: { type: 'thinking_start', contentIndex: 0 } });
+      await vi.waitFor(() => expect(app.snapshot().sessions[id]?.facts?.activities).toEqual(['thinking']));
+      await callback(child, 'tool_execution_start', { toolCallId: 'read-1', toolName: 'read', args: { sentinel: 'never-forward' } });
+      await vi.waitFor(() => expect(app.snapshot().sessions[id]?.facts?.activities).toContain('reading'));
+      await callback(child, 'ui_prompt_start', { title: 'never-forward' });
+      await vi.waitFor(() => expect(app.snapshot().sessions[id]?.facts?.waitingForInput).toBe(true));
+      await callback(child, 'ui_prompt_end');
+      await callback(child, 'tool_execution_end', { toolCallId: 'read-1', isError: true, result: 'never-forward' });
+      await vi.waitFor(() => expect(app.snapshot().sessions[id]?.facts?.occurrence?.kind).toBe('tool_error'));
       await callback(child, 'message_end', { message: { role: 'assistant', stopReason } });
       await callback(child, 'agent_settled');
       await vi.waitFor(() => expect(app.snapshot().bubbles[0]?.status).toBe(status));
@@ -160,7 +169,7 @@ it.each(['rendered', 'deployed'] as const)('runs the %s temporary configured ext
       await callback(child, 'session_info_changed', { name: 'Temporary target' });
     }
     const serializedSnapshot = JSON.stringify(app.snapshot());
-    for (const value of [target.token, target.endpoint]) {
+    for (const value of [target.token, target.endpoint, 'never-forward']) {
       const escapedValue = JSON.stringify(value).slice(1, -1);
       // Positive control: the same check must detect the escaped fixture value.
       expect(JSON.stringify({ leaked: value }).includes(escapedValue)).toBe(true);

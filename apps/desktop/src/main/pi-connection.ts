@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { lstat, mkdir, rmdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import type { SessionObservation } from '@agent-pet/domain';
 import type { AdapterHandle, ObservationSink } from '@agent-pet/adapter-core';
 import type { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import type { PiBridgeConfig } from './pi-config.js';
@@ -26,6 +27,7 @@ export class PiConnection {
   private owned: { deployment: PiTemporaryDeployment; receipt: TemporaryDeploymentReceipt } | undefined;
   private saved: SavedConnection | undefined;
   private callbackEpoch = 0;
+  private acceptedObservations = new Map<string, SessionObservation>();
   private listeners = new Set<(state: PiConnectionState) => void>();
   constructor(private readonly options: {
     target(): PreflightState;
@@ -185,7 +187,14 @@ export class PiConnection {
     this.state.canResume = false; this.state.receiving = 'active'; this.state.status = 'configured-waiting';
     try {
       this.handle = await this.options.adapter.start(config, {
-        publish: value => { if (!this.closed && epoch === this.callbackEpoch) this.options.publish(value); },
+        publish: value => {
+          if (this.closed || epoch !== this.callbackEpoch) return;
+          const previous = this.acceptedObservations.get(value.sessionId);
+          if (previous && (previous.revision !== undefined && value.revision !== undefined
+            ? value.revision <= previous.revision : value.observedAt < previous.observedAt)) return;
+          this.acceptedObservations.set(value.sessionId, value);
+          this.options.publish(value);
+        },
         connectionChanged: state => { if (epoch === this.callbackEpoch) this.connectionChanged(state); },
       });
     } catch {
@@ -248,7 +257,21 @@ export class PiConnection {
   }
   private async stopHandle(): Promise<void> {
     this.callbackEpoch++; // Invalidate callbacks BEFORE awaiting stop, including late socket close/hello.
+    // The epoch guard deliberately rejects Adapter callbacks during stop. Clear
+    // only our previously accepted activity locally, without admitting late data.
+    let observerFailed = false;
+    for (const value of this.acceptedObservations.values()) {
+      if (value.connected === false) continue;
+      const disconnected = { ...value, connected: false, facts: { activities: [], waitingForInput: false },
+          observedAt: new Date().toISOString(),
+          ...(value.revision !== undefined ? { revision: value.revision + 1 } : {}) };
+      try {
+        this.options.publish(disconnected);
+        this.acceptedObservations.set(value.sessionId, disconnected);
+      } catch { observerFailed = true; }
+    }
     if (this.handle) { await this.handle.stop(); this.handle = undefined; }
+    if (observerFailed) throw new Error('Pi activity cleanup failed');
     this.state.receiving = 'stopped';
   }
   private async releaseRuntime(): Promise<void> {

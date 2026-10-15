@@ -1,6 +1,7 @@
 import type { DisplayStatus } from '@agent-pet/domain';
 import { petActionIds, type PetAction, type PetAnimations } from './actions.js';
 export * from './actions.js';
+export * from './presentation.js';
 
 export type PetMotion = PetAction;
 

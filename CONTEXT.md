@@ -30,7 +30,23 @@ A compact visual representation of one Session. It follows the Pet, shows the Se
 A 3D avatar associated with a Configured Agent in the shared management scene. The desktop overlay has one Pet with multiple independent Session bubbles; a Pet is not created per Session.
 
 ### Pet asset
-A 3D GLB model plus the animation metadata needed by the Pet. The current MVP uses the bundled asset; future user-imported assets require explicit complexity and safety limits.
+A 3D GLB model with optional animations and descriptive metadata. A Pet asset with no animations is a valid static Pet; the current MVP uses the bundled asset.
+
+### Observation capability
+
+A Session fact that an Agent integration can reliably report in its current version, mode and connection. An unsupported or unknown observation capability is not evidence that the corresponding activity is absent.
+
+### Pet action
+
+A named presentation intent, such as working, waiting for input or celebrating, independent of any Agent's native event names and any artist's animation names. Every Pet action is optional for an individual Pet asset.
+
+### Pet action catalog
+
+The product's versioned vocabulary of Pet actions available to artists. Inclusion in the catalog does not promise that every Agent can trigger the action or that every asset implements it.
+
+### Animation mapping
+
+An asset's optional association between a Pet action and an animation supplied by its artist. No association means the asset does not implement that action; it does not make the Pet invalid.
 
 ### Open Session
 The user-visible action of bringing the originating Agent window or session to the foreground. It is Adapter-specific and may report unsupported or not-found rather than guaranteeing success.

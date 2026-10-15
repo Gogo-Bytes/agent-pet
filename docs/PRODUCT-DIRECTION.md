@@ -268,7 +268,7 @@ PetAsset  <- AgentPetBinding ->  ConfiguredAgent
 - tags 的加号打开 Agent 配置弹窗；支持多个 Agent 使用同一宠物。关闭 tag 仅解除该绑定，不停用或删除真实 Agent 连接。
 - 宠物页不呈现连接状态；配置弹窗展示当前宠物分配情况。
 - 动画预览入口读取模型能力的最终设计待接入；当前待机/工作/庆祝/睡觉是 CSS 交互演示。
-- 既有模型契约见 ARCHITECTURE-DESIGN.md：idle 必须，working/success/error/attention 可选，缺失动作确定性回退。正式宠物包须用 JSON 映射语义动作到 GLB 内实际 clip，并记录标签、循环方式；界面只列出实际支持动作。睡觉不是当前必需导出动作，不能将原型按钮当作艺术家格式规范。
+- 模型契约见 ARCHITECTURE-DESIGN.md：2026-10-15 用户确认所有动作可选，覆盖旧“idle 必须”的要求；没有动画也可静态显示。正式宠物包用 JSON 将统一动作映射到 GLB 内实际 clip；艺术家得到完整、带版本的动作目录，可任选实现。实际触发还取决于 Agent 的事件支持和当前接入，界面只列出资产实际可播放的动作。睡觉等交互/陪伴动作不要求 Agent 提供事件。当前运行代码的 Idle 必需校验尚待迁移，不把设计确认当作已经实现。
 
 阶段仍是 UI 原型验证。GLB+JSON 导入、真实 clip 播放、Canvas 生命周期和相机过渡需要在真实模型阶段验收。
 

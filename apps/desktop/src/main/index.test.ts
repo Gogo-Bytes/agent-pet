@@ -283,7 +283,9 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
   it('hits pet/toolbar, only visible populated bubbles, and reserves the expanded region', async () => {
     const layout = latestLayout();
     pointAt(layout.pet); expectHit(true);
-    pointAt(layout.toolbar); expectHit(false);
+    pointAt(layout.toolbar); expectHit(true); // direct hover is an entry, even before reveal
+    const gap = { x: layout.toolbar.x, y: layout.pet.y + layout.pet.height + 2, width: layout.toolbar.width, height: 1 };
+    pointAt(gap); expectHit(false);
     invoke('pet:controls-visible', true); expectHit(true);
     invoke('pet:controls-visible', false); expectHit(false);
     pointAt(layout.bubbles); expectHit(false); // no session bubbles

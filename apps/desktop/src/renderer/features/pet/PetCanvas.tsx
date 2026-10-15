@@ -23,7 +23,7 @@ class PetErrorBoundary extends Component<{ children: ReactNode; onNotice: (messa
 }
 
 export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
-  visible: boolean; store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void; onHover: (hovered: boolean) => void;
+  visible: boolean; store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void; onHover?: (hovered: boolean) => void;
 }) {
   const { sessions, preferences } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
@@ -40,7 +40,7 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel motion={selectPetMotion(sessions.bubbles)} reduced={preferences.reduced} onReady={onNotice} onHover={onHover} />
+            <PetModel motion={selectPetMotion(sessions.bubbles)} reduced={preferences.reduced} onReady={onNotice} {...(onHover ? { onHover } : {})} />
           </Bounds>
         </Suspense>
       </Canvas>

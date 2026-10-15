@@ -66,3 +66,20 @@ Electron版本源码依据：[panel选项](https://github.com/electron/electron/
 ![正式共享glass：背景线条检查](screenshots/desktop-overlay-glass/lines.png)
 
 最新包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-Y29Hre/mac-arm64/Agent Pet.app`。仅打包，不替换当前稳定应用或中断pi接收。上一阶段原生层级/全屏待验状态不变；本轮没有pi或系统设置操作，没有推送。
+
+
+## 后续修订：宠物与操作条共享 hover 范围（2026-10-15）
+
+用户要求hover操作条也能显示，并建议将宠物渲染区与操作条放进不可见共同容器。本轮采用这一行为，覆盖之前“仅mesh触发”的限制。
+
+Renderer用共享`petControlsRect`计算紧凑外接矩形，PetCanvas与GlassToolbar在容器内按局部坐标摆放；Tooltip仍使用Main原窗口坐标。气泡保持容器外，键盘顺序保持气泡优先；Canvas不重挂载、不增加场景/监听循环。容器的pointer enter/leave决定显示，停在连接空隙不会开启隐藏倒计时；180ms只用于离开整个组后的轻缓收起。失焦、文档隐藏、IPC失败及卸载清理继续生效。
+
+Main允许宠物和隐藏操作条的固定小区域触发hover；`controlsVisible`确认后，将两者之间的窄空隙也纳入原生命中，隐藏后撤回这一连接区域。渲染与原生命中共用几何函数，没有扩大至整个透明窗口或气泡。示例140px宠物：共同容器140×190，操作条96×44，间距6px。80/140/600px、上/下工具条、外接范围左右边界及释放均有回归。隐藏按钮区域作为hover入口是本轮明确行为，不再宣称该区域始终穿透。
+
+验证：相关 **58 passed / 4 files**；全量`pnpm test` **687 passed / 1 skipped / 71 files**；`pnpm typecheck`、`pnpm package:mac`（含`pnpm --filter @agent-pet/desktop build`）通过。日志`/tmp/agent-pet-hover-group-{tests,full-tests,package}.log`。初次回归发现包装后按钮DOM顺序改变，已保留气泡优先的键盘顺序并复验，没有改弱相关会话/焦点断言。
+
+正式Renderer320×430亲自操作：点击模型后移动到(156,365)的连接空隙，跨工具调用停留后工具条仍显示且elementFromPoint命中共同容器；随后点气泡按钮成功隐藏通知。从组外(300,350)进入后工具条为false，再直接移入隐藏操作条区域(156,390)变为true。原生系统穿透/连续移动没有新增实机验收，Main命中测试不冒充OS事件投递通过。
+
+![停留在宠物与操作条空隙时保持可用](screenshots/desktop-hover-group/gap.png)
+
+最新未签名arm64包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-HkvVrc/mac-arm64/Agent Pet.app`。未替换当前运行应用或中断pi，未操作真实目标、凭据、登录项或依赖。原生层级/全屏与发布验收仍待完成。

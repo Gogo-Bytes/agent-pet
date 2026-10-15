@@ -51,21 +51,30 @@ async function mount(options: Parameters<typeof createPetBridgeDouble>[0] = {}) 
 }
 
 describe('App session interactions', () => {
-  it('reveals controls only from model hits, not the transparent Canvas rectangle, and clears the region after leaving', async () => {
+  it('keeps controls visible across a slow pet-to-toolbar handoff inside the shared hover envelope', async () => {
     const user = userEvent.setup();
     const { bridge, container } = await mount();
     const toolbar = screen.getByRole('toolbar', { name: '桌宠快捷操作' });
-    await user.hover(container.querySelector('canvas')!);
+    const group = container.querySelector<HTMLElement>('[data-pet-controls-region]')!;
     expect(toolbar.getAttribute('data-visible')).toBe('false');
-    expect(bridge.api.controlsVisible).toHaveBeenLastCalledWith(false);
-    await act(async () => { vi.mocked(PetModel).mock.calls.at(-1)![0].onHover?.(true); });
+    await user.hover(container.querySelector('canvas')!);
+    expect(toolbar.getAttribute('data-visible')).toBe('true');
+    await user.hover(group); // the empty connecting area, outside the mesh and buttons
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)); });
     expect(toolbar.getAttribute('data-visible')).toBe('true');
     await user.hover(toolbar);
-    await act(async () => { vi.mocked(PetModel).mock.calls.at(-1)![0].onHover?.(false); });
     expect(toolbar.getAttribute('data-visible')).toBe('true');
     await user.unhover(toolbar);
     await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('false'));
     expect(bridge.api.controlsVisible).toHaveBeenLastCalledWith(false);
+    // Hovering the compact region also reveals controls without a model event.
+    await user.hover(group);
+    await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('true'));
+    act(() => window.dispatchEvent(new Event('blur')));
+    await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('false'));
+    await user.unhover(group);
+    await user.hover(group);
+    await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('true'));
   });
   it('does not render the standalone desktop pet name even with legacy names enabled', async () => {
     await mount();

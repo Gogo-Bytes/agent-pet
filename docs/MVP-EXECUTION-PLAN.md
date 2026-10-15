@@ -94,6 +94,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 用户随后要求统一使用glass组件：管理页玻璃实现已提取为正式`shared/ui/Glass.tsx`/`glass.css`，桌宠采用GlassToolbar/GlassAction/GlassButton，删除简化磨砂版本，加入适合桌面浅/深背景的对比变体及紧凑阴影。全量 **684 passed / 1 skipped / 71 files**，最终相关 **60 passed**，typecheck、desktop build、原型build、package通过；正式Renderer实看浅/深/线条、媒体回退及管理收藏回焦。新包尚未切换，原生层级和真实pi验收边界不变。截图与最新包见上述本轮证据的后续修订。
 
+用户进一步要求操作条容易到达：宠物渲染区域与操作条已放进同一个紧凑透明hover容器，停在中间空隙不再依赖180ms过渡时间；Main允许隐藏操作条区域作为入口，确认显示后接通间隙，远处空域继续穿透。共享几何覆盖80/140/600尺寸、操作条上下布局；保持单Canvas、键盘顺序、Tooltip窗口坐标、拖动、失焦/隐藏清理。全量 **687 passed / 1 skipped / 71 files**、typecheck、desktop build（package内）和package通过；正式Renderer已实测空隙停留、直接操作条入口、远处隐藏及气泡按钮，未切换运行中的用户应用。具体截图和新包见本轮证据的最新修订。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

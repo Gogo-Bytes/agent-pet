@@ -104,3 +104,5 @@ Main亲自重开 **42/42** 场景，并实测窄窗、480px 矮窗、取消、Es
 名称为主标题，下一行并列 Agent 类型与连接状态；不在下方再次渲染同一个状态标签。Identity 与 DeploymentControls 消费原 connectionSummary，同一状态节点 ref 用于预览结束后的回焦，不新增业务状态。没有可执行操作的在线说明区不占视觉留白。
 
 正式 Renderer 示例中，宽窗和 388px 窄窗的类型/状态中心差均为 0；状态标题只出现一次。实际点击预览确认后，焦点落到同行的“等待 pi”；管理页 **33 tests**、typecheck、desktop build（本轮 package 内）通过。截图：[同行信息](screenshots/bubble-shape/connection-meta.png)。未操作真实 pi、重启应用或扩大接入范围；用户视觉确认继续按 demo 反馈。
+
+用户进一步明确两项都应为 tag：名称下方保留独立一行，类型采用品牌紫底色，状态保留语义颜色与圆点；共用高度、字号、内边距和圆角样式，高对比模式两项均保留边框。实际宽窗与 388px 窄窗两项均高 26px、同一 y 坐标，窄窗 scrollWidth/clientWidth 均为 388；改名状态实看布局正常。管理页 **33 tests**、`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build` 通过。[两枚标签实际截图](screenshots/connection-polish/metadata-tags.png)。本次未重新打包或切换当前应用。

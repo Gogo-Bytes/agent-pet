@@ -21,6 +21,9 @@ export function createReviewBridge(scenario: string): ManagementBridge {
     const sessionId = `${id}:pi:process:session`; configs.sessionConfigurations[sessionId] = id;
     sessions = applyObservation(sessions, { provider: 'pi', sessionId, status: index ? 'completed' : 'working', observedAt: '2026-10-14T00:00:00Z', agentName: record.name });
   });
+  if (scenario === 'detail-error') configs.records = configs.records.map(record => ({ ...record, availability: 'attention',
+    inspection: { target: { path: record.targetPath, source: 'chosen' }, findings: ['unreadable'] },
+    connection: { ...base, status: 'failed', notice: 'preview-failed' } }));
   const preflight: PreflightState = { revision: 0, installations: [], automaticTarget: { path: '/test/AgentPet/default', source: 'default' }, selectedInstallation: null, target: { path: '/test/AgentPet', source: 'chosen' }, inspection: null, scan: 'complete', notice: 'none' };
   function pushConfigs() { configs = { ...configs, revision: configs.revision + 1 }; configListeners.forEach(listener => listener(configs)); return Promise.resolve(configs); }
   function subscribe<T>(listeners: Set<(value: T) => void>, listener: (value: T) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }

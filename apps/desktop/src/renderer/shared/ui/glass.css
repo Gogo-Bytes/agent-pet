@@ -7,6 +7,7 @@
   --glass-active-fill: #e8def6;
   --glass-elevation: 0 3px 6px #392b5012, 0 10px 24px #392b5010;
   --glass-compact-elevation: 0 1px 2px #392b5018;
+  --glass-compact-rim: inset 0 1px 0 #ffffffc2, inset 0 -1px 0 #70548a10;
   --glass-rim: inset 0 0 0 1px #ffffff55, inset 2px 3px 1px -2px #fffffffa, inset -2px -3px 1px -2px #ffffffd9, inset -1px -1px 3px #49365b24, inset 1px 4px 5px -4px #49365b38;
 }
 .glass-surface { position:relative; isolation:isolate; }

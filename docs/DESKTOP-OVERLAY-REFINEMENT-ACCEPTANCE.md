@@ -83,3 +83,19 @@ Main允许宠物和隐藏操作条的固定小区域触发hover；`controlsVisib
 ![停留在宠物与操作条空隙时保持可用](screenshots/desktop-hover-group/gap.png)
 
 最新未签名arm64包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-HkvVrc/mac-arm64/Agent Pet.app`。未替换当前运行应用或中断pi，未操作真实目标、凭据、登录项或依赖。原生层级/全屏与发布验收仍待完成。
+
+### 气泡堆叠与玻璃边缘修复（2026-10-15）
+
+用户截图中的半截露出及阴影方块有明确源码原因：BubbleStack.module.css 的后一个 .bubble 声明把默认 absolute 覆盖成 relative，收起后仍以列表流排版；展开时不再命中 compact elevation 规则，恢复到大面板 20px/46px 阴影，而原裁切区仅留 4px 空间。
+
+修订保持共享高对比 panel GlassButton：默认 absolute，只有展开时 relative；层内留 8px、展开滚动区内再留 3px，卡片间距 10px。展开和收起都使用共享 compact elevation 与新 compact rim token，圆角裁切装饰层，去掉名称的模糊白色文字阴影。没有覆盖组件背景/另造玻璃版本，没有增加 Canvas/ResizeObserver/动画循环；Main 几何与先确认后显示、旧 ACK 防护、清理及状态行为不变。
+
+Main 实际查看正式 Renderer 的示例：修复前收起状态第二条露出半截；修复后 absolute 卡片叠放，展开两条均为 54px 高、相隔 10px，阴影为 0 1px 2px。上方/下方方向分别核对，收起仍为 88px；真实 Tab 聚焦第二条后展开为 204px。白色、深色、密集线条背景均无跨卡片的厚重方形阴影，文字 filter/text-shadow 为 none。另打开原型 glass-study 检查原玻璃控件基线（没有将原型画面当作本次桌宠截图）。
+
+CDP 媒体检查只作用于临时示例 tab，已恢复：减少透明度时 optics 为实色且无 backdrop filter；强制颜色时系统文字/边框与无阴影可读；减少动画时 data-motion=reduced。没有实际不支持 backdrop-filter 的浏览器可验证，沿用共享基础回退，未将这一点标为实机通过。
+
+验证：`pnpm exec vitest run apps/desktop/src/renderer/management/ManagementApp.test.tsx apps/desktop/src/renderer/features/session-bubbles/BubbleStack.test.tsx apps/desktop/src/renderer/shared/ui/Glass.test.tsx` **41 passed / 3 files**，`pnpm typecheck`、prototype build、`pnpm package:mac`（含 desktop build）、diff check 通过。未重新运行全量；Main/Adapter/guard/保留文件相关代码和测试均未修改。
+
+截图为正式代码 + 独立示例，不是实际 pi：[白底收起](screenshots/bubble-shape/white-collapsed.png)、[白底展开](screenshots/bubble-shape/white-expanded.png)、[深底展开](screenshots/bubble-shape/dark-expanded.png)、[线条背景](screenshots/bubble-shape/lines-expanded.png)、[系统高对比](screenshots/bubble-shape/forced-colors.png)。预览为 <http://127.0.0.1:4175/visual.html?bubbles=pair&theme=white>，悬停或聚焦展开。
+
+最新未签名 arm64 包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-Rib7Yb/mac-arm64/Agent Pet.app`。没有启动/替换此包，没有中断运行中的应用和 pi，也没有日常配置/凭据读取、部署、重载、系统授权或依赖安装。新包透明原生窗口的合成效果、跨应用/全屏层级仍需真实验证，不由浏览器背景检查外推。

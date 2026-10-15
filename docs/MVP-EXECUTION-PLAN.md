@@ -112,6 +112,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 按用户标注，连接名称下方的 Agent 类型与在线状态已合为一行，状态只渲染一次；预览结束回焦仍指向同一个真实状态节点。宽/窄同排居中差为 0，浏览器实际确认后焦点落在“等待 pi”；管理页 33 tests、typecheck、desktop build（package 内）通过。详见 [连接页记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 最新修订，当前应用与真实 pi 未操作。
 
+桌宠气泡截图反馈已修正：重复 CSS 定位导致收起状态露出下一条半截，展开态又沿用大面板阴影。现在只在展开时进入列表流，统一紧凑玻璃边缘/阴影并预留空间；Main 的 88/204px 边界、确认先于显示和状态语义不变。相关 **41 tests / 3 files**、typecheck、原型 build、desktop build（package 内）及 package 通过；正式 Renderer 实看白/深/线条背景、上下位置、悬停/键盘及系统媒体回退。最新包与原生覆盖限制见 [桌宠记录](DESKTOP-OVERLAY-REFINEMENT-ACCEPTANCE.md) 最新修订；当前应用未替换、真实 pi 未操作。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

@@ -11,7 +11,10 @@ const application = createApplication([{
 }]);
 const params = new URLSearchParams(location.search);
 const motion = params.get('motion');
-const observations = motion === 'idle' ? []
+const observations = params.get('bubbles') === 'pair' ? [
+  piObservation({ sessionId: 'pi:baseline:completed', providerSessionId: 'completed', agentName: '项目助手', status: 'completed' }),
+  piObservation({ agentName: '小忍者', status: 'working' }),
+] : motion === 'idle' ? []
   : motion === 'working' ? [piObservation({ status: 'working' })]
   : motion === 'success' ? [piObservation({ status: 'completed' })]
   : motion === 'error' ? [piObservation({ status: 'error' })] : piBaselineObservations();
@@ -47,4 +50,4 @@ window.addEventListener('beforeunload', unsubscribe, { once: true });
 await import('../main.js');
 document.body.style.background = params.get('theme') === 'lines'
   ? 'repeating-linear-gradient(90deg, #9c8aae 0, #9c8aae 1px, #f8f5fc 1px, #f8f5fc 10px)'
-  : params.get('theme') === 'dark' ? '#111827' : '#f1f5f9';
+  : params.get('theme') === 'dark' ? '#111827' : params.get('theme') === 'white' ? '#fff' : '#f1f5f9';

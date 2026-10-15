@@ -336,6 +336,13 @@ socket and does not simulate native movement. See `../../docs/RENDERER-R2-R3F.md
 for historical R2 lifecycle/dependency evidence and `../../patches/README.md` for
 the pinned Fiber initialization-error patch and its removal gate.
 
+The isolated review host at 4175 also serves
+`/visual.html?bubbles=pair&theme=white` for working/completed bubble styling;
+`theme=dark|lines` checks contrast and backdrop edges. These are in-memory examples.
+Collapsed bubbles are positioned as a stack; only expanded bubbles use list flow.
+Both states use shared compact glass rim/elevation tokens inside the unchanged
+Main-owned 88px/204px interaction regions.
+
 Controlled test-fixture check: changing Session states should change motion, and
 acknowledging all terminal bubbles should
 return it to Idle. Missing optional clips fall back to Idle; missing required Idle

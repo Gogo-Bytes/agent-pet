@@ -102,6 +102,10 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 全量 **691 passed / 1 skipped / 71 files**、typecheck、desktop build（package内）和package通过，独立Review READY。正式Renderer亲自检查宽/窄/矮、等待/错误、检查与连接状态分离、单行长路径、预览/取消回焦；仅使用隔离示例，没有操作真实pi或重启正在运行的应用。最新截图、新包及范围见 [连接页记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 的后续修订。原设置停点、原生层级/全屏、真实任务矩阵及发布仍未完成。
 
+## 连接页逐场景演示（2026-10-15）
+
+按用户要求，暂停自行调整设计，先在 Demo Web 汇总 42 个编号场景，供逐页指导。入口为 `pnpm demo:connections` / <http://127.0.0.1:4175/connection-scenes.html>；当前正式组件配合独立示例 bridge，支持上/下页、直接链接、宽/窄/矮窗口和重新打开。没有修改正式页面布局、Main/preload 或真实 pi。浏览器逐个打开 42 个场景通过，另核对窄窗命名、矮窗预览、取消检查与重开；管理页 32 tests、typecheck、desktop build 及独立 demo build 通过。截图见 [场景目录](screenshots/connection-scenes/catalog-wide.png)。这里只证明示例场景可用于讨论，不代表新 UI 用户认可或真实接入验收。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

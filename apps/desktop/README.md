@@ -163,6 +163,15 @@ pnpm exec vite --config apps/desktop/vite.management-review.config.ts
 # http://127.0.0.1:4175/management-review.html?case=online  (empty/error also supported)
 ```
 
+连接页逐页调整入口：`pnpm demo:connections`，打开
+<http://127.0.0.1:4175/connection-scenes.html>。若 4175 的演示服务已经运行，直接打开链接即可。
+左侧列出 42 个编号场景，包含连接列表/详情、扫描、一键配置、手动添加三步、
+更换位置与移除的正常/等待/错误画面。右侧可操作，也可用“上一个 / 下一个”、
+宽/窄/矮窗口、“重新打开”和单独打开链接。地址中的 `scene` 可分享或刷新恢复。
+这是当前正式 React 组件的演示，使用明确标注的示例数据；所有模拟接口只存在于
+`src/renderer/test-support`，没有文件、系统或 Electron IPC 操作，不会影响正在运行的 pi。
+场景等待状态不会通过计时器自动成功；需要回到初始画面时点击“重新打开”。
+
 That entry imports actual formal components/CSS/GLB but injects a test-only in-memory
 bridge; it cannot deploy or start a receiver and is excluded from Electron rollup.
 See [formal migration evidence](../../docs/MANAGEMENT-MIGRATION-ACCEPTANCE.md) for

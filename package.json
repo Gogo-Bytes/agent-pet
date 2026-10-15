@@ -7,7 +7,8 @@
     "test:d61": "node packages/adapter-pi/src/managed/d6/run.mjs",
     "typecheck": "tsc --noEmit",
     "package:mac": "node scripts/package-desktop.mjs",
-    "prototype": "vite --config apps/desktop/vite.prototype.config.ts --host 127.0.0.1"
+    "prototype": "vite --config apps/desktop/vite.prototype.config.ts --host 127.0.0.1",
+    "demo:connections": "vite --config apps/desktop/vite.management-review.config.ts --open /connection-scenes.html"
   },
   "devDependencies": {
     "@react-three/test-renderer": "9.1.0",

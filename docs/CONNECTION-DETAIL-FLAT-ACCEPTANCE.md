@@ -106,3 +106,5 @@ Main亲自重开 **42/42** 场景，并实测窄窗、480px 矮窗、取消、Es
 正式 Renderer 示例中，宽窗和 388px 窄窗的类型/状态中心差均为 0；状态标题只出现一次。实际点击预览确认后，焦点落到同行的“等待 pi”；管理页 **33 tests**、typecheck、desktop build（本轮 package 内）通过。截图：[同行信息](screenshots/bubble-shape/connection-meta.png)。未操作真实 pi、重启应用或扩大接入范围；用户视觉确认继续按 demo 反馈。
 
 用户进一步明确两项都应为 tag：名称下方保留独立一行，类型采用品牌紫底色，状态保留语义颜色与圆点；共用高度、字号、内边距和圆角样式，高对比模式两项均保留边框。实际宽窗与 388px 窄窗两项均高 26px、同一 y 坐标，窄窗 scrollWidth/clientWidth 均为 388；改名状态实看布局正常。管理页 **33 tests**、`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build` 通过。[两枚标签实际截图](screenshots/connection-polish/metadata-tags.png)。本次未重新打包或切换当前应用。
+
+再次按用户反馈，将标签行移出名称容器，放到头像、名称及编辑按钮整行的下方，跨满详情宽度并与头像左边对齐。宽窗和 388px 窄窗实测标签均在头像底部以下，窄窗无横向溢出，改名表单仍独立占行。管理页 **33 tests**、typecheck、desktop build 通过。[独立整行截图](screenshots/connection-polish/metadata-separate-row.png)。Demo 已更新，当前应用未切换。

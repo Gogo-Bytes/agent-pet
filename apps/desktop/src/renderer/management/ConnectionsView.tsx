@@ -41,8 +41,9 @@ function Identity({ record, onRename, busy, statusRef }: { record: AgentConfigur
   const trigger = useRef<HTMLButtonElement>(null);
   function cancel() { setEditing(false); requestAnimationFrame(() => trigger.current?.focus()); }
   return <div className={`cfg-identity ${editing ? 'is-editing' : ''} ${record.name.length > 18 ? 'is-long' : ''}`}>
-    <AgentMark record={record} /><div className="cfg-identity-name"><h2 tabIndex={-1}>{editing ? '修改名称' : record.name}</h2><div className="cfg-identity-meta"><span className="cfg-type">{providerLabels[record.provider]}</span><h3 ref={statusRef} tabIndex={-1} className={`cfg-status-badge cfg-connection-${summary.tone}`}><span className="cfg-status-dot" aria-hidden="true" />{summary.title}</h3></div></div>
+    <AgentMark record={record} /><div className="cfg-identity-name"><h2 tabIndex={-1}>{editing ? '修改名称' : record.name}</h2></div>
     <button ref={trigger} hidden={editing} className="cfg-icon-button" aria-label="重命名" disabled={busy} onClick={() => { setName(record.name); setEditing(true); }}><Icon name="edit" /></button>
+    <div className="cfg-identity-meta"><span className="cfg-type">{providerLabels[record.provider]}</span><h3 ref={statusRef} tabIndex={-1} className={`cfg-status-badge cfg-connection-${summary.tone}`}><span className="cfg-status-dot" aria-hidden="true" />{summary.title}</h3></div>
     {editing && <form className="cfg-inline-name" onSubmit={event => { event.preventDefault(); if (name.trim() && !busy) void onRename(name).then(saved => { if (saved) cancel(); }); }}>
       <TextField autoFocus id="config-name" label="配置名称" maxLength={40} value={name} error={!name.trim() ? '请输入名称，最多 40 个字。' : undefined} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); cancel(); } }} />
       <div className="cfg-inline-actions"><button type="button" className="cfg-name-cancel" onClick={cancel}>取消</button><button className="cfg-name-save" disabled={busy || !name.trim()}>保存</button></div>

@@ -13,15 +13,15 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   const stateListeners = new Set<(value: ManagementState) => void>();
   const configListeners = new Set<(value: ConfigurationsState) => void>();
   const sessionListeners = new Set<(value: SessionState) => void>();
-  const paths = ['/test/AgentPet/personal', '/test/AgentPet/project'];
-  if (scenario !== 'empty') paths.forEach((path, index) => {
+  const paths = scenario === 'scan-saved' ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
+  if (scenario !== 'empty' && scenario !== 'scan-new') paths.forEach((path, index) => {
     const id = `review-${index}`;
-    const record: ConfigurationMetadata = { id, name: index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };
+    const record: ConfigurationMetadata = { id, name: scenario === 'scan-saved' ? 'pi 默认配置' : index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };
     configs.records.push({ ...record, availability: 'available', inspection: { target: { path, source: 'chosen' }, findings: [] }, connection: { ...base, status: 'connected', receiving: 'active', saved: 'ready', canConfigure: false, canRemove: true, deployedPath: `${path}/extensions/agent-pet.ts` } });
     const sessionId = `${id}:pi:process:session`; configs.sessionConfigurations[sessionId] = id;
     sessions = applyObservation(sessions, { provider: 'pi', sessionId, status: index ? 'completed' : 'working', observedAt: '2026-10-14T00:00:00Z', agentName: record.name });
   });
-  const preflight: PreflightState = { revision: 0, installations: [], selectedInstallation: null, target: { path: '/test/AgentPet', source: 'chosen' }, inspection: null, scan: 'complete', notice: 'none' };
+  const preflight: PreflightState = { revision: 0, installations: [], automaticTarget: { path: '/test/AgentPet/default', source: 'default' }, selectedInstallation: null, target: { path: '/test/AgentPet', source: 'chosen' }, inspection: null, scan: 'complete', notice: 'none' };
   function pushConfigs() { configs = { ...configs, revision: configs.revision + 1 }; configListeners.forEach(listener => listener(configs)); return Promise.resolve(configs); }
   function subscribe<T>(listeners: Set<(value: T) => void>, listener: (value: T) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
   function record(id: string) { const value = configs.records.find(value => value.id === id); if (!value) throw new Error('Record missing'); return value; }
@@ -36,7 +36,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
       stateListeners.forEach(listener => listener(state)); return state;
     }, setLogin: async () => state,
     locations: { choose: async () => '/test/AgentPet/new', authorize: async path => path, inspect: async (path, provider) => provider === 'pi' ? { target: { path, source: 'chosen' }, findings: [] } : null },
-    piPreflight: { getState: async () => preflight, detect: async () => ({ ...preflight, installations: [{ id: 'pi-installation', path: '/test/pi-package', compatibility: 'verified-0.85.1', version: '0.85.1' }] }), chooseInstallation: async () => preflight, chooseTarget: async () => preflight, selectInstallation: async () => preflight, useDefaultTarget: async () => preflight, inspect: async () => preflight },
+    piPreflight: { getState: async () => preflight, detect: async () => ({ ...preflight, installations: ['v22.22.3', 'v24.20.0'].map(version => ({ id: `pi-${version}`, path: `/test/AgentPet/.nvm/versions/node/${version}/bin/pi`, compatibility: 'verified-0.85.1' as const, version: '0.85.1' })) }), chooseInstallation: async () => preflight, chooseTarget: async () => preflight, selectInstallation: async () => preflight, useDefaultTarget: async () => preflight, inspect: async () => preflight },
     piConnection: { getState: async () => base, preview: async () => base, cancel: async () => base, confirm: async () => base, resume: async () => base, disable: async () => base, remove: async () => base, subscribe: () => () => {} },
     configurations: {
       getState: async () => configs, subscribe: listener => subscribe(configListeners, listener),

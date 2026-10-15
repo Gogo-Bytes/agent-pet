@@ -322,7 +322,16 @@ describe('ManagementApp formal four-page interface', () => {
     await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
     expect(screen.getAllByRole('button', { name: '一键配置' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /选择配置位置/ })).toBeNull();
-    expect(screen.getByText('检测到 2 处支持的程序安装，共用此默认配置。')).toBeTruthy();
+    expect(screen.getByText('2 处安装 · 共用此配置')).toBeTruthy();
+    expect(screen.getByText('已找到本机 pi，可使用默认配置接入。')).toBeTruthy();
+    const disclosure = screen.getByText('程序安装详情').closest('summary')!;
+    expect(disclosure.parentElement?.hasAttribute('open')).toBe(false);
+    await test.user.click(disclosure);
+    expect(disclosure.parentElement?.hasAttribute('open')).toBe(true);
+    expect(screen.getByRole('list', { name: '检测到的程序安装' }).textContent).toContain('/synthetic/node24/bin/pi');
+    await test.user.click(disclosure);
+    expect(disclosure.parentElement?.hasAttribute('open')).toBe(false);
+    expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
     await test.user.click(screen.getByRole('button', { name: '一键配置' }));
     expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: '配置检测到的 pi' }).textContent).toContain(initialPreflight.automaticTarget!.path);
@@ -350,6 +359,8 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getAllByRole('alert').some(value => value.textContent?.includes('检查未完成'))).toBe(true);
     await test.user.click(screen.getByRole('button', { name: '取消' }));
     act(() => test.pushConfigs({ ...test.configs(), records: [existing] }));
+    expect(screen.getByText('已找到本机 pi，默认配置已添加。')).toBeTruthy();
+    expect(screen.queryByText(/一键配置会先检查/)).toBeNull();
     await test.user.click(screen.getByRole('button', { name: '查看配置' }));
     expect(screen.getByRole('heading', { name: existing.name })).toBeTruthy();
     expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledTimes(1);

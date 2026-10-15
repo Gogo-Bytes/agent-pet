@@ -14,6 +14,23 @@ const marks: Record<AgentConfiguration['provider'], IconName> = { pi: 'pi', code
 export function AgentMark({ record }: { record: Pick<AgentConfiguration, 'provider'> }) { return <span className={`menu-agent-mark agent-${record.provider}`} aria-hidden="true"><Icon name={marks[record.provider]} /></span>; }
 const labels = { available: '配置可用', unchecked: '尚未检查', attention: '需要处理', unsupported: '接入尚未支持' };
 
+/** The configuration owns the action; expanding installations never moves that action. */
+function DetectedPiResult({ path, installations, existing, busy, onSelect }: {
+  path: string; installations: PreflightState['installations']; existing: boolean; busy: boolean; onSelect: () => void;
+}) {
+  return <article className="cfg-detected" aria-label="pi 默认配置">
+    <div className="cfg-detected-header">
+      <AgentMark record={{ provider: 'pi' }} />
+      <div className="cfg-detected-identity"><h2>pi 默认配置</h2><code>{path}</code></div>
+      <button className="cfg-primary" disabled={busy} onClick={onSelect}>{existing ? '查看配置' : '一键配置'}<Icon name={existing ? 'right' : 'plus'} /></button>
+    </div>
+    <details className="cfg-installations">
+      <summary><span>程序安装详情</span><span className="cfg-installation-count">{installations.length} 处安装 · 共用此配置</span><Icon name="down" /></summary>
+      <ul aria-label="检测到的程序安装">{installations.map(installation => <li key={installation.id}><span className="cfg-installation-version">pi {installation.version}</span><code>{installation.path}</code></li>)}</ul>
+    </details>
+  </article>;
+}
+
 function Identity({ record, onRename, busy }: { record: AgentConfiguration; onRename: (name: string) => Promise<boolean>; busy: boolean }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(record.name);
@@ -76,13 +93,14 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
           </div></div>
       </> : <>
         <header className="cfg-subpage-head"><button className="cfg-text-button" onClick={() => page === 'discover' ? cancelScan() : setPage('agent')}><Icon name="left" />{page === 'remove' ? '配置详情' : '我的连接'}</button><span>{page === 'discover' ? '自动扫描' : '移除配置'}</span></header>
-        <div className="cfg-content-scroll">{page === 'discover' ? <section className="cfg-discovery"><div className="cfg-discovery-heading"><div><h1 tabIndex={-1}>自动扫描</h1><p>{scanning ? '正在查找支持的 pi 安装…' : automatic ? '已自动匹配 pi 默认配置，可以直接配置。' : '查找本机支持的 Agent。'}</p></div><button className="cfg-secondary" disabled={scanning || busy} onClick={() => void detect()}><Icon name="replay" />重新扫描</button></div>
+        <div className="cfg-content-scroll">{page === 'discover' ? <section className="cfg-discovery"><div className="cfg-discovery-heading"><div><h1 tabIndex={-1}>自动扫描</h1><p>{scanning ? '正在查找支持的 pi 安装…' : automatic ? existingDetected ? '已找到本机 pi，默认配置已添加。' : '已找到本机 pi，可使用默认配置接入。' : '查找本机支持的 Agent。'}</p></div><button className="cfg-secondary" disabled={scanning || busy} onClick={() => void detect()}><Icon name="replay" />重新扫描</button></div>
           {scanning ? <div className="cfg-scan-stage" role="status"><div className="cfg-scan-art"><Icon name="scan" /></div><strong>正在查找安装</strong><p>只查找当前支持的 pi，不扫描会话或对话。</p><button className="cfg-secondary" onClick={cancelScan}>取消扫描</button></div> : <>
-            <div className="cfg-results">{automatic && <div className="cfg-result"><AgentMark record={{ provider: 'pi' }} /><div><strong>pi 默认配置</strong><code>{automatic.path}</code><small>检测到 {detected.length} 处支持的程序安装，共用此默认配置。</small><details><summary>程序安装详情</summary>{detected.map(installation => <p key={installation.id}><small>pi {installation.version}</small><code>{installation.path}</code></p>)}</details></div><button className="cfg-primary" disabled={busy} onClick={() => existingDetected ? (setSelected(existingDetected.id), setPage('agent')) : void prepareDetected()}>{existingDetected ? '查看配置' : '一键配置'}<Icon name={existingDetected ? 'right' : 'plus'} /></button></div>}
+            <div className="cfg-results">{automatic && <DetectedPiResult path={automatic.path} installations={detected} existing={!!existingDetected} busy={busy} onSelect={() => existingDetected ? (setSelected(existingDetected.id), setPage('agent')) : void prepareDetected()} />}
               {scan?.installations.filter(installation => installation.compatibility === 'unverified').map(installation => <div className="cfg-result" key={installation.id}><AgentMark record={{ provider: 'pi' }} /><div><strong>pi <span>{installation.version ?? '版本未确认'}</span></strong><code>{installation.path}</code><small>此版本暂不支持一键配置，兼容性尚未验证。</small></div></div>)}</div>
             {!scan?.installations.length && <div className="cfg-empty"><Icon name="scan" /><h2>未找到安装</h2><p>可以手动选择已有配置位置。</p></div>}
             {scan?.scan === 'limited' && <p className="cfg-notice" role="status">扫描范围受限，结果可能不完整。可以重新扫描或手动选择配置位置。</p>}
-            <p className="cfg-notice">一键配置会自动填写名称、类型和默认位置，检查后展示部署预览。确认部署后才开始接收；Agent 在线需收到实际通信。项目或自定义配置可手动添加。</p><button className="cfg-text-button" disabled={busy} onClick={() => setManual(null)}><Icon name="folder" />手动添加<Icon name="right" /></button>{(scanError || error) && <p role="alert">{scanError || error}</p>}
+            {automatic && <p className="cfg-discovery-note">{existingDetected ? '可在配置详情中检查和管理。' : '一键配置会先检查并展示部署预览，确认后才会写入。'}<span>Agent 在线以实际通信为准。</span></p>}
+            <div className="cfg-discovery-manual"><div><strong>使用项目或自定义配置？</strong><p>选择已有配置文件夹，单独添加。</p></div><button className="cfg-text-button" disabled={busy} onClick={() => setManual(null)}>手动添加<Icon name="right" /></button></div>{(scanError || error) && <p role="alert">{scanError || error}</p>}
           </>}
         </section> : current ? <section className="cfg-form-page cfg-removal"><span className="cfg-form-sign"><Icon name="trash" /></span><h1 tabIndex={-1}>移除配置</h1><p className="cfg-form-intro">只处理 Agent Pet 中的这条配置。Agent 程序和用户文件都会保留。</p><div className="cfg-form-target"><AgentMark record={current} /><div><strong>{current.name}</strong><code>{current.targetPath}</code></div></div>
           {current.connection?.deployedPath && <p>会先停用接收并保存停用状态，再仅移除仍匹配本应用所有权、身份与内容的扩展。用户修改或未知文件保留，未完成撤回会保留配置供处理。运行中的扩展不会因此卸载，请自行安全重载或关闭 pi。</p>}

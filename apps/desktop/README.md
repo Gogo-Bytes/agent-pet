@@ -146,6 +146,13 @@ screenshots, commands, native interaction limitations and remaining capabilities
 Only pi and one bundled pet are truly implemented; imports/new Providers and
 automatic project-configuration discovery remain gaps, accurately shown in UI.
 
+The scan result now keeps configuration identity/actions above a separate native
+installation disclosure. Two installations sharing a default target produce one
+action; saved targets open their existing configuration. Narrow windows place the
+action on its own row. Actual Electron screenshots, keyboard checks and test-boundary
+responsive evidence: [scan UI revision](../../docs/PI-SCAN-VISUAL-ACCEPTANCE.md).
+This UI review does not authorize or certify a daily pi deployment.
+
 ## pi detection and read-only preflight (P2a)
 
 Historical P2a APIs expose detect/rescan, installation and target pickers and explicit

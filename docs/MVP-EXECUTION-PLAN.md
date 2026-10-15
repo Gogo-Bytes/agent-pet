@@ -26,7 +26,9 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## 多 Agent 动作与艺术家契约确认（2026-10-15）
 
-用户确认：各 Agent 的原生事件按能力适配成统一事实，宠物动作与资产动画分开；面向艺术家提供完整、带版本的动作目录，所有动作均可选，连 Idle 也不要求存在。缺失动作/clip 不报加载错误，最终可静态显示。触发依据是当前 Agent 版本/模式/接入所支持的事实与资产可用动画，不以类型名称或目录中存在动作冒充已接入。已同步需求、领域术语、架构和产品方向；当前 `pet-runtime` 校验、`PetModel` 和 `ScenePet` 仍要求 Idle，能力声明、扩展动作、目录模板与统一静态回退**尚未实施**。本轮只确认设计，不新增 Provider、不改运行代码、不部署 pi 或打包。
+用户确认：各 Agent 的原生事件按能力适配成统一事实，宠物动作与资产动画分开；所有动作均可选，连 Idle 也不要求存在。阶段1已实施：统一23种动作目录、v2可选动画manifest、生成艺术家模板、共享R3F播放器；无映射/无clip/无Idle时静态回退，单次动作结束回待机或静态。现有包格式兼容，模型路径与必要字段校验保留。资产导入尚未实现，目录不代表所有Agent都支持触发。
+
+验证：全量 **705 passed / 1 skipped / 72 files**，`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、模板一致性检查通过；独立subagent复验76项、无阻塞。4175 dev测试边界使用正式ScenePet和真实GLB，实看无动画映射、无Idle及单次动作回退；零clip与清理由实际Three.js测试覆盖。[静态截图](evidence/pet-actions/static.jpg)、[艺术家说明](PET-ARTIST-GUIDE.md)。未打包、未部署/启动/重载真实pi；下一阶段是pi细分事件与能力事实适配。
 
 ## 本机菜单栏图标恢复（2026-10-15）
 

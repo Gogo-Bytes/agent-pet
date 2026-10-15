@@ -351,8 +351,12 @@ Main-owned 88px/204px interaction regions.
 
 Controlled test-fixture check: changing Session states should change motion, and
 acknowledging all terminal bubbles should
-return it to Idle. Missing optional clips fall back to Idle; missing required Idle
-is a loading error.
+return it to Idle/static. Every animation, including Idle, is optional. All three
+scenes share the catalog resolver/player: absent mappings or clips use a compatible
+fallback, finally restoring the default static pose. Single-shot clips play once
+then return to Idle/static. Artist template and catalog: [guide](../../docs/PET-ARTIST-GUIDE.md).
+The isolated 4175 host serves `/pet-actions-review.html` using the production player
+and bundled GLB; it never connects to an Agent.
 
 ## Explicit pi bridge development configuration
 

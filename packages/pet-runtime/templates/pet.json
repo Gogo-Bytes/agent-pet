@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "actionCatalogVersion": 1,
+  "id": "my-pet",
+  "version": "1.0.0",
+  "model": "pet.glb",
+  "license": "",
+  "animations": {
+    "idle": null,
+    "working": null,
+    "thinking": null,
+    "responding": null,
+    "reading": null,
+    "writing": null,
+    "searching": null,
+    "executing": null,
+    "compacting": null,
+    "waiting_input": null,
+    "success": null,
+    "error": null,
+    "tool_error": null,
+    "retrying": null,
+    "output_limited": null,
+    "cancelled": null,
+    "attention": null,
+    "connected": null,
+    "disconnected": null,
+    "hover": null,
+    "selected": null,
+    "dragging": null,
+    "sleeping": null
+  }
+}

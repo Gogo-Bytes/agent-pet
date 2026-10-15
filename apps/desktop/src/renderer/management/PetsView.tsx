@@ -5,6 +5,7 @@ import { Icon } from './components/icons.js';
 import { Dialog } from './components/Dialog.js';
 import { GlassDrawer } from './components/GlassDrawer.js';
 import { petActions } from './ScenePet.js';
+import { normalizePetAction } from '@agent-pet/pet-runtime';
 import { providerLabels } from './home-projection.js';
 
 export function PetsView({ visible, records, name, clips, action, busy, onName, onBind, onAction, error, reduced }: {
@@ -37,7 +38,8 @@ export function PetsView({ visible, records, name, clips, action, busy, onName, 
       if (saved) { setNotice(''); endNameEdit(); }
     } catch { if (attempt === nameAttempt.current) setNotice('名称保存失败，请重试。'); }
   }
-  const motions = petActions.filter(value => clips.includes(value.id));
+  const motions = petActions.filter(value => clips.some(clip => normalizePetAction(clip) === value.id));
+  const normalizedAction = normalizePetAction(action);
   useEffect(() => { if (!visible) { setPanel(null); setMotionsOpen(false); setEditing(false); } }, [visible]);
   useEffect(() => {
     if (!motionsOpen) return;
@@ -63,10 +65,10 @@ export function PetsView({ visible, records, name, clips, action, busy, onName, 
       <GlassAction className="pet-grid-open" aria-label="打开宠物收藏" onClick={() => openPanel('pets')}><Icon name="grid" /><small>1 / 1</small></GlassAction>
       <GlassAction aria-label="下一个宠物" onClick={() => setNotice('当前收藏只有一只内置宠物。')}><Icon name="right" /></GlassAction></GlassToolbar>
     <div className="pet-animation-picker"><GlassToolbar className="pet-animation-toolbar" aria-label="动画预览"><GlassAction disabled={!motions.length} aria-label="重新播放当前动画" onClick={() => onAction(action)}><Icon name="replay" /></GlassAction>
-      <button ref={motionTrigger} className="glass-action" disabled={!motions.length} aria-label="选择动画" aria-expanded={motionsOpen} aria-controls="motion-palette" onClick={() => setMotionsOpen(value => !value)}><Icon name="play" />{motions.find(value => value.id === action)?.label ?? '加载动作'}<Icon name={motionsOpen ? 'up' : 'down'} /></button></GlassToolbar>
+      <button ref={motionTrigger} className="glass-action" disabled={!motions.length} aria-label="选择动画" aria-expanded={motionsOpen} aria-controls="motion-palette" onClick={() => setMotionsOpen(value => !value)}><Icon name="play" />{motions.find(value => value.id === normalizePetAction(action))?.label ?? (motions.length ? '选择动作' : '静态展示')}<Icon name={motionsOpen ? 'up' : 'down'} /></button></GlassToolbar>
       {motionsOpen && <GlassSurface material="panel" as="section" className="motion-palette" id="motion-palette" aria-label="选择动画"><header><strong>动作</strong><small>{motions.length}</small></header>
         <label className="surface-search glass-inset"><Icon name="search" /><input aria-label="搜索动画" value={query} placeholder="搜索动作" onChange={event => setQuery(event.target.value)} /></label>
-        <div className="motion-list">{motions.filter(value => value.label.includes(query)).map(value => <button className="glass-choice" key={value.id} aria-pressed={action === value.id} onClick={() => onAction(value.id)}><span>{value.label}</span><Icon name={action === value.id ? 'check' : 'play'} /></button>)}</div>
+        <div className="motion-list">{motions.filter(value => value.label.includes(query)).map(value => <button className="glass-choice" key={value.id} aria-pressed={normalizedAction === value.id} onClick={() => onAction(value.id)}><span>{value.label}</span><Icon name={normalizedAction === value.id ? 'check' : 'play'} /></button>)}</div>
       </GlassSurface>}
     </div>
     {(notice || error) && <p className="pet-notice" role={error ? 'alert' : 'status'}>{error || notice}</p>}

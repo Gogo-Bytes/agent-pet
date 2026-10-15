@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { Activity, Component, StrictMode, type ReactNode } from 'react';
+import { Activity, StrictMode } from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { create, act, type ReactThreeTest } from '@react-three/test-renderer';
 import { Bounds, useGLTF } from '@react-three/drei';
@@ -62,7 +62,7 @@ describe('PetModel bundled animation behavior', () => {
   });
 
   it.each([
-    ['idle', 0, .01], ['working', .06, .08], ['success', 0, .225], ['error', .05, 0],
+    ['idle', 0, .01], ['working', .06, .08], ['success', 0, .225], ['error', 0, 0],
   ] as const)('plays %s using the actual GLB clip', async (motion, x, y) => {
     const { view, root } = await mount(motion);
     await view.advanceFrames(3, .1);
@@ -126,19 +126,36 @@ describe('PetModel bundled animation behavior', () => {
     expect(root.position.y).toBeCloseTo(.3, 4);
   });
 
-  it('rejects a missing required Idle clip at the model boundary', async () => {
-    const caught = vi.fn();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-      state = { failed: false };
-      static getDerivedStateFromError() { return { failed: true }; }
-      componentDidCatch(error: Error) { caught(error.message); }
-      render() { return this.state.failed ? null : this.props.children; }
+  it('renders a static asset with no Idle or animations', async () => {
+    const { view, root, ready, switchMotion } = await mount('working', 140, []);
+    expect(ready).toHaveBeenCalledWith('');
+    for (const motion of ['working', 'success', 'error', 'idle'] as const) {
+      await switchMotion(motion); await view.advanceFrames(5, .1);
+      expect(root.position.toArray()).toEqual([0, 0, 0]);
     }
-    vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: [] } as ReturnType<typeof useGLTF>);
-    const view = await create(<Boundary><PetModel motion="idle" onReady={vi.fn()} /></Boundary>);
-    mounted.push(view);
-    expect(caught).toHaveBeenCalledWith('Required Idle clip is missing');
+  });
+
+  it('stops a working animation and restores the default pose when fallback is absent', async () => {
+    const { view, root, switchMotion } = await mount('working', 140, asset.animations.filter(clip => clip.name === 'Work'));
+    await view.advanceFrames(3, .1); expect(root.position.y).toBeGreaterThan(0);
+    await switchMotion('error'); await view.advanceFrames(4, .1);
+    expect(root.position.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it('plays celebration once and returns to the available idle pose', async () => {
+    const { view, root } = await mount('success');
+    await view.advanceFrames(12, .1);
+    await view.advanceFrames(3, .1);
+    expect(root.position.x).toBe(0);
+    expect(root.position.y).toBeLessThan(.05);
+  });
+
+  it('restores a static pose after the once-only clip ends when no Idle exists', async () => {
+    const { view, root } = await mount('success', 140, asset.animations.filter(clip => clip.name === 'Success'));
+    await view.advanceFrames(12, .1);
+    expect(root.position.toArray()).toEqual([0, 0, 0]);
+    await view.advanceFrames(12, .1);
+    expect(root.position.toArray()).toEqual([0, 0, 0]);
   });
 
   it('refits after an authoritative size change without replacing the animated instance', async () => {

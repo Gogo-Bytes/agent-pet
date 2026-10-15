@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { Component, StrictMode, type ReactNode } from 'react';
+import { StrictMode } from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, create, type ReactThreeTest } from '@react-three/test-renderer';
 import { useGLTF } from '@react-three/drei';
@@ -105,7 +105,7 @@ describe('ScenePet actual bundled asset and multi-instance lifecycle', () => {
   });
   it('exposes only available clip capabilities and uses actual Idle when an optional action is absent', async () => {
     const test = await mount([{ id: 'a', action: 'Work' }], asset.animations.filter(clip => clip.name === 'Idle'));
-    expect(test.ready).toHaveBeenCalledWith(['Idle']);
+    expect(test.ready).toHaveBeenCalledWith(['idle']);
     await test.view.advanceFrames(3, .1);
     expect(test.root('a').position.x).toBe(0); expect(test.root('a').position.y).toBeCloseTo(.01, 4);
     expect(vi.mocked(useGLTF)).toHaveBeenCalledWith(expect.stringContaining('starter.glb'), false, false);
@@ -150,16 +150,18 @@ describe('ScenePet actual bundled asset and multi-instance lifecycle', () => {
       expect(Number.isFinite(bounds.min.x) && Number.isFinite(bounds.max.x)).toBe(true);
     }
   });
-  it('rejects missing Idle capability without publishing a usable action list', async () => {
-    const caught = vi.fn(); const ready = vi.fn(); vi.spyOn(console, 'error').mockImplementation(() => {});
-    class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-      state = { failed: false };
-      static getDerivedStateFromError() { return { failed: true }; }
-      componentDidCatch(error: Error) { caught(error.message); }
-      render() { return this.state.failed ? null : this.props.children; }
+  it('renders a static asset and publishes an empty available action list', async () => {
+    const test = await mount([{ id: 'a', action: 'Work' }], []);
+    expect(test.ready).toHaveBeenCalledWith([]);
+    for (const action of ['Work', 'Error', 'unrecognized', 'Idle']) {
+      await test.update([{ id: 'a', action }]); await test.view.advanceFrames(5, .1);
+      expect(test.root('a').position.toArray()).toEqual([0, 0, 0]);
     }
-    vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: [] } as ReturnType<typeof useGLTF>);
-    const view = await create(<Boundary><ScenePet action="Idle" reduced={false} onReady={ready} /></Boundary>); mounted.push(view);
-    expect(caught).toHaveBeenCalledWith('Required Idle clip missing'); expect(ready).not.toHaveBeenCalled();
+  });
+  it('restores the static pose rather than retaining an unsupported working pose', async () => {
+    const test = await mount([{ id: 'a', action: 'Work' }], asset.animations.filter(clip => clip.name === 'Work'));
+    await test.view.advanceFrames(3, .1); expect(test.root('a').position.y).toBeGreaterThan(0);
+    await test.update([{ id: 'a', action: 'Error' }]); await test.view.advanceFrames(4, .1);
+    expect(test.root('a').position.toArray()).toEqual([0, 0, 0]);
   });
 });

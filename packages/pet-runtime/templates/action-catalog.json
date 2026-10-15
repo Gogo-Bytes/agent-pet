@@ -1,0 +1,177 @@
+{
+  "actionCatalogVersion": 1,
+  "actions": {
+    "idle": {
+      "label": "待机",
+      "playback": "loop",
+      "fallback": []
+    },
+    "working": {
+      "label": "工作",
+      "playback": "loop",
+      "fallback": [
+        "idle"
+      ]
+    },
+    "thinking": {
+      "label": "思考",
+      "playback": "loop",
+      "fallback": [
+        "working",
+        "idle"
+      ]
+    },
+    "responding": {
+      "label": "回答",
+      "playback": "loop",
+      "fallback": [
+        "working",
+        "idle"
+      ]
+    },
+    "reading": {
+      "label": "阅读",
+      "playback": "loop",
+      "fallback": [
+        "working",
+        "idle"
+      ]
+    },
+    "writing": {
+      "label": "写作",
+      "playback": "loop",
+      "fallback": [
+        "working",
+        "idle"
+      ]
+    },
+    "searching": {
+      "label": "查找",
+      "playback": "loop",
+      "fallback": [
+        "working",
+        "idle"
+      ]
+    },
+    "executing": {
+      "label": "执行",
+      "playback": "loop",
+      "fallback": [
+        "working",
+        "idle"
+      ]
+    },
+    "compacting": {
+      "label": "整理",
+      "playback": "loop",
+      "fallback": [
+        "working",
+        "idle"
+      ]
+    },
+    "waiting_input": {
+      "label": "等你操作",
+      "playback": "loop",
+      "fallback": [
+        "attention",
+        "idle"
+      ]
+    },
+    "success": {
+      "label": "庆祝",
+      "playback": "once",
+      "fallback": [
+        "attention",
+        "idle"
+      ]
+    },
+    "error": {
+      "label": "出错",
+      "playback": "once",
+      "fallback": [
+        "attention",
+        "idle"
+      ]
+    },
+    "tool_error": {
+      "label": "遇到问题",
+      "playback": "once",
+      "fallback": [
+        "attention",
+        "idle"
+      ]
+    },
+    "retrying": {
+      "label": "再试一次",
+      "playback": "loop",
+      "fallback": [
+        "working",
+        "idle"
+      ]
+    },
+    "output_limited": {
+      "label": "回答中断",
+      "playback": "once",
+      "fallback": [
+        "attention",
+        "idle"
+      ]
+    },
+    "cancelled": {
+      "label": "停下",
+      "playback": "once",
+      "fallback": [
+        "idle"
+      ]
+    },
+    "attention": {
+      "label": "提醒",
+      "playback": "loop",
+      "fallback": [
+        "idle"
+      ]
+    },
+    "connected": {
+      "label": "欢迎",
+      "playback": "once",
+      "fallback": [
+        "idle"
+      ]
+    },
+    "disconnected": {
+      "label": "寻找连接",
+      "playback": "loop",
+      "fallback": [
+        "idle"
+      ]
+    },
+    "hover": {
+      "label": "看向你",
+      "playback": "once",
+      "fallback": [
+        "idle"
+      ]
+    },
+    "selected": {
+      "label": "回应点击",
+      "playback": "once",
+      "fallback": [
+        "idle"
+      ]
+    },
+    "dragging": {
+      "label": "被拖动",
+      "playback": "loop",
+      "fallback": [
+        "idle"
+      ]
+    },
+    "sleeping": {
+      "label": "睡觉",
+      "playback": "loop",
+      "fallback": [
+        "idle"
+      ]
+    }
+  }
+}

@@ -28,7 +28,7 @@ describe('pet runtime contracts', () => {
     expect(validatePetManifest(validManifest)).toEqual({ valid: true, manifest: validManifest });
   });
 
-  it('rejects manifests without an idle animation or with remote models', () => {
+  it('rejects remote models but accepts assets without Idle', () => {
     expect(validatePetManifest({ ...validManifest, model: 'https://example.com/pet.glb' })).toEqual({
       valid: false,
       reason: 'model-must-be-local-glb',
@@ -36,6 +36,11 @@ describe('pet runtime contracts', () => {
     expect(validatePetManifest({
       ...validManifest,
       animations: { working: 'Work' },
-    })).toEqual({ valid: false, reason: 'idle-animation-required' });
+    })).toMatchObject({ valid: true });
   });
+});
+
+it('accepts a completely static asset without animation metadata', () => {
+  const { animations: _animations, ...staticManifest } = validManifest;
+  expect(validatePetManifest(staticManifest)).toMatchObject({ valid: true });
 });

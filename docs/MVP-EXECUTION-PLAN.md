@@ -60,7 +60,7 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 固定 pi 经原生页面确认为当前自身 profile 的历史部署记录；旧目录不存在，却因撤回把缺失路径误判为变更而无法移除。修复为有效私有 receipt + 安全祖先 + 明确缺失的 `already-absent` 结果，先停用保存，再清产品记录；目标/未知文件不删除，读取或保存失败仍保留。Finder GUI PATH 漏扫 NVM，现增加固定一层版本目录的有界 metadata 搜索（64 项/16 版本/51 候选），受限结果在正式 UI 明示。
 
-全量 **652 passed / 1 skipped / 67 files**、typecheck、desktop build、最终 package 通过，独立 Review READY（110 项），最终文案 focused **28 passed**。已更新并启动 `/Users/gan/Desktop/🥷/Agent Pet.app`，实际管理页的移除预览/取消通过；未自动移除当前历史记录。此前授权的精确本机 CLI metadata 识别为 pi 0.85.1；完整本机扫描另行请求精确只读授权，不执行 pi/读取日常配置。截图、红测试和具体边界见 [本轮证据](PI-DISCOVERY-REMOVAL-ACCEPTANCE.md)。设置实机停点、真实任务矩阵和发布验收保持未完成。
+全量 **652 passed / 1 skipped / 67 files**、typecheck、desktop build、最终 package 通过，独立 Review READY（110 项），最终文案 focused **28 passed**。已更新并启动 `/Users/gan/Desktop/🥷/Agent Pet.app`，实际管理页的移除预览/取消通过；未自动移除当前历史记录。此前授权的精确本机 CLI metadata 识别为 pi 0.85.1；2026-10-15 用户另行授权有界只读扫描，正式包实际找到 NVM Node v22.22.3 和 v24.20.0 下的两份 pi 0.85.1，原生 AX/截图一致，留在结果页；未执行 pi、读取日常配置、部署或移除。截图、红测试和具体边界见 [本轮证据](PI-DISCOVERY-REMOVAL-ACCEPTANCE.md)。设置实机停点、真实任务矩阵和发布验收保持未完成。
 
 ## 当前事实与证据
 

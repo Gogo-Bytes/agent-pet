@@ -26,3 +26,18 @@ Main 亲自从稳定路径启动最终包，原生 AX 确认实际 `app.asar/out
 ![正式移除预览](screenshots/pi-discovery-removal/native-removal-preview.png)
 
 日志：`/tmp/agent-pet-discovery-removal-{focused,tests,types,build,ui-final,package-final}.log`；初始红测试为 `...-red.log`。本阶段不推送。
+
+## 本机扫描实测 · 2026-10-15
+
+用户明确授权新版应用的只读扫描：当前 GUI PATH、`/opt/homebrew/bin/pi`、`/usr/local/bin/pi`、`/Users/gan/.local/bin/pi` 和 `/Users/gan/.nvm/versions/node` 一层（最多 64 项/16 版本），仅核对链接和安装元数据。不执行 pi、不读日常 `.pi` 配置或凭据、不部署。该授权覆盖上文此前尚待确认的扫描范围，不扩展到配置选择、旧记录移除或连接恢复。
+
+Main 亲自操作稳定路径 `/Users/gan/Desktop/🥷/Agent Pet.app` 的正式管理窗口，点击一次“自动扫描”。实际 `file:.../app.asar/out/renderer/management.html` 的原生 AX 和截图均显示“找到 2 个安装”，以下两条均为 `pi 0.85.1 / 已验证版本`：
+
+- `/Users/gan/.nvm/versions/node/v22.22.3/bin/pi`
+- `/Users/gan/.nvm/versions/node/v24.20.0/bin/pi`
+
+页面没有受限提示或扫描错误，仍显示“扫描结果是安装候选，尚未读取配置或建立连接”。没有点击选择配置、手动添加、重新扫描、部署、恢复或移除；应用留在扫描结果页。此次确认正式包能够发现本机 NVM 安装；不外推为日常 pi 接入或任务矩阵通过。当前旧测试记录继续保留。
+
+首次截图返回 ScreenCaptureKit `-3811`；按有界恢复规则重新绑定同一应用后截图成功。左上紫色图标为捕获提示。此轮没有修改实现代码，无需重复构建或自动化测试；检查文档 diff 和截图后提交验收证据，不推送。
+
+![正式应用本机扫描结果](screenshots/pi-discovery-removal/native-scan-20261015.png)

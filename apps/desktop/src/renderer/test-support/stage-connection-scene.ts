@@ -41,6 +41,7 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
       }
     }
   } else if (scene.startsWith('manual') || scene === 'change-folder') {
+    if (scene === 'change-folder') (await find(() => document.querySelector<HTMLDetailsElement>('.cfg-more-options'))).open = true;
     await click(scene === 'change-folder' ? '更换位置' : '手动添加');
     await find(() => document.querySelector('#manual-path'));
     if (scene === 'manual-help') (await find(() => document.querySelector<HTMLDetailsElement>('.cfg-location-help'))).open = true;
@@ -79,6 +80,6 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
     }
     if (scene.startsWith('rename')) { await click('重命名'); await find(() => document.querySelector('#config-name')); if (scene === 'rename-empty') { await input('#config-name', ''); await find(() => document.querySelector('.cfg-rename-error')); } }
     if (scene.startsWith('preview')) { await click('设置连接'); await find(() => document.querySelector('.cfg-preview')); }
-    if (scene.startsWith('remove')) { await click('移除连接'); await find(() => document.querySelector('.cfg-removal')); if (scene === 'remove-error') { await click('确认移除'); await find(() => document.querySelector('.cfg-removal [role="alert"]')); } }
+    if (scene.startsWith('remove')) { (await find(() => document.querySelector<HTMLDetailsElement>('.cfg-more-options'))).open = true; await click('移除连接'); await find(() => document.querySelector('.cfg-removal')); if (scene === 'remove-error') { await click('确认移除'); await find(() => document.querySelector('.cfg-removal [role="alert"]')); } }
   }
 }

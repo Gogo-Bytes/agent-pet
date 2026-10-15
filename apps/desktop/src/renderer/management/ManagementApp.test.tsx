@@ -103,7 +103,7 @@ describe('ManagementApp formal four-page interface', () => {
       saved: 'disabled' as const, notice: 'resume-required' as const } };
     const test = await mount([record]); await page(test.user, '连接');
     expect(screen.getByRole('heading', { name: '已暂停' })).toBeTruthy();
-    await test.user.click(screen.getByText('位置检查', { exact: true }));
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
     await test.user.click(screen.getByRole('button', { name: '检查位置' }));
     expect(test.bridge.configurations.inspect).toHaveBeenCalledExactlyOnceWith(record.id);
     expect(screen.getByRole('heading', { name: '已暂停' })).toBeTruthy();
@@ -130,8 +130,11 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getByRole('heading', { name: '等待重新连接' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '重新连接' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: '暂停连接' })).toBeNull();
-    expect(test.container.querySelector('.cfg-position-check')?.hasAttribute('open')).toBe(false);
+    expect(test.container.querySelector('.cfg-more-options')?.hasAttribute('open')).toBe(false);
     expect(test.container.querySelector('.cfg-index-state')).toBeNull();
+    // jsdom's role queries do not model the hidden body of native details.
+    expect(screen.getByRole('button', { name: '更换位置' }).closest('details')?.open).toBe(false);
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
     expect(screen.getByRole('button', { name: '更换位置' }).hasAttribute('disabled')).toBe(true);
     expect(test.bridge.configurations.resume).not.toHaveBeenCalled();
     expect(test.bridge.configurations.inspect).not.toHaveBeenCalled();
@@ -144,6 +147,8 @@ describe('ManagementApp formal four-page interface', () => {
     const test = await mount([record]); await page(test.user, '连接');
     expect(screen.getByRole('heading', { name: '等待 pi' })).toBeTruthy();
     expect(screen.getByText(/如果它已经在运行，请在空闲时输入 \/reload/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '暂停连接' }).closest('details')?.open).toBe(false);
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
     await test.user.click(screen.getByRole('button', { name: '暂停连接' }));
     expect(test.bridge.configurations.disable).toHaveBeenCalledExactlyOnceWith(record.id);
     act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection, status: 'connected' } }] }));
@@ -500,10 +505,12 @@ describe('ManagementApp formal four-page interface', () => {
   });
   it('requires explicit removal confirmation for one configuration and preserves all others', async () => {
     const test = await mount([configuration('one'), configuration('two')]); await page(test.user, '连接');
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
     await test.user.click(screen.getByRole('button', { name: '移除连接' }));
     expect(screen.getByText('这条连接会从 Agent Pet 中移除。Agent 程序和你的文件都会保留。')).toBeTruthy();
     await test.user.click(screen.getByRole('button', { name: '取消' }));
     expect(test.bridge.configurations.remove).not.toHaveBeenCalled();
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
     await test.user.click(screen.getByRole('button', { name: '移除连接' }));
     await test.user.click(screen.getByRole('button', { name: '确认移除' }));
     expect(test.bridge.configurations.remove).toHaveBeenCalledExactlyOnceWith('one');

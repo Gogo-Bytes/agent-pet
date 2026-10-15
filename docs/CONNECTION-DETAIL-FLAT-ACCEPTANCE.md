@@ -76,3 +76,11 @@ Main亲自打开正式页面的隔离示例：1200×850待重新连接/等待pi/
 ![错误提示及处理入口](screenshots/connection-friendly/error-wide.png)
 
 最新未签名arm64包：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-m5-jjC0hq/mac-arm64/Agent Pet.app`。本轮只生成新包，没有替换或重启正在运行的应用，没有读写日常pi配置/凭据、部署、重载、依赖安装或推送。正式UI用户认可、真实接入、原生窗口层级及发布仍分别验收。
+
+### Demo 逐页反馈：01 居中、02 信息层级（2026-10-15）
+
+- 空态占满右侧可用内容区，水平/垂直居中；浏览器测量宽窗 752×292.6 与窄窗 388×315.5 的中心偏差均为 0，不改变扫描未找到的布局。
+- 正常详情只呈现名称、紧凑状态和只读单行路径；继续/重新/设置连接保留为明确主操作。暂停、检查、更换位置、移除合并为一个原生“更多操作”，遇到检查问题或连接失败自动展开。在线的解释保留给辅助阅读，避免与“已连接”重复。
+- 更换受部署保护的位置仍禁用并说明原因；暂停不关闭 pi、移除仍需独立确认、预览/取消/确认与文件保留契约不变。测试适配真实的新入口，不删除原回归。jsdom 对折叠 details 的角色查询与浏览器不同，测试检查原生 open 状态；浏览器另确认折叠后暂停按钮不可见，并实点展开→暂停→已暂停。
+- 42 个目录场景全部重新打开通过；388px 下长路径为 nowrap/ellipsis，页面 scrollWidth/clientWidth 均为 388。另检查窄窗更多操作可用。管理页 **32 tests**、`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build` 通过。
+- 实际正式组件配合示例数据：[空态居中](screenshots/connection-scenes/empty-centered.png)、[详情层级](screenshots/connection-scenes/detail-hierarchy.png)。没有重启/替换当前应用、没有真实 pi 操作或新打包；正式视觉认可仍由用户逐页反馈，不升级为接入/发布验收。

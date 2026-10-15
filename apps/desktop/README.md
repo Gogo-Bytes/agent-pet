@@ -186,9 +186,11 @@ action on its own row. Actual Electron screenshots, keyboard checks and test-bou
 responsive evidence: [scan UI revision](../../docs/PI-SCAN-VISUAL-ACCEPTANCE.md).
 This UI review does not authorize or certify a daily pi deployment.
 
-Connection details use the right pane directly, with inline renaming and separate
-inspection, location and connection-management sections. Deployment review and
-removal confirmation retain their existing semantics. See the
+Connection details lead with identity, a compact status and the next connection
+action, followed by a read-only single-line path. Native “更多操作” groups pause,
+inspection, target changes and removal; it opens automatically for an inspection
+problem or failed connection. Empty content centers in the usable right pane.
+Deployment review and removal confirmation retain their existing semantics. See the
 [flat detail UI evidence](../../docs/CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) for
 responsive checks, staged package and native verification limits. The user's
 currently connected app was kept running; switching to the new package is pending.

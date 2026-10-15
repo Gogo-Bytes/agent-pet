@@ -30,14 +30,13 @@ export function DeploymentControls({ record, api, run, busy, visible = true }: {
   const routineNotice = !state || ['none', 'resume-required', 'disabled', 'stopped'].includes(state.notice);
   return <div className="cfg-deployment">
     <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>
-      <div><span className="cfg-section-label">连接状态</span><h3 ref={statusHeading} tabIndex={-1}>{summary.title}</h3><p>{summary.description}</p></div>
+      <div><h3 ref={statusHeading} tabIndex={-1}><span className="cfg-status-dot" aria-hidden="true" />{summary.title}</h3><p className={summary.tone === 'online' ? 'cfg-sr-only' : undefined}>{summary.description}</p></div>
       {state?.canResume && <button className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{disabled ? '请稍候…' : resumeLabel}</button>}
+      {state?.canConfigure && !state.preview && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>设置连接</button>}
     </div>
     {state && !routineNotice && <div className="cfg-connection-notice" role={summary.tone === 'error' ? 'alert' : 'status'}><p>{connectionNoticeText[state.notice]}</p><details><summary>查看详细原因</summary><p>{noticeText[state.notice]}</p></details></div>}
     {state?.canConfigure && !state.preview && <>
-      <p>先查看需要添加的文件，由你确认后再添加。</p>
       <details className="cfg-operation-help"><summary>会读取或改动哪些内容？</summary><p>会检查所选文件夹及上级文件夹的安全性，读取 settings.json、extensions/package.json，并检查扩展入口和忽略规则。不读取登录信息、会话或对话。确认后只新建 extensions/agent-pet.ts，不更改你原有的 pi 设置，不会自动启动或重新加载 pi。</p><p>连接所需的信息保存在本应用的专用文件夹。退出后会保留，下次打开需要你点击重新连接。</p></details>
-      <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>设置连接</button>
     </>}
     {state?.preview && <section className="cfg-preview" aria-label="连接设置预览"><h3 ref={previewHeading} tabIndex={-1}>确认连接设置</h3><p>将添加 Agent Pet 的连接文件：</p><code>{state.preview.path}</code>
       <p>{state.preview.action === 'create' ? '只新建这个文件，不会覆盖已有文件，也不会改动你的 pi 设置。' : '暂时不能添加，请先处理下面的问题。'}</p>
@@ -50,6 +49,5 @@ export function DeploymentControls({ record, api, run, busy, visible = true }: {
       <div className="cfg-form-actions"><button className="cfg-secondary" disabled={disabled} onClick={() => void run(() => api.cancel(record.id))}>取消</button>
         <button className="cfg-primary" disabled={disabled || state.preview.action !== 'create'} onClick={() => void run(() => api.confirm(record.id, state.preview!.id))}>确认并连接</button></div>
     </section>}
-    {state?.canRemove && state.receiving !== 'stopped' && <div className="cfg-pause-action"><button className="cfg-secondary" disabled={disabled} onClick={() => void run(() => api.disable(record.id))}>{state.receiving === 'unknown' ? '尝试暂停连接' : '暂停连接'}</button><span>不影响 pi 运行，连接文件会保留。</span></div>}
   </div>;
 }

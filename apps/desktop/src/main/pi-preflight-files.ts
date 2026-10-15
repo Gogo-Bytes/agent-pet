@@ -74,6 +74,13 @@ export class ReadBudget {
 function record(value: unknown): value is Record<string, unknown> { return !!value && typeof value === 'object' && !Array.isArray(value); }
 function finding(error: unknown): Finding { return error instanceof CheckFailure ? error.finding : 'unreadable'; }
 
+// pi 0.85.1 resolves package sources separately from auto-discovered user extensions.
+// Only this known additive form is accepted here; no source is resolved or executed.
+function additivePackages(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= 128 && value.every(source => typeof source === 'string' &&
+    source.length > 0 && source.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(source) && !/^[!+-]/.test(source));
+}
+
 export async function inspectTarget(target: TargetCandidate, budget = new ReadBudget()): Promise<Inspection> {
   const findings = new Set<Finding>();
   if (process.platform === 'win32') return { target, findings: ['platform-unknown'] };
@@ -106,7 +113,7 @@ export async function inspectTarget(target: TargetCandidate, budget = new ReadBu
     const settings = await budget.json(join(target.path, 'settings.json'));
     if (settings !== undefined && (!record(settings) ||
       (settings.extensions !== undefined && (!Array.isArray(settings.extensions) || settings.extensions.length > 0)) ||
-      (settings.packages !== undefined && (!Array.isArray(settings.packages) || settings.packages.length > 0)))) findings.add('settings-unknown');
+      (settings.packages !== undefined && !additivePackages(settings.packages)))) findings.add('settings-unknown');
     budget.check();
   } catch (error) { findings.add(finding(error)); }
   return { target, findings: [...findings] };

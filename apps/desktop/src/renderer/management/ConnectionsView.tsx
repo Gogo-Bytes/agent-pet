@@ -7,6 +7,7 @@ import { Icon, type IconName } from './components/icons.js';
 import { GlassButton } from './components/glass.js';
 import { ManualConnectionDialog } from './ManualConnectionDialog.js';
 import { DeploymentControls } from './DeploymentControls.js';
+import { DetectedSetupDialog } from './DetectedSetupDialog.js';
 import { providerLabels } from './home-projection.js';
 import './connections.css';
 const marks: Record<AgentConfiguration['provider'], IconName> = { pi: 'pi', codex: 'command', claude: 'flower', opencode: 'code', gemini: 'sparkles', cursor: 'diagonal' };
@@ -35,6 +36,7 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
   const [scan, setScan] = useState<PreflightState | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState('');
+  const [setupConsent, setSetupConsent] = useState<{ installationId: string; targetPath: string } | null>(null);
   const generation = useRef(0);
   const main = useRef<HTMLElement>(null);
   const records = state?.records ?? [];
@@ -43,7 +45,7 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
   const existingDetected = automatic ? records.find(record => record.provider === 'pi' && record.targetPath === automatic.path) : undefined;
   const current = records.find(record => record.id === selected) ?? (page === 'library' ? records[0] : undefined);
   useEffect(() => () => { generation.current++; }, []);
-  useEffect(() => { if (!visible) setManual(undefined); }, [visible]);
+  useEffect(() => { if (!visible) { setManual(undefined); setSetupConsent(null); } }, [visible]);
   useEffect(() => { if (visible) main.current?.querySelector<HTMLElement>('h1,h2')?.focus({ preventScroll: true }); }, [page, visible]);
   async function detect() {
     const request = ++generation.current; setScanning(true); setScanError(''); setPage('discover');
@@ -54,20 +56,7 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
   function cancelScan() { generation.current++; setScanning(false); setPage('library'); }
   async function prepareDetected() {
     if (!detected[0] || busy || !state) return;
-    const request = ++generation.current;
-    let configurationId: string | null = null;
-    const saved = await run(async () => {
-      const result = await bridge.configurations.prepareDetected(detected[0]!.id);
-      configurationId = result.configurationId; return result.state;
-    });
-    if (saved && configurationId) {
-      if (request !== generation.current) {
-        try { await bridge.configurations.cancel(configurationId); }
-        catch { setScanError('取消预览未确认，请打开配置详情重新取消。'); }
-        return;
-      }
-      setSelected(configurationId); setPage('agent');
-    }
+    if (automatic) setSetupConsent({ installationId: detected[0].id, targetPath: automatic.path });
   }
   const browsing = page === 'library' || page === 'agent';
   return <section hidden={!visible} className="cfg-page co-embedded" aria-label="Agent 配置管理" data-page={page}>
@@ -83,7 +72,7 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
               {(current.connection?.deployedPath || current.id === 'legacy-pi') && <p className="cfg-notice">此位置有已保存的部署关系。更换前需选择性撤回并移除，再添加新位置。</p>}
               <DeploymentControls record={current} api={bridge.configurations} run={run} busy={busy} /></div>
           </div><div className="cfg-detail-end"><div><strong>移除配置</strong><span>Agent 程序和用户文件都会保留</span></div><button className="cfg-delete" disabled={busy} aria-label="移除配置" onClick={() => { setSelected(current.id); setPage('remove'); }}><Icon name="trash" />移除</button></div></section> : <div className="cfg-empty"><Icon name="folder" /><h2 tabIndex={-1}>从第一个连接开始</h2><p>{state ? '自动扫描本机，或选择已有配置位置。' : '正在读取连接配置…'}</p></div>}
-            {error && <p className="cfg-notice" role="alert">{error}</p>}
+            {(error || scanError) && <p className="cfg-notice" role="alert">{error || scanError}</p>}
           </div></div>
       </> : <>
         <header className="cfg-subpage-head"><button className="cfg-text-button" onClick={() => page === 'discover' ? cancelScan() : setPage('agent')}><Icon name="left" />{page === 'remove' ? '配置详情' : '我的连接'}</button><span>{page === 'discover' ? '自动扫描' : '移除配置'}</span></header>
@@ -102,5 +91,6 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
       </>}
     </article>
     {manual !== undefined && visible && <ManualConnectionDialog existing={manual} records={records} bridge={bridge} run={run} busy={busy} error={error} onClose={() => setManual(undefined)} onSaved={id => { setManual(undefined); setSelected(id || null); setPage('agent'); }} />}
+    {setupConsent && state && visible && <DetectedSetupDialog {...setupConsent} state={state} bridge={bridge} run={run} onCancelError={setScanError} onClose={() => setSetupConsent(null)} onPrepared={id => { setSetupConsent(null); setSelected(id); setPage('agent'); }} />}
   </section>;
 }

@@ -68,6 +68,14 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 全量 **665 passed / 1 skipped / 67 files**、typecheck、desktop build、package 通过，独立审查 READY（80 项/6 文件）。已更新并启动稳定包 `/Users/gan/Desktop/🥷/Agent Pet.app`；实际两份 pi 安装显示为一个默认配置入口，点击即原生精确检查确认。工具提示用户接手后，实际已进入默认目标的部署预览，因 `settings-unknown` 阻止部署，未建立日常连接；没有修改现有扩展规则。原生取消自动化结果有覆盖限制，不标完整通过。具体截图、语义与边界见 [本轮验收](PI-AUTOMATIC-SETUP-ACCEPTANCE.md)。
 
+## 用户反馈修复：保留包配置与可取消检查（2026-10-15）
+
+已获精确只读授权核对默认目标：5 条字符串包来源、无顶层扩展过滤/ignore/固定入口。依据已安装 pi 0.85.1 源码，包来源和用户扩展自动发现分开；现在允许有界字符串包来源，保留未知形态、非空顶层扩展规则、数据保护与 managed guard。实际只读复验 `findings: []`，settings 校验摘要不变。
+
+一键检查改为页面内显式范围确认；requestId、Main/Renderer 取消 race、3 秒预算和精确 planId 撤销使取消不再依赖原生弹窗回调，也不误撤较新预览。全量 **671 passed / 1 skipped / 67 files**、typecheck、desktop build、package 通过，独立 Review READY（116 项）。实际新包在隔离 profile 打开新 Dialog，取消后原生 AX 的三个操作均恢复可用；截图恢复一次失败，覆盖限制如实保留。已恢复正常用户 profile 的稳定应用入口。设置实机停点仍未完成。
+
+用户对 [本机部署预览](PI-DAILY-CONNECTION-PREVIEW.md) 明确选择 **“只更新修复，暂不部署”**：本轮没有日常扩展写入、pi 启动/重载或连接通过声明。最终 settings 保持原字节，日常 `agent-pet.ts` 仍不存在。后续真实接入仍需明确授权，不重复请求本轮已拒绝的部署。完整根因、源码依据、回归和原生覆盖见 [本轮证据](PI-RULES-CANCEL-ACCEPTANCE.md)。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

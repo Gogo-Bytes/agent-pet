@@ -8,7 +8,7 @@ export const findingText: Record<Finding, string> = {
   'manifest-unknown': '根 manifest 语义无法确认，需要人工检查。',
   'existing-extension': '已有 agent-pet.ts；所有权未知，不能覆盖或认定已安装。',
   'ignore-unknown': '发现 ignore 文件；本阶段不解析规则，无法确认是否被忽略。',
-  'settings-unknown': 'settings 扩展规则不为空或不受支持，无法确认排除/恢复语义。',
+  'settings-unknown': '现有扩展过滤规则或包配置格式尚未支持，无法确认排除/恢复语义；原设置保持不变。',
   budget: '达到检测时间或工作量上限，结果不完整；可重新检测或手动选择。',
   'platform-unknown': '此平台的路径与权限检查未支持。',
 };

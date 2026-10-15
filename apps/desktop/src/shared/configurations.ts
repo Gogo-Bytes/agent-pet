@@ -37,7 +37,8 @@ export interface CreateConfiguration {
 export interface ConfigurationsApi {
   getState(): Promise<ConfigurationsState>;
   create(input: CreateConfiguration): Promise<ConfigurationsState>;
-  prepareDetected(installationId: string): Promise<{ state: ConfigurationsState; configurationId: string | null }>;
+  prepareDetected(installationId: string, requestId: string): Promise<DetectedSetupResult>;
+  cancelDetected(requestId: string): Promise<void>;
   rename(id: string, name: string): Promise<ConfigurationsState>;
   changeTarget(id: string, path: string): Promise<ConfigurationsState>;
   bindPet(id: string, pet: PetBinding | null): Promise<ConfigurationsState>;
@@ -50,3 +51,4 @@ export interface ConfigurationsApi {
   remove(id: string): Promise<ConfigurationsState>;
   subscribe(listener: (state: ConfigurationsState) => void): () => void;
 }
+export interface DetectedSetupResult { state: ConfigurationsState; configurationId: string | null; reason?: 'cancelled' | 'timeout' }

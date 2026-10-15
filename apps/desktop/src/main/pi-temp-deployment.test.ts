@@ -28,6 +28,19 @@ async function apply(deploy: PiTemporaryDeployment) {
   return { preview, receipt: applied.receipt };
 }
 
+it('deploys alongside additive packages and withdraws only its own artifact, preserving settings bytes and metadata', async () => {
+  const { deploy, target } = await fixture(true);
+  const path = join(target, 'settings.json');
+  const bytes = JSON.stringify({ packages: Array.from({ length: 5 }, (_, n) => `npm:existing-${n}`), theme: 'keep', privateSetting: 'SYNTHETIC_SECRET' });
+  await writeFile(path, bytes, { mode: 0o600 });
+  const before = await lstat(path);
+  const { receipt } = await apply(deploy);
+  expect((await deploy.withdraw(receipt)).file).toBe('removed');
+  expect(await readFile(path, 'utf8')).toBe(bytes);
+  const after = await lstat(path);
+  for (const key of ['ino', 'mode', 'size', 'mtimeMs', 'ctimeMs'] as const) expect(after[key]).toBe(before[key]);
+});
+
 it.each(['file', 'target'] as const)('withdraws obsolete ownership when the %s is already absent without deleting directories or unrelated files', async kind => {
   const { deploy, path, target, root } = await fixture(true);
   const { receipt } = await apply(deploy);

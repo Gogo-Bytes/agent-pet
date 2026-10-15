@@ -69,15 +69,24 @@ directory (64 entries, newest 16 version directories) as well as the bounded GUI
 PATH and standard bins. It reads installation metadata only, never executes pi,
 loads shell profiles or reads daily `.pi` credentials. Partial scans remain visible.
 Discovery groups supported pi installations sharing the Main-resolved default
-configuration into one action. `prepareDetected(scanId)` accepts only a current,
-verified host scan ID, resolves `$HOME/.pi/agent`, asks exact read permission,
+configuration into one action. A scoped in-page dialog shows Main's default target
+and asks read consent before `prepareDetected(scanId, requestId)` accepts a current,
+verified host scan ID and resolves `$HOME/.pi/agent`. Main then
 revalidates the installation and prepares the existing deployment preview. Users
 do not choose a folder, type, or name. The separate preview confirmation still
 owns deployment/listening; cancel creates no extension. Once approved preparation
 saves non-secret configuration metadata, cancelling its preview retains that
 unconnected record for retry. Project/custom targets retain the manual flow.
-Main invalidates pending preparation on close/navigation; Renderer revokes late
-previews after returning to the list. Missing owned extensions yield `already-absent`:
+Main invalidates pending preparation on close/navigation; cancellation uses a typed
+request id and releases both the visible wait and IPC reply independently of delayed
+IO. The underlying filesystem reader stays single-flight until it settles. Late
+work/cancellation revokes only its matching preview id, preserving newer previews.
+Checks accept bounded additive string package sources under the verified pi 0.85.1
+loading semantics without executing or modifying them. Nonempty top-level extension
+rules, unknown package shapes, ignore and ownership guards remain. Actual daily
+configuration was inspected read-only; deployment was deferred by the user. See
+[rules/cancellation evidence](../../docs/PI-RULES-CANCEL-ACCEPTANCE.md).
+Missing owned extensions yield `already-absent`:
 clear the validated private receipt and product configuration without deleting target
 directories or unknown files. Unreadable, replaced and edited paths retain safeguards;
 failed persistence cannot report successful removal. See

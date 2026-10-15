@@ -324,31 +324,38 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.queryByRole('button', { name: /选择配置位置/ })).toBeNull();
     expect(screen.getByText('检测到 2 处支持的程序安装，共用此默认配置。')).toBeTruthy();
     await test.user.click(screen.getByRole('button', { name: '一键配置' }));
-    expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledExactlyOnceWith('node22');
+    expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: '配置检测到的 pi' }).textContent).toContain(initialPreflight.automaticTarget!.path);
+    await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
+    expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledExactlyOnceWith('node22', expect.any(String));
     expect(test.bridge.locations.choose).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByRole('region', { name: '部署预览' })).toBeTruthy();
     expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
     await test.user.click(screen.getByRole('button', { name: '取消预览' }));
     expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith('default');
   });
-  it('keeps cancellation and errors retryable, and opens an existing detected configuration without adding a duplicate', async () => {
+  it('cancels consent without calling Main, recovers errors and opens existing configuration without duplicates', async () => {
     const existing = configuration('saved', initialPreflight.automaticTarget!.path);
     const test = await mount([]); await page(test.user, '连接');
     const installation = { id: 'auto-pi', path: '/synthetic/bin/pi', compatibility: 'verified-0.85.1' as const, version: '0.85.1' };
     test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: [installation] });
     await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
     await test.user.click(screen.getByRole('button', { name: '一键配置' }));
-    expect(screen.getByRole('button', { name: '一键配置' })).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '取消' }));
+    expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '一键配置' }).hasAttribute('disabled')).toBe(false);
     test.bridge.configurations.prepareDetected.mockRejectedValueOnce(new Error('fixture denied'));
     await test.user.click(screen.getByRole('button', { name: '一键配置' }));
-    expect(screen.getByRole('alert').textContent).toContain('请求失败');
+    await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
+    expect(screen.getAllByRole('alert').some(value => value.textContent?.includes('检查未完成'))).toBe(true);
+    await test.user.click(screen.getByRole('button', { name: '取消' }));
     act(() => test.pushConfigs({ ...test.configs(), records: [existing] }));
     await test.user.click(screen.getByRole('button', { name: '查看配置' }));
     expect(screen.getByRole('heading', { name: existing.name })).toBeTruthy();
-    expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledTimes(2);
+    expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledTimes(1);
     expect(test.bridge.configurations.create).not.toHaveBeenCalled();
   });
-  it('does not let late automatic preparation replace a return to the list and revokes its preview', async () => {
+  it('immediately releases buttons on cancel even if IPC never settles and ignores its late preview', async () => {
     const test = await mount([]); await page(test.user, '连接');
     test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: [
       { id: 'auto-pi', path: '/synthetic/bin/pi', compatibility: 'verified-0.85.1', version: '0.85.1' },
@@ -356,11 +363,18 @@ describe('ManagementApp formal four-page interface', () => {
     let finish!: (result: { state: ReturnType<typeof test.configs>; configurationId: string }) => void;
     test.bridge.configurations.prepareDetected.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
     await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
-    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    const opener = screen.getByRole('button', { name: '一键配置' });
+    await test.user.click(opener);
+    await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
+    expect(opener.hasAttribute('disabled')).toBe(true);
+    const requestId = test.bridge.configurations.prepareDetected.mock.calls[0]![1];
+    await test.user.click(screen.getByRole('button', { name: '取消检查' }));
+    await waitFor(() => expect(opener.hasAttribute('disabled')).toBe(false));
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    expect(test.bridge.configurations.cancelDetected).toHaveBeenCalledExactlyOnceWith(requestId);
     await test.user.click(screen.getByRole('button', { name: '我的连接' }));
     await act(async () => finish({ state: test.configs(), configurationId: 'late-preview' }));
     expect(screen.getByRole('heading', { name: '我的连接 00' })).toBeTruthy();
-    expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith('late-preview');
     expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
   });
   it('keeps unsupported installation results honest and preserves the manual fallback', async () => {

@@ -129,6 +129,13 @@ describe('bounded installation metadata identity on synthetic files', () => {
 });
 
 describe('read-only target inspection on actual temporary filesystem', () => {
+  it('permits additive installed package sources without changing or resolving user configuration', async () => {
+    const bytes = JSON.stringify({ packages: ['npm:example-extension', 'git:https://example.invalid/addon'], theme: 'keep', privateSetting: 'SYNTHETIC_SECRET' });
+    await put(join(root, 'settings.json'), bytes);
+    expect((await inspect()).findings).toEqual([]);
+    expect(await readFile(join(root, 'settings.json'), 'utf8')).toBe(bytes);
+    expect(JSON.stringify(await inspect())).not.toContain('SYNTHETIC_SECRET');
+  });
   it('does not change file content, modes, mtimes or directory entries, and projects no secrets', async () => {
     await put(join(root, 'settings.json'), JSON.stringify({ apiKey: 'SYNTHETIC_SECRET', extensions: [], unrelated: { endpoint: 'SECRET_ENDPOINT' } }));
     await put(join(root, 'sessions/private.jsonl'), 'SYNTHETIC_SESSION');
@@ -152,7 +159,7 @@ describe('read-only target inspection on actual temporary filesystem', () => {
     await put(join(root, 'extensions', name), '**/*.ts\n!agent-pet.ts\n');
     expect((await inspect()).findings).toContain('ignore-unknown');
   });
-  it.each([{ extensions: ['!extensions/*.ts', '+extensions/agent-pet.ts'] }, { extensions: ['-extensions/agent-pet.ts'] }, { extensions: false }, { packages: ['npm:must-not-install'] }, []])('marks unsupported/excluded settings unknown: %j', async settings => {
+  it.each([{ extensions: ['!extensions/*.ts', '+extensions/agent-pet.ts'] }, { extensions: ['-extensions/agent-pet.ts'] }, { extensions: false }, { packages: [{ source: false }] }, []])('marks unsupported/excluded settings unknown: %j', async settings => {
     await put(join(root, 'settings.json'), JSON.stringify(settings));
     expect((await inspect()).findings).toContain('settings-unknown');
   });

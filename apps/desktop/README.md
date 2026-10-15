@@ -163,6 +163,12 @@ pnpm exec vite --config apps/desktop/vite.management-review.config.ts
 # http://127.0.0.1:4175/management-review.html?case=online  (empty/error also supported)
 ```
 
+macOS 菜单栏图标不见时，应用开关开启不代表系统允许显示。本机曾因启动 dev 的
+ChatGPT 在系统「菜单栏」设置中被关闭，连带阻止 Electron 图标；经用户授权打开
+ChatGPT 项后，系统解除阻止，用户确认图标恢复。排查时也要核对启动应用的系统开关，
+不要循环重建图标、重置系统或仅凭坐标宣称成功。具体证据与范围见
+[菜单栏恢复记录](../../docs/DESKTOP-MENU-BAR-ACCEPTANCE.md)。正式包本轮没有重测。
+
 连接页逐页调整入口：`pnpm demo:connections`，打开
 <http://127.0.0.1:4175/connection-scenes.html>。若 4175 的演示服务已经运行，直接打开链接即可。
 左侧列出 42 个编号场景，包含连接列表/详情、扫描、一键配置、手动添加三步、

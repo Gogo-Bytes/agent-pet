@@ -37,6 +37,7 @@ export interface CreateConfiguration {
 export interface ConfigurationsApi {
   getState(): Promise<ConfigurationsState>;
   create(input: CreateConfiguration): Promise<ConfigurationsState>;
+  prepareDetected(installationId: string): Promise<{ state: ConfigurationsState; configurationId: string | null }>;
   rename(id: string, name: string): Promise<ConfigurationsState>;
   changeTarget(id: string, path: string): Promise<ConfigurationsState>;
   bindPet(id: string, pet: PetBinding | null): Promise<ConfigurationsState>;

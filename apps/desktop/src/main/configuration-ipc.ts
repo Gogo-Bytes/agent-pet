@@ -3,16 +3,20 @@ import { join } from 'node:path';
 import { dialog, ipcMain, shell, type BrowserWindow } from 'electron';
 import type { SessionState } from '@agent-pet/domain';
 import type { Configurations } from './configurations.js';
+import type { PiPreflight } from './pi-preflight.js';
 import { configurationName, configurationPath } from './configurations-store.js';
 import { assertWindowSender } from './window-trust.js';
-import { inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
+import { identifyInstallation, inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
 import { configurationProviders, type CreateConfiguration, type PetBinding } from '../shared/configurations.js';
 
-export function registerConfigurationIpc({ window, configurations, sessions, quitting }: {
+export function registerConfigurationIpc({ window, configurations, sessions, quitting, preflight }: {
   window: () => BrowserWindow | undefined; configurations: Configurations; sessions: () => SessionState; quitting: () => boolean;
+  preflight?: Pick<PiPreflight, 'detectedConfiguration'>;
 }) {
   const chosen = new Set<string>();
   let inspectionPending = false;
+  let setupPending = false;
+  let generation = 0;
   async function canonicalLocation(value: string): Promise<string> {
     // Read only an explicitly selected/approved path. Preserve the no-symlink contract before canonicalizing case.
     let current = '/';
@@ -60,6 +64,43 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     assert(event); if (!input || typeof input !== 'object') throw new TypeError('Invalid configuration');
     const targetPath = path(input.targetPath); return configurations.create({ name: input.name, provider: input.provider, targetPath });
   });
+  ipcMain.handle('management:configurations-prepare-detected', async (event, ...args: unknown[]) => {
+    assert(event);
+    if (args.length !== 1) throw new TypeError('Invalid detected configuration');
+    const candidateId = id(args[0]);
+    const candidate = preflight?.detectedConfiguration(candidateId);
+    if (!candidate) throw new Error('请重新扫描支持的 pi 安装。');
+    if (setupPending) throw new Error('配置检查正在进行，请稍候。');
+    setupPending = true;
+    const current = window()!; const revision = generation;
+    const cancelled = () => ({ state: configurations.snapshot(), configurationId: null });
+    const active = () => {
+      assert(event);
+      const latest = preflight?.detectedConfiguration(candidateId);
+      return revision === generation && window() === current && current.isVisible() &&
+        latest?.installation.path === candidate.installation.path && latest.targetPath === candidate.targetPath;
+    };
+    try {
+      const result = await dialog.showMessageBox(current, { type: 'question', title: '配置检测到的 pi',
+        message: candidate.targetPath,
+        detail: '已自动匹配 pi 默认配置位置，无需选择文件夹。允许后只读检查此目录及祖先 metadata、settings.json、extensions/package.json 和固定入口/ignore 的存在；不会读取会话、凭据或对话。随后展示部署预览，另行确认后才写入扩展并开始接收。不启动或重载 pi。',
+        buttons: ['取消', '检查并预览'], defaultId: 0, cancelId: 0 });
+      if (result.response !== 1 || !active()) return cancelled();
+      const installation = await identifyInstallation(candidate.installation.path, candidateId);
+      if (!active()) return cancelled();
+      if (installation?.compatibility !== 'verified-0.85.1') throw new Error('pi 安装已变化，请重新扫描。');
+      const targetPath = await canonicalLocation(candidate.targetPath);
+      if (!active()) return cancelled();
+      const existing = configurations.snapshot().records.find(record => record.provider === 'pi' && record.targetPath === targetPath);
+      const created = existing ? configurations.snapshot() : await configurations.create({ name: 'pi 默认配置', provider: 'pi', targetPath, installation });
+      if (created.notice !== 'none') return { state: created, configurationId: null };
+      const record = created.records.find(value => value.provider === 'pi' && value.targetPath === targetPath);
+      if (!record || !active()) return cancelled();
+      const state = record.connection?.canConfigure ? await configurations.preview(record.id) : created;
+      if (!active()) { await configurations.cancel(record.id); return cancelled(); }
+      return { state, configurationId: record.id };
+    } finally { setupPending = false; }
+  });
   ipcMain.handle('management:configurations-rename', (event, value: unknown, name: unknown) => {
     assert(event); const valid = configurationName(name); if (!valid) throw new TypeError('Invalid name'); return configurations.rename(id(value), valid);
   });
@@ -70,4 +111,5 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     disable: (value: string) => configurations.disable(value), remove: (value: string) => configurations.remove(value) };
   for (const [action, operation] of Object.entries(operations)) ipcMain.handle(`management:configurations-${action}`, (event, value: unknown) => { assert(event); return operation(id(value)); });
   ipcMain.handle('management:configurations-confirm', (event, value: unknown, plan: unknown) => { assert(event); return configurations.confirm(id(value), id(plan)); });
+  return { invalidate() { generation++; } };
 }

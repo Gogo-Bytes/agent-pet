@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BrowserWindow } from 'electron';
 import { Configurations } from './configurations.js';
 import { registerConfigurationIpc } from './configuration-ipc.js';
 import { loadTrustedEntry } from './window-trust.js';
+import { PiPreflight } from './pi-preflight.js';
+import { PiConnectionStore } from './pi-connection-store.js';
+import { ConfigurationsStore } from './configurations-store.js';
+import { ReadBudget } from './pi-preflight-files.js';
+import { dirname } from 'node:path';
 const native = vi.hoisted(() => ({ handlers: new Map<string, (...args: unknown[]) => unknown>(), pick: vi.fn(), approve: vi.fn(), open: vi.fn() }));
 vi.mock('electron', () => ({ ipcMain: { handle: (name: string, callback: (...args: unknown[]) => unknown) => native.handlers.set(name, callback) }, dialog: { showOpenDialog: native.pick, showMessageBox: native.approve }, shell: { openExternal: native.open } }));
 let directory: string;
@@ -13,20 +18,128 @@ let registry: Configurations;
 let window: BrowserWindow;
 let event: { sender: BrowserWindow['webContents']; senderFrame: BrowserWindow['webContents']['mainFrame'] };
 let closed: boolean;
+let preflight: PiPreflight;
+let capabilities: ReturnType<typeof registerConfigurationIpc>;
+let visible: boolean;
+const start = vi.fn(async () => ({ stop: vi.fn(async () => {}) }));
 beforeEach(() => {
   native.handlers.clear(); native.pick.mockReset(); native.approve.mockReset(); native.open.mockReset();
   directory = realpathSync(mkdtempSync(join(tmpdir(), 'agent-pet-ipc-')));
   const profile = join(directory, 'profile'); mkdirSync(profile, { mode: 0o700 });
-  registry = new Configurations({ directory: profile, adapter: () => ({ start: vi.fn() }), publish: vi.fn() });
+  start.mockClear();
+  registry = new Configurations({ directory: profile, adapter: () => ({ start }), publish: vi.fn() });
+  preflight = new PiPreflight({ home: directory, guiPath: join(directory, 'bin'), pick: async () => null });
   const contents = { mainFrame: { url: 'file:///review.html' }, setWindowOpenHandler: vi.fn(), on: vi.fn() };
-  window = { webContents: contents, isDestroyed: () => false, loadFile: vi.fn(), loadURL: vi.fn() } as unknown as BrowserWindow;
+  visible = true;
+  window = { webContents: contents, isDestroyed: () => false, isVisible: () => visible, loadFile: vi.fn(), loadURL: vi.fn() } as unknown as BrowserWindow;
   loadTrustedEntry(window, '/review.html'); closed = false;
   event = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
-  registerConfigurationIpc({ window: () => window, configurations: registry, sessions: () => ({ sessions: {}, bubbles: [] }), quitting: () => closed });
+  capabilities = registerConfigurationIpc({ window: () => window, configurations: registry, preflight, sessions: () => ({ sessions: {}, bubbles: [] }), quitting: () => closed });
 });
-afterEach(async () => { await registry.stop(); rmSync(directory, { recursive: true, force: true }); });
+afterEach(async () => {
+  preflight.close(); await registry.stop();
+  for (const record of registry.snapshot().records) {
+    const saved = new PiConnectionStore(join(directory, 'profile', `configuration-${record.id}`)).snapshot();
+    if (saved) rmSync(dirname(saved.config.endpoint), { recursive: true, force: true });
+  }
+  vi.restoreAllMocks(); rmSync(directory, { recursive: true, force: true });
+});
 const invoke = (action: string, ...args: unknown[]) => native.handlers.get(`management:${action}`)!(event, ...args);
+async function scanFixture() {
+  const stat = ReadBudget.prototype.stat;
+  vi.spyOn(ReadBudget.prototype, 'stat').mockImplementation(function(this: ReadBudget, path) {
+    if (['/opt/homebrew/bin/pi', '/usr/local/bin/pi'].includes(path)) return Promise.resolve(null);
+    return stat.call(this, path);
+  });
+  const node = join(directory, '.nvm/versions/node/v22.22.3');
+  const pkg = join(node, 'lib/node_modules/@earendil-works/pi-coding-agent');
+  mkdirSync(join(pkg, 'dist/bundle'), { recursive: true, mode: 0o700 });
+  writeFileSync(join(pkg, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '0.85.1', bin: { pi: 'dist/bundle/cli.js' }, piConfig: { configDir: '.pi' } }), { mode: 0o600 });
+  writeFileSync(join(pkg, 'dist/bundle/cli.js'), 'throw new Error("MUST NOT EXECUTE")', { mode: 0o600 });
+  mkdirSync(join(node, 'bin')); symlinkSync('../lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js', join(node, 'bin/pi'));
+  mkdirSync(join(directory, '.pi/agent'), { recursive: true, mode: 0o700 });
+  const state = await preflight.detect();
+  const installation = state.installations.find(value => value.path === join(node, 'bin/pi'))!;
+  return { id: installation.id, cli: join(pkg, 'package.json'), target: join(directory, '.pi/agent'), artifact: join(directory, '.pi/agent/extensions/agent-pet.ts') };
+}
 describe('configuration host capability boundary', () => {
+  it('revokes a completed preview after window invalidation and keeps target files untouched', async () => {
+    const f = await scanFixture(); native.approve.mockResolvedValue({ response: 1 });
+    const preview = registry.preview.bind(registry);
+    let finish!: () => void; let ready!: () => void;
+    const entered = new Promise<void>(resolve => { ready = resolve; });
+    vi.spyOn(registry, 'preview').mockImplementationOnce(async id => {
+      const state = await preview(id); ready(); await new Promise<void>(resolve => { finish = resolve; }); return state;
+    });
+    const pending = invoke('configurations-prepare-detected', f.id); await entered;
+    capabilities.invalidate(); finish();
+    expect(await pending).toMatchObject({ configurationId: null });
+    expect(registry.snapshot().records[0]!.connection!.preview).toBeNull();
+    expect(existsSync(f.artifact)).toBe(false); expect(start).not.toHaveBeenCalled();
+  });
+  it('preserves a blocked default and reports persistence failure without deploying', async () => {
+    const f = await scanFixture(); native.approve.mockResolvedValue({ response: 1 });
+    rmSync(join(directory, '.pi'), { recursive: true });
+    const result = await invoke('configurations-prepare-detected', f.id) as { state: ReturnType<Configurations['snapshot']>; configurationId: string };
+    expect(result.state.records[0]!.connection!.preview?.action).toBe('blocked');
+    expect(existsSync(join(directory, '.pi'))).toBe(false); expect(start).not.toHaveBeenCalled();
+    await registry.remove(result.configurationId);
+    vi.spyOn(ConfigurationsStore.prototype, 'save').mockReturnValueOnce(false);
+    expect(await invoke('configurations-prepare-detected', f.id)).toMatchObject({ state: { notice: 'save-failed', records: [] }, configurationId: null });
+    expect(start).not.toHaveBeenCalled(); expect(existsSync(f.artifact)).toBe(false);
+  });
+  it('automatically prepares the detected default without a folder picker, but never deploys before confirmation', async () => {
+    const f = await scanFixture(); native.approve.mockResolvedValue({ response: 1 });
+    const result = await invoke('configurations-prepare-detected', f.id) as { state: ReturnType<Configurations['snapshot']>; configurationId: string };
+    expect(native.pick).not.toHaveBeenCalled();
+    expect(native.approve.mock.calls[0]?.[1]).toMatchObject({ message: f.target, buttons: ['取消', '检查并预览'] });
+    const record = result.state.records[0]!;
+    expect(record).toMatchObject({ name: 'pi 默认配置', provider: 'pi', targetPath: f.target, installation: { id: f.id, compatibility: 'verified-0.85.1' },
+      connection: { status: 'not-configured', receiving: 'stopped', preview: { action: 'create', path: f.artifact } } });
+    expect(start).not.toHaveBeenCalled(); expect(existsSync(f.artifact)).toBe(false);
+    await invoke('configurations-cancel', result.configurationId);
+    expect(existsSync(f.artifact)).toBe(false);
+    const second = await invoke('configurations-prepare-detected', f.id) as typeof result;
+    expect(second.configurationId).toBe(result.configurationId); expect(registry.snapshot().records).toHaveLength(1);
+    await invoke('configurations-confirm', second.configurationId, second.state.records[0]!.connection!.preview!.id);
+    expect(start).toHaveBeenCalledTimes(1); expect(existsSync(f.artifact)).toBe(true);
+    expect((await registry.remove(second.configurationId)).records).toEqual([]);
+    expect(existsSync(f.artifact)).toBe(false);
+  });
+  it('cancels before inspecting or adding a configuration and rejects arbitrary or stale candidates', async () => {
+    const f = await scanFixture(); native.approve.mockResolvedValue({ response: 0 });
+    expect(await invoke('configurations-prepare-detected', f.id)).toMatchObject({ configurationId: null });
+    expect(registry.snapshot().records).toEqual([]); expect(start).not.toHaveBeenCalled();
+    await expect(invoke('configurations-prepare-detected', '/arbitrary/path')).rejects.toThrow('重新扫描');
+    await expect(invoke('configurations-prepare-detected', f.id, '/different')).rejects.toThrow('Invalid');
+    await preflight.detect();
+    await expect(invoke('configurations-prepare-detected', f.id)).rejects.toThrow('重新扫描');
+  });
+  it('does not offer automatic setup for an unverified installation', async () => {
+    const f = await scanFixture();
+    const metadata = JSON.parse(readFileSync(f.cli, 'utf8')); metadata.version = '0.85.2'; writeFileSync(f.cli, JSON.stringify(metadata), { mode: 0o600 });
+    const scanned = await preflight.detect(); const installation = scanned.installations.find(value => value.path.includes('/.nvm/'))!;
+    expect(installation.compatibility).toBe('unverified');
+    await expect(invoke('configurations-prepare-detected', installation.id)).rejects.toThrow('重新扫描');
+    expect(native.approve).not.toHaveBeenCalled(); expect(registry.snapshot().records).toEqual([]);
+  });
+  it.each(['close', 'hide', 'rescan', 'changed-installation'] as const)('does not prepare a stale default after %s during native approval', async change => {
+    const f = await scanFixture();
+    let finish!: (result: { response: number }) => void;
+    native.approve.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const pending = invoke('configurations-prepare-detected', f.id);
+    await expect(invoke('configurations-prepare-detected', f.id)).rejects.toThrow('正在进行');
+    if (change === 'close') capabilities.invalidate();
+    if (change === 'hide') visible = false;
+    if (change === 'rescan') await preflight.detect();
+    if (change === 'changed-installation') {
+      const metadata = JSON.parse(readFileSync(f.cli, 'utf8')); metadata.version = '0.85.2'; writeFileSync(f.cli, JSON.stringify(metadata), { mode: 0o600 });
+    }
+    finish({ response: 1 });
+    if (change === 'changed-installation') await expect(pending).rejects.toThrow('安装已变化');
+    else expect(await pending).toMatchObject({ configurationId: null });
+    expect(registry.snapshot().records).toEqual([]); expect(start).not.toHaveBeenCalled(); expect(existsSync(f.artifact)).toBe(false);
+  });
   it('rejects every new channel from the pet window, subframes and foreign navigation', async () => {
     for (const handler of native.handlers.values()) {
       await expect(Promise.resolve().then(() => handler({ sender: {}, senderFrame: event.senderFrame }))).rejects.toThrow('Untrusted renderer');

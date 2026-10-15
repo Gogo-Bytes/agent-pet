@@ -62,6 +62,12 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 全量 **652 passed / 1 skipped / 67 files**、typecheck、desktop build、最终 package 通过，独立 Review READY（110 项），最终文案 focused **28 passed**。已更新并启动 `/Users/gan/Desktop/🥷/Agent Pet.app`，实际管理页的移除预览/取消通过；未自动移除当前历史记录。此前授权的精确本机 CLI metadata 识别为 pi 0.85.1；2026-10-15 用户另行授权有界只读扫描，正式包实际找到 NVM Node v22.22.3 和 v24.20.0 下的两份 pi 0.85.1，原生 AX/截图一致，留在结果页；未执行 pi、读取日常配置、部署或移除。截图、红测试和具体边界见 [本轮证据](PI-DISCOVERY-REMOVAL-ACCEPTANCE.md)。设置实机停点、真实任务矩阵和发布验收保持未完成。
 
+## 用户反馈修复：自动扫描直接配置（2026-10-15）
+
+已将“找到安装后再次手动选位置”改为按默认配置目标合并的一键入口。Main 从最新支持的扫描 ID 匹配自身 HOME 的 `.pi/agent`，自动名称/类型/位置，具体只读批准后直接准备既有部署预览；独立确认仍控制扩展写入与接收。已有配置直接查看，未知版本不提供一键操作，项目/自定义位置保留手动入口。返回迟到结果撤销预览，窗口 close/reload 和重新扫描使陈旧批准失效。
+
+全量 **665 passed / 1 skipped / 67 files**、typecheck、desktop build、package 通过，独立审查 READY（80 项/6 文件）。已更新并启动稳定包 `/Users/gan/Desktop/🥷/Agent Pet.app`；实际两份 pi 安装显示为一个默认配置入口，点击即原生精确检查确认。工具提示用户接手后，实际已进入默认目标的部署预览，因 `settings-unknown` 阻止部署，未建立日常连接；没有修改现有扩展规则。原生取消自动化结果有覆盖限制，不标完整通过。具体截图、语义与边界见 [本轮验收](PI-AUTOMATIC-SETUP-ACCEPTANCE.md)。
+
 ## 当前事实与证据
 
 M1 实施基线：`9ec14c5c22253c3b1793fcf216332fc3cf49a912`。以下代码入口已核对；历史执行结果归属原阶段，M1 与 M2 临时切片验证分别列于对应检查点。两个历史未跟踪 native smoke fixture 原样保留。临时部署阶段已提交为 `c052037`，所有权撤回修复后独立审查 **READY**；当前桌面接入增量基于该 commit；独立审查 READY，Main 已复跑全量测试、类型检查与构建。本地提交遵循工程规则，不自动推送。

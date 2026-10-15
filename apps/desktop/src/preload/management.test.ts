@@ -56,11 +56,11 @@ describe('management preload capability boundary', () => {
     }
     native.invoke.mockClear();
     await api.configurations.rename('id', '项目'); await api.configurations.bindPet('id', null);
-    await api.configurations.confirm('id', 'plan'); await api.locations.choose();
+    await api.configurations.confirm('id', 'plan'); await api.configurations.prepareDetected('scan-id'); await api.locations.choose();
     await api.locations.authorize('/tmp/owned'); await api.locations.inspect('/tmp/owned', 'pi');
     expect(native.invoke.mock.calls).toEqual([
       ['management:configurations-rename', 'id', '项目'], ['management:configurations-pet', 'id', null],
-      ['management:configurations-confirm', 'id', 'plan'], ['management:location-choose'],
+      ['management:configurations-confirm', 'id', 'plan'], ['management:configurations-prepare-detected', 'scan-id'], ['management:location-choose'],
       ['management:location-authorize', '/tmp/owned'], ['management:location-inspect', '/tmp/owned', 'pi'],
     ]);
     native.invoke.mockClear();

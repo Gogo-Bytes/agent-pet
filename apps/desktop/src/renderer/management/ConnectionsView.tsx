@@ -38,6 +38,9 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
   const generation = useRef(0);
   const main = useRef<HTMLElement>(null);
   const records = state?.records ?? [];
+  const detected = scan?.installations.filter(value => value.compatibility === 'verified-0.85.1') ?? [];
+  const automatic = detected.length ? scan?.automaticTarget : undefined;
+  const existingDetected = automatic ? records.find(record => record.provider === 'pi' && record.targetPath === automatic.path) : undefined;
   const current = records.find(record => record.id === selected) ?? (page === 'library' ? records[0] : undefined);
   useEffect(() => () => { generation.current++; }, []);
   useEffect(() => { if (!visible) setManual(undefined); }, [visible]);
@@ -49,6 +52,23 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
     finally { if (request === generation.current) setScanning(false); }
   }
   function cancelScan() { generation.current++; setScanning(false); setPage('library'); }
+  async function prepareDetected() {
+    if (!detected[0] || busy || !state) return;
+    const request = ++generation.current;
+    let configurationId: string | null = null;
+    const saved = await run(async () => {
+      const result = await bridge.configurations.prepareDetected(detected[0]!.id);
+      configurationId = result.configurationId; return result.state;
+    });
+    if (saved && configurationId) {
+      if (request !== generation.current) {
+        try { await bridge.configurations.cancel(configurationId); }
+        catch { setScanError('取消预览未确认，请打开配置详情重新取消。'); }
+        return;
+      }
+      setSelected(configurationId); setPage('agent');
+    }
+  }
   const browsing = page === 'library' || page === 'agent';
   return <section hidden={!visible} className="cfg-page co-embedded" aria-label="Agent 配置管理" data-page={page}>
     <article ref={main} className="cfg-menu">
@@ -67,12 +87,13 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
           </div></div>
       </> : <>
         <header className="cfg-subpage-head"><button className="cfg-text-button" onClick={() => page === 'discover' ? cancelScan() : setPage('agent')}><Icon name="left" />{page === 'remove' ? '配置详情' : '我的连接'}</button><span>{page === 'discover' ? '自动扫描' : '移除配置'}</span></header>
-        <div className="cfg-content-scroll">{page === 'discover' ? <section className="cfg-discovery"><div className="cfg-discovery-heading"><div><h1 tabIndex={-1}>自动扫描</h1><p>{scanning ? '正在查找支持的 pi 安装…' : scan ? `找到 ${scan.installations.length} 个安装。选择配置位置继续。` : '查找本机支持的 Agent。'}</p></div><button className="cfg-secondary" disabled={scanning} onClick={() => void detect()}><Icon name="replay" />重新扫描</button></div>
+        <div className="cfg-content-scroll">{page === 'discover' ? <section className="cfg-discovery"><div className="cfg-discovery-heading"><div><h1 tabIndex={-1}>自动扫描</h1><p>{scanning ? '正在查找支持的 pi 安装…' : automatic ? '已自动匹配 pi 默认配置，可以直接配置。' : '查找本机支持的 Agent。'}</p></div><button className="cfg-secondary" disabled={scanning || busy} onClick={() => void detect()}><Icon name="replay" />重新扫描</button></div>
           {scanning ? <div className="cfg-scan-stage" role="status"><div className="cfg-scan-art"><Icon name="scan" /></div><strong>正在查找安装</strong><p>只查找当前支持的 pi，不扫描会话或对话。</p><button className="cfg-secondary" onClick={cancelScan}>取消扫描</button></div> : <>
-            <div className="cfg-results">{scan?.installations.map(installation => <div className="cfg-result" key={installation.id}><AgentMark record={{ provider: 'pi' }} /><div><strong>pi <span>{installation.version ?? '版本未确认'}</span></strong><code>{installation.path}</code><small>{installation.compatibility === 'unverified' ? '此版本兼容性尚未验证' : '已验证版本'}</small></div><button className="cfg-secondary" onClick={() => setManual(null)}>选择配置位置<Icon name="plus" /></button></div>)}</div>
+            <div className="cfg-results">{automatic && <div className="cfg-result"><AgentMark record={{ provider: 'pi' }} /><div><strong>pi 默认配置</strong><code>{automatic.path}</code><small>检测到 {detected.length} 处支持的程序安装，共用此默认配置。</small><details><summary>程序安装详情</summary>{detected.map(installation => <p key={installation.id}><small>pi {installation.version}</small><code>{installation.path}</code></p>)}</details></div><button className="cfg-primary" disabled={busy} onClick={() => existingDetected ? (setSelected(existingDetected.id), setPage('agent')) : void prepareDetected()}>{existingDetected ? '查看配置' : '一键配置'}<Icon name={existingDetected ? 'right' : 'plus'} /></button></div>}
+              {scan?.installations.filter(installation => installation.compatibility === 'unverified').map(installation => <div className="cfg-result" key={installation.id}><AgentMark record={{ provider: 'pi' }} /><div><strong>pi <span>{installation.version ?? '版本未确认'}</span></strong><code>{installation.path}</code><small>此版本暂不支持一键配置，兼容性尚未验证。</small></div></div>)}</div>
             {!scan?.installations.length && <div className="cfg-empty"><Icon name="scan" /><h2>未找到安装</h2><p>可以手动选择已有配置位置。</p></div>}
             {scan?.scan === 'limited' && <p className="cfg-notice" role="status">扫描范围受限，结果可能不完整。可以重新扫描或手动选择配置位置。</p>}
-            <p className="cfg-notice">扫描结果是安装候选，尚未读取配置或建立连接。项目配置请手动选择对应目录。</p><button className="cfg-text-button" onClick={() => setManual(null)}><Icon name="folder" />手动添加<Icon name="right" /></button>{scanError && <p role="alert">{scanError}</p>}
+            <p className="cfg-notice">一键配置会自动填写名称、类型和默认位置，检查后展示部署预览。确认部署后才开始接收；Agent 在线需收到实际通信。项目或自定义配置可手动添加。</p><button className="cfg-text-button" disabled={busy} onClick={() => setManual(null)}><Icon name="folder" />手动添加<Icon name="right" /></button>{(scanError || error) && <p role="alert">{scanError || error}</p>}
           </>}
         </section> : current ? <section className="cfg-form-page cfg-removal"><span className="cfg-form-sign"><Icon name="trash" /></span><h1 tabIndex={-1}>移除配置</h1><p className="cfg-form-intro">只处理 Agent Pet 中的这条配置。Agent 程序和用户文件都会保留。</p><div className="cfg-form-target"><AgentMark record={current} /><div><strong>{current.name}</strong><code>{current.targetPath}</code></div></div>
           {current.connection?.deployedPath && <p>会先停用接收并保存停用状态，再仅移除仍匹配本应用所有权、身份与内容的扩展。用户修改或未知文件保留，未完成撤回会保留配置供处理。运行中的扩展不会因此卸载，请自行安全重载或关闭 pi。</p>}

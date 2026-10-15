@@ -40,6 +40,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
     piConnection: { getState: async () => base, preview: async () => base, cancel: async () => base, confirm: async () => base, resume: async () => base, disable: async () => base, remove: async () => base, subscribe: () => () => {} },
     configurations: {
       getState: async () => configs, subscribe: listener => subscribe(configListeners, listener),
+      prepareDetected: async () => { throw new Error('Browser fixture cannot authorize real locations. Verify detected setup with isolated Main IPC tests.'); },
       create: async input => {
         configs.notice = configs.records.some(value => value.provider === input.provider && value.targetPath === input.targetPath) ? 'duplicate' : 'none';
         if (configs.notice === 'none') configs.records = [...configs.records, { id: `review-${configs.revision + 2}`, ...input, installation: null, pet: null, availability: input.provider === 'pi' ? 'unchecked' : 'unsupported', inspection: null, connection: input.provider === 'pi' ? { ...base } : null }];

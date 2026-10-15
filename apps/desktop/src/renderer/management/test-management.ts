@@ -35,6 +35,7 @@ export function managementBridge(records: AgentConfiguration[] = [configuration(
       getState: vi.fn(async () => configs),
       create: vi.fn(async (input: CreateConfiguration) => changed([...configs.records, { ...configuration('added', input.targetPath), ...input,
         availability: input.provider === 'pi' ? 'unchecked' as const : 'unsupported' as const, pet: null }])),
+      prepareDetected: vi.fn(async (_installationId: string): Promise<{ state: ConfigurationsState; configurationId: string | null }> => ({ state: configs, configurationId: null })),
       rename: vi.fn(async (id: string, name: string) => changed(configs.records.map(record => record.id === id ? { ...record, name: name.trim() } : record))),
       changeTarget: vi.fn(async (id: string, path: string) => changed(configs.records.map(record => record.id === id ? { ...record, targetPath: path } : record))),
       bindPet: vi.fn(async (id: string, pet: PetBinding | null) => changed(configs.records.map(record => record.id === id ? { ...record, pet } : record))),

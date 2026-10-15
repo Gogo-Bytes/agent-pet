@@ -15,7 +15,7 @@ type Entry = { metadata: ConfigurationMetadata; inspection: Inspection | null; r
   connection: PiConnection | null; unsubscribe?: () => void; controller?: AbortController };
 
 /** Main owns persistence, inspection and PiConnection capabilities. Renderer selection is observational.
- * IPC must only accept target paths returned by the Main native picker (not arbitrary renderer strings).
+ * IPC accepts only explicitly approved native selections or Main-resolved detected defaults.
  */
 export class Configurations {
   private readonly store: ConfigurationsStore;

@@ -32,6 +32,7 @@ const piPreflight: PiPreflightApi = {
 const configurations: ConfigurationsApi = {
   getState: () => ipcRenderer.invoke('management:configurations-state'),
   create: input => ipcRenderer.invoke('management:configurations-create', input),
+  prepareDetected: id => ipcRenderer.invoke('management:configurations-prepare-detected', id),
   rename: (id, name) => ipcRenderer.invoke('management:configurations-rename', id, name),
   changeTarget: (id, path) => ipcRenderer.invoke('management:configurations-target', id, path),
   bindPet: (id, pet) => ipcRenderer.invoke('management:configurations-pet', id, pet),

@@ -310,6 +310,70 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getByRole('button', { name: '重新扫描' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '手动添加' })).toBeTruthy();
   });
+  it('groups pi installations sharing a default and prepares configuration without the manual wizard', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    const installs = ['node22', 'node24'].map(id => ({ id, path: `/synthetic/${id}/bin/pi`, version: '0.85.1', compatibility: 'verified-0.85.1' as const }));
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: installs });
+    const record = { ...configuration('default', initialPreflight.automaticTarget!.path), name: 'pi 默认配置', connection: { ...initialConnection,
+      preview: { id: 'automatic-preview', path: `${initialPreflight.automaticTarget!.path}/extensions/agent-pet.ts`, target: { ...initialPreflight.automaticTarget!, source: 'chosen' as const }, action: 'create' as const, findings: [], createDirectories: [] } } };
+    test.bridge.configurations.prepareDetected.mockImplementationOnce(async () => {
+      const next = { ...test.configs(), records: [record] }; test.pushConfigs(next); return { state: next, configurationId: record.id };
+    });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    expect(screen.getAllByRole('button', { name: '一键配置' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /选择配置位置/ })).toBeNull();
+    expect(screen.getByText('检测到 2 处支持的程序安装，共用此默认配置。')).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledExactlyOnceWith('node22');
+    expect(test.bridge.locations.choose).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('region', { name: '部署预览' })).toBeTruthy();
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+    await test.user.click(screen.getByRole('button', { name: '取消预览' }));
+    expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith('default');
+  });
+  it('keeps cancellation and errors retryable, and opens an existing detected configuration without adding a duplicate', async () => {
+    const existing = configuration('saved', initialPreflight.automaticTarget!.path);
+    const test = await mount([]); await page(test.user, '连接');
+    const installation = { id: 'auto-pi', path: '/synthetic/bin/pi', compatibility: 'verified-0.85.1' as const, version: '0.85.1' };
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: [installation] });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    expect(screen.getByRole('button', { name: '一键配置' })).toBeTruthy();
+    test.bridge.configurations.prepareDetected.mockRejectedValueOnce(new Error('fixture denied'));
+    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    expect(screen.getByRole('alert').textContent).toContain('请求失败');
+    act(() => test.pushConfigs({ ...test.configs(), records: [existing] }));
+    await test.user.click(screen.getByRole('button', { name: '查看配置' }));
+    expect(screen.getByRole('heading', { name: existing.name })).toBeTruthy();
+    expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledTimes(2);
+    expect(test.bridge.configurations.create).not.toHaveBeenCalled();
+  });
+  it('does not let late automatic preparation replace a return to the list and revokes its preview', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: [
+      { id: 'auto-pi', path: '/synthetic/bin/pi', compatibility: 'verified-0.85.1', version: '0.85.1' },
+    ] });
+    let finish!: (result: { state: ReturnType<typeof test.configs>; configurationId: string }) => void;
+    test.bridge.configurations.prepareDetected.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    await test.user.click(screen.getByRole('button', { name: '我的连接' }));
+    await act(async () => finish({ state: test.configs(), configurationId: 'late-preview' }));
+    expect(screen.getByRole('heading', { name: '我的连接 00' })).toBeTruthy();
+    expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith('late-preview');
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+  });
+  it('keeps unsupported installation results honest and preserves the manual fallback', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: [
+      { id: 'unsupported', path: '/synthetic/bin/pi', compatibility: 'unverified', version: '0.85.2' },
+    ] });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    expect(screen.queryByRole('button', { name: '一键配置' })).toBeNull();
+    expect(screen.getByText('此版本暂不支持一键配置，兼容性尚未验证。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '手动添加' })).toBeTruthy();
+    expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
+  });
   it('keeps pending discovery alive across page navigation and discards an explicitly canceled scan reply', async () => {
     const test = await mount(); await page(test.user, '连接');
     let finish!: (state: PreflightState) => void;

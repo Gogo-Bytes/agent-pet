@@ -51,7 +51,8 @@ export function createManagement(options: {
     options.onlineChanged?.(snapshot.records.some(record => record.connection?.status === 'connected'));
     if (window && !window.isDestroyed()) window.webContents.send('management:configurations-state', snapshot);
   });
-  registerConfigurationIpc({ window: () => window, configurations, sessions: () => options.sessions?.() ?? { sessions: {}, bubbles: [] }, quitting: () => quitting });
+  const configurationIpc = registerConfigurationIpc({ window: () => window, configurations, preflight,
+    sessions: () => options.sessions?.() ?? { sessions: {}, bubbles: [] }, quitting: () => quitting });
   let tray: Tray | undefined;
   let runtimeError: string | null = null;
   let dockReady = false;
@@ -99,18 +100,18 @@ export function createManagement(options: {
           contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true } });
       const current = window;
       current.on('close', event => {
-        connection.invalidate(); configurations.invalidateAll();
+        connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate();
         if (!quitting) {
           event.preventDefault(); windowRequested = false;
           if (preferences.snapshot().background) current.hide(); else app.quit();
         }
       });
-      current.webContents.on('did-start-loading', () => { connection.invalidate(); configurations.invalidateAll(); });
-      current.webContents.on('render-process-gone', () => { connection.invalidate(); configurations.invalidateAll(); });
+      current.webContents.on('did-start-loading', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
+      current.webContents.on('render-process-gone', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
       current.once('ready-to-show', () => {
         if (!quitting && windowRequested && window === current && !current.isDestroyed()) current.show();
       });
-      current.on('closed', () => { connection.invalidate(); configurations.invalidateAll(); if (window === current) window = undefined; });
+      current.on('closed', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); if (window === current) window = undefined; });
       const dev = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
       loadTrustedEntry(current, join(__dirname, '../renderer/management.html'), dev ? new URL('management.html', dev.endsWith('/') ? dev : dev + '/').href : undefined);
     } else {

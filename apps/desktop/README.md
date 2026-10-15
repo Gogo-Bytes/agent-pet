@@ -68,8 +68,16 @@ Finder-launched installation discovery includes the fixed `$HOME/.nvm/versions/n
 directory (64 entries, newest 16 version directories) as well as the bounded GUI
 PATH and standard bins. It reads installation metadata only, never executes pi,
 loads shell profiles or reads daily `.pi` credentials. Partial scans remain visible.
-Discovery produces installation candidates; users still choose and authorize a
-configuration target separately. Missing owned extensions now yield `already-absent`:
+Discovery groups supported pi installations sharing the Main-resolved default
+configuration into one action. `prepareDetected(scanId)` accepts only a current,
+verified host scan ID, resolves `$HOME/.pi/agent`, asks exact read permission,
+revalidates the installation and prepares the existing deployment preview. Users
+do not choose a folder, type, or name. The separate preview confirmation still
+owns deployment/listening; cancel creates no extension. Once approved preparation
+saves non-secret configuration metadata, cancelling its preview retains that
+unconnected record for retry. Project/custom targets retain the manual flow.
+Main invalidates pending preparation on close/navigation; Renderer revokes late
+previews after returning to the list. Missing owned extensions yield `already-absent`:
 clear the validated private receipt and product configuration without deleting target
 directories or unknown files. Unreadable, replaced and edited paths retain safeguards;
 failed persistence cannot report successful removal. See

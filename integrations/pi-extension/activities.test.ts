@@ -18,7 +18,8 @@ async function setup() {
   type Handler = Parameters<Parameters<typeof extension>[0]['on']>[1];
   const handlers = new Map<string, Handler>();
   let idle = true;
-  const ctx = { cwd: '/fixture/project', mode: 'tui', isIdle: () => idle, sessionManager: { getSessionId: () => 'activities' } };
+  let signal: AbortSignal | undefined;
+  const ctx = { get signal() { return signal; }, cwd: '/fixture/project', mode: 'tui', isIdle: () => idle, sessionManager: { getSessionId: () => 'activities' } };
   extension({ on: (name, handler) => handlers.set(name, handler) });
   const emit = (name: string, event: unknown = {}) => handlers.get(name)!(event, ctx);
   cleanups.push(async () => { emit('session_shutdown'); await handle.stop(); await rm(root, { recursive: true, force: true }); });
@@ -27,7 +28,7 @@ async function setup() {
   const record = () => Object.values(app.snapshot().sessions)[0]!;
   const motion = () => projectPetPresentation(app.snapshot());
   const expectAction = (action: string) => vi.waitFor(() => expect(motion().action).toBe(action));
-  return { app, emit, record, motion, expectAction, idle: (value: boolean) => { idle = value; },
+  return { app, emit, record, motion, expectAction, signal: (value: AbortSignal | undefined) => { signal = value; }, idle: (value: boolean) => { idle = value; },
     async restart() { await handle.stop(); handle = await start(); await vi.waitFor(() => expect(record().connected).toBe(true)); },
     stop: () => handle.stop(),
   };
@@ -96,4 +97,39 @@ it('clears current activity on receiver stop, reconnects without event replay, a
   expect(t.app.snapshot().bubbles[0]?.status).toBe('completed-unread');
   await t.app.acknowledgeAndOpen({ provider: 'pi', sessionId: id }); await t.expectAction('idle');
   await t.restart(); expect(t.app.snapshot().bubbles).toEqual([]);
+});
+
+it('uses the run abort signal when a cancelled tool is followed by an error stop reason', async () => {
+  const t = await setup(), controller = new AbortController();
+  t.signal(controller.signal); t.idle(false); t.emit('agent_start'); await t.expectAction('working');
+  t.emit('tool_execution_start', { toolCallId: 'sleep', toolName: 'bash' }); await t.expectAction('executing');
+  controller.abort();
+  t.emit('tool_execution_end', { toolCallId: 'sleep', isError: true, get result() { throw Error('must not read tool output'); } });
+  await t.expectAction('working'); // Cancelling a tool is not a transient tool failure.
+  t.emit('message_end', { message: { role: 'assistant', stopReason: 'error', get errorMessage() { throw Error('must not parse error strings'); } } });
+  // pi may clear ctx.signal before agent_settled; retain the observed run signal.
+  t.signal(undefined); t.idle(true); t.emit('agent_settled');
+  await t.expectAction('cancelled');
+  expect(t.record().status).toBe('idle');
+  expect(t.record().capabilities?.cancelled).toBe('supported');
+  expect(t.record().facts).toMatchObject({ activities: [], waitingForInput: false });
+  expect(t.app.snapshot().bubbles).toEqual([]);
+  const next = new AbortController();
+  t.signal(next.signal); t.emit('agent_start'); await t.expectAction('working');
+  t.emit('message_end', { message: { role: 'assistant', stopReason: 'error' } }); t.emit('agent_settled');
+  await t.expectAction('error'); // An earlier cancellation cannot mask a genuine new failure.
+});
+it('replaces the previous attempt signal during a continuation without letting its later abort cancel the new attempt', async () => {
+  const t = await setup(), previous = new AbortController(), current = new AbortController();
+  t.signal(previous.signal); t.idle(false); t.emit('agent_start'); await t.expectAction('working');
+  const work = t.record().workId;
+  t.signal(current.signal); t.emit('agent_start');
+  previous.abort();
+  t.emit('tool_execution_start', { toolCallId: 'current', toolName: 'read' }); await t.expectAction('reading');
+  t.emit('tool_execution_end', { toolCallId: 'current', isError: true }); await t.expectAction('tool_error');
+  expect(t.record().workId).toBe(work);
+  t.emit('message_end', { message: { role: 'assistant', stopReason: 'stop' } });
+  t.signal(undefined); t.idle(true); t.emit('agent_settled'); await t.expectAction('success');
+  expect(t.record().facts?.occurrence).toBeUndefined();
+  expect(t.record().capabilities?.cancelled).toBe('unknown');
 });

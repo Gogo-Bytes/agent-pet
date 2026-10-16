@@ -14,7 +14,9 @@ self-contained and does not depend on the Agent Pet npm workspace.
 - Observes `session_start`, `agent_start`, `message_end`, `agent_settled`,
   `session_info_changed` and `session_shutdown`, plus stream phase, tool, extension
   UI-prompt and compaction start/end/abort hooks verified against pi 0.85.1.
-  Tool failures remain transient, cancellation remains distinct, and automatic retry
+  Tool failures remain transient; the current run AbortSignal plus terminal stop reason
+  distinguishes cancellation without parsing error/tool text. Signal references are
+  replaced on continuation and released on settled/shutdown/reload. Automatic retry
   is unknown (not an Extension API event here). See the [event matrix and evidence](../../docs/PET-ACTIONS-ACCEPTANCE.md).
 - Treats `agent_settled` plus `ctx.isIdle()` as the point at which a work cycle
   may become completed/error.
@@ -108,3 +110,12 @@ retry-period cancellation, native acceptance of the new connection health UI and
 `session_shutdown` is connection cleanup, not task completion. The desktop side
 keeps `openSession` unsupported until the original terminal window can be
 reliably located.
+
+## Explicit live-check fixture
+
+`test-support/live-check.ts` is never imported by the product or configured observer.
+It registers a user-invoked native confirmation and a distinct zero-cost local provider
+that throws before any network operation. It never selects a model, sends a prompt,
+controls cancellation or emits observation frames. Loading into a real pi is a separate
+precisely authorized test operation, not part of normal deployment. See
+[the cancellation/waiting/error preview](../../docs/PI-CANCEL-WAIT-CHECK-PREVIEW.md).

@@ -30,6 +30,12 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 全量 **760 passed / 1 skipped / 77 files**、typecheck、desktop build、原型build、真实Electron缩放fixture通过；当前正式dev设置页实看比例恢复、无序号。未打包或推送，pi细分任务验证暂停待继续。见 [修复与验收边界](UI-SCALE-REGRESSION-ACCEPTANCE.md)。原设置停点与native fixtures保留。
 
+## 取消误报修复与等待/受控出错检查准备（2026-10-16）
+
+用户继续实机验证取消，按Esc后pi显示“Error: This operation was aborted”；私有枚举记录先tool_error再error，取消验收失败，不能作为正常任务出错通过。观察扩展已改为只读保留当前运行的原生AbortSignal，settled时用真实aborted区分取消，取消工具不冒充tool_error；续跑替换signal、结束/卸载释放引用，不加监听或Agent控制。能力表按扩展实例隔离，避免多个实例相互虚增支持状态。
+
+另备好独立test-support helper：用户显式命令打开真正确认框、用户自行选择的本机抛错模型触发受控失败；不发观察假事件，不自动选模型或请求，不进入正式部署源。独立focused10项、typecheck、desktop build通过。最终全量并行有1项原Worker启动unavailable（763通过/1跳过），原文件4项复验通过，一次有界完整低并行复验764通过/1跳过/78文件，未改guard或阈值。当前用户扩展尚未再次替换、helper尚未加载，真实取消/等待/受控任务出错仍未通过。新的精确真实操作范围见 [预览](PI-CANCEL-WAIT-CHECK-PREVIEW.md)，原实机证据见 [记录](PI-EXTENSION-LIVE-ACCEPTANCE.md)。仍用dev，不打包。
+
 ## 当前连接的扩展更新与真实事件验证（2026-10-16）
 
 用户要求更新当前pi扩展并做真实细分验证，保留配置，仅用dev。只读核对当前默认配置、私有receipt与现有扩展匹配，runtime有效/socket缺失。新增显式host/operator更新器：严格ownership与inactive保护、原目标绑定、700/600私有备份、原子替换及新receipt、显式校验恢复；保留接收配置与settings，不接Renderer/自动启动更新。dev可显式启用有界枚举证据，匿名身份、无正文/名称/凭据，打包应用忽略。

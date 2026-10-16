@@ -7,6 +7,7 @@ import { basename } from 'node:path';
 type PiContext = {
   cwd: string;
   mode?: string;
+  signal?: AbortSignal | undefined;
   isIdle(): boolean;
   sessionManager: {
     getSessionId(): string | undefined;
@@ -20,13 +21,6 @@ type PiApi = {
 
 type Activity = 'thinking' | 'responding' | 'reading' | 'writing' | 'searching' | 'executing' | 'compacting';
 type Occurrence = 'tool_error' | 'output_limited' | 'cancelled';
-// Extension API coverage verified against pi 0.85.1 TUI. Runtime version is not
-// exposed by ctx. Fine capabilities stay unknown until their native event is
-// observed; registering a hook alone cannot prove an older runtime supports it.
-const capabilities = Object.fromEntries([
-  ...['thinking', 'responding', 'reading', 'writing', 'searching', 'executing', 'compacting', 'waiting_input', 'tool_error', 'output_limited', 'cancelled'].map(key => [key, 'unknown']),
-  ['retrying', 'unknown'],
-]);
 type BridgeStatus = 'working' | 'completed' | 'error' | 'idle' | 'offline';
 
 // Replaced with serialized data by configured-source.ts, never a runtime source loader.
@@ -59,6 +53,14 @@ export default function agentPetPiExtension(pi: PiApi): void {
   const endpoint = (explicitConfig?.endpoint ?? process.env.AGENT_PET_PI_ENDPOINT)?.trim();
   const token = (explicitConfig?.token ?? process.env.AGENT_PET_PI_TOKEN)?.trim();
   if (!endpoint || !token || token.length < 16) return;
+  // Extension API coverage verified against pi 0.85.1 TUI. Runtime version is not
+  // exposed by ctx. Fine capabilities stay unknown until their native event is
+  // observed; registering a hook alone cannot prove an older runtime supports it.
+  const capabilities = Object.fromEntries([
+    ...['thinking', 'responding', 'reading', 'writing', 'searching', 'executing', 'compacting', 'waiting_input', 'tool_error', 'output_limited', 'cancelled'].map(key => [key, 'unknown']),
+    ['retrying', 'unknown'],
+  ]);
+
   const configuredEndpoint = endpoint;
   const configuredToken = token;
 
@@ -78,6 +80,7 @@ export default function agentPetPiExtension(pi: PiApi): void {
   let lastOccurrence: Occurrence | undefined;
   let occurrenceCounter = 0;
   let inWork = false;
+  let workSignal: AbortSignal | undefined;
   let waiting = false;
   let compacting = false;
   let removeCompactAbort: (() => void) | undefined;
@@ -162,7 +165,7 @@ export default function agentPetPiExtension(pi: PiApi): void {
     sessionNameValue = sessionName(ctx);
     projectName = basename(ctx.cwd);
     lastTerminalStatus = undefined;
-    lastOccurrence = undefined; workId = undefined; inWork = !ctx.isIdle(); clearActivities();
+    lastOccurrence = undefined; workId = undefined; inWork = !ctx.isIdle(); workSignal = ctx.signal; clearActivities();
     send('hello', ctx, { status: ctx.isIdle() ? 'idle' : 'working', capabilities, facts: facts() });
   });
 
@@ -171,12 +174,14 @@ export default function agentPetPiExtension(pi: PiApi): void {
     // pi may start continuations/retries before the whole batch settles.
     if (!inWork || !workId) { workId = `work-${++workCounter}`; inWork = true; }
     lastTerminalStatus = undefined; lastOccurrence = undefined;
+    workSignal = ctx.signal;
     streams.clear();
     send('lifecycle', ctx, { status: 'working', workId, facts: facts() });
   });
 
   pi.on('message_end', (event, ctx) => {
     if (!active || !inWork || event?.message?.role !== 'assistant') return;
+    workSignal ??= ctx.signal;
     const status = stopReasonStatus(event.message.stopReason);
     if (status) lastTerminalStatus = status;
     lastOccurrence = event.message.stopReason === 'aborted' ? 'cancelled' : event.message.stopReason === 'length' ? 'output_limited' : undefined;
@@ -186,11 +191,15 @@ export default function agentPetPiExtension(pi: PiApi): void {
 
   pi.on('agent_settled', (_event, ctx) => {
     if (!active || !ctx.isIdle() || !inWork) return;
-    inWork = false; clearActivities();
+    // pi can finalize a cancelled tool run with stopReason=error. The run's
+    // native AbortSignal distinguishes cancellation without parsing tool/text bodies.
+    const cancelled = workSignal?.aborted === true || lastOccurrence === 'cancelled';
+    if (cancelled) lastOccurrence = 'cancelled';
+    workSignal = undefined; inWork = false; clearActivities();
     if (lastOccurrence) capabilities[lastOccurrence] = 'supported';
     send('lifecycle', ctx, {
       capabilities, facts: facts(lastOccurrence),
-      status: lastTerminalStatus ?? 'idle',
+      status: cancelled ? 'idle' : lastTerminalStatus ?? 'idle',
       ...(workId ? { workId } : {}),
     });
   });
@@ -211,6 +220,7 @@ export default function agentPetPiExtension(pi: PiApi): void {
   });
   pi.on('tool_execution_start', (event, ctx) => {
     if (!active || !inWork || typeof event?.toolCallId !== 'string' || event.toolCallId.length > 256 || tools.size >= 64) return;
+    workSignal ??= ctx.signal;
     const kinds: Record<string, Activity> = { read: 'reading', write: 'writing', edit: 'writing', grep: 'searching', find: 'searching', ls: 'searching', bash: 'executing', powershell: 'executing' };
     const kind = typeof event.toolName === 'string' && Object.hasOwn(kinds, event.toolName) ? kinds[event.toolName] : undefined;
     if (kind) capabilities[kind] = 'supported';
@@ -220,7 +230,8 @@ export default function agentPetPiExtension(pi: PiApi): void {
   pi.on('tool_execution_end', (event, ctx) => {
     if (!active || !inWork || typeof event?.toolCallId !== 'string' || !tools.has(event.toolCallId)) return;
     tools.delete(event.toolCallId);
-    activity(ctx, event.isError === true ? 'tool_error' : undefined);
+    workSignal ??= ctx.signal;
+    activity(ctx, event.isError === true && !workSignal?.aborted ? 'tool_error' : undefined);
   });
   pi.on('ui_prompt_start', (_event, ctx) => {
     if (!active) return;
@@ -256,7 +267,7 @@ export default function agentPetPiExtension(pi: PiApi): void {
   });
 
   pi.on('session_shutdown', (_event, ctx) => {
-    clearActivities(); inWork = false;
+    clearActivities(); inWork = false; workSignal = undefined;
     send('lifecycle', ctx, { status: 'offline', facts: facts() });
     active = false;
     clearTimeout(retry);

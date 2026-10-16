@@ -35,7 +35,11 @@ export function ManualConnectionDialog({ existing, records, bridge, onClose, onS
   async function validate() {
     const request = ++generation.current; setChecking(true); setLocalError('');
     try {
-      const selected = approved ? path : await bridge.locations.authorize(path);
+      // Whitespace before the leading slash cannot belong to an absolute path.
+      // Keep trailing spaces: they can be part of a real folder name.
+      const candidate = path.trimStart();
+      if (!candidate.startsWith('/')) { setLocalError('请输入以 / 开头的完整路径，或点击「选择位置」。'); return; }
+      const selected = approved ? path : await bridge.locations.authorize(candidate);
       if (request !== generation.current || !selected) return;
       setPath(selected); setApproved(true); setStep(1);
       if (provider === 'pi') {

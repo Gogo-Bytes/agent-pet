@@ -2,7 +2,7 @@
 
 **当前执行入口：[MVP 执行计划](MVP-EXECUTION-PLAN.md)。** 首个pi切片的实施和验收以该计划及其链接为准；下文I0–I3保留历史拆分和候选研究，不再作为“下一步M1”或禁止新Provider的当前结论。
 
-2026-10-16用户新增Claude Code、Codex桌面端/CLI与Antigravity桌面端/CLI接入需求，覆盖历史“Claude/Codex不进入MVP”和先完成全部pi矩阵的排期限制；不表示新Provider已验收。最新顺序为Claude Code CLI→Codex CLI→Antigravity CLI，桌面端全部最后做。当前完成安装metadata检查、Claude独立输入白名单与隔离回调传输；真实运行绑定、部署和Main接线尚未实现。新事实与后续依赖见 [MVP新增检查点](MVP-EXECUTION-PLAN.md#新-agent-接入准备与-claude-输入边界2026-10-16) 和 [模块边界](../integrations/claude-hooks/README.md)。历史I0当时全文不可访问，不代表本轮官方全文仍不可访问；真实目标仍需分别精确授权，现有managed guard与数据保留契约不变。
+2026-10-16用户新增Claude Code、Codex桌面端/CLI与Antigravity桌面端/CLI接入需求，覆盖历史“Claude/Codex不进入MVP”和先完成全部pi矩阵的排期限制；不表示新Provider已验收。最新顺序为Claude Code CLI→Codex CLI→Antigravity CLI，桌面端全部最后做。当前完成安装metadata检查、Claude独立输入白名单、隔离回调传输与调用脚本；本轮授权的CLI程序升级和Claude原生manifest校验已通过，真实运行绑定、hook加载、部署和Main接线尚未实现。新事实与后续依赖见 [MVP新增检查点](MVP-EXECUTION-PLAN.md#新-agent-接入准备与-claude-输入边界2026-10-16) 和 [模块边界](../integrations/claude-hooks/README.md)。历史I0当时全文不可访问，不代表本轮官方全文仍不可访问；真实目标仍需分别精确授权，现有managed guard与数据保留契约不变。
 
 ## 1. 已确认边界
 

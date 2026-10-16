@@ -407,9 +407,16 @@ The approved [metadata check](../../docs/AGENT-INSTALLATION-CHECK-PREVIEW.md) fo
 Claude package 2.1.143 and Antigravity app 2.22.0; agy/Codex versions remain unconfirmed
 within that permission boundary. No Agent was executed or configured.
 
-The [Claude input normalizer and callback transport](../../integrations/claude-hooks/README.md)
-are implemented and isolated-tested; no native producer binding or installation exists. It strips private hook contents and retains native
+The [Claude input normalizer, callback transport and standalone hook command](../../integrations/claude-hooks/README.md)
+are implemented and isolated-tested; no trusted native invocation binding or product installation exists. It strips private hook contents and retains native
 facts without fabricating terminal success, cancellation or online state. Main,
 Configurations, discovery, deployment and the renderer remain unchanged; non-pi
 records still honestly report unsupported. Do not claim a new Provider is connected
 or install the normalizer as a hook script. Continue dev; no application package.
+
+2026-10-16: the user separately authorized [CLI program updates](../../docs/CLI-UPDATE-PREVIEW.md):
+Claude2.1.301, Codex0.163.0, Antigravity CLI1.4.0, each verified through its original
+entry in isolated configuration. Existing Agent settings/processes and pi remain untouched.
+Separately approved native manifest validation and isolated `--init-only` loading
+passed with real startup/end callbacks. Normal tasks, trusted native work binding
+and product Provider integration remain unverified. No application package was built.

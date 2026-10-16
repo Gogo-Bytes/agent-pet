@@ -1,6 +1,6 @@
 # Claude Code CLI 实施与验收 · 2026-10-16
 
-状态：**输入白名单、本机回调传输、独立调用脚本与插件文档生成器已实现并隔离验证。真实Claude尚未接通；未注册Main/连接页面、未部署或加载hook。** 继续dev，不打包；日常Agent配置、pi及既有Agent进程保持原状。
+状态：**输入白名单、本机回调传输、独立调用脚本与插件文档生成器已实现并隔离验证。真实CLI的隔离启动/结束回调通过；尚未接通正式产品，未注册Main/连接页面或部署到日常配置。** 继续dev，不打包；日常Agent配置、pi及既有Agent进程保持原状。
 
 ## 顺序与边界
 
@@ -27,8 +27,10 @@ Stop、工具失败和工具中止不冒充整个任务成功或取消；短命h
 
 ## 尚缺的正式接入条件
 
-1. 原生插件语法校验及实际加载，按更新后的本机CLI分别核对字段/事件。历史[版本帮助检查](CLI-VERSION-HELP-CHECK-PREVIEW.md)不是加载或修改配置授权。
+1. 原生manifest校验已按[精确授权](CLAUDE-PLUGIN-CHECK-PREVIEW.md)通过；另按[启动检查授权](CLAUDE-NATIVE-START-PREVIEW.md)实际--init-only加载插件，退出0、无输出，真实收到startup/SessionEnd。仅覆盖隔离初始化运行，没有prompt，不能推断工作/子任务编号与交互事件；日常部署仍未授权/完成。
 2. 原生producer的运行身份及工作/子任务关联；不能用hook子进程PID、会话编号或最近事件冒充运行绑定，缺失prompt_id不归到最近一轮。
 3. 可靠生命周期/在线表达及真实等待、失败、取消；没有后置结束证据时Stop不是completed-unread，不用定时器补造。
 4. Provider controller、Configurations、Main/UI接线，以及精确部署预览、独立授权、激活、重启恢复、选择性撤回和现有设置保留。
 5. Claude验证后依次实施Codex CLI与Antigravity CLI；桌面端最后。真实新Provider与发布验收均保持未通过。
+
+CLI程序已按本轮用户授权更新；[原入口版本、备份与撤回范围](CLI-UPDATE-PREVIEW.md)。原生隔离启动/结束也通过；不把程序更新、manifest或短命初始化回调当正式新Provider接入通过。

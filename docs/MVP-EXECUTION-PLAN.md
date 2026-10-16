@@ -26,6 +26,10 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## 多 Agent 最新实施顺序与 Claude 回调通道（2026-10-16）
 
+用户本轮明确授权更新CLI程序，已保留原安装方式完成Claude Code 2.1.143→2.1.301、Codex 0.161.0→0.163.0、Antigravity CLI 1.1.27→1.4.0；候选版本/帮助及切换后原入口版本全部通过，旧程序与Codex旧release保留。只处理程序/安装选择，不读写日常Agent配置、凭据、对话或shell配置，不重启dev/现有Agent、不操作pi、不打包。Claude原NVM位置未进入当前dev shell PATH，接入使用绝对路径，不新增第二份安装。见 [范围/备份/结果](CLI-UPDATE-PREVIEW.md)。
+
+用户另分别精确授权原生manifest校验和一次隔离`--init-only`：Claude2.1.301校验通过；修复版插件实际加载，退出0、无输出，真实收到startup及SessionEnd。接收绑定只接受本次实际创建且仍有效的child，退出立即退役，token/运行UUID未落盘，没有模型任务或原应用重启。原生工作/子任务身份、正常任务、正式连接和UI仍未通过；见 [manifest结果](CLAUDE-PLUGIN-CHECK-PREVIEW.md) 与 [启动回调证据](CLAUDE-NATIVE-START-PREVIEW.md)。
+
 后续调用脚本已恢复并完成隔离验证：标准Readable证明closed标志早于排队error事件，修复清理时机后保留原失败回归，47项通过；最终全量811 passed / 1 skipped / 81 files、typecheck、desktop build通过，独立47项复验通过。输入契约限本机stdin（启用close事件），自定义emitClose:false异步销毁流的清理限制已明示。脚本/插件文档生成器不注册Main、不启动或加载真实Claude；阶段2提交`d8bdf26`不变。详见 [Claude记录](CLAUDE-CLI-ACCEPTANCE.md)。
 
 用户进一步确认Codex桌面端与CLI均纳入，顺序为Claude Code CLI → Codex CLI → Antigravity CLI，桌面端（Codex、Antigravity）全部最后做；继续dev、不打包、保留现有配置。覆盖下方上一轮“Antigravity两宿主随后一起推进”的顺序，不放宽任何真实目标操作授权。

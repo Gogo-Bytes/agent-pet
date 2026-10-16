@@ -2,7 +2,7 @@
 
 **Normalization, local delivery and a standalone hook command are implemented for isolated verification. Not a connected
 Adapter, installed hook, Main registration, or native compatibility acceptance.** Nothing
-in this directory is loaded by the running desktop or Claude Code. Generated plugin documents
+in this directory is registered in the running desktop or daily Claude configuration. Generated plugin documents
 are not an installation or an authorization to load them.
 
 `normalizeClaudeHook()` accepts one JSON payload capped at 64 KiB (UTF-8 bytes),
@@ -16,7 +16,10 @@ open `transcript_path`, discover files, contact a receiver, or write to Agent st
 
 The approved isolated version/help check returned Claude Code 2.1.143 and advertised
 `--plugin-dir`. The candidate first host is its interactive CLI. This is version/help
-evidence, not a hook-loading test. The current [official hook reference](https://code.claude.com/docs/en/hooks)
+evidence, not by itself a hook-loading test. A separately approved Claude2.1.301 isolated
+`--init-only` run has now delivered native startup/end facts, with no prompt or model task;
+see [native scope and evidence](../../docs/CLAUDE-NATIVE-START-PREVIEW.md). This does
+not prove normal task/work identity or product integration. The current [official hook reference](https://code.claude.com/docs/en/hooks)
 contains newer-version fields too; absent optional fields remain unknown.
 [Official release notes](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md#2178)
 record the addition of `StopFailure` in 2.1.78; this is supporting release evidence,
@@ -97,8 +100,8 @@ the process; only the dedicated entry does. Do not import that entry in Main.
 `.claude-plugin/plugin.json` and `hooks/hooks.json` contain passive command hooks, a
 quoted absolute Node executable and a runtime path under `${CLAUDE_PLUGIN_ROOT}`.
 No credential, run identity, setting overwrite, permission decision or Agent launch is
-embedded. Synthetic shell tests cover literal spaces/quotes/metacharacters; installed
-Claude's variable expansion and event support still require native acceptance.
+embedded. Synthetic shell tests cover literal spaces/quotes/metacharacters; Claude2.1.301 loaded these documents and invoked startup/end in the approved isolated
+check; other event support and daily activation still require native acceptance.
 
 Tests compile the entry with the existing Vite toolchain and run it in fresh Node
 children against test-owned loopback receivers. This proves the command behavior,

@@ -34,3 +34,11 @@ Stop、工具失败和工具中止不冒充整个任务成功或取消；短命h
 5. Claude验证后依次实施Codex CLI与Antigravity CLI；桌面端最后。真实新Provider与发布验收均保持未通过。
 
 CLI程序已按本轮用户授权更新；[原入口版本、备份与撤回范围](CLI-UPDATE-PREVIEW.md)。原生隔离启动/结束也通过；不把程序更新、manifest或短命初始化回调当正式新Provider接入通过。
+
+## 用户终端入口的进程绑定基础
+
+`launcher.ts`新增独立调用库，由未来用户终端入口显式调用，不接Main/UI。每次独立UUID/token和真实ChildProcess，根SessionStart且子进程有效才报告观察；其他hook、SessionEnd或短命hook退出不完成运行。停止观察只关闭接收，不发信号/等待/结束Claude；实际退出后再清理。用户环境与参数保留，AGENT_PET_*控制环境剔除，仅添加三项hook环境。报告异常/拒绝Promise只撤销观察，不终止子进程。
+
+相关58项（含11个真实自有Node子进程用例）通过；最终全量`pnpm test --maxWorkers=2`为822 passed / 1 skipped / 82 files，typecheck与desktop build通过。独立Review另复验11项，无确定问题；显式回调重入和已有--plugin-dir尚缺专项测试，原生参数/终端信号/派生进程生命周期仍未验收。此阶段没有新的真实Claude执行或配置读取。设计范围见[连接与陪伴](CLAUDE-CLI-PRESENCE-DESIGN.md)。
+
+尚缺：可执行终端入口及信号行为、独立认证Main控制通道、私有材料预览/部署/撤回、正式管理窗口和首页接线。当前dev仍只有pi正式连接；不能用此调用库给用户显示成功连接按钮，任务动作和提醒也未启用。

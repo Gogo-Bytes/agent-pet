@@ -1,6 +1,6 @@
-# Claude Code passive observation — isolated stages 1–3
+# Claude Code passive observation — isolated building blocks
 
-**Normalization, local delivery and a standalone hook command are implemented for isolated verification. Not a connected
+**Normalization, local delivery, a standalone hook command and explicit invocation binding are implemented for isolated verification. Not a connected
 Adapter, installed hook, Main registration, or native compatibility acceptance.** Nothing
 in this directory is registered in the running desktop or daily Claude configuration. Generated plugin documents
 are not an installation or an authorization to load them.
@@ -106,7 +106,32 @@ check; other event support and daily activation still require native acceptance.
 Tests compile the entry with the existing Vite toolchain and run it in fresh Node
 children against test-owned loopback receivers. This proves the command behavior,
 not Claude plugin validation/loading or config/run/work correlation. No production
-plugin builder, installer, invocation launcher or Provider controller exists yet.
+plugin builder, installer, runnable terminal entry or Provider controller exists yet.
+
+## Explicit invocation owner (library only)
+
+`observeClaudeInvocation()` in `launcher.ts` is for a future user-run terminal
+entry, never Main/UI. It holds its direct ChildProcess privately, creates a new
+run UUID/token/receiver per invocation, and only reports root SessionStart presence
+while that child is live. SessionEnd, Stop and hook-client closure do not end the
+process. An actual child exit or failed spawn ends the invocation; no task result
+is inferred. `stopObserving()` closes observation without signalling or waiting
+for Claude, and `completed` follows the actual child lifetime.
+
+The child inherits terminal stdio and caller arguments through argv (observer
+options are inserted before an existing `--`). Ordinary user environment survives;
+all inherited `AGENT_PET_*` keys are stripped before adding only the three hook
+values. The future Main-control credential cannot be inherited by the child.
+Synchronous enum-only report failures retire observation while leaving the child
+running; rejected JS callback promises are consumed without diagnostic content.
+
+This is not a runnable launcher command or a product connection. A separate
+authenticated launcher-to-Main channel, app-private activation materials, controller
+and Renderer projection still need implementation. Terminal signal/process-group
+handling and detached/re-exec descendants are not supported by this library. Do not
+ship a terminal wrapper until its signal/stdio behavior is verified. Receiver setup
+failure occurs before any child exists and returns a fixed error; no automatic retry.
+See [presence slice boundary](../../docs/CLAUDE-CLI-PRESENCE-DESIGN.md).
 
 ## Next independently verifiable stage
 

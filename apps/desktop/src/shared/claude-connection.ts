@@ -4,10 +4,12 @@ export interface ClaudeConnectionPreview {
   executable: string;
   directory: string;
   files: readonly string[];
+  settings?: { path: string; exists: boolean; canApply: boolean; reason: string };
 }
 export interface ClaudeConnectionState {
   revision: number;
   scope: 'presence-only';
+  mode?: 'normal-start' | 'legacy-launcher';
   status: 'not-configured' | 'waiting' | 'observing' | 'disconnected' | 'disabled' | 'failed';
   busy: boolean;
   configured: boolean;

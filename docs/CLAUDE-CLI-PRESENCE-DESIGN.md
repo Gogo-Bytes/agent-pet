@@ -1,5 +1,7 @@
 # Claude CLI：先交付连接与陪伴
 
+> 2026-10-16 后续用户明确改为一次配置、普通 `claude` 启动；正式入口已由[普通启动设计](CLAUDE-NORMAL-START-DESIGN.md)取代。本文专用 launcher 仅保留历史实现与测试证据，不再作为正常使用要求。
+
 状态：连接与陪伴切片已接入正式 Main/连接页/首页，并在隔离 dev 验证；真实日常 Claude 前台接入仍待精确授权实测；用户要求的任务动作与提醒仍在后续范围，本切片不宣称全部Claude接入完成。执行入口与实际通过证据仍在[MVP计划](MVP-EXECUTION-PLAN.md)和[Claude验收](CLAUDE-CLI-ACCEPTANCE.md)。
 
 ## 可见行为

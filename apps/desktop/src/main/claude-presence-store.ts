@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
 
-const PATHS = ['plugin/.claude-plugin/plugin.json', 'plugin/hooks/hooks.json', 'plugin/runtime/hook.cjs', 'launcher.cjs', 'activation.json'] as const;
-const DIRECTORIES = ['', 'plugin', 'plugin/.claude-plugin', 'plugin/hooks', 'plugin/runtime'] as const;
+const LEGACY_PATHS = ['plugin/.claude-plugin/plugin.json', 'plugin/hooks/hooks.json', 'plugin/runtime/hook.cjs', 'launcher.cjs', 'activation.json'] as const;
+const LEGACY_DIRECTORIES = ['', 'plugin', 'plugin/.claude-plugin', 'plugin/hooks', 'plugin/runtime'] as const;
 const MAX_FILE = 512 * 1024, MAX_TOTAL = 2 * 1024 * 1024;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 type Receipt = { schemaVersion: 1; configurationId: string; executable: string; disabled: boolean; files: Record<string, string> };
@@ -48,10 +48,10 @@ function readPrivate(path: string): { bytes: Buffer; stat: fs.Stats } {
     return { bytes: buffer.subarray(0, count), stat: before };
   } finally { if (fd !== undefined) fs.closeSync(fd); }
 }
-function validReceipt(value: unknown, id: string): value is Receipt {
+function validReceipt(value: unknown, id: string, paths: readonly string[]): value is Receipt {
   return keys(value, ['schemaVersion', 'configurationId', 'executable', 'disabled', 'files']) && value.schemaVersion === 1 &&
     value.configurationId === id && validExecutable(value.executable) && typeof value.disabled === 'boolean' &&
-    keys(value.files, PATHS) && Object.values(value.files).every(digest => typeof digest === 'string' && /^[a-f0-9]{64}$/.test(digest));
+    keys(value.files, paths) && Object.values(value.files).every(digest => typeof digest === 'string' && /^[a-f0-9]{64}$/.test(digest));
 }
 
 /** Main-only private materials. Constructor never creates/adopts a directory or repairs an
@@ -65,32 +65,34 @@ export class ClaudePresenceStore {
   private readonly directories = new Map<string, fs.Stats>();
   private readonly files = new Map<string, OwnedFile>();
   get error(): boolean { return this.failed; }
-  constructor(private readonly directory: string, private readonly configurationId: string) {
+  private get paths(): readonly string[] { return this.layout === 'normal' ? ['observer.cjs', 'activation.json', 'hook.json', 'settings-before.json'] : LEGACY_PATHS; }
+  private get directoryPaths(): readonly string[] { return this.layout === 'normal' ? [''] : LEGACY_DIRECTORIES; }
+  constructor(private readonly directory: string, private readonly configurationId: string, private readonly layout: 'legacy' | 'normal' = 'legacy') {
     try {
       if (!UUID.test(configurationId) || !isAbsolute(directory) || normalize(directory) !== directory ||
           Buffer.byteLength(directory) > 4096 || /[\u0000-\u001f\u007f-\u009f]/u.test(directory) ||
-          directory.split('/').length > 64 || basename(directory) !== `claude-${configurationId}`) throw new Error();
+          directory.split('/').length > 64 || basename(directory) !== `${layout === 'normal' ? 'claude-normal' : 'claude'}-${configurationId}`) throw new Error();
       let current = '/';
       this.ancestors.set(current, this.ancestorStat(current));
       for (const part of dirname(directory).split('/').filter(Boolean)) {
         current = join(current, part); this.ancestors.set(current, this.ancestorStat(current));
       }
       if (absent(directory)) return;
-      for (const relative of DIRECTORIES) this.directories.set(relative, privateStat(join(directory, relative), 'directory'));
+      for (const relative of this.directoryPaths) this.directories.set(relative, privateStat(join(directory, relative), 'directory'));
       // Fixed tree validation precedes reading any material, including activation secrets.
-      this.checkTree(new Set([...PATHS, 'receipt.json']));
+      this.checkTree(new Set([...this.paths, 'receipt.json']));
       let total = 0;
-      for (const relative of [...PATHS, 'receipt.json']) {
+      for (const relative of [...this.paths, 'receipt.json']) {
         const { bytes, stat } = readPrivate(join(directory, relative)); total += bytes.length;
         if (total > MAX_TOTAL) throw new Error();
         this.files.set(relative, { stat, digest: hash(bytes) });
         if (relative === 'receipt.json') {
           const receipt: unknown = JSON.parse(bytes.toString('utf8'));
-          if (!validReceipt(receipt, configurationId)) throw new Error();
+          if (!validReceipt(receipt, configurationId, this.paths)) throw new Error();
           this.value = receipt;
         }
       }
-      if (!this.value || PATHS.some(path => this.files.get(path)?.digest !== this.value?.files[path])) throw new Error();
+      if (!this.value || this.paths.some(path => this.files.get(path)?.digest !== this.value?.files[path])) throw new Error();
       this.assertState();
     } catch { this.failed = true; this.value = null; }
   }
@@ -130,6 +132,14 @@ export class ClaudePresenceStore {
     }
     this.checkTree(paths);
     if ([...this.files.values()].reduce((sum, file) => sum + file.stat.size, 0) > MAX_TOTAL) throw new Error();
+  }
+  readMaterial(path: string): string | null {
+    if (!this.paths.includes(path) || !this.verify()) return null;
+    try {
+      const actual = readPrivate(join(this.directory, path)), expected = this.files.get(path)!;
+      if (!sameFile(actual.stat, expected.stat) || hash(actual.bytes) !== expected.digest) throw new Error();
+      this.assertState(); return actual.bytes.toString('utf8');
+    } catch { this.failed = true; return null; }
   }
   read(): { executable: string; disabled: boolean } | null {
     if (!this.value || !this.verify()) return null;
@@ -176,7 +186,7 @@ export class ClaudePresenceStore {
   private receiptText(receipt: Receipt): string { return `${JSON.stringify(receipt)}\n`; }
   private ensureSize(replacements: Record<string, string>): void {
     let total = 0;
-    for (const path of [...PATHS, 'receipt.json']) {
+    for (const path of [...this.paths, 'receipt.json']) {
       const text = replacements[path], size = text === undefined ? this.files.get(path)?.stat.size : Buffer.byteLength(text);
       if (size === undefined || size > MAX_FILE) throw new Error();
       total += size;
@@ -186,19 +196,19 @@ export class ClaudePresenceStore {
   initialize(input: { executable: string; files: Record<string, string> }): boolean {
     if (this.failed) return false;
     try {
-      if (this.value || this.directories.size || !validExecutable(input.executable) || !keys(input.files, PATHS) ||
+      if (this.value || this.directories.size || !validExecutable(input.executable) || !keys(input.files, this.paths) ||
           !Object.values(input.files).every(text => typeof text === 'string')) throw new Error();
       const files = { ...input.files };
       const receipt: Receipt = { schemaVersion: 1, configurationId: this.configurationId, executable: input.executable,
-        disabled: false, files: Object.fromEntries(PATHS.map(path => [path, hash(files[path]!)])) };
+        disabled: false, files: Object.fromEntries(this.paths.map(path => [path, hash(files[path]!)])) };
       const text = this.receiptText(receipt);
       this.ensureSize({ ...files, 'receipt.json': text }); this.checkDirectories();
       if (!absent(this.directory)) throw new Error();
-      for (const relative of DIRECTORIES) {
+      for (const relative of this.directoryPaths) {
         this.assertState(); fs.mkdirSync(join(this.directory, relative), { mode: 0o700 });
         this.directories.set(relative, privateStat(join(this.directory, relative), 'directory')); this.assertState();
       }
-      for (const relative of [...PATHS, 'receipt.json']) {
+      for (const relative of [...this.paths, 'receipt.json']) {
         const content = relative === 'receipt.json' ? text : files[relative]!;
         this.files.set(relative, this.writeExclusive(relative, content));
       }

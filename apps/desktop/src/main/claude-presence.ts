@@ -11,7 +11,7 @@ export interface ClaudePresenceOptions {
   configurationId: string;
   nodeExecutable: string;
   runAsNode: boolean;
-  runtimeAssets(): Promise<{ hook: string; launcher: string }>;
+  runtimeAssets(): Promise<{ hook: string; launcher: string; nativeHook?: string }>;
   chooseExecutable(): Promise<string | null>;
   inspectExecutable?(path: string): string | null;
 }

@@ -178,3 +178,20 @@ presence state, without publishing task observations or displaying task actions/
 Dev/build compile standalone CJS hook/launcher assets. Exact files, persistence, failure
 preservation and real acceptance limits are documented in [the current slice](../../docs/CLAUDE-CLI-PRESENCE-DESIGN.md).
 Earlier “not yet runnable/Main/UI” paragraphs describe their historical stage only.
+
+
+## Ordinary CLI startup (current production mode)
+
+The user explicitly replaced recurring launcher usage with one-time persistent setup.
+`native-hook-entry.ts` reads only its private activation and root startup stdin, reports
+its own hook PID and narrowed source, and silently exits0 on failure. Main's
+`native-presence.ts` independently verifies the complete bounded ancestor chain through
+`native-process-probe.c`, then watches only exact known native Claude PIDs and their
+microsecond birth/UID/executable identity. No Agent launch/control, process listing,
+argv/env/cwd/transcript read, Session/task inference, background daemon or ps fallback.
+
+The command hook and private settings installer replace the wrapper in the formal flow;
+legacy launcher code remains an isolated implementation boundary, not a user requirement.
+Native helper compatibility is macOS-specific. All daily settings changes and actual
+native Claude checks require the [precise preview](../../docs/CLAUDE-NORMAL-START-PREVIEW.md);
+self-created native/C fixtures do not prove daily acceptance. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md).

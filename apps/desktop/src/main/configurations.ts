@@ -11,9 +11,10 @@ import { PiConnection } from './pi-connection.js';
 import { PiConnectionStore } from './pi-connection-store.js';
 import { inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
 import { ClaudePresence, type ClaudePresenceOptions } from './claude-presence.js';
+import { ClaudeNormalPresence } from './claude-normal-presence.js';
 
 type Entry = { metadata: ConfigurationMetadata; inspection: Inspection | null; revision: number;
-  connection: PiConnection | null; claude?: ClaudePresence; unsubscribe?: () => void; controller?: AbortController };
+  connection: PiConnection | null; claude?: ClaudePresence | ClaudeNormalPresence; unsubscribe?: () => void; controller?: AbortController };
 
 /** Main owns persistence, inspection and PiConnection capabilities. Renderer selection is observational.
  * IPC accepts only explicitly approved native selections or Main-resolved detected defaults.
@@ -33,7 +34,9 @@ export class Configurations {
     publish: ObservationSink['publish'];
     developmentEnvironment?: boolean;
     legacy?: { connection: PiConnection; targetPath: string };
-    claude?: Omit<ClaudePresenceOptions, 'directory' | 'configurationId'>;
+    claude?: Omit<ClaudePresenceOptions, 'directory' | 'configurationId'> & {
+      normal?: { probePath: string; observerExecutable: string };
+    };
   }) {
     this.store = new ConfigurationsStore(options.directory);
     if (this.store.error) this.notice = 'saved-invalid';
@@ -75,10 +78,17 @@ export class Configurations {
         store });
     }
     if (metadata.provider === 'claude' && this.options.claude) {
-      entry.claude = new ClaudePresence({ ...this.options.claude, directory: this.options.directory, configurationId: metadata.id });
-      entry.unsubscribe = entry.claude.subscribe(() => this.emit());
+      this.attachClaude(entry);
     }
     if (entry.connection) entry.unsubscribe = entry.connection.subscribe(() => this.emit());
+  }
+  private attachClaude(entry: Entry): void {
+    const options = this.options.claude!;
+    entry.claude = options.normal ? new ClaudeNormalPresence({ ...options, ...options.normal,
+      directory: this.options.directory, configurationId: entry.metadata.id, targetDirectory: entry.metadata.targetPath }) :
+      new ClaudePresence({ ...options, directory: this.options.directory, configurationId: entry.metadata.id });
+    entry.unsubscribe = entry.claude.subscribe(() => this.emit());
+    if (entry.claude instanceof ClaudeNormalPresence) void entry.claude.restore();
   }
   private receiverDirectory(id: string): string { return join(this.options.directory, `configuration-${id}`); }
   snapshot(): ConfigurationsState {
@@ -168,7 +178,12 @@ export class Configurations {
     });
     if (result.notice === 'none') {
       const entry = this.entry(id)!; entry.controller?.abort(); entry.inspection = null;
-      entry.connection?.invalidate(); entry.claude?.invalidate(); return this.emit();
+      entry.connection?.invalidate(); entry.claude?.invalidate();
+      if (entry.claude instanceof ClaudeNormalPresence) {
+        entry.unsubscribe?.(); await entry.claude.stop();
+        if (!this.closed) this.attachClaude(entry);
+      }
+      return this.emit();
     }
     return result;
   }
@@ -200,7 +215,7 @@ export class Configurations {
     } finally { if (timer) clearTimeout(timer); }
     return this.emit();
   }
-  private async operation(id: string, work: (connection: PiConnection | ClaudePresence) => Promise<unknown> | unknown): Promise<ConfigurationsState> {
+  private async operation(id: string, work: (connection: PiConnection | ClaudePresence | ClaudeNormalPresence) => Promise<unknown> | unknown): Promise<ConfigurationsState> {
     if (!this.available()) return this.result(this.blockedNotice());
     const entry = this.entry(id); if (!entry) return this.result('not-found');
     const connection = entry.claude ?? entry.connection;

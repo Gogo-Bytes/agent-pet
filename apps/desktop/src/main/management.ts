@@ -1,9 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
 import { dirname, join } from 'node:path';
+import { realpathSync } from 'node:fs';
 import { PiBridgeAdapter as ConfigurationAdapter } from '@agent-pet/adapter-pi';
 import type { SessionState } from '@agent-pet/domain';
 import { Configurations } from './configurations.js';
-import { loadClaudeRuntimeAssets } from './claude-runtime-assets.js';
+import { loadClaudeRuntimeAssets, claudeProcessProbePath } from './claude-runtime-assets.js';
 import { configurationOnline } from '../shared/configurations.js';
 import { registerConfigurationIpc } from './configuration-ipc.js';
 import { PreferenceStore } from './preferences.js';
@@ -46,6 +47,7 @@ export function createManagement(options: {
   const configurations = new Configurations({ directory: app.getPath('userData'),
     adapter: () => new ConfigurationAdapter(), publish: options.pi.publish,
     claude: { nodeExecutable: process.execPath, runAsNode: true, runtimeAssets: loadClaudeRuntimeAssets,
+      normal: { probePath: claudeProcessProbePath(), observerExecutable: realpathSync(process.execPath) },
       async chooseExecutable() {
         if (!window || window.isDestroyed() || quitting) return null;
         const result = await dialog.showOpenDialog(window, { title: '选择 Claude Code 程序（当前支持 npm 2.1.301）',

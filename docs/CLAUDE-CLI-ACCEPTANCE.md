@@ -1,6 +1,6 @@
 # Claude Code CLI 实施与验收 · 2026-10-16
 
-状态：**Claude CLI 的连接与静态陪伴已接入正式 Main、连接页与首页，完成隔离 dev 验证。真实日常 Claude 交互接入尚未验收；任务动作、完成/出错提醒尚未启用。** 继续 dev，不打包；没有读取或改动日常 Claude 设置、原有 hooks、shell 配置或现有 Agent 进程。下方前三阶段是历史证据，最新范围见末节。
+状态：**Claude CLI 的连接与静态陪伴已接入正式 Main、连接页与首页。用户最新要求改成一次配置、普通claude启动，取代每次专用命令；普通启动已完成隔离dev核心验证，真实日常配置未启用。真实日常 Claude 交互接入尚未验收；任务动作、完成/出错提醒尚未启用。** 继续 dev，不打包；没有读取或改动日常 Claude 设置、原有 hooks、shell 配置或现有 Agent 进程。下方前三阶段是历史证据，最新范围见末节。
 
 ## 顺序与边界
 
@@ -73,3 +73,36 @@ CLI程序已按本轮用户授权更新；[原入口版本、备份与撤回范�
 收尾：自有程序均自然退出，独立dev保留“Claude CLI · 手动隔离验证”记录，状态等待启动。没有启动/重载/暂停真实Claude或pi、改写日常Agent配置、依赖安装、模型消费、打包或推送。终端错误恢复提示/文案/焦点修正后相关19项及typecheck/build再次通过；完整924项属于此前同实现核心范围，未重复全量消耗。
 
 仍待：精确预览/授权后的本机真实Claude前台交互、原配置/hooks并存和多真实运行验证；后台/脱离/重新执行派生进程支持；任务/子任务事实适配、等待/出错/取消与动作提醒；Codex/Antigravity及其桌面宿主；发布验收。
+
+
+## 一次配置、普通 claude 启动（覆盖前述专用入口，2026-10-16）
+
+用户明确要求保留原设置与 hooks，正常运行 claude 即连接。正式 Main 每配置仅使用 normal-start 模式，不展示专用启动命令，不重复启用旧 launcher。`claude-user-hook.ts` 局部追加一个 SessionStart hook，保留原 JSON 字节、未知数字/值及既有 hooks；禁用/异常/歧义不覆盖。自有目录保存五份0600材料（含原设置私有备份），移除仅撤回精确自有条目；识别到修改引用（包括追加参数、重排引号或改到args）保留记录。实际文件/权限/激活/撤回方式见[普通启动设计](CLAUDE-NORMAL-START-DESIGN.md)与[待授权预览](CLAUDE-NORMAL-START-PREVIEW.md)。
+
+原生 command hook 仅发送自身PID和安全启动类别；Main通过自有macOS helper核对完整有界祖先链，再固定Claude PID、UID、微秒启动时间与程序路径，只观察这些已知进程。不扫描进程列表/参数/环境/对话，不启动或控制Agent，不把短命hook或SessionEnd/Stop当进程退出。每秒实查OS身份，检查失败清除观察，最多32运行。仍无任务Session/气泡，不触发动作/提醒。
+
+独立Review首轮118项通过但发现两项P2，均已修复并保留回归：未配置时更换位置后重建目标绑定；修改过的产品hook命令不能误报已撤回。审查指出的并发发布风险已保留原始私有证据，仍不宣称对任意外部编辑器提供原子CAS。最终独立122项复验及diff检查通过。Main实机另发现初始窗口加载会撤销autoResume，修正为仅预览/未确认安装受该失效影响；恢复已保存连接只在真正关闭时撤销，主动暂停仍持久化。
+
+### 实际隔离 dev
+
+沿用前述独立profile/Vite5476/CDP9476，正式Main/preload/Renderer；原生picker仅在测试bootstrap返回自建程序/目录。自有C程序直接运行，读取测试环境中的生成hook命令模拟正常native启动；没有专用launcher或直接伪造Main控制消息。不是Claude程序，也不发模型请求。
+
+- 手动添加与设置预览/取消、正常配置、原JSON/大整数/旧hook字节保留通过。
+- 原始生成hook → Main真实OS祖先核对 → 首页静态宠物通过；两个相同SessionID的进程仍独立计数，2→1保留宠物，最后退出首页空态。测得一次359ms至下一次读状态，不能当稳定延迟承诺。
+- 暂停不终止原程序；恢复不自动认领旧程序，新启动可连接；旧程序退出不清除新程序。Application Session/气泡一直为空。
+- 正常移除后共享settings与初始文件逐字节相等。最新五文件预览明确原配置备份不会覆盖后来修改，私有backup与原始字节相等/0600。
+- **首次直接C运行曾保持等待，原因未确定**。一次有界诊断确认同UID真实祖先/HTTP204、原hook只读副本阶段正常；一次原始命令复验通过。没有切协议、放宽身份匹配或把首次失败标为修复，日常可靠性保持待验证。
+- 一次连接截图顶部logo瞬时裁切，但随后顶部栏y0/logo y9、窗口/根/shell滚动均0，原因未确认；未猜测修改全局CSS。
+
+截图均来自实际正式 Electron dev：[五文件确认](evidence/claude-normal-start/native-preview-five-files.png)、[配置后等待](evidence/claude-normal-start/native-waiting-after-setup.png)、[首页陪伴](evidence/claude-normal-start/native-home-observing.png)、[部分退出](evidence/claude-normal-start/native-connected-one-remaining.png)、[全部退出](evidence/claude-normal-start/native-home-after-exit.png)。首次等待失败截图保留；四文件确认截图明确标为历史，不能替代最终五文件授权。
+
+日常 `/Users/gan/.claude/settings.json` 尚未读取或写入，真实Claude未启动/重载/控制；pi配置与现有进程保留，没有打包/依赖安装/推送。普通启动真实2.1.301祖先、原hooks并存、异常退出和用户前台交互仍待[精确授权](CLAUDE-NORMAL-START-PREVIEW.md)实测；任务状态/桌面宿主/发布验收仍未完成。
+
+
+### 最终验证与收尾
+
+- `pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`git diff --check`通过；没有打包。
+- 最终 `pnpm test --maxWorkers=1` 一次有界完整复验：**1016 passed / 1 skipped / 91 files**。此前最新全量有一项既有pi Bucket边界断言失败（1015通过/1跳过），原文件20项独立复验通过；未修改该测试、Bucket、限流阈值或managed guard。完整复验日志在自有临时目录，测试不会替代真实Claude验收。
+- 最终独立Review122项复验无确定剩余缺陷，保留外部编辑器竞争窗口和首次native连接不明失败两项限制。
+- Main正常重启独立dev后，既有未暂停的五文件配置自动恢复为waiting/notice none，无专用命令；此前启动加载取消恢复问题已以实机结果和隔离回归修正。[重启后正式页面](evidence/claude-normal-start/native-restored-waiting.png)。隔离记录改名“Claude · 隔离验证”，自有程序均退出；本机日常profile/Claude/pi未切换。
+- [最新五文件确认](evidence/claude-normal-start/native-preview-five-files.png)替代历史四文件预览，私有原始字节证据不进Git。阶段提交仅本地，不推送；真实目标仍按[预览](CLAUDE-NORMAL-START-PREVIEW.md)等待授权。

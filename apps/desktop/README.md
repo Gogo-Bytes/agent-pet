@@ -451,3 +451,40 @@ are preserved and block unsafe operations. No automatic runtime cleanup in this 
 Never print or copy `activation.json` into diagnostics; Renderer receives only public
 paths and a credential-free launch command. See [design](../../docs/CLAUDE-CLI-PRESENCE-DESIGN.md)
 and [formal/real acceptance boundaries](../../docs/CLAUDE-CLI-ACCEPTANCE.md).
+
+
+## Claude ordinary startup (supersedes the wrapper flow above)
+
+The confirmed current flow is **configure once, then run `claude` normally**.
+Use `~/.claude` for your usual user-wide configuration (or a project's `.claude`
+for that project). Setup previews the selected `settings.json` and adds only one
+SessionStart hook. It does not change existing hooks, shell, HOME or Agent args.
+The supported selected executable remains npm2.1.301/bin/claude.exe; install or
+normal-start verification against a daily target requires its precise preview/consent.
+
+Main uses a bounded, built-in macOS exact-PID helper to verify the hook's ancestor
+and then watch the native Claude PID, microsecond birth identity, UID and executable.
+It does not scan process lists or read argv, env, cwd or conversation files. Hook exit
+and SessionEnd never terminate native presence. Identity/query failure removes the
+observation; no name/ps/timer-based guess. A positive liveness query is repeated each
+second. The helper uses libproc and must be verified per supported macOS/version.
+Dev/build compile it with the existing clang; no dependency installation or packaging.
+
+Normal mode never displays a special launch command. App restart resumes unpaused
+observation; explicit pause stays paused. Already-running processes without a startup
+callback to the new receiver are not adopted: open a new Claude session. Task actions
+and completion/error notifications remain unavailable, with a static Home pet only.
+
+Private files are in `userData/claude-normal-<UUID>`: observer.cjs, activation.json,
+hook.json, settings-before.json and receipt.json (0700 directory/0600 files).
+The original settings backup can contain secrets; keep it local, never log/copy to
+Renderer or Git, and never auto-restore it over later edits. Shared JSON is spliced
+losslessly with identity checks, exclusive pending publication and original permissions.
+There is no atomic compare-and-swap with external editors; do not save Claude settings
+concurrently with installation. Unknown/changed/pending data is retained.
+
+Removal withdraws only the exact unmodified owned hook and product record; recognizable
+modified references retain the record for review. Runtime files remain for already-loaded
+hook snapshots. Legacy launcher files are retained, but each production record uses only
+normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
+[real operation preview](../../docs/CLAUDE-NORMAL-START-PREVIEW.md).

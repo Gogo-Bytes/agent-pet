@@ -37,6 +37,61 @@ async function mount(record = claude()) {
   return { ...test, ...view, user, update };
 }
 describe('Claude formal connection controls', () => {
+  it('configures normal startup once with exact settings consent and never shows a special command', async () => {
+    const test = await mount(claude({ mode: 'normal-start' }));
+    const normalPreview = { ...preview, settings: { path: '/isolated/project-one/settings.json', exists: true, canApply: true, reason: '' } };
+    test.bridge.configurations.preview.mockImplementationOnce(async () => test.update({ preview: normalPreview }));
+    await test.user.click(screen.getByRole('button', { name: '设置连接' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('将更新的配置文件')).toBeTruthy();
+    expect(within(dialog).getAllByTitle(normalPreview.settings.path)).toHaveLength(2);
+    expect(dialog.textContent).toContain('追加一条 Agent Pet 的 SessionStart hook');
+    expect(dialog.textContent).toContain('原有设置和 hooks 会保留');
+    expect(dialog.textContent).not.toContain('不会修改 ~/.claude');
+    await test.user.click(within(dialog).getByText('查看文件与权限'));
+    expect(dialog.textContent).toContain('已有配置文件保留原权限');
+    expect(dialog.textContent).toContain('不读取命令参数或对话内容');
+    expect(dialog.textContent).toContain('不会启动或重新加载 Claude Code');
+    await test.user.click(within(dialog).getByRole('button', { name: '确认并设置连接' }));
+    expect(test.bridge.configurations.confirm).toHaveBeenCalledExactlyOnceWith('claude-one', 'claude-plan');
+    expect(screen.getByText('配置已完成，照常在终端运行 claude 即可。首次设置后请新开 Claude 会话。')).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: '终端启动命令' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '复制命令' })).toBeNull();
+    expect(test.bridge.piConnection.confirm).not.toHaveBeenCalled();
+  });
+  it.each([false, true])('blocks unsafe or absent normal settings preview and keeps cancellation available (missing=%s)', async missing => {
+    const test = await mount(claude({ mode: 'normal-start' }));
+    const blockedPreview = missing ? preview : { ...preview, settings: { path: '/isolated/project-one/settings.json', exists: true, canApply: false, reason: '配置文件无法安全更新，请检查后重新预览。' } };
+    test.bridge.configurations.preview.mockImplementationOnce(async () => test.update({ preview: blockedPreview }));
+    await test.user.click(screen.getByRole('button', { name: '设置连接' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: '确认并设置连接' }).hasAttribute('disabled')).toBe(true);
+    expect(within(dialog).getByRole('alert').textContent).toContain(missing ? '无法安全更新配置文件' : '配置文件无法安全更新');
+    await test.user.click(within(dialog).getByRole('button', { name: '确认并设置连接' }));
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+    await test.user.click(within(dialog).getByRole('button', { name: '取消' }));
+    expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith('claude-one');
+  });
+  it('describes native normal connection, pause/resume and own hook removal without launcher instructions', async () => {
+    const test = await mount(claude({ mode: 'normal-start', configured: true, status: 'observing', observedRuns: 1, canConfigure: false }));
+    expect(screen.getByRole('heading', { name: '已连接' })).toBeTruthy();
+    expect(screen.getByText('Claude Code 已连接，宠物可以陪伴你。')).toBeTruthy();
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
+    test.bridge.configurations.disable.mockImplementationOnce(async () => test.update({ status: 'disabled', canResume: true, notice: 'disabled', observedRuns: 0 }));
+    await test.user.click(screen.getByRole('button', { name: '暂停连接' }));
+    expect(screen.getByText('观察已暂停，连接材料会保留，不影响 Claude Code 运行。')).toBeTruthy();
+    test.bridge.configurations.resume.mockImplementationOnce(async () => test.update({ status: 'waiting', canResume: false, notice: 'none' }));
+    await test.user.click(screen.getByRole('button', { name: '继续连接' }));
+    expect(screen.getByText(/配置已完成，照常在终端运行 claude/)).toBeTruthy();
+    expect(screen.queryByText(/用命令打开/)).toBeNull();
+    await test.user.click(screen.getByRole('button', { name: '移除连接' }));
+    const dialog = screen.getByRole('dialog'); await test.user.click(within(dialog).getByText('会移除什么？'));
+    expect(dialog.textContent).toContain('只撤回本应用添加的 hook 条目');
+    expect(dialog.textContent).toContain('保留原有 hooks、其他设置和用户文件');
+    expect(dialog.textContent).toContain('已加载的配置仍可能调用观察助手');
+    expect(dialog.textContent).toContain('私有运行材料会保留');
+    expect(test.bridge.configurations.remove).not.toHaveBeenCalled();
+  });
   it('previews exact private files in a modal and only confirms the selected plan', async () => {
     const test = await mount();
     expect(screen.queryByText(/pi 已在运行/)).toBeNull(); expect(screen.queryByRole('button', { name: '检查位置' })).toBeNull();
@@ -113,13 +168,16 @@ describe('Claude formal connection controls', () => {
     await test.user.click(within(dialog).getByText('会移除什么？')); expect(dialog.textContent).toContain('运行材料会保留'); expect(dialog.textContent).not.toContain('/reload');
     await test.user.click(within(dialog).getByRole('button', { name: '确认移除' })); expect(test.bridge.configurations.remove).toHaveBeenCalledExactlyOnceWith('claude-one');
   });
-  it('adds Claude as approved path metadata without reading settings or claiming executable availability', async () => {
+  it('adds the actual Claude configuration folder and defers settings inspection to connection preview', async () => {
     const test = await mount(); await test.user.click(screen.getByRole('button', { name: '手动添加' }));
     const dialog = screen.getByRole('dialog'); await test.user.click(within(dialog).getByRole('button', { name: '选择位置' }));
     await test.user.click(within(dialog).getByRole('button', { name: '验证配置' }));
     await test.user.selectOptions(within(dialog).getByRole('combobox', { name: 'Agent 类型' }), 'claude');
     expect(within(dialog).getByRole('option', { name: 'Claude Code（支持 CLI 连接）' })).toBeTruthy();
     expect(within(dialog).getByRole('status').textContent).toContain('添加后再选择 Claude Code 程序');
+    expect(within(dialog).getByRole('status').textContent).toContain('通常为 ~/.claude');
+    expect(within(dialog).getByRole('status').textContent).toContain('仅对该项目生效');
+    expect(within(dialog).getByRole('status').textContent).toContain('现在不读取或改动设置');
     expect(test.bridge.locations.inspect).not.toHaveBeenCalled();
     await test.user.click(within(dialog).getByRole('button', { name: '下一步' })); await test.user.click(within(dialog).getByRole('button', { name: '添加配置' }));
     expect(test.bridge.configurations.create).toHaveBeenCalledExactlyOnceWith({ name: '个人配置', provider: 'claude', targetPath: '/isolated/new-project' });

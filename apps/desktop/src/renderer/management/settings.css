@@ -86,10 +86,6 @@
   margin-top: 5px;
   color: var(--preferences-muted);
 }
-.preferences-nav-number {
-  font-size: 10px;
-  color: #9386b1;
-}
 .preferences-nav .preferences-nav-arrow {
   display: none;
   flex: none;
@@ -108,9 +104,6 @@
 }
 .preferences-nav button[aria-pressed=true] small {
   color: #ede9ff;
-}
-.preferences-nav button[aria-pressed=true] .preferences-nav-number {
-  display: none;
 }
 .preferences-nav button[aria-pressed=true] .preferences-nav-arrow {
   display: block;
@@ -804,9 +797,6 @@
   .preferences-nav button {
     gap: 10px;
   }
-  .preferences-nav-number {
-    display: none;
-  }
   .preference-choice button {
     padding: 9px;
     min-width: 55px;
@@ -862,7 +852,7 @@
     gap: 5px;
     border-radius: 9px;
   }
-  .preferences-nav small,.preferences-nav-number,.preferences-nav .preferences-nav-arrow,.preferences-nav button[aria-pressed=true] .preferences-nav-arrow {
+  .preferences-nav small,.preferences-nav .preferences-nav-arrow,.preferences-nav button[aria-pressed=true] .preferences-nav-arrow {
     display: none;
   }
   .preferences-nav strong {

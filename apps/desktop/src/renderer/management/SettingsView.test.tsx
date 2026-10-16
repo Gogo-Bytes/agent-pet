@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultPreferences, type ManagementState } from '../../shared/preferences.js';
@@ -24,6 +24,15 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('formal preference controls', () => {
+  it('shows named setting categories without decorative numbering', async () => {
+    render(<SettingsView {...props()} />);
+    const nav = screen.getByRole('navigation', { name: '设置分类' });
+    expect(within(nav).getAllByRole('button')).toHaveLength(5);
+    expect(nav.textContent).not.toMatch(/0[1-5]/);
+    await userEvent.click(within(nav).getByRole('button', { name: /关于/ }));
+    expect(nav.textContent).not.toMatch(/0[1-5]/);
+    expect(screen.getByRole('article', { name: '关于 Agent Pet' })).toBeTruthy();
+  });
   it('submits render presets and keyboard choices through the typed preference owner', async () => {
     const input = props();
     render(<SettingsView {...input} />);

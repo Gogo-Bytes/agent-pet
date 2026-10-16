@@ -133,7 +133,10 @@ export function createManagement(options: {
     tray?.setContextMenu(Menu.buildFromTemplate(menuItems()));
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: 'Agent Pet', submenu: menuItems() },
-      { role: 'editMenu' }, { role: 'viewMenu' },
+      { role: 'editMenu' }, { label: 'View', submenu: [
+        { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' },
+        { type: 'separator' }, { role: 'resetZoom' }, { role: 'togglefullscreen' },
+      ] },
     ]));
   }
   // Small bundled monochrome menu-bar glyph; no remote icon or extra asset dependency.

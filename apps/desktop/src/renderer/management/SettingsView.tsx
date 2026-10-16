@@ -129,11 +129,10 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
     onKeyDown={event => { if (event.key.startsWith('Arrow')) event.stopPropagation(); }}>
     <aside className="preferences-sidebar">
       <nav ref={categories} className="preferences-nav" aria-label="设置分类">
-        {sections.map((item, index) => <button key={item.id} aria-pressed={section === item.id}
+        {sections.map(item => <button key={item.id} aria-pressed={section === item.id}
           onClick={event => chooseSection(item.id, event.currentTarget)}>
           <Icon name={item.icon} size={19} />
           <span><strong>{item.label}</strong><small>{item.detail}</small></span>
-          <span className="preferences-nav-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
           <Icon name="right" size={14} className="preferences-nav-arrow" />
         </button>)}
       </nav>

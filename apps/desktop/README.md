@@ -488,3 +488,5 @@ modified references retain the record for review. Runtime files remain for alrea
 hook snapshots. Legacy launcher files are retained, but each production record uses only
 normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
 [real operation preview](../../docs/CLAUDE-NORMAL-START-PREVIEW.md).
+
+本机普通CLI启动、恢复未暂停观察及首页陪伴已在真实Claude2.1.301与正式dev验证；临时阶段检查随后完整撤回，原版再次连接通过。退出/并发/任务动作不因此视为通过，见[实测与范围](../../docs/CLAUDE-CLI-ACCEPTANCE.md)。若终端提示 `command not found: claude`，表示终端未找到程序入口；可先由用户直接运行已选择安装的绝对路径。产品不会自动改shell/PATH或新增重复安装。

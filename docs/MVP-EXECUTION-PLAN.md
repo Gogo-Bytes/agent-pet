@@ -26,7 +26,7 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Claude CLI 一次配置、普通启动（2026-10-16）
 
-**日常配置进度（覆盖下方历史待授权记录）：** 用户已按[精确预览](CLAUDE-NORMAL-START-PREVIEW.md)授权并完成正式 dev 中的设置确认。原默认 settings.json 不存在，本次仅新建一个自有 SessionStart hook；私有五文件摘要/权限、自有 hook 精确匹配均通过，偏好摘要未变，原 pi 记录保留且未自动恢复。当前页面为「等待启动」，真实 Claude 由用户正常启动，连接/退出/首页陪伴尚待本机证据；不把配置完成当在线或任务验收。粘贴路径前导空格的实机问题已修复为 `434ae5c`，相关45项/typecheck/desktop build通过。保持 dev，无打包/推送。
+**日常配置与实测（覆盖下方历史待授权记录）：** 用户已按[配置预览](CLAUDE-NORMAL-START-PREVIEW.md)及[临时阶段检查](CLAUDE-LIVE-STAGE-CHECK-PREVIEW.md)分别授权。默认settings原先不存在，仅新建自有SessionStart hook；原pi配置保留且未自动恢复。真实Claude由用户运行原入口完整路径，检查版连接/首页通过；临时记录完整撤回后，原observer/原Main摘要和自有hook复核通过，原版再次新开会话为observing/1/notice none，实际首页有对应GLB宠物。CUA旧绑定曾返回过时空态，不能据旧截图认定同步bug或宣称根因修复；初始等待原因仍未确定。偏好仅初次配置时摘要一致，最终发现仅petSize160→80变化，未归因/覆盖/恢复该值。原回调边界20项、阶段记录9种输入/guard及自有安装撤回闭环通过；前导空格修复`434ae5c`的45项/typecheck/build结果保留。当前原dev与用户会话继续运行，无依赖安装/模型请求/打包/推送。普通启动/恢复观察/首页链路通过，退出/并发/任务动作/终端PATH/桌面宿主与发布仍未验收，详见[验收记录](CLAUDE-CLI-ACCEPTANCE.md)。
 
 用户后续明确覆盖专用launcher体验：仅追加自有SessionStart hook，保留原settings/hooks，以后正常运行claude。Main使用自有macOS helper核对hook真实祖先/Claude确切PID和微秒启动身份，只观察已知进程，不扫描参数/对话、不启动/控制Agent。正常模式已接正式页面与首页，启动命令不再显示；任务动作/提醒仍未启用。未暂停连接在应用启动时校验恢复，已运行但无新启动hook的旧进程不自动认领。
 

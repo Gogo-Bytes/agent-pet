@@ -106,3 +106,13 @@ CLI程序已按本轮用户授权更新；[原入口版本、备份与撤回范�
 - 最终独立Review122项复验无确定剩余缺陷，保留外部编辑器竞争窗口和首次native连接不明失败两项限制。
 - Main正常重启独立dev后，既有未暂停的五文件配置自动恢复为waiting/notice none，无专用命令；此前启动加载取消恢复问题已以实机结果和隔离回归修正。[重启后正式页面](evidence/claude-normal-start/native-restored-waiting.png)。隔离记录改名“Claude · 隔离验证”，自有程序均退出；本机日常profile/Claude/pi未切换。
 - [最新五文件确认](evidence/claude-normal-start/native-preview-five-files.png)替代历史四文件预览，私有原始字节证据不进Git。阶段提交仅本地，不推送；真实目标仍按[预览](CLAUDE-NORMAL-START-PREVIEW.md)等待授权。
+
+### 日常默认配置已设置（2026-10-16，真实启动待验证）
+
+本节覆盖上述「未读写日常设置/等待授权」的历史停点。用户明确授权按普通启动预览配置，自行启动 Claude。正式 Electron dev 已切回原产品 profile，用户在正式手动添加流程保存 `Claude code`，选择原安装链接指向的实际 npm2.1.301程序，并确认设置；页面进入「等待启动」。没有替用户启动/重载 Agent、登录或发模型请求，也没有打包/推送。
+
+安装前有界检查确认默认 `/Users/gan/.claude/settings.json` 不存在；本次新建内容与仅包含一个自有 SessionStart hook 的结构相等。原先不存在不代表其他位置无配置，未扫描其他配置路径。私有目录0700，五份材料和新设置0600；正式 Store校验所有摘要/身份通过，自有hook检查通过，备份精确记录原文件不存在。偏好摘要与切换前相同，原pi配置元数据保留，不自动恢复pi；详细目标与记录见[本次执行记录](CLAUDE-NORMAL-START-PREVIEW.md)。私有材料/原始设置未进日志、截图或Git。
+
+实机路径输入有一个前导空格，用户删除空格后保存成功。`434ae5c` 修正粘贴路径的前导空白及非绝对路径提示，保留尾部合法空格和Main授权流程；两个新增回归先失败后通过，管理页面/Claude控件45项、typecheck和desktop build通过。只读安装复核脚本首次使用strip-only模式不支持参数属性，单次改用Node transform-types后通过；重复预览读取器会按已安装条目关闭并隐藏原始文本，因此完整结构复核改为有界只读实际文件后通过，没有再次写入设置。
+
+当前仍待用户正常运行 `claude` 后核对在线、首页宠物及正常退出。Claude任务动作/提醒、多真实运行、异常退出、桌面宿主和正式发布保持未验收。

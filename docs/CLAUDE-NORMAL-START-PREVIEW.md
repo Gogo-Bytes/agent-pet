@@ -1,6 +1,15 @@
 # 本机 Claude 普通启动接入：精确操作预览
 
-状态：代码/隔离验证阶段；以下日常目标操作尚未授权，不执行。
+状态：2026-10-16 用户明确授权「按预览配置，我来启动 Claude」。本次范围内的兼容性检查和正式 dev 配置已开始；真实 Claude 仍由用户启动，未通过的项目不得标为验收完成。
+
+## 本次执行记录
+
+- 已用正式 Main 同款只读检查确认原入口指向 npm Claude Code 2.1.301 的 `bin/claude.exe`，没有执行 Claude。该入口是符号链接，文件选择器可直接选择实际文件 `/Users/gan/.nvm/versions/node/v22.18.0/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe`，没有切换安装。
+- `/Users/gan/.claude/settings.json` 在首次有界检查时不存在，目录及新增 hook 条件通过；不代表其他目录没有 Claude 配置，也没有读取其他位置寻找配置。
+- 正式 dev 已切换回上述日常产品 profile；用户通过正式手动添加流程保存 Claude 记录 `96b61d46-b8b4-4c45-bb1e-7415b4f6f312`，名称 `Claude code`。已有 pi 记录保留，未自动恢复 pi。
+- 实机发现粘贴路径开头空格会触发笼统的权限错误；用户去掉空格后保存成功。修复 `434ae5c` 只清理不可能属于绝对路径的前导空白，保留合法尾部空格，非绝对路径明确提示；两个新增回归先失败后通过，相关45项/typecheck/desktop build通过，无打包或推送。
+- 用户选择实际程序并确认后，正式页面已进入「等待启动」。Main 同款读取器复验：私有记录/所有文件摘要有效、自有启动 hook 精确匹配；私有目录0700，五份文件及新 settings.json 均0600。原始备份为 `null\n`，明确表示此前无 settings.json；新设置仅含本产品一个启动 hook。偏好摘要与切换前一致。
+- 私有目录为 `/Users/gan/Library/Application Support/@agent-pet/desktop/claude-normal-96b61d46-b8b4-4c45-bb1e-7415b4f6f312`。接收已启用，后续由用户正常运行 `claude`；真实启动、退出和首页陪伴验收仍待实际结果。未触碰 pi 目标、其他 Claude 文件或模型请求。
 
 ## 目标和读取
 

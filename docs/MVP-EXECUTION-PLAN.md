@@ -26,6 +26,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Claude CLI 一次配置、普通启动（2026-10-16）
 
+**日常配置进度（覆盖下方历史待授权记录）：** 用户已按[精确预览](CLAUDE-NORMAL-START-PREVIEW.md)授权并完成正式 dev 中的设置确认。原默认 settings.json 不存在，本次仅新建一个自有 SessionStart hook；私有五文件摘要/权限、自有 hook 精确匹配均通过，偏好摘要未变，原 pi 记录保留且未自动恢复。当前页面为「等待启动」，真实 Claude 由用户正常启动，连接/退出/首页陪伴尚待本机证据；不把配置完成当在线或任务验收。粘贴路径前导空格的实机问题已修复为 `434ae5c`，相关45项/typecheck/desktop build通过。保持 dev，无打包/推送。
+
 用户后续明确覆盖专用launcher体验：仅追加自有SessionStart hook，保留原settings/hooks，以后正常运行claude。Main使用自有macOS helper核对hook真实祖先/Claude确切PID和微秒启动身份，只观察已知进程，不扫描参数/对话、不启动/控制Agent。正常模式已接正式页面与首页，启动命令不再显示；任务动作/提醒仍未启用。未暂停连接在应用启动时校验恢复，已运行但无新启动hook的旧进程不自动认领。
 
 最终完整单并行复验1016 passed / 1 skipped / 91 files，typecheck/desktop build通过；独立122项复验无剩余确定缺陷。首次最终全量的既有pi Bucket边界断言失败（其余1015通过/1跳过），原文件20项独立复验与一次有界完整复验均通过，未修改该用例/生产guard。独立发现的旧目标绑定、修改hook误报撤回已修复补测；Main实机发现的启动加载取消恢复也已修复，重开独立dev回到waiting而非disconnected。共享JSON保留原字节，发布前保存私有原始证据，不能整份自动回滚覆盖后来编辑。原生隔离首次未连接原因未明，一次原始命令复验及双进程部分退出通过，不能掩去首次失败。日常Claude设置尚未读写或启用；无真实Agent/模型调用、打包或推送。[设计](CLAUDE-NORMAL-START-DESIGN.md)、[验收](CLAUDE-CLI-ACCEPTANCE.md)、[待授权精确预览](CLAUDE-NORMAL-START-PREVIEW.md)。

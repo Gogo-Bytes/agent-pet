@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import type { PreflightState } from '../shared/pi-preflight.js';
-import { detectInstallations, identifyInstallation, inspectTarget, limits, ReadBudget, scanPaths } from './pi-preflight-files.js';
+import type { InstallationCandidate, PreflightState } from '../shared/pi-preflight.js';
+import { detectInstallations, discoverScanPaths, identifyInstallation, inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
 
 export class PiPreflight {
   private state: PreflightState;
@@ -9,15 +9,23 @@ export class PiPreflight {
   private picking = false;
   private controller?: AbortController;
   private closed = false;
+  private detected = new Map<string, InstallationCandidate>();
   constructor(private readonly options: { home: string; guiPath: string; pick(kind: 'installation' | 'target'): Promise<string | null> }) {
     this.state = { revision: 0, installations: [], selectedInstallation: null,
-      target: { path: join(options.home, '.pi/agent'), source: 'default' }, inspection: null, scan: 'not-run', notice: 'none' };
+      target: { path: join(options.home, '.pi/agent'), source: 'default' }, inspection: null, scan: 'not-run', notice: 'none',
+      automaticTarget: { path: join(options.home, '.pi/agent'), source: 'default' } };
   }
   snapshot(): PreflightState { return structuredClone(this.state); }
-  close(): void { this.closed = true; this.generation++; this.controller?.abort(); }
+  close(): void { this.closed = true; this.generation++; this.detected.clear(); this.controller?.abort(); }
+  detectedConfiguration(id: string): { installation: InstallationCandidate; targetPath: string } | null {
+    const installation = this.detected.get(id);
+    if (this.closed || this.reading || installation?.compatibility !== 'verified-0.85.1') return null;
+    return { installation: structuredClone(installation), targetPath: join(this.options.home, '.pi/agent') };
+  }
   private begin(): number {
     if (this.closed) throw new Error('Preflight unavailable');
     this.controller?.abort();
+    this.detected.clear();
     this.state.revision = ++this.generation;
     this.state.notice = 'none';
     return this.generation;
@@ -39,9 +47,14 @@ export class PiPreflight {
     const generation = this.begin();
     if (this.reading) { this.state.notice = 'busy'; return this.snapshot(); }
     try {
-      const result = await this.read(budget => detectInstallations(scanPaths(this.options.home, this.options.guiPath), budget));
+      const result = await this.read(async budget => {
+        const candidates = await discoverScanPaths(this.options.home, this.options.guiPath, budget);
+        const result = await detectInstallations(candidates.paths, budget);
+        return { ...result, scan: candidates.limited ? 'limited' as const : result.scan };
+      });
       if (generation === this.generation) {
         this.state.installations = result.installations.map((candidate, index) => ({ ...candidate, id: `scan-${generation}-${index}` }));
+        this.detected = new Map(this.state.installations.map(candidate => [candidate.id, candidate]));
         this.state.selectedInstallation = null;
         this.state.scan = this.options.guiPath.length > 32768 || this.options.guiPath.split(':').length > limits.pathEntries ? 'limited' : result.scan;
       }

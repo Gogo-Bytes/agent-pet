@@ -1,115 +1,80 @@
-import { useEffect, useRef, useState } from 'react';
-import { Cat, Cable, Settings } from 'lucide-react';
-import { Box, Button, Callout, Card, Checkbox, Flex, Grid, Heading, TabNav, Text, Theme } from '@radix-ui/themes';
-import type { ManagementState } from '../../shared/preferences.js';
-import { PiPreflightPanel } from './PiPreflightPanel.js';
-import { PiConnectionPanel } from './PiConnectionPanel.js';
-import { PetSizeControl } from './PetSizeControl.js';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { defaultPreferences, type ManagementState, type PreferencePatch } from '../../shared/preferences.js';
+import type { ConfigurationsState } from '../../shared/configurations.js';
+import { createManagementStore, type ManagementBridge } from './management-store.js';
+import { CompanionScene } from './CompanionScene.js';
+import { PetsView } from './PetsView.js';
+import { ConnectionsView } from './ConnectionsView.js';
+import { SettingsView } from './SettingsView.js';
+import { Icon } from './components/icons.js';
+import { projectHomePets } from './home-projection.js';
 
-export function ManagementApp({ bridge = window.management }: { bridge?: Window['management'] }) {
-  const [page, setPage] = useState('Agent 连接');
-  const [state, setState] = useState<ManagementState | null>(null);
+const pages = [['home', 'home', '首页'], ['pets', 'pet', '宠物'], ['connections', 'link', '连接'], ['settings', 'settings', '设置']] as const;
+const notices: Record<ConfigurationsState['notice'], string> = {
+  none: '', invalid: '输入无效，请检查名称和位置。', duplicate: '这个配置已添加，请选择其他位置。',
+  'not-found': '配置已移除，请返回列表。', busy: '前一操作尚未完成，请稍后重试。',
+  'save-failed': '配置保存失败，未确认更改。请检查应用数据目录权限与可用空间后重试。',
+  'saved-invalid': '无法读取保存的连接信息，已停止操作。请保留原文件，重新打开应用后检查。',
+  'withdraw-first': '请先移除此连接，再重新添加新的文件夹。', retained: '连接还没有移除，记录和文件都已保留。请返回详情查看原因后重试。',
+  unsupported: '此 Agent 接入尚未支持。', limit: '已达到配置数量上限，请移除不需要的配置。',
+};
+export function ManagementApp({ bridge = window.management }: { bridge?: ManagementBridge }) {
+  const store = useMemo(() => createManagementStore(bridge), [bridge]);
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const [page, setPage] = useState('home');
   const [error, setError] = useState('');
+  const [windowError, setWindowError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [sizeSaving, setSizeSaving] = useState(false);
+  const pending = useRef(false);
   const mounted = useRef(false);
-  const pushRevision = useRef(0);
-  useEffect(() => {
-    mounted.current = true;
-    let active = true;
-    let pushed = false;
-    const off = bridge.subscribe(value => { pushed = true; if (active) { pushRevision.current++; setState(value); } });
-    void bridge.getState().then(value => { if (active && !pushed) setState(value); }, () => { if (active) setError('无法读取应用设置，请重试。'); });
-    return () => { active = false; mounted.current = false; off(); };
-  }, [bridge]);
-  async function change(action: () => Promise<ManagementState>) {
-    if (sizeSaving) return;
-    setBusy(true); setError('');
-    const revision = pushRevision.current;
-    try { const confirmed = await action(); if (mounted.current && pushRevision.current === revision) setState(confirmed); }
-    catch { setError('操作失败，未确认更改。请重试。'); }
-    finally { setBusy(false); }
+  const [clips, setClips] = useState<string[]>([]);
+  const [action, setAction] = useState('Idle');
+  const [replay, setReplay] = useState(0);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const onClips = useCallback((values: string[]) => setClips(previous => previous.join() === values.join() ? previous : values), []);
+  const preferences = snapshot.state?.preferences ?? defaultPreferences;
+  const pets = useMemo(() => snapshot.configurations ? projectHomePets(snapshot.configurations, snapshot.sessions, preferences.petName) : [], [snapshot.configurations, snapshot.sessions, preferences.petName]);
+  async function change<T extends ManagementState | ConfigurationsState>(work: () => Promise<T>, login = false): Promise<boolean> {
+    if (pending.current) return false;
+    pending.current = true; setBusy(true); setError('');
+    try {
+      const value = await work();
+      const failure = 'notice' in value ? notices[value.notice] : value.preferenceError || (login ? value.login.error : '') || '';
+      if (mounted.current) setError(failure);
+      return !failure;
+    } catch { if (mounted.current) setError('请求失败，未确认操作结果。请重新读取状态后重试。'); return false; }
+    finally { pending.current = false; if (mounted.current) setBusy(false); }
   }
-  async function resize(petSize: number) {
-    const revision = pushRevision.current;
-    const confirmed = await bridge.updatePreferences({ petSize });
-    if (!mounted.current) return null;
-    if (pushRevision.current === revision) setState(confirmed);
-    // Main publishes even failed writes before replying; still stop failed commit queues.
-    return confirmed.preferenceError;
-  }
-  return <Theme appearance="light" accentColor="indigo" grayColor="slate" radius="large">
-    <Grid className="management-shell">
-      <Box asChild p="4" className="management-sidebar"><aside>
-        <Heading as="h1" size="5" mb="5">Agent Pet</Heading>
-        <TabNav.Root aria-label="管理导航" className="management-navigation">
-          {([['Agent 连接', Cable], ['宠物', Cat], ['设置', Settings]] as const).map(([name, Icon]) =>
-            <TabNav.Link key={name} active={page === name} asChild>
-              <button type="button" aria-label={name} onClick={() => setPage(name)}>
-                <Flex as="span" align="center" gap="2"><Icon size={19} aria-hidden="true" />{name}</Flex>
-              </button>
-            </TabNav.Link>)}
-        </TabNav.Root>
-        <Text as="p" color="gray" size="2" mt="5" className="sidebar-note">macOS 预览版 · M2 本机试用</Text>
-      </aside></Box>
-      <Box asChild p={{ initial: '4', sm: '6' }} className="management-main"><main>
-        <Heading as="h2" size="6" mb="3">{page}</Heading>
-        <Text as="p" color="gray" size="2" mb="4">关闭此窗口后，宠物与已确认的桥接继续运行。可从菜单栏重新打开；退出请使用“退出 Agent Pet”。</Text>
-        {error && <Callout.Root role="alert" color="red" mb="3"><Callout.Text>{error}</Callout.Text></Callout.Root>}
-        {!state && error && <Button disabled={busy || sizeSaving} onClick={() => { void change(() => bridge.getState()); }}>重新读取设置</Button>}
-        {page !== '宠物' && state?.preferenceError && <Callout.Root role="alert" color="red" mb="3"><Callout.Text>{state.preferenceError}</Callout.Text></Callout.Root>}
-        {/* Plain hidden/inert boundaries cannot be overridden by Themes layout display rules.
-            Keep connection and pet request owners mounted across navigation. */}
-        <div hidden={page !== 'Agent 连接'} inert={page !== 'Agent 连接'}>
-          <Flex direction="column" gap="4">
-            <Card asChild size="3"><section>
-              <Heading as="h3" size="4" mb="3">让宠物关注你的工作</Heading>
-              <Text as="p">只读观察 Session 名称和状态，不读取对话正文，也不控制 Agent。</Text>
-            </section></Card>
-            <PiPreflightPanel api={bridge.piPreflight} />
-            <PiConnectionPanel api={bridge.piConnection} />
-            <Card asChild size="3"><section><Heading as="h3" size="4" mb="3">其他 Agent</Heading><Text as="p">Codex 和 Claude Code 接入尚不支持。</Text></section></Card>
-          </Flex>
-        </div>
-        <div hidden={page !== '宠物'} inert={page !== '宠物'}>
-          <Flex direction="column" gap="4">
-            <Card asChild size="3"><section>
-              <Heading as="h3" size="4" mb="3">当前宠物 · starter.glb</Heading>
-              <Text as="p" mb="3">沿用应用内置模型。当前没有其他形象或模型导入功能。</Text>
-              <Text as="p" color="gray" size="2">直接在桌面查看宠物；管理窗口不运行第二个 3D 预览。</Text>
-            </section></Card>
-            <Card asChild size="3"><section>
-              <Heading as="h3" size="4" mb="3">显示与尺寸</Heading>
-              {state ? <Box>
-                <Text as="label"><Flex as="span" align="center" gap="2">
-                  <Checkbox disabled={busy || sizeSaving} checked={state.preferences.petVisible} onCheckedChange={checked => { void change(() => bridge.updatePreferences({ petVisible: checked === true })); }} />显示宠物
-                </Flex></Text>
-                <PetSizeControl confirmedSize={state.preferences.petSize} preferenceError={state.preferenceError}
-                  disabled={busy} visible={page === '宠物'} save={resize} onSavingChange={setSizeSaving} />
-              </Box> : <Text as="p">正在读取偏好…</Text>}
-            </section></Card>
-          </Flex>
-        </div>
-        {page === '设置' && <Flex direction="column" gap="4">
-          <Card asChild size="3"><section>
-            <Heading as="h3" size="4" mb="3">启动</Heading>
-            {state ? <>
-              <Text as="label"><Flex as="span" align="center" gap="2">
-                <Checkbox disabled={busy || sizeSaving || !state.login.supported} checked={state.login.enabled} onCheckedChange={checked => { void change(() => bridge.setLogin(checked === true)); }} />登录时启动 Agent Pet
-              </Flex></Text>
-              <Text as="p" mt="3">默认关闭，不会在启动应用时自动注册登录项。</Text>
-              {!state.login.supported && <Text as="p" color="gray" size="2" mt="3">仅打包后的 macOS 应用支持。开发模式不会将 Electron 加入登录项。</Text>}
-              {state.login.error && <Callout.Root role="alert" color="red" mt="3"><Callout.Text>{state.login.error}</Callout.Text></Callout.Root>}
-            </> : <Text as="p">正在读取设置…</Text>}
-          </section></Card>
-          <Card asChild size="3"><section>
-            <Heading as="h3" size="4" mb="3">关于与数据</Heading>
-            <Text as="p" mb="3">提供只读预检与显式授权的临时接入；尚非日常持久化、完整 MVP 或正式发布验收。</Text>
-            <Text as="p" mb="3">偏好仅保存宠物显隐与大小。Session 未读状态不会跨重启保存。登录项以系统实际状态为准。</Text>
-            <Text as="p">所有窗口隐藏后，仍可通过菜单栏、Dock 或重新打开应用找回管理窗口。</Text>
-          </section></Card>
-        </Flex>}
-      </main></Box>
-    </Grid>
-  </Theme>;
+  const configError = error || (snapshot.configurations ? notices[snapshot.configurations.notice] : '');
+  return <div className="management-page"><main className="game-shell" data-reduced={preferences.reduced} data-native-chrome={bridge.nativeWindowControls}>
+    <header className="game-topbar">
+      <button className="game-logo" onClick={() => setPage('home')}><span>✦</span>Agent Pet</button>
+      <div className="game-titlebar-actions">
+        <span className="feature-page-label">{page === 'home' ? '' : pages.find(value => value[0] === page)?.[2]}</span>
+        {!bridge.nativeWindowControls && <div className="window-controls" role="group" aria-label="窗口操作">
+          {([['minimize', '最小化窗口', 'minus'], ['toggle-maximize', '最大化或还原窗口', 'maximize'], ['close', '关闭窗口', 'close']] as const).map(([action, label, icon]) =>
+            <button key={action} className={`window-control window-control-${action}`} aria-label={label} title={label}
+              onClick={() => { setWindowError(''); void bridge.windowAction(action).catch(() => setWindowError('窗口操作失败，请重试。')); }}><Icon name={icon} size={16} /></button>)}
+        </div>}
+      </div>
+    </header>
+    {(windowError || snapshot.error || snapshot.state?.preferenceError) && <p className="app-alert" role="alert">{windowError || snapshot.error || snapshot.state?.preferenceError}<button onClick={() => void store.retry()}>重新读取</button></p>}
+    <div className="game-content">
+      <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} onClips={onClips}>
+        <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
+          onName={petName => change(() => bridge.updatePreferences({ petName }))} onBind={(id, pet) => void change(() => bridge.configurations.bindPet(id, pet))}
+          onAction={value => { setAction(value); setReplay(previous => previous + 1); }} />
+      </CompanionScene>
+      <ConnectionsView visible={page === 'connections'} state={snapshot.configurations} bridge={bridge} run={change} busy={busy || !!snapshot.configurations?.busy} error={configError} />
+      <SettingsView visible={page === 'settings'} state={snapshot.state} busy={busy} error={error}
+        onChange={(patch: PreferencePatch) => void change(() => bridge.updatePreferences(patch))} onLogin={enabled => void change(() => bridge.setLogin(enabled), true)}
+        onReset={async () => {
+          const { schemaVersion: _, petName: __, ...defaults } = defaultPreferences;
+          const saved = await change(() => bridge.updatePreferences(defaults));
+          if (!saved) throw new Error('偏好恢复失败，请检查应用数据目录并重试。');
+          if (snapshot.state?.login.supported) { const login = await change(() => bridge.setLogin(false), true); if (!login) throw new Error('偏好已恢复，但系统登录项未恢复，请重试。'); }
+        }} onOpenProject={() => void bridge.openProject().catch(() => setError('无法打开项目链接。'))} />
+    </div>
+    <footer className="game-dock"><nav className="dock-tabs" role="tablist" aria-label="页面导航" style={{ '--dock-index': pages.findIndex(value => value[0] === page) } as CSSProperties}>{<span className="dock-tab-slider" aria-hidden="true" />}{pages.map(([id, icon, label]) => <button key={id} className={`dock-tab ${page === id ? 'active' : ''}`} role="tab" aria-selected={page === id} onClick={() => { setPage(id); setError(''); }}><Icon name={icon} /><small>{label}</small></button>)}</nav></footer>
+  </main></div>;
 }

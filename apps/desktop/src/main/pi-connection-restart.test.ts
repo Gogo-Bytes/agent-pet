@@ -158,6 +158,17 @@ it('failed save before listen retains receipt; stop/save failure and failed remo
   expect(fs.existsSync(next.path)).toBe(false);
 });
 
+it('does not report absent-artifact removal as saved when clearing private ownership fails', async () => {
+  const f = fixture(); const first = await f.deploy(); await first.connection.stop();
+  fs.unlinkSync(first.path);
+  const second = f.controller();
+  vi.spyOn(second.store, 'save').mockReturnValueOnce(true).mockReturnValueOnce(false);
+  expect(await second.connection.remove()).toMatchObject({ notice: 'removed-save-failed', saved: 'uncertain',
+    receiving: 'stopped', canConfigure: false, canRemove: false, deployedPath: null });
+  expect(fs.existsSync(f.target)).toBe(true);
+  expect(fs.existsSync(f.record)).toBe(true);
+});
+
 it('serializes resume/disable; late callbacks cannot resurrect stopped state or publish observations', async () => {
   const f = fixture(); const first = await f.deploy(); await first.connection.stop();
   const second = f.controller();
@@ -222,4 +233,29 @@ it('refuses an existing real socket and leaves its listener untouched', async ()
     expect(second.start).not.toHaveBeenCalled();
     expect(other.listening).toBe(true); expect(fs.lstatSync(first.saved.config.endpoint).isSocket()).toBe(true);
   } finally { await new Promise<void>(resolve => other.close(() => resolve())); }
+});
+
+it('retries a failed local activity cleanup while preserving the closed callback epoch and stopped handle', async () => {
+  const f = fixture(), first = await f.deploy(); await first.connection.stop();
+  const second = f.controller(), stop = vi.fn(async () => {});
+  second.start.mockImplementationOnce(async (_config, sink) => {
+    sink.publish({ ...piObservation(), revision: 2, status: 'working', connected: true,
+      capabilities: { waiting_input: 'supported' }, facts: { activities: [], waitingForInput: true } });
+    return { stop };
+  });
+  await second.connection.resume();
+  let attempted = 0;
+  const offCount = second.app.subscribe(state => { if (Object.values(state.sessions)[0]?.connected === false) attempted++; });
+  const offThrow = second.app.subscribe(() => { throw Error('private observer detail'); });
+  expect((await second.connection.disable()).notice).toBe('stop-failed');
+  expect(stop).toHaveBeenCalledOnce(); expect(attempted).toBe(1);
+  offThrow();
+  expect((await second.connection.disable()).notice).toBe('disabled');
+  expect(attempted).toBe(2); // The failed cleanup is retried, not silently forgotten.
+  const id = Object.keys(second.app.snapshot().sessions)[0]!;
+  expect(second.app.snapshot().sessions[id]).toMatchObject({ connected: false, facts: { activities: [], waitingForInput: false } });
+  expect(second.app.snapshot().bubbles).toEqual([]);
+  second.start.mock.calls[0]![1].publish({ ...piObservation(), status: 'working', revision: 100 });
+  expect(second.app.snapshot().bubbles).toEqual([]);
+  offCount();
 });

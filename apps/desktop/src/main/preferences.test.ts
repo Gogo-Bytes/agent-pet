@@ -26,11 +26,33 @@ describe('PreferenceStore actual file boundary', () => {
       store.update({ petSize: 310 });
       expect(JSON.parse(fs.readFileSync(old, 'utf8')).petSize).toBe(222); // old inode stays complete
     } finally { fs.closeSync(old); }
-    expect(new PreferenceStore(path).snapshot()).toEqual({ schemaVersion: 1, petVisible: false, petSize: 310 });
+    expect(new PreferenceStore(path).snapshot()).toEqual({ ...defaultPreferences, petVisible: false, petSize: 310 });
     expect(fs.readdirSync(root)).toEqual(['preferences.json']);
     if (process.platform !== 'win32') expect(fs.statSync(path).mode & 0o777).toBe(0o600);
     const copy = store.snapshot(); copy.petSize = 80;
     expect(store.snapshot().petSize).toBe(310);
+  });
+  it('migrates version 1 in memory, preserves the original until save, and persists all settings across restart', () => {
+    const legacy = JSON.stringify({ schemaVersion: 1, petVisible: false, petSize: 180 });
+    fs.writeFileSync(path, legacy);
+    const store = new PreferenceStore(path);
+    expect(store.snapshot()).toEqual({ ...defaultPreferences, petVisible: false, petSize: 180 });
+    expect(fs.readFileSync(path, 'utf8')).toBe(legacy);
+    const patch = { fps: 30, resolution: 75, pauseHidden: false, tray: false, dock: true,
+      startConsole: true, background: false, offline: false, names: false, topmost: false,
+      bubbles: false, reduced: true, completed: false, error: false, petName: '  小团子  ' };
+    expect(store.update(patch)).toBe(true);
+    expect(new PreferenceStore(path).snapshot()).toEqual({ ...defaultPreferences, ...patch, petName: '小团子', petVisible: false, petSize: 180 });
+  });
+  it('guards the last application entry against partial and combined patches before disk writes', () => {
+    const store = new PreferenceStore(path);
+    expect(() => store.update({ tray: false, dock: false })).toThrow('至少保留');
+    expect(fs.existsSync(path)).toBe(false);
+    expect(store.update({ tray: false })).toBe(true);
+    const original = fs.readFileSync(path, 'utf8');
+    expect(() => store.update({ dock: false })).toThrow('至少保留');
+    expect(fs.readFileSync(path, 'utf8')).toBe(original);
+    expect(store.snapshot().dock).toBe(true);
   });
   it.each(['broken json', 'null', '{}', '{"schemaVersion":2,"petVisible":false,"petSize":140}',
     '{"schemaVersion":1,"petVisible":"false","petSize":140}',
@@ -101,7 +123,7 @@ describe('PreferenceStore actual file boundary', () => {
     expect(fs.readdirSync(root)).toEqual([]);
   });
   it.each([null, [], { schemaVersion: 1 }, { token: 'no' }, { petVisible: 1 }, { petSize: NaN }, { petSize: Infinity },
-    { petSize: 80.5 }, { petSize: 79 }, { petSize: 601 }])('rejects untrusted patches %# before touching disk', patch => {
+    { fps: 59 }, { resolution: 200 }, { pauseHidden: 1 }, { petName: ' ' }, { petName: 'x'.repeat(41) }, { petSize: 80.5 }, { petSize: 79 }, { petSize: 601 }])('rejects untrusted patches %# before touching disk', patch => {
     const store = new PreferenceStore(path);
     expect(() => store.update(patch)).toThrow(TypeError);
     expect(fs.readdirSync(root)).toEqual([]);

@@ -1,9 +1,9 @@
 import { constants } from 'node:fs';
-import { lstat, open, readlink } from 'node:fs/promises';
+import { lstat, open, opendir, readlink } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize, parse, sep } from 'node:path';
 import type { Finding, Inspection, InstallationCandidate, TargetCandidate } from '../shared/pi-preflight.js';
 
-export const limits = { bytes: 64 * 1024, pathBytes: 4096, depth: 32, pathEntries: 32, links: 8, operations: 4096, milliseconds: 3000 } as const;
+export const limits = { bytes: 64 * 1024, pathBytes: 4096, depth: 32, pathEntries: 32, nodeVersions: 16, directoryEntries: 64, links: 8, operations: 4096, milliseconds: 3000 } as const;
 class CheckFailure extends Error { constructor(readonly finding: Finding) { super(finding); } }
 const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
 export class ReadBudget {
@@ -74,6 +74,13 @@ export class ReadBudget {
 function record(value: unknown): value is Record<string, unknown> { return !!value && typeof value === 'object' && !Array.isArray(value); }
 function finding(error: unknown): Finding { return error instanceof CheckFailure ? error.finding : 'unreadable'; }
 
+// pi 0.85.1 resolves package sources separately from auto-discovered user extensions.
+// Only this known additive form is accepted here; no source is resolved or executed.
+function additivePackages(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= 128 && value.every(source => typeof source === 'string' &&
+    source.length > 0 && source.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(source) && !/^[!+-]/.test(source));
+}
+
 export async function inspectTarget(target: TargetCandidate, budget = new ReadBudget()): Promise<Inspection> {
   const findings = new Set<Finding>();
   if (process.platform === 'win32') return { target, findings: ['platform-unknown'] };
@@ -106,7 +113,7 @@ export async function inspectTarget(target: TargetCandidate, budget = new ReadBu
     const settings = await budget.json(join(target.path, 'settings.json'));
     if (settings !== undefined && (!record(settings) ||
       (settings.extensions !== undefined && (!Array.isArray(settings.extensions) || settings.extensions.length > 0)) ||
-      (settings.packages !== undefined && (!Array.isArray(settings.packages) || settings.packages.length > 0)))) findings.add('settings-unknown');
+      (settings.packages !== undefined && !additivePackages(settings.packages)))) findings.add('settings-unknown');
     budget.check();
   } catch (error) { findings.add(finding(error)); }
   return { target, findings: [...findings] };
@@ -158,14 +165,46 @@ export function scanPaths(home: string, guiPath: string): string[] {
     .filter(path => isAbsolute(path) && Buffer.byteLength(path) <= limits.pathBytes && !path.includes('\0')))].map(path => join(path, 'pi'));
 }
 
+/** Finder does not inherit shell NVM setup. Inspect only one fixed version-manager directory,
+ * never shell profiles, arbitrary sibling trees or executable output. */
+export async function discoverScanPaths(home: string, guiPath: string, budget = new ReadBudget()): Promise<{ paths: string[]; limited: boolean }> {
+  const base = scanPaths(home, guiPath);
+  const root = join(home, '.nvm/versions/node');
+  const versions: string[] = [];
+  let limited = false;
+  try {
+    await budget.ancestors(root, false);
+    const before = await budget.stat(root);
+    if (!before) return { paths: base, limited };
+    if (!before.isDirectory() || before.isSymbolicLink()) return { paths: base, limited: true };
+    budget.check();
+    const directory = await opendir(root);
+    let count = 0;
+    for await (const entry of directory) {
+      budget.check();
+      if (++count > limits.directoryEntries) { limited = true; break; }
+      if (entry.isDirectory() && /^v\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(entry.name)) versions.push(entry.name);
+    }
+    const after = await budget.stat(root);
+    if (!after?.isDirectory() || before.dev !== after.dev || before.ino !== after.ino ||
+        before.mode !== after.mode || before.uid !== after.uid || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) {
+      return { paths: base, limited: true };
+    }
+    if (versions.length > limits.nodeVersions) limited = true;
+    versions.sort((a, b) => b.localeCompare(a, 'en', { numeric: true }));
+    const paths = [...new Set([...base, ...versions.slice(0, limits.nodeVersions).map(version => join(root, version, 'bin/pi'))])];
+    return { paths, limited };
+  } catch { return { paths: base, limited: true }; }
+}
+
 export async function detectInstallations(paths: string[], budget = new ReadBudget()): Promise<{ installations: InstallationCandidate[]; scan: 'complete' | 'limited' }> {
   const installations: InstallationCandidate[] = [];
   if (process.platform === 'win32') return { installations, scan: 'limited' };
   try {
-    for (const [index, path] of paths.slice(0, limits.pathEntries + 3).entries()) {
+    for (const [index, path] of paths.slice(0, limits.pathEntries + 3 + limits.nodeVersions).entries()) {
       const candidate = await identifyInstallation(path, `scan-${index}`, false, budget);
       if (candidate) installations.push(candidate);
     }
-    return { installations, scan: paths.length > limits.pathEntries + 3 ? 'limited' : 'complete' };
+    return { installations, scan: paths.length > limits.pathEntries + 3 + limits.nodeVersions ? 'limited' : 'complete' };
   } catch { return { installations, scan: 'limited' }; }
 }

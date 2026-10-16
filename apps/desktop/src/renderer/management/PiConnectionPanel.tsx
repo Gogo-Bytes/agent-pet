@@ -15,6 +15,7 @@ const noticeText: Record<PiConnectionState['notice'], string> = {
   'start-failed': '桥接启动失败；若已部署，文件和本次撤回凭证仍保留。',
   'runtime-failed': '无法创建私有运行目录；未部署或启动连接，不会删除已有对象。',
   removed: '本次扩展文件已移除；不确定、非空或外部修改的目录可能保留。运行中的扩展未卸载。',
+  'already-absent': '扩展路径已无文件；只清除了本应用保存记录，没有删除目标目录或未知文件。运行中的扩展未卸载。',
   'retained-changed': '文件已变化，保留原状；接收已停止，运行中的扩展未卸载。',
   'retained-unknown': '没有可用的本次所有权凭证；不会移除未知文件。',
   'failed-preserved': '撤回未完成；接收已停止，文件与可用凭证保留，可重试。运行中的扩展未卸载。',
@@ -25,7 +26,7 @@ const noticeText: Record<PiConnectionState['notice'], string> = {
   disabled: '已停止接收并保存停用状态；扩展文件保留，运行中的扩展未卸载。',
   'stop-failed': '停止接收失败；不能保证接收已停止。保存结果见下方；重启不会自动恢复。',
   'stop-save-failed': '停止接收和保存停用状态均未确认成功；文件与所有权保留，重启不会自动恢复。',
-  'removed-save-failed': '扩展文件已移除，但保存移除结果失败；不能声称记录已清除，禁止重配。',
+  'removed-save-failed': '扩展路径已无文件，但保存移除结果失败；不能声称记录已清除，禁止重配。',
   stopped: '本次接收已停止；配置文件不会随退出自动删除。',
 };
 

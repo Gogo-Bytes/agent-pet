@@ -24,7 +24,7 @@ function validStat(v: unknown, kind: 'file' | 'directory'): v is SavedStat {
     (s.mode & fs.constants.S_IFMT) === (kind === 'file' ? fs.constants.S_IFREG : fs.constants.S_IFDIR) &&
     (kind !== 'file' || (s.nlink === 1 && s.size <= 65536));
 }
-function validConnection(v: unknown): v is SavedConnection {
+export function validSavedConnection(v: unknown): v is SavedConnection {
   if (!keys(v, 'target,config,runtime,ownership,disabled') || typeof v.disabled !== 'boolean' ||
     typeof v.target !== 'string' || !isAbsolute(v.target) || normalize(v.target) !== v.target ||
     dirname(v.target) === v.target || Buffer.byteLength(v.target) > 4096 || v.target.includes('\0') ||
@@ -100,7 +100,7 @@ export class PiConnectionStore {
       const v: unknown = JSON.parse(bytes.subarray(0, count).toString('utf8'));
       if (!keys(v, 'version,host,uid,directory,connection') || v.version !== 1 || v.host !== hostname() || v.uid !== uid() ||
         !validStat(v.directory, 'directory') || !sameIdentity(v.directory, this.directoryStat) ||
-        (v.connection !== null && !validConnection(v.connection))) throw new Error();
+        (v.connection !== null && !validSavedConnection(v.connection))) throw new Error();
       fs.closeSync(fd); fd = undefined;
       this.value = v.connection as SavedConnection | null; this.fileStat = saveStat(before);
     } catch { this.error = true; }
@@ -112,7 +112,7 @@ export class PiConnectionStore {
     let fd: number | undefined;
     try {
       validateParents(dirname(this.directory));
-      if (connection !== null && !validConnection(connection)) throw new Error();
+      if (connection !== null && !validSavedConnection(connection)) throw new Error();
       if (!this.directoryStat) {
         fs.mkdirSync(this.directory, { mode: 0o700 }); // no recursive mkdir or adoption
         this.directoryStat = saveStat(privateStat(this.directory, 'directory'));

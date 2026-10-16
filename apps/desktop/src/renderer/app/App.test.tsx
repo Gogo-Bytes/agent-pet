@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '../test-support/dom-platform.js';
 import { Children, StrictMode, isValidElement, useEffect, type ReactNode } from 'react';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { configure, getConfig } from '@testing-library/dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,7 @@ import { App } from './App.js';
 import { createPetStore } from './bridge/pet-store.js';
 import { createPetBridgeDouble } from '../test-support/pet-bridge-double.js';
 import { baselineLayout, piBaselineObservations, piObservation } from '../test-support/pi-fixtures.js';
+import { defaultPreferences } from '../../shared/preferences.js';
 import { PetModel } from '../features/pet/PetModel.js';
 
 // Only the WebGL boundary is substituted; PetCanvas, native DOM gestures,
@@ -19,6 +20,7 @@ vi.mock('@react-three/fiber', () => ({
     <canvas />{Children.toArray(children).filter(child => isValidElement(child) && typeof child.type !== 'string')}
   </div>,
 }));
+vi.mock('../shared/PreferenceRenderLoop.js', () => ({ PreferenceRenderLoop: ({ active }: { active: boolean }) => <span data-loop-active={String(active)} /> }));
 vi.mock('@react-three/drei', () => ({ Bounds: ({ children }: { children: ReactNode }) => children }));
 vi.mock('../features/pet/PetModel.js', () => ({ PetModel: vi.fn(() => null) }));
 const asyncWrapper = getConfig().asyncWrapper;
@@ -49,6 +51,36 @@ async function mount(options: Parameters<typeof createPetBridgeDouble>[0] = {}) 
 }
 
 describe('App session interactions', () => {
+  it('keeps controls visible across a slow pet-to-toolbar handoff inside the shared hover envelope', async () => {
+    const user = userEvent.setup();
+    const { bridge, container } = await mount();
+    const toolbar = screen.getByRole('toolbar', { name: '桌宠快捷操作' });
+    const group = container.querySelector<HTMLElement>('[data-pet-controls-region]')!;
+    expect(toolbar.getAttribute('data-visible')).toBe('false');
+    await user.hover(container.querySelector('canvas')!);
+    expect(toolbar.getAttribute('data-visible')).toBe('true');
+    await user.hover(group); // the empty connecting area, outside the mesh and buttons
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)); });
+    expect(toolbar.getAttribute('data-visible')).toBe('true');
+    await user.hover(toolbar);
+    expect(toolbar.getAttribute('data-visible')).toBe('true');
+    await user.unhover(toolbar);
+    await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('false'));
+    expect(bridge.api.controlsVisible).toHaveBeenLastCalledWith(false);
+    // Hovering the compact region also reveals controls without a model event.
+    await user.hover(group);
+    await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('true'));
+    act(() => window.dispatchEvent(new Event('blur')));
+    await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('false'));
+    await user.unhover(group);
+    await user.hover(group);
+    await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('true'));
+  });
+  it('does not render the standalone desktop pet name even with legacy names enabled', async () => {
+    await mount();
+    expect(screen.queryByText(defaultPreferences.petName)).toBeNull();
+  });
+
   it('confirms only the clicked completed/error bubble, retains working and shows explicit unsupported outcome', async () => {
     const user = userEvent.setup();
     const { bridge } = await mount({ observations: [
@@ -179,24 +211,36 @@ describe('App lifecycle and notices', () => {
     expect(screen.getByRole('button', { name: '显示气泡' })).toBeTruthy();
   });
 
-  it('selects never while hidden and always on resume, retaining one visibility subscription through StrictMode', async () => {
+  it('pauses the preference render loop while hidden and resumes it, retaining one visibility subscription through StrictMode', async () => {
     let hidden = false;
     vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
     const add = vi.spyOn(document, 'addEventListener');
     const remove = vi.spyOn(document, 'removeEventListener');
     const { container, unmount } = await mount();
-    const loop = () => container.querySelector('[data-frameloop]')?.getAttribute('data-frameloop');
-    expect(loop()).toBe('always');
+    const loop = () => container.querySelector('[data-loop-active]')?.getAttribute('data-loop-active');
+    expect(loop()).toBe('true');
     act(() => { hidden = true; document.dispatchEvent(new Event('visibilitychange')); });
-    expect(loop()).toBe('never');
+    expect(loop()).toBe('false');
     act(() => { hidden = false; document.dispatchEvent(new Event('visibilitychange')); });
-    expect(loop()).toBe('always');
+    expect(loop()).toBe('true');
     const count = (calls: typeof add.mock.calls) => calls.filter(([event]) => event === 'visibilitychange').length;
     expect(count(add.mock.calls) - count(remove.mock.calls)).toBe(1);
     unmount();
     expect(count(add.mock.calls)).toBe(count(remove.mock.calls));
   });
 
+  it('applies bubble and reminder dependencies without acknowledging suppressed results', async () => {
+    const { bridge } = await mount({ observations: piBaselineObservations() });
+    act(() => bridge.publishPreferences({ ...defaultPreferences, bubbles: false, completed: false }));
+    await act(async () => {});
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(bridge.api.acknowledgeAndOpen).not.toHaveBeenCalled();
+    act(() => bridge.publishPreferences({ ...defaultPreferences, completed: false, error: false, petName: '小团子' }));
+    await act(async () => {});
+    expect(screen.queryByRole('button', { name: /已完成|发生错误/ })).toBeNull();
+    expect(screen.queryByText('小团子')).toBeNull();
+    expect(bridge.snapshot().bubbles).toHaveLength(5);
+  });
   it('subscribes before the initial request, keeps one StrictMode listener pair, and cleans up on unmount', async () => {
     const { bridge, unmount, container } = await mount();
     expect(bridge.api.requestSnapshot).toHaveBeenCalledTimes(1);

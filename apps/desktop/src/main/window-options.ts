@@ -2,6 +2,7 @@ import type { BrowserWindowConstructorOptions } from 'electron';
 
 export function createPetWindowOptions(
   preloadPath: string,
+  platform: NodeJS.Platform = process.platform,
 ): BrowserWindowConstructorOptions {
   return {
     width: 140,
@@ -16,6 +17,9 @@ export function createPetWindowOptions(
     hasShadow: false,
     skipTaskbar: true,
     alwaysOnTop: true,
+    // A macOS nonactivating panel can accompany other apps' fullscreen Spaces
+    // without transforming the whole app (and its management/Dock window).
+    ...(platform === 'darwin' ? { type: 'panel' } : {}),
     backgroundColor: '#00000000',
     webPreferences: {
       preload: preloadPath,

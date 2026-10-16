@@ -1,497 +1,570 @@
 // @vitest-environment jsdom
+import { useEffect, type ReactNode } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { initialPreflight, preflightBridge } from './test-preflight.js';
-import { connectionBridge } from './test-connection.js';
+import type { ManagementState } from '../../shared/preferences.js';
 import type { PreflightState } from '../../shared/pi-preflight.js';
+import { initialPreflight } from './test-preflight.js';
 import { ManagementApp } from './ManagementApp.js';
-import { defaultPreferences, type ManagementState, type PreferencePatch } from '../../shared/preferences.js';
+import { configuration, managementBridge } from './test-management.js';
+import { initialConnection } from './test-connection.js';
 
-// jsdom lacks browser pointer capture/geometry. Exercise the real Radix component,
-// supplying only platform APIs; no Slider or IPC implementation is mocked out.
+// Only Three/WebGL is substituted. Real page controls, dialogs, request owner and store execute.
+vi.mock('./CompanionScene.js', () => ({ CompanionScene: ({ children, page, onClips }: {
+  children: ReactNode; page: string; onClips: (clips: string[]) => void;
+}) => { useEffect(() => onClips(['Idle', 'Work', 'Success', 'Error']), [onClips]);
+  return <section aria-label="正式场景测试边界"><div hidden={page !== 'pets'}>{children}</div></section>; } }));
 beforeEach(() => {
-  class TestPointerEvent extends MouseEvent {
-    readonly pointerId: number;
-    constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; }
-  }
-  vi.stubGlobal('PointerEvent', TestPointerEvent);
-  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
-  const captures = new WeakMap<Element, number>();
-  vi.spyOn(Element.prototype, 'setPointerCapture').mockImplementation(function (this: Element, id) { captures.set(this, id); });
-  vi.spyOn(Element.prototype, 'hasPointerCapture').mockImplementation(function (this: Element, id) { return captures.get(this) === id; });
-  vi.spyOn(Element.prototype, 'releasePointerCapture').mockImplementation(function (this: Element, id) {
-    captures.delete(this);
-    fireEvent.lostPointerCapture(this, { pointerId: id });
-  });
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (this: HTMLDialogElement) { this.setAttribute('open', ''); });
+  vi.spyOn(HTMLDialogElement.prototype, 'close').mockImplementation(function (this: HTMLDialogElement) { this.removeAttribute('open'); });
+  vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
 });
-// Define absent platform methods once so spies can be restored between tests.
-for (const method of ['setPointerCapture', 'hasPointerCapture', 'releasePointerCapture'] as const) {
-  if (!Element.prototype[method]) Object.defineProperty(Element.prototype, method, { configurable: true, writable: true, value: () => false });
+for (const method of ['showModal', 'close'] as const) {
+  if (!HTMLDialogElement.prototype[method]) Object.defineProperty(HTMLDialogElement.prototype, method, { configurable: true, writable: true, value() {} });
 }
+if (!HTMLElement.prototype.scrollTo) Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, writable: true, value() {} });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-function saved(size: number, preferenceError: string | null = null): ManagementState {
-  return { preferences: { ...defaultPreferences, petSize: size }, preferenceError, login: { supported: false, enabled: false, error: null } };
+async function mount(records = [configuration()], supported = false) {
+  const test = managementBridge(records, supported);
+  const view = render(<ManagementApp bridge={test.bridge} />);
+  await act(async () => {});
+  return { ...test, ...view, user: userEvent.setup() };
 }
-function geometry(slider = screen.getByRole('slider')) {
-  const root = slider.closest('.size-slider')!;
-  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 520, height: 32, right: 520, bottom: 32, x: 0, y: 0, toJSON: () => ({}) });
-  return { slider, root };
+async function page(user: ReturnType<typeof userEvent.setup>, name: string) { await user.click(screen.getByRole('tab', { name })); }
+async function category(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(within(screen.getByRole('navigation', { name: '设置分类' })).getByRole('button', { name: new RegExp(name) }));
 }
-function startDrag(size: number) {
-  const controls = geometry();
-  fireEvent.pointerDown(controls.slider, { pointerId: 1, button: 0 });
-  fireEvent.pointerMove(controls.slider, { pointerId: 1, clientX: size - 80 });
-  return controls;
-}
-function release(slider: Element = screen.getByRole('slider')) { fireEvent.pointerUp(slider, { pointerId: 1 }); }
-function expectSize(size: number) { expect(screen.getByRole('slider').getAttribute('aria-valuenow')).toBe(String(size)); }
+const flush = async () => { await act(async () => {}); };
 
-function createBridge(supported = false) {
-  let state: ManagementState = { preferences: { ...defaultPreferences }, preferenceError: null, login: { supported, enabled: false, error: null } };
-  let listener: ((state: ManagementState) => void) | undefined;
-  const off = vi.fn(() => { listener = undefined; });
-  const bridge = {
-    piPreflight: preflightBridge(),
-    piConnection: connectionBridge(),
-    getState: vi.fn(async () => state),
-    updatePreferences: vi.fn(async (patch: PreferencePatch) => { state = { ...state, preferences: { ...state.preferences, ...patch } }; return state; }),
-    setLogin: vi.fn(async (enabled: boolean) => { state = { ...state, login: { ...state.login, enabled } }; return state; }),
-    subscribe: vi.fn((callback: (state: ManagementState) => void) => { listener = callback; return off; }),
-  };
-  return { bridge, off, push: (value: ManagementState) => listener?.(value) };
-}
-
-describe('ManagementApp real DOM controls', () => {
-  it('uses actual Themes components on every management surface and retains inaccessible page owners', async () => {
-    const { bridge } = createBridge();
-    bridge.piPreflight.getState.mockResolvedValue({ ...initialPreflight, installations: [
-      { id: 'candidate', path: '/synthetic/pi', compatibility: 'unverified', version: null },
-    ] });
+describe('ManagementApp formal four-page interface', () => {
+  it('edits the pet name at its outside heading with validation, failure recovery, Enter and Escape', async () => {
+    const test = await mount(); await page(test.user, '宠物');
+    const heading = screen.getByRole('heading', { name: '团子' });
+    const trigger = within(heading).getByRole('button', { name: '修改宠物名称' });
+    await test.user.click(trigger);
+    let input = screen.getByRole('textbox', { name: '宠物名称' });
+    expect(document.activeElement).toBe(input);
+    expect(input.getAttribute('maxlength')).toBe('40');
+    await test.user.clear(input);
+    expect(screen.getByRole('button', { name: '保存' }).hasAttribute('disabled')).toBe(true);
+    await test.user.type(input, '  新名字  ');
+    test.bridge.updatePreferences.mockRejectedValueOnce(new Error('isolated failure'));
+    await test.user.click(screen.getByRole('button', { name: '保存' }));
+    expect((screen.getByRole('textbox', { name: '宠物名称' }) as HTMLInputElement).value).toBe('  新名字  ');
+    expect(screen.getByRole('alert').textContent).toContain('请求失败');
+    await test.user.type(input, '{Enter}');
+    expect(test.bridge.updatePreferences).toHaveBeenLastCalledWith({ petName: '新名字' });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '修改宠物名称' })));
+    await test.user.click(screen.getByRole('button', { name: '修改宠物名称' }));
+    input = screen.getByRole('textbox', { name: '宠物名称' });
+    await test.user.clear(input); await test.user.type(input, '取消的名称{Escape}');
+    expect(screen.getByRole('heading', { name: '新名字' })).toBeTruthy();
+    expect(test.bridge.updatePreferences).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '修改宠物名称' })));
+    await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: '修改宠物名称' })).toBeNull();
+  });
+  it.each(['button', 'escape', 'backdrop'] as const)('keeps the glass collection modal until its %s exit completes, then restores focus', async method => {
+    const test = await mount(); await page(test.user, '宠物');
+    const opener = screen.getByRole('button', { name: '打开宠物收藏' });
+    await test.user.click(opener);
+    const dialog = screen.getByRole('dialog', { name: '宠物收藏' });
+    expect(document.activeElement).toBe(within(dialog).getByRole('textbox', { name: '搜索宠物' }));
+    const panel = dialog.querySelector('.glass-drawer-panel')!;
+    expect(panel.classList.contains('glass-panel')).toBe(true);
+    if (method === 'button') await test.user.click(within(dialog).getByRole('button', { name: '关闭弹窗' }));
+    else if (method === 'escape') fireEvent(dialog, new Event('cancel', { bubbles: true, cancelable: true }));
+    else fireEvent.click(dialog);
+    expect(dialog.getAttribute('data-closing')).toBe('true');
+    expect(dialog.hasAttribute('open')).toBe(true);
+    const end = new Event('animationend', { bubbles: true });
+    Object.defineProperty(end, 'animationName', { value: 'glass-drawer-out' });
+    fireEvent(panel, end);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+  it('closes collection immediately with reduced motion and falls back when animationend is lost', async () => {
+    const test = await mount(); await page(test.user, '宠物');
+    act(() => test.pushState({ ...test.state(), preferences: { ...test.state().preferences, reduced: true } }));
+    await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    await test.user.click(screen.getByRole('button', { name: '关闭弹窗' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    act(() => test.pushState({ ...test.state(), preferences: { ...test.state().preferences, reduced: false } }));
+    await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    await test.user.click(screen.getByRole('button', { name: '关闭弹窗' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '打开宠物收藏' }));
+  });
+  it('distinguishes persisted disablement after restart, resumes only explicitly and retains failure reasons', async () => {
+    const record = { ...configuration(), connection: { ...initialConnection, canConfigure: false, canResume: true, canRemove: true,
+      deployedPath: '/isolated/project-one/extensions/agent-pet.ts', status: 'disconnected' as const,
+      saved: 'disabled' as const, notice: 'resume-required' as const } };
+    const test = await mount([record]); await page(test.user, '连接');
+    expect(screen.getByRole('heading', { name: '已暂停' })).toBeTruthy();
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
+    await test.user.click(screen.getByRole('button', { name: '检查位置' }));
+    expect(test.bridge.configurations.inspect).toHaveBeenCalledExactlyOnceWith(record.id);
+    expect(screen.getByRole('heading', { name: '已暂停' })).toBeTruthy();
+    expect(screen.queryByText(/尚未读取目标|仅点击恢复才校验/)).toBeNull();
+    expect(test.bridge.configurations.resume).not.toHaveBeenCalled();
+    await test.user.click(screen.getByRole('button', { name: '继续连接' }));
+    expect(test.bridge.configurations.resume).toHaveBeenCalledExactlyOnceWith(record.id);
+    await act(async () => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      saved: 'ready', notice: 'none', status: 'configured-waiting', receiving: 'active', canResume: false } }] }));
+    expect(screen.queryByText(/已保存停用/)).toBeNull();
+    await act(async () => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      notice: 'resume-refused', status: 'failed' } }] }));
+    expect(screen.getByRole('alert').textContent).toContain('暂时无法重新连接');
+    await test.user.click(screen.getByText('查看详细原因'));
+    expect(screen.getByText(/恢复被拒绝：原运行目录或扩展已缺失/)).toBeTruthy();
+    expect(screen.queryByText(/已保存停用/)).toBeNull();
+  });
+  it('leads with reconnect rather than an unchecked location and never resumes on page open', async () => {
+    const record = { ...configuration(), name: 'pi 默认配置', availability: 'unchecked' as const,
+      connection: { ...initialConnection, canConfigure: false, canResume: true, canRemove: true,
+        deployedPath: '/isolated/project-one/extensions/agent-pet.ts', saved: 'ready' as const,
+        status: 'disconnected' as const, notice: 'resume-required' as const } };
+    const test = await mount([record]); await page(test.user, '连接');
+    expect(screen.getByRole('heading', { name: '等待重新连接' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '重新连接' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '暂停连接' })).toBeNull();
+    expect(test.container.querySelector('.cfg-more-options')?.hasAttribute('open')).toBe(false);
+    expect(test.container.querySelector('.cfg-index-state')).toBeNull();
+    // jsdom's role queries do not model the hidden body of native details.
+    expect(screen.getByRole('button', { name: '更换位置' }).closest('details')?.open).toBe(false);
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
+    expect(screen.getByRole('button', { name: '更换位置' }).hasAttribute('disabled')).toBe(true);
+    expect(test.bridge.configurations.resume).not.toHaveBeenCalled();
+    expect(test.bridge.configurations.inspect).not.toHaveBeenCalled();
+    await test.user.click(screen.getByRole('button', { name: '重新连接' }));
+    expect(test.bridge.configurations.resume).toHaveBeenCalledExactlyOnceWith(record.id);
+  });
+  it('shows actual connection, loading guidance and uncertain errors independently of location availability', async () => {
+    const record = { ...configuration(), connection: { ...initialConnection, canConfigure: false, canRemove: true,
+      status: 'configured-waiting' as const, receiving: 'active' as const, saved: 'ready' as const } };
+    const test = await mount([record]); await page(test.user, '连接');
+    expect(screen.getByRole('heading', { name: '等待 pi' })).toBeTruthy();
+    expect(screen.getByText(/如果它已经在运行，请在空闲时输入 \/reload/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '暂停连接' }).closest('details')?.open).toBe(false);
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
+    await test.user.click(screen.getByRole('button', { name: '暂停连接' }));
+    expect(test.bridge.configurations.disable).toHaveBeenCalledExactlyOnceWith(record.id);
+    act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection, status: 'connected' } }] }));
+    expect(screen.getByRole('heading', { name: '已连接' })).toBeTruthy();
+    act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      status: 'connected', receiving: 'unknown', notice: 'stop-failed' } }] }));
+    expect(screen.queryByRole('heading', { name: '已连接' })).toBeNull();
+    expect(screen.getByRole('heading', { name: '连接需要处理' })).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('未能确认连接是否暂停');
+    expect(screen.getByRole('button', { name: '尝试暂停连接' })).toBeTruthy();
+  });
+  it('keeps a separate write confirmation and blocks same-name files after the copy change', async () => {
+    const preview = { id: 'review-plan', path: '/isolated/project-one/extensions/agent-pet.ts',
+      target: { path: '/isolated/project-one', source: 'chosen' as const }, action: 'create' as const, findings: [], createDirectories: [] };
+    const record = { ...configuration(), connection: { ...initialConnection, preview } };
+    const test = await mount([record]); await page(test.user, '连接');
+    const review = screen.getByRole('region', { name: '连接设置预览' });
+    expect(review.textContent).toContain(preview.path);
+    expect(review.textContent).toContain('不覆盖文件或改动 pi 设置');
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+    await test.user.click(within(review).getByRole('button', { name: '确认并连接' }));
+    expect(test.bridge.configurations.confirm).toHaveBeenCalledExactlyOnceWith(record.id, preview.id);
+    act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      preview: { ...preview, action: 'blocked', findings: ['existing-extension'] } } }] }));
+    expect(screen.getByRole('heading', { name: '已有同名文件' })).toBeTruthy();
+    expect(screen.getByText('原文件会保留，请先确认它的来源。')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '确认并连接' })).toBeNull();
+    await test.user.click(screen.getByRole('button', { name: '返回详情' }));
+    expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith(record.id);
+    expect(test.bridge.configurations.confirm).toHaveBeenCalledTimes(1);
+  });
+  it('gives a real recovery route after receiver start failure and scopes stale-preview wording to this attempt', async () => {
+    const record = { ...configuration(), connection: { ...initialConnection, status: 'failed' as const,
+      canConfigure: false, canResume: false, canRemove: true, receiving: 'stopped' as const, notice: 'start-failed' as const,
+      deployedPath: '/isolated/project-one/extensions/agent-pet.ts' } };
+    const test = await mount([record]); await page(test.user, '连接');
+    expect(screen.getByRole('alert').textContent).toContain('重新打开 Agent Pet 后重试，或移除此连接');
+    expect(screen.queryByRole('button', { name: '重新连接' })).toBeNull();
+    expect(screen.getByRole('button', { name: '移除连接' })).toBeTruthy();
+    act(() => test.pushConfigs({ ...test.configs(), records: [{ ...record, connection: { ...record.connection,
+      status: 'connected', receiving: 'active', saved: 'ready', notice: 'invalid-plan' } }] }));
+    expect(screen.getByRole('heading', { name: '已连接' })).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('本次没有添加新的连接文件');
+  });
+  it('keeps page navigation accessible with native controls and omits duplicate HTML controls', async () => {
+    const test = managementBridge(undefined, false, true);
+    render(<ManagementApp bridge={test.bridge} />);
+    await act(async () => {});
+    expect(screen.queryByRole('group', { name: '窗口操作' })).toBeNull();
     const user = userEvent.setup();
-    const view = render(<ManagementApp bridge={bridge} />);
-    await act(async () => {});
-    expect(view.container.querySelectorAll('.radix-themes')).toHaveLength(1);
-    expect(screen.getByRole('navigation', { name: '管理导航' }).classList.contains('rt-TabNavRoot')).toBe(true);
-    for (const name of ['Agent 连接', '宠物', '设置']) {
-      expect(screen.getByRole('button', { name }).classList.contains('rt-TabNavLink')).toBe(true);
-    }
-    expect(screen.getByRole('button', { name: 'Agent 连接' }).getAttribute('aria-current')).toBe('page');
-    for (const name of ['检测 / 重新扫描', '选择安装包目录', '选择配置目录', '使用默认候选', '检查所选目标（只读）']) {
-      expect(screen.getByRole('button', { name }).classList.contains('rt-Button')).toBe(true);
-    }
-    const connection = screen.getByRole('region', { name: 'pi 只读预检' });
-    expect(connection.classList.contains('rt-Card')).toBe(true);
-    expect(screen.getByRole('radiogroup', { name: '安装身份（不决定配置目录）' }).classList.contains('rt-RadioGroupRoot')).toBe(true);
-    expect(screen.getByRole('radio').classList.contains('rt-BaseRadioRoot')).toBe(true);
-    expect(screen.getByText('P2a · 检测与只读预检').classList.contains('rt-Badge')).toBe(true);
-    const pet = screen.getByRole('slider', { hidden: true });
-    expect(pet.closest('[hidden]')?.hasAttribute('inert')).toBe(true);
-    expect(screen.queryByRole('slider')).toBeNull();
-    screen.getByRole('button', { name: 'Agent 连接' }).focus();
-    await user.keyboard('{ArrowDown}');
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '宠物' })));
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Agent 连接');
-    await user.keyboard(' ');
-    expect(screen.getByRole('slider', { name: '宠物大小' })).toBe(pet);
-    expect(pet.classList.contains('rt-SliderThumb')).toBe(true);
-    expect(screen.getByRole('checkbox', { name: '显示宠物' }).classList.contains('rt-CheckboxRoot')).toBe(true);
-    expect(screen.queryByRole('region', { name: 'pi 只读预检' })).toBeNull();
-    expect(connection.isConnected).toBe(true);
-    expect(connection.closest('[hidden]')?.hasAttribute('inert')).toBe(true);
-    expect(screen.queryByRole('radio')).toBeNull();
-    expect(screen.queryByRole('button', { name: '检测 / 重新扫描' })).toBeNull();
-    // Tab from the last navigation item skips all controls in the hidden connection page.
-    screen.getByRole('button', { name: '设置' }).focus();
-    await user.tab();
-    expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: '显示宠物' }));
-    await user.click(screen.getByRole('button', { name: '设置' }));
-    expect(screen.getByRole('checkbox', { name: '登录时启动 Agent Pet' }).classList.contains('rt-CheckboxRoot')).toBe(true);
-    expect(screen.queryByRole('slider')).toBeNull();
-    expect(pet.isConnected).toBe(true);
-    for (const heading of within(view.container).getAllByRole('heading', { hidden: true })) {
-      expect(heading.classList.contains('rt-Heading')).toBe(true);
-    }
-    for (const paragraph of view.container.querySelectorAll('p')) {
-      expect(paragraph.classList.contains('rt-Text')).toBe(true);
-    }
-    await user.click(screen.getByRole('button', { name: 'Agent 连接' }));
-    expect(screen.getByRole('region', { name: 'pi 只读预检' })).toBe(connection);
-    expect(bridge.piPreflight.getState).toHaveBeenCalledOnce();
-    const css = readFileSync('apps/desktop/src/renderer/management/management.css', 'utf8');
-    expect(css).toContain('.management-shell [hidden] { display: none !important; }');
-    expect(css).not.toMatch(/size-track|size-thumb|size-range|button:|input:/);
-    const entry = readFileSync('apps/desktop/src/renderer/management/main.tsx', 'utf8');
-    expect(entry).toContain("import '@radix-ui/themes/styles.css'");
-    expect(entry).not.toContain('tokens.css');
-    expect(readFileSync('apps/desktop/src/renderer/main.tsx', 'utf8')).not.toContain('@radix-ui/themes');
+    await page(user, '设置');
+    expect(screen.getByRole('navigation', { name: '设置分类' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /Agent Pet/ }));
+    expect(screen.getByRole('tab', { name: '首页' }).getAttribute('aria-selected')).toBe('true');
+    expect(test.bridge.windowAction).not.toHaveBeenCalled();
   });
-  it('uses Themes retry/error feedback without a duplicate retry while the request completes', async () => {
-    const { bridge } = createBridge();
-    bridge.getState.mockRejectedValueOnce(new Error('IPC'));
-    let finish!: (state: ManagementState) => void;
-    bridge.getState.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    const user = userEvent.setup();
-    render(<ManagementApp bridge={bridge} />);
-    await act(async () => {});
-    expect(screen.getByRole('alert').classList.contains('rt-CalloutRoot')).toBe(true);
-    const retry = screen.getByRole('button', { name: '重新读取设置' });
-    expect(retry.classList.contains('rt-Button')).toBe(true);
-    await user.click(retry);
-    // Retrying clears the old error; no duplicate retry is offered during the request.
-    expect(screen.queryByRole('button', { name: '重新读取设置' })).toBeNull();
-    await act(async () => finish(saved(140)));
+  it('places usable window controls in the shared titlebar and reports host failures', async () => {
+    const test = await mount();
+    const controls = screen.getByRole('group', { name: '窗口操作' });
+    await test.user.click(within(controls).getByRole('button', { name: '最小化窗口' }));
+    await test.user.click(within(controls).getByRole('button', { name: '最大化或还原窗口' }));
+    expect(test.bridge.windowAction.mock.calls).toEqual([['minimize'], ['toggle-maximize']]);
+    test.bridge.windowAction.mockRejectedValueOnce(new Error('IPC failed'));
+    await test.user.click(within(controls).getByRole('button', { name: '关闭窗口' }));
+    expect(screen.getByRole('alert').textContent).toContain('窗口操作失败');
+  });
+  it('keeps four page owners and one shared state subscription, with honest empty and real asset collection states', async () => {
+    const test = await mount([]);
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['首页', '宠物', '连接', '设置']);
+    expect(screen.getByRole('tab', { name: '首页' }).getAttribute('aria-selected')).toBe('true');
+    await page(test.user, '连接');
+    expect(screen.getByRole('heading', { name: '从第一个连接开始' })).toBeTruthy();
+    await page(test.user, '宠物');
+    await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    expect(screen.getByRole('dialog', { name: '宠物收藏' })).toBeTruthy();
+    expect(screen.getByText(/宠物包导入尚未支持/)).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '关闭弹窗' }));
+    await page(test.user, '设置');
+    expect(screen.getByRole('heading', { name: '场景渲染' })).toBeTruthy();
+    expect(test.bridge.getState).toHaveBeenCalledOnce();
+    expect(test.bridge.configurations.getState).toHaveBeenCalledOnce();
+    expect(test.bridge.getSessions).toHaveBeenCalledOnce();
+    expect(test.listenerCounts()).toEqual([1, 1, 1]);
+    expect(test.bridge.piPreflight.detect).not.toHaveBeenCalled();
+    expect(test.bridge.updatePreferences).not.toHaveBeenCalled();
+  });
+  it('reports an initial state read failure and recovers through an explicit retry', async () => {
+    const test = managementBridge(); test.bridge.getState.mockRejectedValueOnce(Error('IPC failure'));
+    render(<ManagementApp bridge={test.bridge} />); await flush();
+    expect(screen.getByRole('alert').textContent).toContain('无法读取应用状态');
+    await userEvent.click(screen.getByRole('button', { name: '重新读取' })); await flush();
     expect(screen.queryByRole('alert')).toBeNull();
-    await user.click(screen.getByRole('button', { name: '宠物' }));
-    expectSize(140);
+    expect(test.bridge.getState).toHaveBeenCalledTimes(2);
   });
-  it('opens on honest P2a connection information with no installation actions or second Canvas', async () => {
-    const { bridge } = createBridge();
-    const view = render(<ManagementApp bridge={bridge} />);
-    await act(async () => {});
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Agent 连接');
-    expect(screen.getByText('P2a · 检测与只读预检')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '安装' })).toBeNull();
-    expect(bridge.piPreflight.detect).not.toHaveBeenCalled(); expect(bridge.piPreflight.inspect).not.toHaveBeenCalled();
-    expect(view.container.querySelector('canvas')).toBeNull();
-    expect(bridge.updatePreferences).not.toHaveBeenCalled(); expect(bridge.setLogin).not.toHaveBeenCalled();
+  it('does not replace a newer authoritative push with a late initial reply', async () => {
+    const test = managementBridge(); let finish!: (value: ManagementState) => void;
+    test.bridge.getState.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    render(<ManagementApp bridge={test.bridge} />); await flush();
+    const old = test.state();
+    act(() => test.pushState({ ...old, preferences: { ...old.preferences, petName: '新名称', pauseHidden: false } }));
+    await act(async () => finish(old));
+    const user = userEvent.setup(); await page(user, '宠物');
+    expect(screen.getByRole('heading', { name: '新名称' })).toBeTruthy();
+    await page(user, '设置');
+    expect(screen.getByRole('switch', { name: '隐藏时暂停渲染' }).getAttribute('aria-checked')).toBe('false');
   });
-  it.each(['detect', 'inspect'] as const)('retains pending %s completion across page navigation', async operation => {
-    const { bridge } = createBridge();
-    let finish!: (state: PreflightState) => void;
-    bridge.piPreflight[operation].mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    const user = userEvent.setup();
-    render(<ManagementApp bridge={bridge} />);
-    await act(async () => {});
-    await user.click(screen.getByRole('button', { name: operation === 'detect' ? '检测 / 重新扫描' : '检查所选目标（只读）' }));
-    await user.click(screen.getByRole('button', { name: '宠物' }));
-    expect(screen.queryByRole('region', { name: 'pi 只读预检' })).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Agent 连接' }));
-    expect(screen.getByText('正在处理只读请求…')).toBeTruthy();
-    await act(async () => finish({ ...initialPreflight, revision: 1, scan: 'complete',
-      inspection: { target: initialPreflight.target, findings: ['existing-extension'] } }));
-    expect(screen.getByText('已有 agent-pet.ts；所有权未知，不能覆盖或认定已安装。')).toBeTruthy();
-    expect(screen.queryByText('正在处理只读请求…')).toBeNull();
-    expect(bridge.piPreflight[operation]).toHaveBeenCalledOnce();
-  });
-  it('navigates by keyboard, persists visibility/size from DOM events and receives toolbar/tray changes', async () => {
-    const user = userEvent.setup();
-    const { bridge, off, push } = createBridge();
-    const view = render(<ManagementApp bridge={bridge} />);
-    await act(async () => {});
-    await user.tab(); await user.tab(); await user.keyboard('{Enter}');
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('宠物');
-    await user.click(screen.getByRole('checkbox', { name: '显示宠物' }));
-    expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petVisible: false });
-    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
-    startDrag(240); release();
-    await act(async () => {});
-    expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petSize: 240 });
-    act(() => push({ preferences: { ...defaultPreferences, petSize: 280 }, preferenceError: null, login: { supported: false, enabled: false, error: null } }));
-    expectSize(280);
-    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('true');
-    view.unmount(); expect(off).toHaveBeenCalledOnce();
-  });
-  it('previews real pointer moves without IPC and saves only on release without remount or geometry changes', async () => {
-    const { bridge } = createBridge();
-    let finish!: (value: ManagementState) => void;
-    bridge.updatePreferences.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    const { slider, root } = startDrag(200);
-    const status = document.querySelector('.size-status')!;
-    fireEvent.pointerMove(slider, { pointerId: 1, clientX: 200 });
-    expectSize(280);
-    expect(screen.getByText('已确认尺寸：140 DIP')).toBeTruthy();
-    expect(bridge.updatePreferences).not.toHaveBeenCalled();
-    const children = root.parentElement!.childElementCount;
-    release(slider);
-    expect(bridge.updatePreferences).toHaveBeenCalledExactlyOnceWith({ petSize: 280 });
-    expect(screen.getByRole('slider')).toBe(slider);
-    expect(document.activeElement).toBe(slider);
-    expect(slider.hasAttribute('data-disabled')).toBe(false);
-    expect(document.querySelector('.size-status')!).toBe(status);
-    expect(status.textContent).toBe('正在保存尺寸…');
-    expect(status.classList.contains('rt-Text')).toBe(true);
-    expect(screen.getByRole('checkbox', { name: '显示宠物' }).hasAttribute('disabled')).toBe(true);
-    expect(root.parentElement!.childElementCount).toBe(children);
-    await act(async () => finish(saved(280)));
-    expectSize(280);
-    expect(screen.getByRole('slider')).toBe(slider);
-    expect(document.querySelector('.size-status')!).toBe(status);
-    expect(root.parentElement!.childElementCount).toBe(children);
-    expect(screen.getByText('已确认尺寸：280 DIP')).toBeTruthy();
-    expect(screen.getByRole('checkbox', { name: '显示宠物' }).hasAttribute('disabled')).toBe(false);
-    // jsdom has no layout: assert the explicit CSS geometry contract, not fake pixel rendering.
-    const css = readFileSync('apps/desktop/src/renderer/management/management.css', 'utf8');
-    expect(css).toMatch(/\.size-status \{ height: 48px; overflow: auto; display: block;/);
-    expect(css).toMatch(/\.size-slider \{[^}]*width: 100%; height: 32px;/);
-  });
-  it.each(['success', 'failure', 'rejection'] as const)('keeps a newer unreleased draft when an older save ends in %s', async outcome => {
-    const { bridge } = createBridge();
-    let finish!: (value: ManagementState) => void;
-    let reject!: (error: Error) => void;
-    bridge.updatePreferences.mockImplementationOnce(() => new Promise((resolve, fail) => { finish = resolve; reject = fail; }));
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    const { slider } = startDrag(200); release(slider);
-    startDrag(300);
-    await act(async () => { if (outcome === 'rejection') reject(new Error('IPC')); else finish(saved(outcome === 'success' ? 200 : 140, outcome === 'failure' ? '保存失败' : null)); });
-    expectSize(300);
-    expect(screen.getByRole('slider')).toBe(slider);
-    expect(slider.hasAttribute('data-disabled')).toBe(false);
-    expect(bridge.updatePreferences).toHaveBeenCalledTimes(1);
-    release(slider);
-    await act(async () => {});
-    expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petSize: 300 });
-    expectSize(300);
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-  it('serializes only committed adjustments and keeps the latest release while IPC is pending', async () => {
-    const { bridge } = createBridge();
-    const pending: ((value: ManagementState) => void)[] = [];
-    bridge.updatePreferences.mockImplementation(() => new Promise(resolve => pending.push(resolve)));
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    startDrag(200); release();
-    startDrag(240); release();
-    startDrag(280); release();
-    expectSize(280);
-    expect(bridge.updatePreferences).toHaveBeenCalledTimes(1);
-    await act(async () => pending.shift()!(saved(200)));
-    expectSize(280);
-    expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petSize: 280 });
-    await act(async () => pending.shift()!(saved(280)));
-    expectSize(280);
-    expect(bridge.updatePreferences).toHaveBeenCalledTimes(2);
-  });
-  it.each(['failure', 'rejection'] as const)('rolls back %s, discards queued commits and permits retry', async outcome => {
-    const { bridge } = createBridge();
-    let finish!: (value: ManagementState) => void;
-    let reject!: (error: Error) => void;
-    bridge.updatePreferences.mockImplementationOnce(() => new Promise((resolve, fail) => { finish = resolve; reject = fail; }));
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    const { slider, root } = startDrag(200); release();
-    const status = root.parentElement!.querySelector('.size-status');
-    const children = root.parentElement!.childElementCount;
-    startDrag(300); release();
-    await act(async () => { if (outcome === 'failure') finish(saved(140, '保存失败')); else reject(new Error('IPC')); });
-    expectSize(140);
-    expect(bridge.updatePreferences).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('alert').textContent).toMatch(/失败/);
-    expect(screen.getByRole('alert')).toBe(status);
-    expect(root.parentElement!.childElementCount).toBe(children);
-    expect(screen.getByRole('slider')).toBe(slider);
-    startDrag(220); release();
-    await act(async () => {});
-    expectSize(220);
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-  it('clears a persistence failure after an authoritative external recovery', async () => {
-    const { bridge, push } = createBridge();
-    bridge.updatePreferences.mockResolvedValueOnce(saved(140, '保存失败'));
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.click(screen.getByRole('button', { name: '宠物' }));
-    startDrag(200); release();
-    await act(async () => {});
-    expect(screen.getByRole('alert').textContent).toBe('保存失败');
-    act(() => push(saved(260)));
-    expect(screen.queryByRole('alert')).toBeNull();
-    expectSize(260);
-  });
-  it.each([1, 2])('ignores non-primary pointer button %s on the track', async button => {
-    const { bridge } = createBridge();
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.click(screen.getByRole('button', { name: '宠物' }));
-    const { root } = geometry();
-    fireEvent.pointerDown(root, { pointerId: 1, button, clientX: 200 });
-    fireEvent.pointerUp(root, { pointerId: 1, button, clientX: 200 });
-    await act(async () => {});
-    expectSize(140);
-    expect(bridge.updatePreferences).not.toHaveBeenCalled();
-  });
-  it('stops failed queued commits when Main publishes the failure before its IPC reply', async () => {
-    const { bridge, push } = createBridge();
-    let finish!: (value: ManagementState) => void;
-    bridge.updatePreferences.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    startDrag(200); release(); startDrag(300); release();
-    act(() => push(saved(140, '保存失败')));
-    await act(async () => finish(saved(140, '保存失败')));
-    expectSize(140);
-    expect(bridge.updatePreferences).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('alert').textContent).toBe('保存失败');
-    startDrag(220); release();
-    await act(async () => {});
-    expectSize(220);
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-  it('preserves draft during a toolbar push and does not overwrite that push with an older reply', async () => {
-    const { bridge, push } = createBridge();
-    let finish!: (value: ManagementState) => void;
-    bridge.updatePreferences.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    startDrag(200); release();
-    const { slider } = startDrag(300);
-    act(() => push(saved(260)));
-    expectSize(300);
-    expect(screen.getByText('已确认尺寸：260 DIP')).toBeTruthy();
-    await act(async () => finish(saved(200)));
-    expectSize(300);
-    fireEvent.pointerCancel(slider, { pointerId: 1 });
-    expectSize(260);
-    expect(bridge.updatePreferences).toHaveBeenCalledTimes(1);
-  });
-  it.each(['pointerCancel', 'lostPointerCapture'] as const)('aborts %s without saving and resets cached geometry only after cancellation', async event => {
-    const { bridge } = createBridge();
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    vi.spyOn(document, 'hasFocus').mockReturnValue(true);
-    const { slider } = startDrag(300);
-    await act(async () => { fireEvent[event](slider, { pointerId: 1 }); });
-    expectSize(140);
-    expect(bridge.updatePreferences).not.toHaveBeenCalled();
-    const next = screen.getByRole('slider', { name: '宠物大小' });
-    expect(next.getAttribute('aria-describedby')).toBe('pet-size-help');
-    expect(next.getAttribute('aria-valuetext')).toBe('预览 140 DIP');
-    expect(next).not.toBe(slider);
-    expect(document.activeElement).toBe(next);
-    const { root } = geometry(next);
-    vi.mocked(root.getBoundingClientRect).mockReturnValue({ left: 100, width: 260 } as DOMRect);
-    fireEvent.pointerDown(next, { pointerId: 2 });
-    fireEvent.pointerMove(next, { pointerId: 2, clientX: 230 });
-    expectSize(340);
-    fireEvent.pointerUp(next, { pointerId: 2 });
-    await act(async () => {});
-    expect(bridge.updatePreferences).toHaveBeenCalledExactlyOnceWith({ petSize: 340 });
-  });
-  it.each(['pointerCancel', 'lostPointerCapture'] as const)('cancels a newer draft via %s without losing an older pending commit', async event => {
-    const { bridge } = createBridge();
-    let finish!: (value: ManagementState) => void;
-    bridge.updatePreferences.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    const { slider } = startDrag(200); release(); startDrag(300);
-    fireEvent[event](slider, { pointerId: 1 });
-    expectSize(200);
-    await act(async () => finish(saved(200)));
-    expectSize(200);
-    expect(bridge.updatePreferences).toHaveBeenCalledExactlyOnceWith({ petSize: 200 });
-  });
-  it('keeps keyboard commits responsive and ordered while persistence is deferred', async () => {
-    const { bridge } = createBridge();
-    const pending: ((value: ManagementState) => void)[] = [];
-    bridge.updatePreferences.mockImplementation(() => new Promise(resolve => pending.push(resolve)));
-    const user = userEvent.setup(); render(<ManagementApp bridge={bridge} />);
-    await user.click(screen.getByRole('button', { name: '宠物' }));
-    const slider = screen.getByRole('slider');
-    slider.focus();
-    await user.keyboard('{ArrowRight}{ArrowRight}');
-    expectSize(142);
-    expect(bridge.updatePreferences).toHaveBeenCalledExactlyOnceWith({ petSize: 141 });
-    await act(async () => pending.shift()!(saved(141)));
-    expectSize(142);
-    expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petSize: 142 });
-    await act(async () => pending.shift()!(saved(142)));
-    expectSize(142);
-    expect(document.activeElement).toBe(slider);
-  });
-  it('does not steal focus on cancellation after app blur', async () => {
-    const { bridge } = createBridge();
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    vi.spyOn(document, 'hasFocus').mockReturnValue(false);
-    const { slider } = startDrag(300);
-    fireEvent.pointerCancel(slider, { pointerId: 1 });
-    expect(document.activeElement).not.toBe(screen.getByRole('slider'));
-    expect(bridge.updatePreferences).not.toHaveBeenCalled();
-  });
-  it('uses real Radix track click, unchanged release and keyboard commit ordering/bounds', async () => {
-    const { bridge } = createBridge();
-    const user = userEvent.setup();
-    render(<ManagementApp bridge={bridge} />);
-    await user.click(screen.getByRole('button', { name: '宠物' }));
-    const { root, slider } = geometry();
-    fireEvent.pointerDown(slider, { pointerId: 1 }); release(slider);
-    expect(bridge.updatePreferences).not.toHaveBeenCalled();
-    fireEvent.pointerDown(root, { pointerId: 1, clientX: 160 });
-    expectSize(240);
-    expect(bridge.updatePreferences).not.toHaveBeenCalled();
-    release(root);
-    await act(async () => {});
-    expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petSize: 240 });
-    expect(document.activeElement).toBe(slider);
-    for (const [key, value] of [['ArrowRight', 241], ['PageUp', 251], ['Home', 80], ['End', 600], ['ArrowLeft', 599]] as const) {
-      await user.keyboard(`{${key}}`);
-      expectSize(value);
-      expect(bridge.updatePreferences).toHaveBeenLastCalledWith({ petSize: value });
-    }
-    expect(slider.getAttribute('aria-valuemin')).toBe('80');
-    expect(slider.getAttribute('aria-valuemax')).toBe('600');
-    expect(screen.getByRole('slider', { name: '宠物大小' })).toBe(slider);
-    expect(slider.getAttribute('aria-describedby')).toBe('pet-size-help');
-    expect(slider.getAttribute('aria-valuetext')).toBe('预览 599 DIP');
-  });
-  it('retains committed saves across navigation but cancels an unreleased draft without stealing focus', async () => {
-    const { bridge } = createBridge();
-    let finish!: (value: ManagementState) => void;
-    bridge.updatePreferences.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    const user = userEvent.setup(); render(<ManagementApp bridge={bridge} />);
-    await user.click(screen.getByRole('button', { name: '宠物' }));
-    startDrag(200); release(); startDrag(300);
-    const settings = screen.getByRole('button', { name: '设置' });
-    await user.click(settings);
-    expect(document.activeElement).toBe(settings);
-    await act(async () => finish(saved(200)));
-    await user.click(screen.getByRole('button', { name: '宠物' }));
-    expectSize(200);
-    expect(bridge.updatePreferences).toHaveBeenCalledTimes(1);
-  });
-  it('drops queued commits and subscription after unmount', async () => {
-    const { bridge, off } = createBridge();
-    let finish!: (value: ManagementState) => void;
-    bridge.updatePreferences.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    const view = render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '宠物' }));
-    startDrag(200); release(); startDrag(300); release();
-    view.unmount();
-    await act(async () => finish(saved(200)));
-    expect(bridge.updatePreferences).toHaveBeenCalledTimes(1);
-    expect(off).toHaveBeenCalledOnce();
-  });
-  it('does not enable login in dev and does not invoke OS state changes on render', async () => {
-    const { bridge } = createBridge();
-    render(<ManagementApp bridge={bridge} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: '设置' }));
-    expect(screen.getByRole('checkbox', { name: '登录时启动 Agent Pet' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByText(/开发模式不会将 Electron/)).toBeTruthy();
-    expect(bridge.setLogin).not.toHaveBeenCalled();
-  });
-  it('lets supported users opt in explicitly and shows truthful returned OS failure', async () => {
-    const { bridge } = createBridge(true);
-    bridge.setLogin.mockResolvedValueOnce({ preferences: defaultPreferences, preferenceError: null, login: { supported: true, enabled: false, error: '系统未应用登录项更改' } });
-    const user = userEvent.setup(); render(<ManagementApp bridge={bridge} />);
-    await user.click(screen.getByRole('button', { name: '设置' }));
-    await user.click(screen.getByRole('checkbox', { name: '登录时启动 Agent Pet' }));
-    expect(bridge.setLogin).toHaveBeenCalledExactlyOnceWith(true);
-    expect(screen.getByRole('alert').textContent).toBe('系统未应用登录项更改');
-    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
-  });
-  it('reports persistence errors, keeps confirmed values and handles rejected IPC without optimistic success', async () => {
-    const { bridge } = createBridge();
-    bridge.updatePreferences.mockResolvedValueOnce({ preferences: defaultPreferences, preferenceError: '偏好保存失败，未应用更改', login: { supported: false, enabled: false, error: null } });
-    const user = userEvent.setup(); render(<ManagementApp bridge={bridge} />);
-    await user.click(screen.getByRole('button', { name: '宠物' }));
-    await user.click(screen.getByRole('checkbox'));
+  it('retains confirmed settings after persistence failure and recovers from an external push', async () => {
+    const test = await mount(); await page(test.user, '设置');
+    test.bridge.updatePreferences.mockResolvedValueOnce({ ...test.state(), preferenceError: '偏好保存失败，未应用更改' });
+    await test.user.click(screen.getByRole('switch', { name: '隐藏时暂停渲染' }));
     expect(screen.getByRole('alert').textContent).toContain('未应用更改');
-    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('true');
-    bridge.updatePreferences.mockRejectedValueOnce(new Error('IPC unavailable'));
-    await user.click(screen.getByRole('checkbox'));
-    expect(screen.getByText('操作失败，未确认更改。请重试。')).toBeTruthy();
-    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: '隐藏时暂停渲染' }).getAttribute('aria-checked')).toBe('true');
+    act(() => test.pushState({ ...test.state(), preferenceError: null, preferences: { ...test.state().preferences, pauseHidden: false } }));
+    await page(test.user, '首页'); await page(test.user, '设置');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('switch', { name: '隐藏时暂停渲染' }).getAttribute('aria-checked')).toBe('false');
+  });
+  it('continues a committed setting save across navigation and prevents a second simultaneous action', async () => {
+    const test = await mount(); await page(test.user, '设置');
+    let finish!: (state: ManagementState) => void;
+    test.bridge.updatePreferences.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await test.user.click(screen.getByRole('switch', { name: '隐藏时暂停渲染' }));
+    expect(screen.getByRole('switch', { name: '隐藏时暂停渲染' }).hasAttribute('disabled')).toBe(true);
+    await page(test.user, '宠物'); await page(test.user, '连接');
+    const next = { ...test.state(), preferences: { ...test.state().preferences, pauseHidden: false } };
+    await act(async () => { test.pushState(next); finish(next); });
+    await page(test.user, '设置');
+    expect(screen.getByRole('switch', { name: '隐藏时暂停渲染' }).getAttribute('aria-checked')).toBe('false');
+    expect(test.bridge.updatePreferences).toHaveBeenCalledExactlyOnceWith({ pauseHidden: false });
+  });
+  it('resets preferences while retaining configuration identities, bindings and pet name', async () => {
+    const test = await mount(); await page(test.user, '设置');
+    const original = test.configs();
+    await test.user.click(screen.getByRole('button', { name: '恢复默认' }));
+    await test.user.click(screen.getByRole('button', { name: '确认恢复' })); await flush();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(test.bridge.updatePreferences.mock.calls[0]?.[0]).not.toHaveProperty('petName');
+    expect(test.bridge.updatePreferences.mock.calls[0]?.[0]).not.toHaveProperty('schemaVersion');
+    expect(test.configs()).toBe(original);
+    expect(test.state().preferences.petName).toBe('团子');
+    expect(test.bridge.configurations.remove).not.toHaveBeenCalled();
+  });
+  it('keeps failed reset reviewable in its dialog and allows cancel with no configuration changes', async () => {
+    const test = await mount(); await page(test.user, '设置');
+    test.bridge.updatePreferences.mockRejectedValueOnce(Error('disk full'));
+    await test.user.click(screen.getByRole('button', { name: '恢复默认' }));
+    const dialog = screen.getByRole('dialog');
+    await test.user.click(within(dialog).getByRole('button', { name: '确认恢复' }));
+    expect(within(dialog).getByRole('alert').textContent).toContain('恢复默认失败');
+    await test.user.click(within(dialog).getByRole('button', { name: '取消' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(test.bridge.configurations.remove).not.toHaveBeenCalled();
+  });
+  it('uses explicit login opt-in and reports returned OS failure without optimistic success', async () => {
+    const test = await mount(undefined, true); await page(test.user, '设置'); await category(test.user, '软件');
+    test.bridge.setLogin.mockResolvedValueOnce({ ...test.state(), login: { supported: true, enabled: false, error: '系统未应用登录项更改' } });
+    await test.user.click(screen.getByRole('switch', { name: '登录时启动' }));
+    expect(test.bridge.setLogin).toHaveBeenCalledExactlyOnceWith(true);
+    expect(screen.getByRole('alert').textContent).toContain('系统未应用');
+    expect(screen.getByRole('switch', { name: '登录时启动' }).getAttribute('aria-checked')).toBe('false');
+  });
+  it('renames the selected independent configuration with Enter, validates blank names and cancels with Escape', async () => {
+    const test = await mount([configuration('one'), configuration('two')]); await page(test.user, '连接');
+    await test.user.click(screen.getByRole('button', { name: /配置 two pi/ }));
+    await test.user.click(screen.getByRole('button', { name: '重命名' }));
+    const input = screen.getByRole('textbox', { name: '配置名称' });
+    expect(input.getAttribute('maxlength')).toBe('40');
+    await test.user.clear(input); await test.user.type(input, '   ');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByRole('button', { name: '保存' }).hasAttribute('disabled')).toBe(true);
+    await test.user.keyboard('{Escape}');
+    expect(test.bridge.configurations.rename).not.toHaveBeenCalled();
+    await test.user.click(screen.getByRole('button', { name: '重命名' }));
+    await test.user.clear(screen.getByRole('textbox', { name: '配置名称' }));
+    await test.user.type(screen.getByRole('textbox', { name: '配置名称' }), '项目二{Enter}');
+    expect(test.bridge.configurations.rename).toHaveBeenCalledExactlyOnceWith('two', '项目二');
+    expect(screen.getByRole('heading', { name: '项目二' })).toBeTruthy();
+    expect(test.configs().records[0]?.name).toBe('配置 one');
+  });
+  it('blocks a duplicate manual configuration and returns to the same path selection for recovery', async () => {
+    const test = await mount(); await page(test.user, '连接');
+    test.bridge.locations.choose.mockResolvedValueOnce('/isolated/project-one');
+    await test.user.click(screen.getByRole('button', { name: '手动添加' }));
+    const dialog = screen.getByRole('dialog', { name: '手动添加' });
+    await test.user.click(within(dialog).getByRole('button', { name: '选择位置' }));
+    await test.user.click(within(dialog).getByRole('button', { name: '验证配置' }));
+    await test.user.selectOptions(within(dialog).getByRole('combobox', { name: 'Agent 类型' }), 'pi');
+    expect(within(dialog).getByRole('alert').textContent).toContain('已添加');
+    expect(within(dialog).getByRole('button', { name: '下一步' }).hasAttribute('disabled')).toBe(true);
+    await test.user.click(within(dialog).getByRole('button', { name: '上一步' }));
+    expect((within(dialog).getByRole('textbox', { name: '配置文件夹' }) as HTMLInputElement).value).toBe('/isolated/project-one');
+    expect(test.bridge.configurations.create).not.toHaveBeenCalled();
+  });
+  it('saves an explicitly selected unsupported type as metadata and never presents it as online', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    await test.user.click(screen.getByRole('button', { name: '手动添加' }));
+    let dialog = screen.getByRole('dialog', { name: '手动添加' });
+    await test.user.click(within(dialog).getByRole('button', { name: '选择位置' }));
+    await test.user.click(within(dialog).getByRole('button', { name: '验证配置' }));
+    await test.user.selectOptions(within(dialog).getByRole('combobox', { name: 'Agent 类型' }), 'codex');
+    expect(within(dialog).getByRole('status').textContent).toContain('暂时还不能连接');
+    await test.user.click(within(dialog).getByRole('button', { name: '下一步' }));
+    await test.user.clear(within(dialog).getByRole('textbox', { name: '配置名称' }));
+    await test.user.type(within(dialog).getByRole('textbox', { name: '配置名称' }), '工作 Codex');
+    await test.user.click(within(dialog).getByRole('button', { name: '添加配置' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(test.bridge.configurations.create).toHaveBeenCalledExactlyOnceWith({ name: '工作 Codex', provider: 'codex', targetPath: '/isolated/new-project' });
+    expect(screen.getByRole('heading', { name: '暂不支持连接' })).toBeTruthy();
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+  });
+  it('discards a manual verification response after cancellation and opens a clean wizard on retry', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    await test.user.click(screen.getByRole('button', { name: '手动添加' }));
+    const dialog = screen.getByRole('dialog', { name: '手动添加' });
+    await test.user.click(within(dialog).getByRole('button', { name: '选择位置' }));
+    await test.user.click(within(dialog).getByRole('button', { name: '验证配置' }));
+    await test.user.selectOptions(within(dialog).getByRole('combobox', { name: 'Agent 类型' }), 'pi');
+    let finish!: (value: { target: typeof initialPreflight.target; findings: [] }) => void;
+    test.bridge.locations.inspect.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await test.user.click(within(dialog).getByRole('button', { name: '重新检查' }));
+    expect(within(dialog).getByRole('status').textContent).toContain('正在识别并验证');
+    await test.user.click(within(dialog).getByRole('button', { name: '关闭手动配置' }));
+    await act(async () => finish({ target: initialPreflight.target, findings: [] }));
+    expect(test.bridge.configurations.create).not.toHaveBeenCalled();
+    await test.user.click(screen.getByRole('button', { name: '手动添加' }));
+    expect(screen.getByRole('heading', { name: '选择你的配置位置' })).toBeTruthy();
+    expect((screen.getByRole('textbox', { name: '配置文件夹' }) as HTMLInputElement).value).toBe('');
+  });
+  it('reports limited discovery without implying the entire machine has been scanned', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'limited', installations: [] });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    expect(screen.getByText('扫描范围受限，结果可能不完整。可以重新扫描或手动选择配置位置。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '重新扫描' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '手动添加' })).toBeTruthy();
+  });
+  it('groups pi installations sharing a default and prepares configuration without the manual wizard', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    const installs = ['node22', 'node24'].map(id => ({ id, path: `/synthetic/${id}/bin/pi`, version: '0.85.1', compatibility: 'verified-0.85.1' as const }));
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: installs });
+    const record = { ...configuration('default', initialPreflight.automaticTarget!.path), name: 'pi 默认配置', connection: { ...initialConnection,
+      preview: { id: 'automatic-preview', path: `${initialPreflight.automaticTarget!.path}/extensions/agent-pet.ts`, target: { ...initialPreflight.automaticTarget!, source: 'chosen' as const }, action: 'create' as const, findings: [], createDirectories: [] } } };
+    test.bridge.configurations.prepareDetected.mockImplementationOnce(async () => {
+      const next = { ...test.configs(), records: [record] }; test.pushConfigs(next); return { state: next, configurationId: record.id };
+    });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    expect(screen.getAllByRole('button', { name: '一键配置' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /选择配置位置/ })).toBeNull();
+    expect(screen.getByText('2 处安装 · 共用此配置')).toBeTruthy();
+    expect(screen.getByText('已找到本机 pi，可使用默认配置接入。')).toBeTruthy();
+    const disclosure = screen.getByText('程序安装详情').closest('summary')!;
+    expect(disclosure.parentElement?.hasAttribute('open')).toBe(false);
+    await test.user.click(disclosure);
+    expect(disclosure.parentElement?.hasAttribute('open')).toBe(true);
+    expect(screen.getByRole('list', { name: '检测到的程序安装' }).textContent).toContain('/synthetic/node24/bin/pi');
+    await test.user.click(disclosure);
+    expect(disclosure.parentElement?.hasAttribute('open')).toBe(false);
+    expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
+    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: '连接 pi' }).textContent).toContain(initialPreflight.automaticTarget!.path);
+    await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
+    expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledExactlyOnceWith('node22', expect.any(String));
+    expect(test.bridge.locations.choose).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('region', { name: '连接设置预览' })).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: '确认连接设置' })));
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+    let finishCancel!: () => void;
+    test.bridge.configurations.cancel.mockImplementationOnce(async () => {
+      test.pushConfigs({ ...test.configs(), revision: test.configs().revision + 1, records: test.configs().records.map(value => ({ ...value,
+        connection: value.connection ? { ...value.connection, preview: null } : null })) });
+      await new Promise<void>(resolve => { finishCancel = resolve; });
+      return test.configs();
+    });
+    await test.user.click(screen.getByRole('button', { name: '取消' }));
+    expect(test.bridge.configurations.cancel).toHaveBeenCalledExactlyOnceWith('default');
+    // Main can push cleared preview before the invoke reply; wait through a frame
+    // with the return button disabled, then release the reply.
+    await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); });
+    expect(screen.getByRole('button', { name: '设置连接' }).hasAttribute('disabled')).toBe(true);
+    await act(async () => finishCancel());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '设置连接' })));
+  });
+  it('cancels consent without calling Main, recovers errors and opens existing configuration without duplicates', async () => {
+    const existing = configuration('saved', initialPreflight.automaticTarget!.path);
+    const test = await mount([]); await page(test.user, '连接');
+    const installation = { id: 'auto-pi', path: '/synthetic/bin/pi', compatibility: 'verified-0.85.1' as const, version: '0.85.1' };
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: [installation] });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    await test.user.click(screen.getByRole('button', { name: '取消' }));
+    expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '一键配置' }).hasAttribute('disabled')).toBe(false);
+    test.bridge.configurations.prepareDetected.mockRejectedValueOnce(new Error('fixture denied'));
+    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
+    expect(screen.getAllByRole('alert').some(value => value.textContent?.includes('检查未完成'))).toBe(true);
+    await test.user.click(screen.getByRole('button', { name: '取消' }));
+    act(() => test.pushConfigs({ ...test.configs(), records: [existing] }));
+    expect(screen.getByText('已找到本机 pi，默认配置已添加。')).toBeTruthy();
+    expect(screen.queryByText(/一键配置会先检查/)).toBeNull();
+    await test.user.click(screen.getByRole('button', { name: '查看配置' }));
+    expect(screen.getByRole('heading', { name: existing.name })).toBeTruthy();
+    expect(test.bridge.configurations.prepareDetected).toHaveBeenCalledTimes(1);
+    expect(test.bridge.configurations.create).not.toHaveBeenCalled();
+  });
+  it('immediately releases buttons on cancel even if IPC never settles and ignores its late preview', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: [
+      { id: 'auto-pi', path: '/synthetic/bin/pi', compatibility: 'verified-0.85.1', version: '0.85.1' },
+    ] });
+    let finish!: (result: { state: ReturnType<typeof test.configs>; configurationId: string }) => void;
+    test.bridge.configurations.prepareDetected.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    const opener = screen.getByRole('button', { name: '一键配置' });
+    await test.user.click(opener);
+    await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
+    expect(opener.hasAttribute('disabled')).toBe(true);
+    const requestId = test.bridge.configurations.prepareDetected.mock.calls[0]![1];
+    await test.user.click(screen.getByRole('button', { name: '取消检查' }));
+    await waitFor(() => expect(opener.hasAttribute('disabled')).toBe(false));
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    expect(test.bridge.configurations.cancelDetected).toHaveBeenCalledExactlyOnceWith(requestId);
+    await test.user.click(screen.getByRole('button', { name: '我的连接' }));
+    await act(async () => finish({ state: test.configs(), configurationId: 'late-preview' }));
+    expect(screen.getByRole('heading', { name: '我的连接 00' })).toBeTruthy();
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+  });
+  it('keeps unsupported installation results honest and preserves the manual fallback', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'complete', installations: [
+      { id: 'unsupported', path: '/synthetic/bin/pi', compatibility: 'unverified', version: '0.85.2' },
+    ] });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    expect(screen.queryByRole('button', { name: '一键配置' })).toBeNull();
+    expect(screen.getByText('此版本暂不支持一键配置，兼容性尚未验证。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '手动添加' })).toBeTruthy();
+    expect(test.bridge.configurations.prepareDetected).not.toHaveBeenCalled();
+  });
+  it('keeps pending discovery alive across page navigation and discards an explicitly canceled scan reply', async () => {
+    const test = await mount(); await page(test.user, '连接');
+    let finish!: (state: PreflightState) => void;
+    test.bridge.piPreflight.detect.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    await page(test.user, '宠物'); await page(test.user, '连接');
+    expect(screen.getByText('正在查找安装')).toBeTruthy();
+    await act(async () => finish({ ...initialPreflight, scan: 'complete', installations: [] }));
+    expect(screen.getByRole('heading', { name: '未找到安装' })).toBeTruthy();
+    test.bridge.piPreflight.detect.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await test.user.click(screen.getByRole('button', { name: '重新扫描' }));
+    await test.user.click(screen.getByRole('button', { name: '取消扫描' }));
+    await act(async () => finish({ ...initialPreflight, scan: 'complete', installations: [] }));
+    expect(screen.getByRole('heading', { name: /我的连接/ })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: '未找到安装' })).toBeNull();
+  });
+  it('dismisses removal without a write, restores focus and only removes the explicitly confirmed configuration', async () => {
+    const test = await mount([configuration('one'), configuration('two')]); await page(test.user, '连接');
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
+    const opener = screen.getByRole('button', { name: '移除连接' });
+    for (const dismissal of ['cancel', 'escape', 'backdrop']) {
+      await test.user.click(opener);
+      const dialog = screen.getByRole('dialog', { name: '移除此连接？' });
+      expect(within(dialog).getByText('不会删除 Agent 程序或你的文件。')).toBeTruthy();
+      expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: '取消' }));
+      expect(test.bridge.configurations.remove).not.toHaveBeenCalled();
+      if (dismissal === 'cancel') await test.user.click(within(dialog).getByRole('button', { name: '取消' }));
+      else if (dismissal === 'escape') fireEvent(dialog, new Event('cancel', { cancelable: true }));
+      else await test.user.click(dialog);
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(document.activeElement).toBe(opener);
+      expect(test.configs().records.map(record => record.id)).toEqual(['one', 'two']);
+    }
+    await test.user.click(opener);
+    await test.user.click(screen.getByRole('button', { name: '确认移除' }));
+    expect(test.bridge.configurations.remove).toHaveBeenCalledExactlyOnceWith('one');
+    expect(test.configs().records.map(record => record.id)).toEqual(['two']);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(test.bridge.piConnection.remove).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: /我的连接/ })));
+  });
+  it('keeps pending removal modal and preserves a failed result for retry or cancellation', async () => {
+    const record = { ...configuration(), connection: { ...initialConnection, canRemove: true, deployedPath: '/isolated/project-one/extensions/agent-pet.ts' } };
+    const test = await mount([record]); await page(test.user, '连接');
+    await test.user.click(screen.getByText('更多操作', { exact: true }));
+    await test.user.click(screen.getByRole('button', { name: '移除连接' }));
+    const dialog = screen.getByRole('dialog', { name: '移除此连接？' });
+    await test.user.click(within(dialog).getByText('会移除什么？'));
+    expect(dialog.textContent).toContain(record.connection.deployedPath);
+    expect(dialog.textContent).toContain('被修改过或不能确认来源的文件会保留');
+    let finish!: () => void;
+    test.bridge.configurations.remove.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => { finish = resolve; });
+      return { ...test.configs(), notice: 'retained' as const };
+    });
+    await test.user.click(within(dialog).getByRole('button', { name: '确认移除' }));
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    expect(screen.getByRole('dialog', { name: '移除此连接？' })).toBe(dialog);
+    expect(within(dialog).getByRole('button', { name: '取消' }).hasAttribute('disabled')).toBe(true);
+    await act(async () => finish());
+    expect(within(dialog).getByRole('alert').textContent).toContain('连接还没有移除');
+    expect(test.configs().records).toEqual([record]);
+    expect(within(dialog).getByRole('button', { name: '确认移除' }).hasAttribute('disabled')).toBe(false);
+    await test.user.click(within(dialog).getByRole('button', { name: '取消' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(test.bridge.configurations.remove).toHaveBeenCalledExactlyOnceWith(record.id);
+  });
+  it('closes manual configuration on navigation and releases all subscriptions without accepting late callbacks', async () => {
+    const test = await mount(); await page(test.user, '连接');
+    await test.user.click(screen.getByRole('button', { name: '手动添加' }));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    // This direct event models Main/page lifecycle; browser-native modality blocks pointer navigation while open.
+    fireEvent.click(screen.getByRole('tab', { name: '设置' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    test.unmount();
+    expect(test.listenerCounts()).toEqual([0, 0, 0]);
+    expect(test.offState).toHaveBeenCalledOnce(); expect(test.offConfigs).toHaveBeenCalledOnce(); expect(test.offSessions).toHaveBeenCalledOnce();
+    act(() => test.pushState(test.state()));
   });
 });

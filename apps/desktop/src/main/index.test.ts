@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, realpathSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { defaultPreferences } from '../shared/preferences.js';
 import type { SessionObservation } from '@agent-pet/domain';
 import type { OverlayLayout, Rect } from '../shared/overlay-layout.js';
 import { piObservation } from '../renderer/test-support/pi-fixtures.js';
@@ -12,14 +13,16 @@ const native = vi.hoisted(() => {
   const webContents = { mainFrame: frame, send: vi.fn(), setWindowOpenHandler: vi.fn(), on: vi.fn() };
   const window = {
     webContents, setBounds: vi.fn(), isDestroyed: () => false,
-    setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
+    isVisible: vi.fn(() => true), moveTop: vi.fn(), showInactive: vi.fn(), setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
     loadFile: vi.fn(), loadURL: vi.fn(), once: vi.fn(), show: vi.fn(), hide: vi.fn(),
+    minimize: vi.fn(), maximize: vi.fn(), unmaximize: vi.fn(), isMaximized: vi.fn(() => false), close: vi.fn(),
     setIgnoreMouseEvents: vi.fn(), on: vi.fn(), focus: vi.fn(), isMinimized: () => false, restore: vi.fn(),
   };
   return {
     handlers: new Map<string, (event: unknown, value?: unknown) => unknown>(),
     appEvents: new Map<string, (event?: { preventDefault(): void }) => void>(),
     path: '', lock: true, envConfigured: true, quit: vi.fn(), stop: vi.fn(), start: vi.fn(), loginSet: vi.fn(), loginGet: vi.fn(() => ({ openAtLogin: false })),
+    dockShow: vi.fn(async () => {}), dockHide: vi.fn(),
     pick: vi.fn(async () => ({ canceled: true, filePaths: [] as string[] })),
     management: undefined as typeof window | undefined,
     tray: { setContextMenu: vi.fn(), setToolTip: vi.fn(), on: vi.fn(), destroy: vi.fn() },
@@ -30,6 +33,7 @@ const native = vi.hoisted(() => {
 });
 vi.mock('electron', () => ({
   app: {
+    dock: { show: native.dockShow, hide: native.dockHide },
     requestSingleInstanceLock: () => native.lock, getPath: () => native.path,
     getLoginItemSettings: native.loginGet, setLoginItemSettings: native.loginSet,
     whenReady: () => Promise.resolve(), get isPackaged() { return native.isPackaged; },
@@ -47,7 +51,10 @@ vi.mock('electron', () => ({
       } : native.window;
       target.loadFile.mockImplementation((file: string) => { target.webContents.mainFrame.url = pathToFileURL(file).href; });
       target.loadURL.mockImplementation((url: string) => { target.webContents.mainFrame.url = url; });
-      if (management) native.management = target;
+      if (management) {
+        target.close = vi.fn(() => target.on.mock.calls.find(([event]) => event === 'close')?.[1]({ preventDefault: vi.fn() }));
+        native.management = target;
+      }
       return target;
     }
     static getAllWindows() { return [native.window]; }
@@ -250,18 +257,37 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     expect(native.window.setBounds).toHaveBeenLastCalledWith(latestLayout().bounds);
   });
 
+  it('reapplies the current topmost choice on show and restore without focusing the pet', () => {
+    const show = native.window.on.mock.calls.find(([name]) => name === 'show')![1];
+    const restore = native.window.on.mock.calls.find(([name]) => name === 'restore')![1];
+    native.window.focus.mockClear(); native.window.moveTop.mockClear();
+    show(); restore();
+    expect(native.window.moveTop).toHaveBeenCalledTimes(2);
+    expect(native.window.focus).not.toHaveBeenCalled();
+    invoke('management:update-preferences', { topmost: false }, {
+      sender: native.management!.webContents, senderFrame: native.management!.webContents.mainFrame,
+    });
+    native.window.moveTop.mockClear(); show(); restore();
+    expect(native.window.setAlwaysOnTop).toHaveBeenLastCalledWith(false, 'screen-saver');
+    expect(native.window.moveTop).not.toHaveBeenCalled();
+  });
+
   it('returns snapshot and authoritative layout through request-snapshot', () => {
     native.publish!(piObservation());
     native.webContents.send.mockClear();
     invoke('pet:request-snapshot');
-    expect(native.webContents.send.mock.calls.map(([channel]) => channel)).toEqual(['pet:snapshot', 'pet:layout']);
+    expect(native.webContents.send.mock.calls.map(([channel]) => channel)).toEqual(['pet:snapshot', 'pet:preferences', 'pet:layout']);
     expect(native.webContents.send.mock.calls[0]?.[1].bubbles[0]).toMatchObject({ status: 'working' });
   });
 
   it('hits pet/toolbar, only visible populated bubbles, and reserves the expanded region', async () => {
     const layout = latestLayout();
     pointAt(layout.pet); expectHit(true);
-    pointAt(layout.toolbar); expectHit(true);
+    pointAt(layout.toolbar); expectHit(true); // direct hover is an entry, even before reveal
+    const gap = { x: layout.toolbar.x, y: layout.pet.y + layout.pet.height + 2, width: layout.toolbar.width, height: 1 };
+    pointAt(gap); expectHit(false);
+    invoke('pet:controls-visible', true); expectHit(true);
+    invoke('pet:controls-visible', false); expectHit(false);
     pointAt(layout.bubbles); expectHit(false); // no session bubbles
     native.publish!(piObservation({ status: 'completed' }));
     invoke('pet:bubbles-visible', true); // renderer has prepared presentation
@@ -313,6 +339,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     invoke('pet:bubbles-visible', true);
     invoke('pet:bubbles-expanded', true);
     invoke('pet:interaction', true);
+    invoke('pet:controls-visible', true);
     const listener = native.webContents.on.mock.calls.find(([name]) => name === event)?.[1];
     expect(listener).toBeTypeOf('function');
     listener();
@@ -326,7 +353,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     for (const event of [{ sender: {}, senderFrame: native.webContents.mainFrame },
       { sender: native.webContents, senderFrame: {} }]) {
       expect(() => invoke('pet:move-window-by', { x: 1, y: 1 }, event)).toThrow('Untrusted renderer');
-      for (const channel of ['pet:bubbles-visible', 'pet:bubbles-expanded', 'pet:interaction']) {
+      for (const channel of ['pet:bubbles-visible', 'pet:bubbles-expanded', 'pet:controls-visible', 'pet:interaction']) {
         expect(() => invoke(channel, true, event)).toThrow('Untrusted renderer');
       }
     }
@@ -335,7 +362,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
         expect(() => invoke(channel, value)).toThrow('Invalid delta');
       }
     }
-    for (const channel of ['pet:bubbles-expanded', 'pet:bubbles-visible', 'pet:interaction']) {
+    for (const channel of ['pet:bubbles-expanded', 'pet:bubbles-visible', 'pet:controls-visible', 'pet:interaction']) {
       expect(() => invoke(channel, 'true')).toThrow(TypeError);
     }
     expect(latestLayout()).toBe(layout);
@@ -354,7 +381,9 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
   it('creates distinct sandboxed entries and denies cross-window, subframe and navigated-frame capabilities', () => {
     expect(native.management).toBeDefined();
     expect(native.management!.webContents).not.toBe(native.webContents);
-    expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ title: 'Agent Pet', webPreferences: expect.objectContaining({ sandbox: true, contextIsolation: true, nodeIntegration: false }) }));
+    expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ title: 'Agent Pet', frame: process.platform === 'darwin',
+      ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
+      webPreferences: expect.objectContaining({ sandbox: true, contextIsolation: true, nodeIntegration: false }) }));
     for (const channel of ['pet:request-snapshot', 'pet:interaction', 'pet:resize-window-by']) {
       expect(() => invoke(channel, true, managementEvent())).toThrow('Untrusted renderer');
     }
@@ -376,11 +405,27 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     }
     expect(native.management!.webContents.setWindowOpenHandler.mock.calls[0]![0]()).toEqual({ action: 'deny' });
   });
+  it('routes only trusted window actions and preserves close-to-background/quit behavior', () => {
+    const handler = native.handlers.get('management:window-action')!;
+    for (const event of [
+      { sender: native.webContents, senderFrame: native.webContents.mainFrame },
+      { sender: native.management!.webContents, senderFrame: {} },
+    ]) expect(() => handler(event, 'close')).toThrow('Untrusted renderer');
+    for (const action of ['quit', 'destroy', {}, null]) expect(() => handler(managementEvent(), action)).toThrow('Invalid window action');
+    handler(managementEvent(), 'minimize'); expect(native.management!.minimize).toHaveBeenCalledOnce();
+    handler(managementEvent(), 'toggle-maximize'); expect(native.management!.maximize).toHaveBeenCalledOnce();
+    native.management!.isMaximized.mockReturnValueOnce(true);
+    handler(managementEvent(), 'toggle-maximize'); expect(native.management!.unmaximize).toHaveBeenCalledOnce();
+    handler(managementEvent(), 'close'); expect(native.management!.hide).toHaveBeenCalledTimes(2);
+    expect(native.quit).not.toHaveBeenCalled();
+    invoke('management:update-preferences', { background: false }, managementEvent());
+    handler(managementEvent(), 'close'); expect(native.quit).toHaveBeenCalledOnce();
+  });
   it('close hides, activate/second instance/tray reopens, and visibility and toolbar size persist together', () => {
     const close = native.management!.on.mock.calls.find(([event]) => event === 'close')![1];
     const preventDefault = vi.fn();
     close({ preventDefault });
-    expect(preventDefault).toHaveBeenCalledOnce(); expect(native.management!.hide).toHaveBeenCalledOnce();
+    expect(preventDefault).toHaveBeenCalledOnce(); expect(native.management!.hide).toHaveBeenCalledTimes(2);
     expect(native.stop).not.toHaveBeenCalled(); expect(native.quit).not.toHaveBeenCalled();
     native.appEvents.get('activate')!(); native.appEvents.get('second-instance')!();
     native.tray.on.mock.calls.find(([event]) => event === 'click')![1]();
@@ -389,13 +434,13 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     expect(native.start).toHaveBeenCalledOnce();
     invoke('management:update-preferences', { petVisible: false, petSize: 220 }, managementEvent());
     expect(native.window.hide).toHaveBeenCalled(); expect(latestLayout().pet.width).toBe(220);
-    native.window.show.mockClear(); native.window.hide.mockClear();
+    native.window.showInactive.mockClear(); native.window.hide.mockClear();
     invoke('pet:resize-window-by', { x: 10, y: 10 });
-    expect(native.window.show).not.toHaveBeenCalled(); expect(native.window.hide).not.toHaveBeenCalled();
+    expect(native.window.showInactive).not.toHaveBeenCalled(); expect(native.window.hide).not.toHaveBeenCalled();
     const saved = JSON.parse(readFileSync(join(native.path, 'preferences.json'), 'utf8'));
-    expect(saved).toEqual({ schemaVersion: 1, petVisible: false, petSize: 230 });
+    expect(saved).toEqual({ ...defaultPreferences, petVisible: false, petSize: 230 });
     invoke('management:update-preferences', { petVisible: true }, managementEvent());
-    expect(native.window.show).toHaveBeenCalled();
+    expect(native.window.showInactive).toHaveBeenCalled();
     native.appEvents.get('window-all-closed')!(); expect(native.quit).not.toHaveBeenCalled();
   });
   it('does not reshow management when closed before ready-to-show', () => {
@@ -411,6 +456,26 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     expect(() => invoke('management:update-preferences', { path: '/tmp/no' }, managementEvent())).toThrow(TypeError);
     expect(() => invoke('management:set-login', 'yes', managementEvent())).toThrow(TypeError);
     expect(native.loginSet).not.toHaveBeenCalled();
+  });
+  it('applies native entries and topmost, rejects removal of the last entry, and obeys close-to-quit', () => {
+    invoke('management:update-preferences', { dock: false, topmost: false }, managementEvent());
+    if (process.platform === 'darwin') expect(native.dockHide).toHaveBeenCalledOnce();
+    expect(native.window.setAlwaysOnTop).toHaveBeenLastCalledWith(false, 'screen-saver');
+    expect(() => invoke('management:update-preferences', { tray: false }, managementEvent())).toThrow('至少保留');
+    expect(native.tray.destroy).not.toHaveBeenCalled();
+    invoke('management:update-preferences', { background: false }, managementEvent());
+    const close = native.management!.on.mock.calls.find(([event]) => event === 'close')![1];
+    close({ preventDefault: vi.fn() });
+    expect(native.quit).toHaveBeenCalledOnce();
+  });
+  it('preserves an available entry and reports asynchronous Dock failure', async () => {
+    if (process.platform !== 'darwin') return;
+    native.dockShow.mockRejectedValueOnce(Error('OS failure'));
+    invoke('management:update-preferences', { dock: false }, managementEvent());
+    invoke('management:update-preferences', { tray: false, dock: true }, managementEvent());
+    await Promise.resolve(); await Promise.resolve();
+    expect(invoke('management:get-state', undefined, managementEvent())).toMatchObject({ preferenceError: expect.stringContaining('Dock') });
+    expect(native.tray.on).toHaveBeenCalledWith('click', expect.any(Function));
   });
   it('never registers login items at startup; dev refuses opt-in without calling OS login APIs', async () => {
     expect(native.loginSet).not.toHaveBeenCalled();
@@ -454,7 +519,7 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     await import('./index.js');
     expect(latestLayout().pet.width).toBe(260);
     native.window.once.mock.calls.find(([event]) => event === 'ready-to-show')![1]();
-    expect(native.window.show).not.toHaveBeenCalled(); expect(native.window.hide).toHaveBeenCalled();
+    expect(native.window.showInactive).not.toHaveBeenCalled(); expect(native.window.hide).toHaveBeenCalled();
     expect(invoke('management:get-state', undefined, managementEvent())).toMatchObject({ preferences: { petVisible: false, petSize: 260 } });
   });
   it('failed toolbar persistence retains geometry and opens management with the error', () => {

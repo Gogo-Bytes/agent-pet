@@ -1,12 +1,12 @@
 # 当前 MVP 执行计划
 
-> 产品方向已统一记录在 [产品方向与统一路线](PRODUCT-DIRECTION.md)：Agent Pet 是面向多个 AI Agent 的低门槛娱乐桌宠，pi 只是当前第一个实现 Provider。本文只记录本机 macOS/pi 纵向 MVP 的工程顺序、证据和边界，不定义最终 UI 定位，也不把当前 pi 技术面板视为最终产品体验。下一阶段先做浏览器 UI 原型，再回写桌面 Renderer。
+> 产品方向已统一记录在 [产品方向与统一路线](PRODUCT-DIRECTION.md)：Agent Pet 是面向多个 AI Agent 的低门槛娱乐桌宠，pi 只是当前第一个实现 Provider。本文只记录本机 macOS/pi 纵向 MVP 的工程顺序、证据和边界，不定义最终 UI 定位，也不把当前 pi 技术面板视为最终产品体验。已验收 Web 原型正在正式 Electron/React 中实施；本轮范围与证据见 [正式迁移验收](MANAGEMENT-MIGRATION-ACCEPTANCE.md)。
 
 ## 优先级与范围
 
 **当前目标：先交付单用户、本机 macOS、pi 的可用 MVP，再补生产安全与正式分发。** 本文是当前执行顺序、检查点与进度的唯一入口；旧 P0/P2/B/D 阶段文档保留技术契约和历史证据，不再决定本地 MVP 的先后顺序。产品语义见 [需求](../PRODUCT-REQUIREMENTS.md) 与 [领域术语](../CONTEXT.md)。不另建任务数据库或完成百分比。
 
-MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application 状态模型和 pi 观测扩展：一个宠物、多独立 Session，只观察名称和状态；不启动、接管、审批或控制 Agent，不读取对话正文。先跑通一个明确授权的真实 pi 配置目标；不扩大到 Windows、Codex、Claude Code 或新核心框架。
+MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application 状态模型和 pi 观测扩展：一只内置资产、按配置展示多个管理场景实例、桌面浮层承载多独立 Session，只观察名称和状态；不启动、接管、审批或控制 Agent，不读取对话正文。先跑通一个明确授权的真实 pi 配置目标；不扩大到 Windows、Codex、Claude Code 或新核心框架。
 
 最终需要脱离源码目录可运行的本地 `.app`，不是要求用户一直运行开发服务器。正式签名、公证和自动更新不作为这个本地 MVP 的前置条件；未签名/本地签名的使用限制必须明示，不能宣传为正式可分发安全产品。
 
@@ -23,6 +23,134 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 - 安装候选、配置目标、已部署、已加载、连接在线与业务事件通过分别提供证据。只读检查不是安装同意，socket connect 不是业务验收。
 - 此前仅授权 M1/M2 部署与桌面授权入口的代码实现、自有临时目标/隔离 socket 验证。2026-10-08 用户另授权以 Computer-Use 操作桌面端验收，范围为本轮自建的独立测试目录；开发版 App 已运行。仍不读写日常 HOME/pi 配置或安装目标、不安装依赖。M2 的目标读写/部署/连接须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权；本轮已按预览确认写入并在同一桌面进程撤回自有测试扩展。
 - 普通实现与小修复由 Main 按范围推进，不逐项询问用户；只有结果/范围变化、真实环境权限、不可逆动作、新增依赖/实质成本或风险接受需要另行确认。打包依赖安装与签名账号/证书成本分开处理，不默认获准。
+
+## dev 显示比例与设置序号修复（2026-10-16）
+
+当前应用的localhost保存了-1.5级缩放（约76%），同时影响管理页和桌宠；缩小还触发宽屏规则，暴露一直残留的设置序号。已在实际dev恢复100%，正式/原型都彻底删除序号节点和CSS；Main窗口入口恢复正常比例、View菜单移除放大/缩小，保留宠物大小偏好。当前dev未重启，Main保护下次启动生效，已用独立Electron验证同host双窗口及重载。没有修改pi配置、扩展或用户宠物大小。
+
+全量 **760 passed / 1 skipped / 77 files**、typecheck、desktop build、原型build、真实Electron缩放fixture通过；当前正式dev设置页实看比例恢复、无序号。未打包或推送，pi细分任务验证暂停待继续。见 [修复与验收边界](UI-SCALE-REGRESSION-ACCEPTANCE.md)。原设置停点与native fixtures保留。
+
+## 取消误报修复与等待/受控出错检查准备（2026-10-16）
+
+用户继续实机验证取消，按Esc后pi显示“Error: This operation was aborted”；私有枚举记录先tool_error再error，取消验收失败，不能作为正常任务出错通过。观察扩展已改为只读保留当前运行的原生AbortSignal，settled时用真实aborted区分取消，取消工具不冒充tool_error；续跑替换signal、结束/卸载释放引用，不加监听或Agent控制。能力表按扩展实例隔离，避免多个实例相互虚增支持状态。
+
+另备好独立test-support helper：用户显式命令打开真正确认框、用户自行选择的本机抛错模型触发受控失败；不发观察假事件，不自动选模型或请求，不进入正式部署源。独立focused10项、typecheck、desktop build通过。最终全量并行有1项原Worker启动unavailable（763通过/1跳过），原文件4项复验通过，一次有界完整低并行复验764通过/1跳过/78文件，未改guard或阈值。用户已精确授权；已正常停止dev、原子替换取消修复版扩展、独占创建0600临时helper及私有撤回记录，settings摘要不变；同profile的dev已重启并恢复原socket，原配置/凭据/runtime/disabled一致。用户reload后12:23真实取消复验通过：executing→idle/cancelled，无tool_error或整个任务error；12:17另收到真实thinking。临时命令两次reload仍无法识别且无相关错误，等待/受控任务出错未通过。已按原授权校验身份/摘要/权限/父目录，只撤回临时helper；settings摘要一致，正式观察扩展保留，用户确认清理后reload无相关错误，12:27新身份idle/connected，临时文件撤回与reload收尾完成。不改发现规则或换协议绕过，按有界规则记录停点。新的精确真实操作范围见 [预览](PI-CANCEL-WAIT-CHECK-PREVIEW.md)，原实机证据见 [记录](PI-EXTENSION-LIVE-ACCEPTANCE.md)。仍用dev，不打包。
+
+## 当前连接的扩展更新与真实事件验证（2026-10-16）
+
+用户要求更新当前pi扩展并做真实细分验证，保留配置，仅用dev。只读核对当前默认配置、私有receipt与现有扩展匹配，runtime有效/socket缺失。新增显式host/operator更新器：严格ownership与inactive保护、原目标绑定、700/600私有备份、原子替换及新receipt、显式校验恢复；保留接收配置与settings，不接Renderer/自动启动更新。dev可显式启用有界枚举证据，匿名身份、无正文/名称/凭据，打包应用忽略。
+
+工程工具已验证：全量 **756 passed / 1 skipped / 76 files**，typecheck、desktop build通过；独立重点19项通过，最终目标绑定补测20项通过。没有打包或依赖安装。用户已确认精确预览；真实扩展替换和原配置dev接收恢复完成，settings校验一致，新源码/receipt匹配，目标/凭据/runtime/disabled保留。用户reload后自行完成限定任务，真实收到读取、写入、执行6.027秒、单个工具出错、继续回答与正常完成，任务中途保持working，能力随实际事件确认。思考/查找仍unknown，整个任务失败/取消/等待/整理/长度中断及真实动画显示未验收；见 [操作预览](PI-EXTENSION-UPDATE-PREVIEW.md) 与 [实机记录](PI-EXTENSION-LIVE-ACCEPTANCE.md)。原设置实机停点和native fixtures保留。
+
+## 多 Agent 动作与艺术家契约确认（2026-10-15）
+
+用户确认：各 Agent 的原生事件按能力适配成统一事实，宠物动作与资产动画分开；所有动作均可选，连 Idle 也不要求存在。阶段1已实施：统一23种动作目录、v2可选动画manifest、生成艺术家模板、共享R3F播放器；无映射/无clip/无Idle时静态回退，单次动作结束回待机或静态。现有包格式兼容，模型路径与必要字段校验保留。资产导入尚未实现，目录不代表所有Agent都支持触发。
+
+验证：全量 **705 passed / 1 skipped / 72 files**，`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、模板一致性检查通过；独立subagent复验76项、无阻塞。4175 dev测试边界使用正式ScenePet和真实GLB，实看无动画映射、无Idle及单次动作回退；零clip与清理由实际Three.js测试覆盖。[静态截图](evidence/pet-actions/static.jpg)、[艺术家说明](PET-ARTIST-GUIDE.md)。未打包、未部署/启动/重载真实pi；下一阶段是pi细分事件与能力事实适配。
+
+## 动作第2阶段：pi细分事件与统一投影（2026-10-15）
+
+已实现：domain独立能力/活动/等待/单次事件事实，保留原Session生命周期与未读；pi只提取流式类别、工具类别、扩展UI等待、整理上下文、取消和回答中断，按实际收到事件确认能力，不猜运行版本/自动重试。桌宠与首页共用动作投影，正式播放器按资产能力回退；单次业务反馈不随重命名/等待结束/场景重挂而重播，主动试播可重播。新接收器兼容旧粗略扩展，严格嵌套字段校验保留。
+
+真实隔离socket与无环境生成扩展子进程覆盖并行、正文不读取、整批settled、压缩取消/旧signal、断开清活动/重连保未读、旧peer close与stop重入/发布异常清理；Main本地清理保留epoch保护，旧peer不能覆盖新记录，发布失败可重试。最终全量 **736 passed / 1 skipped / 74 files**；typecheck、desktop build、模板一致性与diff检查通过。独立重点复验 **86 passed**，Main最终修正另复验 **31 passed**，无确定阻塞。未削弱managed/部署/撤回/数据保留测试。默认/managed mapper契约保持，断开清理仅启用在本机legacy receiver。
+
+Electron dev隔离profile已启动，原生管理首页启动实看，AX确认宠物页及试播入口；动作盘点击/截图工具恢复后仍有故障，未标完整原生交互通过。4175正式播放器测试边界已实看活动→已有动画、能力未知与静态回退。[证据与截图](PET-ACTIONS-ACCEPTANCE.md)。没有打包、依赖安装、日常pi配置读取/写入、部署、启动或reload；真实已加载扩展不会自动升级，新增细分TUI任务矩阵尚未实机验收。其他Provider/外部资产导入/发布保持未完成。
+
+## 本机菜单栏图标恢复（2026-10-15）
+
+**VERIFIED（当前 dev 可见，用户确认）**：系统日志证明图标被 ControlCenter 阻止。当前开发实例归于 ChatGPT 启动链，Agent Pet 的系统开关已开，但 ChatGPT 项关闭；经用户精确授权只打开 ChatGPT 项，同代码/隔离配置 dev 的日志恢复正常接收，用户确认“能看到了”。按授权保留开关开启，菜单栏功能继续保留，没有修改图标实现或重新打包。底层受保护映射未读取，不把坐标/创建成功当可见证明。正式包重开、菜单点击、其他设置与发布范围未验；完整证据见 [菜单栏恢复记录](DESKTOP-MENU-BAR-ACCEPTANCE.md)。
+
+本轮 Main/偏好 **61 passed / 2 files**、`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、diff 检查通过。仅记录已完成的系统排查和恢复证据，不改变产品实现；没有生成应用包、操作真实 pi 或推送。原未完成的设置实机记录与历史 native fixtures 保留。
+
+## 当前正式 UI 迁移（2026-10-14）
+
+用户已明确验收原型基线 `3b2f0cd`，覆盖历史“等待原型视觉验收”记录；不代表正式代码、真实 pi 接入或发布已经验收。
+
+实现阶段提交 `4f05049`：正式管理窗口四页、共享外框/导航、真实 GLB 场景、按配置身份的多目标 pi 接入、完整偏好持久化和运行时应用。Main/preload/Application 边界、managed guard、授权预览和选择性撤回保留；没有新增 Provider 或依赖安装，也没有日常 HOME/pi 配置读写。两份历史 native smoke fixture 原样保留，未推送。
+
+本轮全量 **620 passed / 1 skipped / 65 files**、`pnpm typecheck`、desktop build 通过；最后手动保存详情入口增量另复验 **23 passed / 2 files**，类型检查与构建通过。Main 亲自启动隔离 profile 的实际 Electron 并记录首页空态；同一正式 Renderer 在测试边界中检查 1280×720、390×844、1000×480、模型点击与键盘、主要弹窗和滚动。独立 Review 的三个确切问题已修正并覆盖；独立 Product Test 检查实际截图和 DOM 行为测试，独立点击因 CUA 工具故障未完成。
+
+状态为 **IMPLEMENTED-NOT-ACCEPTED（正式 UI 用户验收未完成；新多配置真实连接与生命周期有界通过，模型任务矩阵未完成）**。现有 M2–M5 证据保持原范围；正式签名/公证/发布仍未验收，完整 D6 仍 BLOCKED。
+
+用户随后要求消除双层窗口，并采用其他 macOS 应用的样式：正式管理界面铺满窗口，macOS 使用原生 `hiddenInset` 标题栏及左上角系统按钮，共享顶部栏预留按钮空间；其他平台保留 HTML 操作回退。关闭仍遵循后台偏好。最新相关 **47 项测试**、类型检查、构建及打包通过；实际新包的原生 AX 确认关闭/最小化/全屏按钮，截图工具的紫色捕获提示遮挡按钮区域，颜色的截图检查有此限制。实际截图及检查边界见正式迁移验收记录。
+
+准确缺口：仅一只真实内置 starter 宠物，包导入尚未实现；其他 Provider 仅可保存非秘密元数据，不能连接；自动扫描仍是支持的 pi 安装候选，不能自动找遍项目配置或证明其活跃；手动类型识别不确定时必须用户选择。旧已部署位置更换须先选择性撤回/移除再添加。系统登录项/GPU性能及新界面真实模型任务矩阵仍需实际验收；多 pi TUI 的空闲连接与生命周期范围已通过。映射、截图、运行方式和后续清单见 [正式迁移验收](MANAGEMENT-MIGRATION-ACCEPTANCE.md)。
+
+## 功能接入第 1 阶段：配置在线状态（2026-10-14）
+
+本阶段已完成代码与隔离验证：legacy receiver 只计入有效 hello 的 socket，同配置部分 peer 退出不误报离线，最后一个退出才离场；每次 start 独立维护连接集合。停止先禁止新数据/旧回调，再排空服务并发布一次断开，重复停止共享完成结果。Session 业务状态、未读结果、managed guard 与部署/数据保留契约不变。
+
+新增 5 项真实隔离 socket 回归和 1 项 Configurations → Application → 正式首页投影集成，覆盖无效 peer、重叠重连、同 Adapter 多 receiver、缓冲数据期间停止、配置离场与选择性移除。全量 **629 passed / 1 skipped / 67 files**，`pnpm typecheck`、desktop build、package:mac 通过。独立 subagent 审查 READY（19 项 focused 复验通过，新增缓冲数据用例另作只读复核）；未注入 server.close 故障。实际新包启动及范围见正式迁移验收记录；不算真实 pi TUI 通过。
+
+后续按已讨论顺序：一个真实 pi 配置 → 多配置/重启 → macOS 设置实机 → 资产选择与绑定、受约束导入分别交付 → 正式应用整体验收。真实操作已获用户精确授权，原范围见 [pi 实机操作预览](PI-LIVE-CONNECTION-PREVIEW.md)，不自动使用日常配置、复制凭据或发起模型请求。
+
+## 功能接入第 2 阶段：真实 pi 与多配置生命周期（2026-10-14）
+
+**VERIFIED（授权隔离范围）**：现有 pi 0.85.1 与源码外正式应用包实际走通 A/B 手动添加、预览确认、0600 独占部署、hello、多 peer 部分退出、两个同类独立宠物、原位命名、干净应用重启后明确恢复、停用保存和选择性撤回。最终配置为空，自有扩展已撤回、pi/应用正常退出；pi 生成资料保留。
+
+修复重启停用提示及刷新后准确性，保留具体失败原因。全量 **630 passed / 1 skipped / 67 files**，typecheck、desktop build（package 内）、package:mac、diff 检查通过，独立审查 READY。操作范围、截图、最新包及首次 pi 自动下载越界说明见 [实机证据](PI-LIVE-CONNECTION-ACCEPTANCE.md)。本轮未登录、未复制凭据、未发起模型请求；真实任务/取消/错误矩阵、正式 UI 用户认可和发布验收未通过。下一步为 macOS 非登录项设置实机，登录项变更需另外明确范围。
+
+## 用户反馈修复：宠物场景、名称与收藏（2026-10-14）
+
+已交付独立Renderer增量：首页/单宠物场景使用不同内容与镜头，保留单一R3F Canvas；宠物无地台并居中，名称从左上角直接编辑，收藏采用共享玻璃抽屉/进出动画/native modality/关闭回焦。宽窄矮、40字名称及动作条遮挡依据实图修正。全量 **639 passed / 1 skipped / 67 files**，最后微调focused **34 passed**、typecheck、desktop build与package通过，独立审查READY；最终包原生关闭与名称保存通过，捕获失败未升级为完整键盘矩阵通过。最新包、截图及边界见 [修订验收](PET-SCENE-REVISION-ACCEPTANCE.md)。未新增资产/Provider或日常pi目标操作；设置实机停点仍未完成。
+
+## 用户反馈修复：pi 安装扫描与失效连接（2026-10-14）
+
+固定 pi 经原生页面确认为当前自身 profile 的历史部署记录；旧目录不存在，却因撤回把缺失路径误判为变更而无法移除。修复为有效私有 receipt + 安全祖先 + 明确缺失的 `already-absent` 结果，先停用保存，再清产品记录；目标/未知文件不删除，读取或保存失败仍保留。Finder GUI PATH 漏扫 NVM，现增加固定一层版本目录的有界 metadata 搜索（64 项/16 版本/51 候选），受限结果在正式 UI 明示。
+
+全量 **652 passed / 1 skipped / 67 files**、typecheck、desktop build、最终 package 通过，独立 Review READY（110 项），最终文案 focused **28 passed**。已更新并启动 `/Users/gan/Desktop/🥷/Agent Pet.app`，实际管理页的移除预览/取消通过；未自动移除当前历史记录。此前授权的精确本机 CLI metadata 识别为 pi 0.85.1；2026-10-15 用户另行授权有界只读扫描，正式包实际找到 NVM Node v22.22.3 和 v24.20.0 下的两份 pi 0.85.1，原生 AX/截图一致，留在结果页；未执行 pi、读取日常配置、部署或移除。截图、红测试和具体边界见 [本轮证据](PI-DISCOVERY-REMOVAL-ACCEPTANCE.md)。设置实机停点、真实任务矩阵和发布验收保持未完成。
+
+## 用户反馈修复：自动扫描直接配置（2026-10-15）
+
+已将“找到安装后再次手动选位置”改为按默认配置目标合并的一键入口。Main 从最新支持的扫描 ID 匹配自身 HOME 的 `.pi/agent`，自动名称/类型/位置，具体只读批准后直接准备既有部署预览；独立确认仍控制扩展写入与接收。已有配置直接查看，未知版本不提供一键操作，项目/自定义位置保留手动入口。返回迟到结果撤销预览，窗口 close/reload 和重新扫描使陈旧批准失效。
+
+全量 **665 passed / 1 skipped / 67 files**、typecheck、desktop build、package 通过，独立审查 READY（80 项/6 文件）。已更新并启动稳定包 `/Users/gan/Desktop/🥷/Agent Pet.app`；实际两份 pi 安装显示为一个默认配置入口，点击即原生精确检查确认。工具提示用户接手后，实际已进入默认目标的部署预览，因 `settings-unknown` 阻止部署，未建立日常连接；没有修改现有扩展规则。原生取消自动化结果有覆盖限制，不标完整通过。具体截图、语义与边界见 [本轮验收](PI-AUTOMATIC-SETUP-ACCEPTANCE.md)。
+
+## 用户反馈修复：保留包配置与可取消检查（2026-10-15）
+
+已获精确只读授权核对默认目标：5 条字符串包来源、无顶层扩展过滤/ignore/固定入口。依据已安装 pi 0.85.1 源码，包来源和用户扩展自动发现分开；现在允许有界字符串包来源，保留未知形态、非空顶层扩展规则、数据保护与 managed guard。实际只读复验 `findings: []`，settings 校验摘要不变。
+
+一键检查改为页面内显式范围确认；requestId、Main/Renderer 取消 race、3 秒预算和精确 planId 撤销使取消不再依赖原生弹窗回调，也不误撤较新预览。全量 **671 passed / 1 skipped / 67 files**、typecheck、desktop build、package 通过，独立 Review READY（116 项）。实际新包在隔离 profile 打开新 Dialog，取消后原生 AX 的三个操作均恢复可用；截图恢复一次失败，覆盖限制如实保留。已恢复正常用户 profile 的稳定应用入口。设置实机停点仍未完成。
+
+用户对 [本机部署预览](PI-DAILY-CONNECTION-PREVIEW.md) 明确选择 **“只更新修复，暂不部署”**：本轮没有日常扩展写入、pi 启动/重载或连接通过声明。最终 settings 保持原字节，日常 `agent-pet.ts` 仍不存在。后续真实接入仍需明确授权，不重复请求本轮已拒绝的部署。完整根因、源码依据、回归和原生覆盖见 [本轮证据](PI-RULES-CANCEL-ACCEPTANCE.md)。
+
+## 用户反馈修订：扫描结果视觉（2026-10-15）
+
+按用户要求先由独立 Product Test 批评，再拆分配置摘要和安装详情，主操作不随展开位移，窄窗独占一行；已有/新建文案分别表达，保留在线需实际通信及独立部署确认。独立复核未发现必须修正项。管理页 **28 tests**、typecheck、desktop build、package 通过；实际正常 profile 应用扫描与展开/空格收起已验证并截图，另以正式 Renderer 测试边界检查宽/窄/矮窗口及取消。仅 UI 修订，无 pi 部署、重载或真实通信验收；正式 UI 用户认可待反馈，原设置停点保留。见 [截图与验收边界](PI-SCAN-VISUAL-ACCEPTANCE.md)。
+
+## 用户反馈修订：连接详情平铺（2026-10-15）
+
+用户此前已自行完成本机 pi 接入并反馈 `/reload` 后首页在线，确认运行中的 pi 需要加载新扩展；本轮没有再次部署或重载。按新截图反馈及独立 Product Test 批评，已移除右侧大卡片和700px限宽，名称/检查/位置/接入管理/移除直接铺开，窄矮窗及长名编辑保持可用。独立截图复核无确定阻塞；既有 **28 tests**、typecheck、desktop build、package通过。实际新包隔离启动取得平铺详情AX/一次画面，后续捕获在一次恢复后仍失败，覆盖限制见 [本轮证据](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md)。原连接应用保持运行，新包已生成但未切换；未把测试 bridge 当真实接入或发布验收，原设置停点不变。
+
+后续用户要求配置路径保持单行：详情位置行改为末尾省略，保留完整title/无障碍描述及“更换位置”操作。384字符路径在390px/1280px下均为一行、无横向溢出；28项管理页测试、typecheck、desktop build通过，未重新打包或切换当前应用。见上述平铺详情证据的后续修订。
+
+## 用户反馈修复：桌宠外观、命中与层级（2026-10-15）
+
+已移除桌宠常驻名称及失效名称开关，保留旧偏好读取兼容；气泡/双操作胶囊采用轻量共享玻璃样式。工具条改由R3F真实模型命中或键盘进入触发，Main仅为已确认显示的工具条保留鼠标区域，旧ACK、失焦、隐藏恢复、卸载及拖动回归均保留。macOS桌宠使用非激活panel，在显示/恢复时重应用置顶与工作区策略，关闭置顶仍有效，不定时抢焦点。
+
+全量 **682 passed / 1 skipped / 70 files**、typecheck、desktop build（package内）、最终package通过，独立工程Review READY、独立截图复核无确定阻塞。正式Renderer已实看远处/透明角不触发、直接模型命中与气泡开关；隔离原生包启动/GLB/无名称/正常退出通过，原生坐标工具一次恢复后仍不能可靠证明操作条交接及跨应用/全屏层级，保持待验。当前用户应用与pi接收未切换/中断；新包与截图见 [本轮证据](DESKTOP-OVERLAY-REFINEMENT-ACCEPTANCE.md)。没有日常pi读写、部署、重载、依赖安装或推送；原设置停点和发布门槛不变。
+
+用户随后要求统一使用glass组件：管理页玻璃实现已提取为正式`shared/ui/Glass.tsx`/`glass.css`，桌宠采用GlassToolbar/GlassAction/GlassButton，删除简化磨砂版本，加入适合桌面浅/深背景的对比变体及紧凑阴影。全量 **684 passed / 1 skipped / 71 files**，最终相关 **60 passed**，typecheck、desktop build、原型build、package通过；正式Renderer实看浅/深/线条、媒体回退及管理收藏回焦。新包尚未切换，原生层级和真实pi验收边界不变。截图与最新包见上述本轮证据的后续修订。
+
+用户进一步要求操作条容易到达：宠物渲染区域与操作条已放进同一个紧凑透明hover容器，停在中间空隙不再依赖180ms过渡时间；Main允许隐藏操作条区域作为入口，确认显示后接通间隙，远处空域继续穿透。共享几何覆盖80/140/600尺寸、操作条上下布局；保持单Canvas、键盘顺序、Tooltip窗口坐标、拖动、失焦/隐藏清理。全量 **687 passed / 1 skipped / 71 files**、typecheck、desktop build（package内）和package通过；正式Renderer已实测空隙停留、直接操作条入口、远处隐藏及气泡按钮，未切换运行中的用户应用。具体截图和新包见本轮证据的最新修订。
+
+## 用户反馈修订：连接页更易读、更好操作（2026-10-15）
+
+连接状态和主要操作前置，位置检查收起，未检查不再挤占列表名称。连接/暂停/继续、检查与移除用日常表达，技术原因和精确范围可展开；已有部署的位置明确提示先移除再添加，不以按钮暗示可直接更换。精确预览、独立写入确认、保护未知/修改文件和Main边界不变。新增预览/取消回焦并覆盖Main先推送、操作稍后完成的顺序，隐藏页面不抢焦点。
+
+全量 **691 passed / 1 skipped / 71 files**、typecheck、desktop build（package内）和package通过，独立Review READY。正式Renderer亲自检查宽/窄/矮、等待/错误、检查与连接状态分离、单行长路径、预览/取消回焦；仅使用隔离示例，没有操作真实pi或重启正在运行的应用。最新截图、新包及范围见 [连接页记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 的后续修订。原设置停点、原生层级/全屏、真实任务矩阵及发布仍未完成。
+
+## 连接页逐场景演示（2026-10-15）
+
+按用户要求，暂停自行调整设计，先在 Demo Web 汇总 42 个编号场景，供逐页指导。入口为 `pnpm demo:connections` / <http://127.0.0.1:4175/connection-scenes.html>；当前正式组件配合独立示例 bridge，支持上/下页、直接链接、宽/窄/矮窗口和重新打开。没有修改正式页面布局、Main/preload 或真实 pi。浏览器逐个打开 42 个场景通过，另核对窄窗命名、矮窗预览、取消检查与重开；管理页 32 tests、typecheck、desktop build 及独立 demo build 通过。截图见 [场景目录](screenshots/connection-scenes/catalog-wide.png)。这里只证明示例场景可用于讨论，不代表新 UI 用户认可或真实接入验收。
+
+用户逐页反馈后，01 空态已在右侧可用区水平/垂直居中；02 详情重新区分信息主次：名称为主、状态缩为标记、单行路径为次，暂停/检查/更换/移除统一收进“更多操作”，检查异常或连接失败时自动展开。42 个演示入口全部复验，宽/窄居中偏差均为 0；长路径不换行、无横向溢出，相关 32 tests、typecheck、desktop build 通过。截图与边界见 [详情记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 最新修订。本轮未重启应用或操作真实 pi。
+
+用户继续标注的 14/18/23/27/41 场景已修订：名称编辑采用独立输入区域/计数/单一焦点样式，类型字号增大；扫描为可减少动画的装饰雷达；读取确认和文件冲突默认短文案，完整范围可展开；移除改为有界确认弹窗，取消回焦、失败保留、确认中不误关闭。42 个演示场景复验、全量 **692 passed / 1 skipped / 71 files**、最终管理页 **33 tests**、typecheck、desktop build 和 demo build 通过。截图、首轮无关时钟边界失败及复验记录见 [详情记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 最新修订。未修改 Main/Adapter/guard、未替换运行中应用或操作真实 pi；正式 UI 仍由用户逐页确认。
+
+按用户标注，连接名称下方的 Agent 类型与在线状态已合为一行，状态只渲染一次；预览结束回焦仍指向同一个真实状态节点。宽/窄同排居中差为 0，浏览器实际确认后焦点落在“等待 pi”；管理页 33 tests、typecheck、desktop build（package 内）通过。详见 [连接页记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 最新修订，当前应用与真实 pi 未操作。
+
+桌宠气泡截图反馈已修正：重复 CSS 定位导致收起状态露出下一条半截，展开态又沿用大面板阴影。现在只在展开时进入列表流，统一紧凑玻璃边缘/阴影并预留空间；Main 的 88/204px 边界、确认先于显示和状态语义不变。相关 **41 tests / 3 files**、typecheck、原型 build、desktop build（package 内）及 package 通过；正式 Renderer 实看白/深/线条背景、上下位置、悬停/键盘及系统媒体回退。最新包与原生覆盖限制见 [桌宠记录](DESKTOP-OVERLAY-REFINEMENT-ACCEPTANCE.md) 最新修订；当前应用未替换、真实 pi 未操作。
 
 ## 当前事实与证据
 

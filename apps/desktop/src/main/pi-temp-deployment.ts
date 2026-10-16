@@ -199,17 +199,24 @@ export class PiTemporaryDeployment {
   }
 
   async withdraw(receipt: TemporaryDeploymentReceipt): Promise<{
-    file: 'removed' | 'retained-changed' | 'retained-unknown' | 'failed-preserved';
+    file: 'removed' | 'already-absent' | 'retained-changed' | 'retained-unknown' | 'failed-preserved';
     directories: 'removed' | 'retained';
     runtime: 'not-unloaded';
   }> {
     const owned = this.#owned.get(receipt);
-    const result = (file: 'removed' | 'retained-changed' | 'retained-unknown' | 'failed-preserved', directories: 'removed' | 'retained' = 'retained') =>
+    const result = (file: 'removed' | 'already-absent' | 'retained-changed' | 'retained-unknown' | 'failed-preserved', directories: 'removed' | 'retained' = 'retained') =>
       ({ file, directories, runtime: 'not-unloaded' as const });
     if (!owned) return result('retained-unknown');
     let removed = false;
     try {
       const budget = new ReadBudget();
+      // Absence is a separate outcome from changed/unknown. Validate every ancestor
+      // first, so a dangling symlink or unreadable directory can never masquerade as missing.
+      await budget.ancestors(dirname(receipt.path), true);
+      if (!await budget.stat(receipt.path)) {
+        this.#owned.delete(receipt);
+        return result('already-absent'); // No unlink, rmdir, repair or adoption.
+      }
       if (!await this.#matches(receipt, owned, budget)) return result('retained-changed');
       // Establish which owned directories are unchanged BEFORE our removal changes timestamps.
       const removable = new Set<string>();

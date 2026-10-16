@@ -3,6 +3,7 @@ import type { PreflightState } from '../../shared/pi-preflight.js';
 export const initialPreflight: PreflightState = {
   revision: 0, installations: [], selectedInstallation: null,
   target: { path: '/synthetic/.pi/agent', source: 'default' }, inspection: null, scan: 'not-run', notice: 'none',
+  automaticTarget: { path: '/synthetic/.pi/agent', source: 'default' },
 };
 export function preflightBridge() {
   return {

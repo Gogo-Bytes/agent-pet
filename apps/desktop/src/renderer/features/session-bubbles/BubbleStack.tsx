@@ -7,14 +7,16 @@ import type { PetBridge } from '../../app/bridge/pet-store.js';
 import { rectStyle } from '../../shared/rect-style.js';
 
 import { motion, type MotionStyle } from 'motion/react';
-import { glassSurfaceClass } from '../../shared/ui/GlassSurface.js';
+import { GlassButton } from '../../shared/ui/Glass.js';
 import { useReducedMotionPreference } from '../../shared/use-reduced-motion.js';
 import styles from './BubbleStack.module.css';
+import { Icon } from '../../management/components/icons.js';
 
+const MotionGlassButton = motion.create(GlassButton);
 const labels = { working: '正在工作', 'completed-unread': '已完成', 'error-unread': '发生错误' };
-export function BubbleStack({ bridge, state, layout, hidden, onOpen }: {
+export function BubbleStack({ bridge, state, layout, hidden, reducedMotion = false, onOpen }: {
   bridge: PetBridge; state: SessionState; layout: OverlayLayout | null;
-  hidden: boolean; onOpen: (session: SessionRef) => Promise<void>;
+  hidden: boolean; reducedMotion?: boolean; onOpen: (session: SessionRef) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hovered = useRef(false);
@@ -23,7 +25,8 @@ export function BubbleStack({ bridge, state, layout, hidden, onOpen }: {
   const present = !hidden && bubbles.length > 0;
   const wantExpanded = present && expanded;
   const [ack, setAck] = useState({ present: false, expanded: false });
-  const reduced = useReducedMotionPreference();
+  const systemReduced = useReducedMotionPreference();
+  const reduced = reducedMotion || systemReduced;
   const shown = present && ack.present;
   const isExpanded = shown && wantExpanded && ack.expanded;
   // Grow/reveal only after Main has installed the hit policy. Shrink/removal
@@ -61,7 +64,7 @@ export function BubbleStack({ bridge, state, layout, hidden, onOpen }: {
       transition={{ duration: reduced ? 0 : 0.14 }} data-motion={reduced ? 'reduced' : 'opacity'}
       className={`bubble-deck ${styles.deck}${isExpanded ? ` is-expanded ${styles.expanded}` : ''}`} role="group"
       aria-label={`${bubbles.length} 个会话通知，悬停或聚焦展开`}
-      style={{ '--stack-height': `${Math.min(3, bubbles.length) * 7 + 66}px` } as MotionStyle}
+      style={{ '--stack-height': `${(Math.min(3, bubbles.length) - 1) * 6 + 54}px` } as MotionStyle}
       onPointerEnter={() => { hovered.current = true; setExpanded(true); }}
       onPointerLeave={() => {
         hovered.current = false;
@@ -71,18 +74,18 @@ export function BubbleStack({ bridge, state, layout, hidden, onOpen }: {
       onBlur={() => queueMicrotask(() => {
         if (deck.current && !hovered.current && !deck.current.contains(document.activeElement)) setExpanded(false);
       })}>
-      {bubbles.map((bubble, index) => <motion.button key={bubble.sessionId}
+      {bubbles.map((bubble, index) => <MotionGlassButton material="panel" data-contrast="high" key={bubble.sessionId}
         initial={reduced ? false : { opacity: 0 }} animate={reduced ? 'still' : 'enter'}
         variants={{ still: { opacity: 1 }, enter: { opacity: [0, 1] } }} transition={{ duration: reduced ? 0 : 0.14 }}
-        className={`session-bubble ${styles.bubble} ${glassSurfaceClass}`} data-status={bubble.status} type="button"
+        className={`session-bubble ${styles.bubble}`} data-status={bubble.status} type="button"
         style={{ '--depth': Math.min(index, 2), '--order': bubbles.length - index } as MotionStyle}
         data-stacked-hidden={index > 2}
         onClick={() => {
           const session = state.sessions[bubble.sessionId];
           if (session) void onOpen({ provider: session.provider, sessionId: session.sessionId });
         }}>
-        <strong>{bubble.name}</strong><span>{labels[bubble.status]}</span>
-      </motion.button>)}
+        <span className={styles.statusIcon} aria-hidden="true"><Icon name={bubble.status === 'working' ? 'clock' : bubble.status === 'completed-unread' ? 'check' : 'alert'} /></span><span className={styles.copy}><strong>{bubble.name}</strong><span>{labels[bubble.status]}</span></span>
+      </MotionGlassButton>)}
     </motion.div>
   </div>;
 }

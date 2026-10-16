@@ -1,5 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { PiBridgeAdapter as ConfigurationAdapter } from '@agent-pet/adapter-pi';
+import type { SessionState } from '@agent-pet/domain';
+import { Configurations } from './configurations.js';
+import { registerConfigurationIpc } from './configuration-ipc.js';
 import { PreferenceStore } from './preferences.js';
 import { PiPreflight } from './pi-preflight.js';
 import { PiConnectionStore } from './pi-connection-store.js';
@@ -12,7 +16,8 @@ import type { ManagementState, PreferencePatch, Preferences } from '../shared/pr
 export function createManagement(options: {
   applyPreferences(preferences: Preferences): void;
   stop(): Promise<void>;
-  developmentMenu: Electron.MenuItemConstructorOptions[];
+  onlineChanged?(online: boolean): void;
+  sessions?(): SessionState;
   pi: { adapter: PiBridgeAdapter; publish: ObservationSink['publish']; developmentEnvironment: boolean };
 }) {
   const preferences = new PreferenceStore(join(app.getPath('userData'), 'preferences.json'));
@@ -28,12 +33,30 @@ export function createManagement(options: {
       return result.canceled ? null : result.filePaths[0] ?? null;
     },
   });
-  const connection = new PiConnection({ ...options.pi, target: () => preflight.snapshot(),
+  const connection = new PiConnection({ ...options.pi, publish: observation => { configurations.registerLegacySession(observation.sessionId); options.pi.publish(observation); }, target: () => preflight.snapshot(),
     ...(!options.pi.developmentEnvironment ? { store: new PiConnectionStore(app.getPath('userData')) } : {}) });
   connection.subscribe(snapshot => {
+    if (options.pi.developmentEnvironment) options.onlineChanged?.(snapshot.status === 'connected');
     if (window && !window.isDestroyed()) window.webContents.send('management:pi-connection-state', snapshot);
   });
-  let tray: Tray;
+  const legacyState = connection.snapshot();
+  const collectionOwnsLegacy = !!(legacyState.deployedPath || legacyState.saved === 'invalid' || options.pi.developmentEnvironment);
+  const configurations = new Configurations({ directory: app.getPath('userData'),
+    adapter: () => new ConfigurationAdapter(), publish: options.pi.publish,
+    developmentEnvironment: options.pi.developmentEnvironment,
+    ...(collectionOwnsLegacy
+      ? { legacy: { connection, targetPath: legacyState.deployedPath ? dirname(dirname(legacyState.deployedPath)) : preflight.snapshot().target.path } } : {}),
+  });
+  configurations.subscribe(snapshot => {
+    options.onlineChanged?.(snapshot.records.some(record => record.connection?.status === 'connected'));
+    if (window && !window.isDestroyed()) window.webContents.send('management:configurations-state', snapshot);
+  });
+  const configurationIpc = registerConfigurationIpc({ window: () => window, configurations, preflight,
+    sessions: () => options.sessions?.() ?? { sessions: {}, bubbles: [] }, quitting: () => quitting });
+  let tray: Tray | undefined;
+  let runtimeError: string | null = null;
+  let dockReady = false;
+  let entryRevision = 0;
   let quitting = false;
   let stopped = false;
   let loginError: string | null = null;
@@ -45,7 +68,7 @@ export function createManagement(options: {
       try { enabled = app.getLoginItemSettings().openAtLogin; }
       catch { readError = '无法读取系统登录项状态。'; }
     }
-    return { preferences: preferences.snapshot(), preferenceError: preferences.error,
+    return { preferences: preferences.snapshot(), preferenceError: preferences.error ?? runtimeError,
       login: { supported: loginSupported, enabled, error: readError ?? loginError } };
   }
   function publish(): ManagementState {
@@ -56,29 +79,39 @@ export function createManagement(options: {
   function update(patch: PreferencePatch): ManagementState {
     if (quitting) throw new Error('Application is quitting');
     const previous = preferences.snapshot();
-    if (preferences.update(patch)) options.applyPreferences(preferences.snapshot());
-    if (previous.petVisible !== preferences.snapshot().petVisible) rebuildMenu();
+    if (preferences.update(patch)) {
+      runtimeError = null;
+      try {
+        applyEntrypoints(previous);
+        options.applyPreferences(preferences.snapshot());
+      } catch { runtimeError = '偏好已保存，但部分系统设置未生效，请重新打开应用后检查。'; }
+    }
+    rebuildMenu();
     return publish();
   }
   function open(): void {
     if (quitting) return;
     windowRequested = true;
     if (!window || window.isDestroyed()) {
-      window = new BrowserWindow({ width: 900, height: 680, minWidth: 620, minHeight: 480,
-        show: false, title: 'Agent Pet', backgroundColor: '#f5f7fa',
+      window = new BrowserWindow({ width: 900, height: 680, minWidth: 400, minHeight: 400,
+        show: false, frame: process.platform === 'darwin', title: 'Agent Pet', backgroundColor: '#f7f4ff',
+        ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
         webPreferences: { preload: join(__dirname, '../preload/management.cjs'),
           contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true } });
       const current = window;
       current.on('close', event => {
-        connection.invalidate();
-        if (!quitting) { event.preventDefault(); windowRequested = false; current.hide(); }
+        connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate();
+        if (!quitting) {
+          event.preventDefault(); windowRequested = false;
+          if (preferences.snapshot().background) current.hide(); else app.quit();
+        }
       });
-      current.webContents.on('did-start-loading', () => connection.invalidate());
-      current.webContents.on('render-process-gone', () => connection.invalidate());
+      current.webContents.on('did-start-loading', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
+      current.webContents.on('render-process-gone', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
       current.once('ready-to-show', () => {
         if (!quitting && windowRequested && window === current && !current.isDestroyed()) current.show();
       });
-      current.on('closed', () => { connection.invalidate(); if (window === current) window = undefined; });
+      current.on('closed', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); if (window === current) window = undefined; });
       const dev = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
       loadTrustedEntry(current, join(__dirname, '../renderer/management.html'), dev ? new URL('management.html', dev.endsWith('/') ? dev : dev + '/').href : undefined);
     } else {
@@ -100,7 +133,10 @@ export function createManagement(options: {
     tray?.setContextMenu(Menu.buildFromTemplate(menuItems()));
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: 'Agent Pet', submenu: menuItems() },
-      { role: 'editMenu' }, { role: 'viewMenu' }, ...options.developmentMenu,
+      { role: 'editMenu' }, { label: 'View', submenu: [
+        { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' },
+        { type: 'separator' }, { role: 'resetZoom' }, { role: 'togglefullscreen' },
+      ] },
     ]));
   }
   // Small bundled monochrome menu-bar glyph; no remote icon or extra asset dependency.
@@ -110,10 +146,45 @@ export function createManagement(options: {
   }
   const icon = nativeImage.createFromBitmap(pixels, { width: 16, height: 16, scaleFactor: 1 });
   icon.setTemplateImage(true);
-  tray = new Tray(icon);
-  tray.setToolTip('Agent Pet');
-  tray.on('click', open);
+  function applyEntrypoints(previous?: Preferences): void {
+    const next = preferences.snapshot();
+    const revision = ++entryRevision;
+    function ensureTray(): void {
+      if (tray) return;
+      tray = new Tray(icon);
+      tray.setToolTip('Agent Pet'); tray.on('click', open); rebuildMenu();
+    }
+    // Establish a confirmed remaining entry before removing the previous one.
+    if (next.tray || (!next.tray && !dockReady)) ensureTray();
+    if (process.platform === 'darwin' && app.dock) {
+      if (next.dock && (!dockReady || !previous || previous.dock !== next.dock)) {
+        dockReady = false;
+        ensureTray();
+        void app.dock.show().then(() => {
+          if (revision !== entryRevision || quitting) return;
+          dockReady = true;
+          if (!preferences.snapshot().tray && tray) { tray.destroy(); tray = undefined; }
+        }).catch(() => {
+          if (revision !== entryRevision || quitting) return;
+          dockReady = false;
+          runtimeError = 'Dock 图标未能显示，已保留菜单栏入口，请重试或重新打开应用。';
+          ensureTray(); publish();
+        });
+      } else if (!next.dock) { dockReady = false; app.dock.hide(); }
+    }
+    if (!next.tray && dockReady && tray) { tray.destroy(); tray = undefined; }
+  }
+  applyEntrypoints();
   rebuildMenu();
+  ipcMain.handle('management:window-action', (event, action: unknown) => {
+    assertWindowSender(window, event);
+    if (typeof action !== 'string' || !['minimize', 'toggle-maximize', 'close'].includes(action)) throw new TypeError('Invalid window action');
+    if (quitting) return;
+    if (action === 'minimize') window!.minimize();
+    else if (action === 'toggle-maximize') {
+      if (window!.isMaximized()) window!.unmaximize(); else window!.maximize();
+    } else window!.close(); // Existing close handler owns background/quit and preview invalidation.
+  });
   ipcMain.handle('management:get-state', event => { assertWindowSender(window, event); return state(); });
   ipcMain.handle('management:update-preferences', (event, patch: unknown) => {
     assertWindowSender(window, event);
@@ -189,14 +260,18 @@ export function createManagement(options: {
     if (quitting) return;
     quitting = true;
     preflight.close();
-    void Promise.all([options.stop(), connection.stop()]).catch(() => { console.warn('Adapter shutdown failed'); }).finally(() => {
-      stopped = true; tray.destroy();
+    void Promise.all([options.stop(), configurations.stop(), ...(collectionOwnsLegacy ? [] : [connection.stop()])]).catch(() => { console.warn('Adapter shutdown failed'); }).finally(() => {
+      stopped = true; tray?.destroy();
       // Let native cancellation of the first before-quit unwind before retrying.
       // A microtask retry can leave a windowless process holding the instance lock.
       setImmediate(() => app.quit());
     });
   });
   options.applyPreferences(preferences.snapshot());
+  // Construct the trusted IPC owner without forcing a console on startup.
   open();
-  return { update, open, connection, isQuitting: () => quitting };
+  if (!preferences.snapshot().startConsole) { windowRequested = false; window?.hide(); }
+  return { update, open, connection, configurations,
+    publishSessions(snapshot: SessionState) { if (window && !window.isDestroyed()) window.webContents.send('management:sessions', snapshot); },
+    preferences: () => preferences.snapshot(), isQuitting: () => quitting };
 }

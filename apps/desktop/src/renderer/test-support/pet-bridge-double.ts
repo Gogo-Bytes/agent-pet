@@ -3,6 +3,7 @@ import { createApplication } from '@agent-pet/application';
 import type { OpenSessionResult, SessionRef } from '@agent-pet/adapter-core';
 import type { SessionObservation, SessionState } from '@agent-pet/domain';
 import type { OverlayLayout } from '../../shared/overlay-layout.js';
+import { defaultPreferences, type Preferences } from '../../shared/preferences.js';
 import { baselineLayout } from './pi-fixtures.js';
 
 type Options = {
@@ -21,6 +22,8 @@ export function createPetBridgeDouble(options: Options = {}) {
   for (const observation of options.observations ?? []) application.observe(observation);
   const snapshotListeners = new Set<(snapshot: SessionState) => void>();
   const layoutListeners = new Set<(layout: OverlayLayout) => void>();
+  const preferenceListeners = new Set<(preferences: Preferences) => void>();
+  let preferences = { ...defaultPreferences };
   let layout = options.layout ?? baselineLayout();
   const unsubscribe = application.subscribe(snapshot => {
     for (const listener of snapshotListeners) listener(snapshot);
@@ -30,6 +33,11 @@ export function createPetBridgeDouble(options: Options = {}) {
     requestSnapshot: vi.fn(async () => {
       for (const listener of snapshotListeners) listener(application.snapshot());
       for (const listener of layoutListeners) listener(layout);
+      for (const listener of preferenceListeners) listener(preferences);
+    }),
+    subscribePreferences: vi.fn((listener: (preferences: Preferences) => void) => {
+      preferenceListeners.add(listener);
+      return () => { preferenceListeners.delete(listener); };
     }),
     subscribeSnapshot: vi.fn((listener: (snapshot: SessionState) => void) => {
       const registration = (snapshot: SessionState) => listener(snapshot);
@@ -41,6 +49,7 @@ export function createPetBridgeDouble(options: Options = {}) {
       layoutListeners.add(registration);
       return () => { layoutListeners.delete(registration); };
     }),
+    controlsVisible: vi.fn(async (_visible: boolean) => {}),
     bubblesExpanded: vi.fn(async (_expanded: boolean) => {}),
     bubblesVisible: vi.fn(async (_visible: boolean) => {}),
     interaction: vi.fn(async (_active: boolean) => {}),
@@ -55,7 +64,11 @@ export function createPetBridgeDouble(options: Options = {}) {
       layout = value;
       for (const listener of layoutListeners) listener(layout);
     },
+    publishPreferences(value: Preferences) {
+      preferences = value;
+      for (const listener of preferenceListeners) listener(value);
+    },
     listenerCounts: () => ({ snapshot: snapshotListeners.size, layout: layoutListeners.size }),
-    dispose() { unsubscribe(); snapshotListeners.clear(); layoutListeners.clear(); },
+    dispose() { unsubscribe(); snapshotListeners.clear(); layoutListeners.clear(); preferenceListeners.clear(); },
   };
 }

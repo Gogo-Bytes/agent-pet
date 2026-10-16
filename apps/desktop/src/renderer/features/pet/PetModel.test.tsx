@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
-import { Activity, Component, StrictMode, type ReactNode } from 'react';
+import { Activity, StrictMode } from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { create, act, type ReactThreeTest } from '@react-three/test-renderer';
 import { Bounds, useGLTF } from '@react-three/drei';
 import { useThree, type RootState } from '@react-three/fiber';
-import { Box3, Mesh, Vector3, type Group, type AnimationClip } from 'three';
+import { Box3, Mesh, Raycaster, Vector2, Vector3, type Group, type AnimationClip } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PetModel } from './PetModel.js';
 import { bundledAnimationBounds } from './bundled-animation-bounds.js';
-import type { PetMotion } from '@agent-pet/pet-runtime';
+import type { PetMotion, PetAnimations } from '@agent-pet/pet-runtime';
 
 // Real parsed asset, R3F reconciler, Drei Bounds/useAnimations, Three actions.
 // Only network/cache access is substituted; this test does not claim WebGL.
@@ -27,23 +27,43 @@ beforeAll(async () => {
 afterAll(() => vi.unstubAllGlobals());
 afterEach(async () => { for (const view of mounted.splice(0)) await view.unmount(); vi.restoreAllMocks(); });
 
-async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.animations) {
+async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.animations, reduced = false) {
   vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: clips } as ReturnType<typeof useGLTF>);
   let state!: RootState;
   function Probe() { state = useThree(); return null; }
+  let presentation: { replay?: string; restAction?: PetMotion; animations?: PetAnimations } = {};
   const ready = vi.fn();
+  const hover = vi.fn();
   const tree = (value: PetMotion, visible = true) => <StrictMode><Activity mode={visible ? 'visible' : 'hidden'}><Probe /><Bounds margin={1.2} maxDuration={0}>
-    <PetModel motion={value} onReady={ready} />
+    <PetModel {...presentation} motion={value} reduced={reduced} onReady={ready} onHover={hover} />
   </Bounds></Activity></StrictMode>;
   const view = await create(tree(motion), { width: size, height: size, camera: { fov: 35, position: [0, 0, 5] } });
   mounted.push(view);
   const root = state.scene.getObjectByName('Pet')!;
-  return { view, root, state, ready, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)) };
+  return { view, root, state, ready, hover, present: (value: typeof presentation) => { presentation = value; return view.update(tree(motion)); }, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
 }
 
 describe('PetModel bundled animation behavior', () => {
+  it('raycasts the real GLB instead of its transparent canvas corners and clears hover on teardown', async () => {
+    const { view, state, hover } = await mount();
+    await view.advanceFrames(2, .016);
+    state.scene.updateMatrixWorld(true); state.camera.updateMatrixWorld();
+    const ray = new Raycaster();
+    ray.setFromCamera(new Vector2(0, 0), state.camera);
+    expect(ray.intersectObjects(state.scene.children, true).length).toBeGreaterThan(0);
+    ray.setFromCamera(new Vector2(.99, .99), state.camera);
+    expect(ray.intersectObjects(state.scene.children, true)).toHaveLength(0);
+    const target = view.scene.findByProps({ name: 'pet-pointer-target' });
+    await view.fireEvent(target, 'pointerOver', { stopPropagation: vi.fn() });
+    expect(hover).toHaveBeenLastCalledWith(true);
+    await view.fireEvent(target, 'pointerOut', {});
+    expect(hover).toHaveBeenLastCalledWith(false);
+    await view.unmount(); mounted.splice(mounted.indexOf(view), 1);
+    expect(hover).toHaveBeenLastCalledWith(false);
+  });
+
   it.each([
-    ['idle', 0, .01], ['working', .06, .08], ['success', 0, .225], ['error', .05, 0],
+    ['idle', 0, .01], ['working', .06, .08], ['success', 0, .225], ['error', 0, 0],
   ] as const)('plays %s using the actual GLB clip', async (motion, x, y) => {
     const { view, root } = await mount(motion);
     await view.advanceFrames(3, .1);
@@ -52,6 +72,21 @@ describe('PetModel bundled animation behavior', () => {
     expect(vi.mocked(useGLTF)).toHaveBeenCalledWith(expect.stringContaining('starter.glb'), false, false);
   });
 
+  it('pauses continuous GLB movement when reduced animation is selected, then resumes from the chosen state', async () => {
+    const { view, root, reduce, switchMotion } = await mount('working', 140, asset.animations, true);
+    await view.advanceFrames(1, .1); // Evaluate the selected clip at its static initial pose.
+    const position = root.position.clone();
+    await view.advanceFrames(8, .1);
+    expect(root.position.equals(position)).toBe(true);
+    await switchMotion('error');
+    await view.advanceFrames(1, .1);
+    const errorPosition = root.position.clone();
+    await view.advanceFrames(8, .1);
+    expect(root.position.equals(errorPosition)).toBe(true);
+    await reduce(false);
+    await view.advanceFrames(3, .1);
+    expect(root.position.equals(position)).toBe(false);
+  });
   it('stops prior actions on quick switches and releases the pose/frame subscription on unmount without disposing cache assets', async () => {
     const cachedPet = asset.scene.getObjectByName('Pet')!;
     const cachedHead = asset.scene.getObjectByName('Head') as Mesh;
@@ -92,19 +127,70 @@ describe('PetModel bundled animation behavior', () => {
     expect(root.position.y).toBeCloseTo(.3, 4);
   });
 
-  it('rejects a missing required Idle clip at the model boundary', async () => {
-    const caught = vi.fn();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-      state = { failed: false };
-      static getDerivedStateFromError() { return { failed: true }; }
-      componentDidCatch(error: Error) { caught(error.message); }
-      render() { return this.state.failed ? null : this.props.children; }
+  it('renders a static asset with no Idle or animations', async () => {
+    const { view, root, ready, switchMotion } = await mount('working', 140, []);
+    expect(ready).toHaveBeenCalledWith('');
+    for (const motion of ['working', 'success', 'error', 'idle'] as const) {
+      await switchMotion(motion); await view.advanceFrames(5, .1);
+      expect(root.position.toArray()).toEqual([0, 0, 0]);
     }
-    vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: [] } as ReturnType<typeof useGLTF>);
-    const view = await create(<Boundary><PetModel motion="idle" onReady={vi.fn()} /></Boundary>);
-    mounted.push(view);
-    expect(caught).toHaveBeenCalledWith('Required Idle clip is missing');
+  });
+
+  it('stops a working animation and restores the default pose when fallback is absent', async () => {
+    const { view, root, switchMotion } = await mount('working', 140, asset.animations.filter(clip => clip.name === 'Work'));
+    await view.advanceFrames(3, .1); expect(root.position.y).toBeGreaterThan(0);
+    await switchMotion('error'); await view.advanceFrames(4, .1);
+    expect(root.position.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it('plays celebration once and returns to the available idle pose', async () => {
+    const { view, root } = await mount('success');
+    await view.advanceFrames(12, .1);
+    await view.advanceFrames(3, .1);
+    expect(root.position.x).toBe(0);
+    expect(root.position.y).toBeLessThan(.05);
+  });
+
+  it('restores a static pose after the once-only clip ends when no Idle exists', async () => {
+    const { view, root } = await mount('success', 140, asset.animations.filter(clip => clip.name === 'Success'));
+    await view.advanceFrames(12, .1);
+    expect(root.position.toArray()).toEqual([0, 0, 0]);
+    await view.advanceFrames(12, .1);
+    expect(root.position.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it('continues current work when a transient animation is missing', async () => {
+    const { view, root, present } = await mount('tool_error');
+    await present({ restAction: 'working', replay: 'missing-tool-1' });
+    await view.advanceFrames(3, .1);
+    expect(root.position.x).toBeCloseTo(.06, 4);
+    expect(root.position.y).toBeCloseTo(.08, 4);
+  });
+
+  it('plays a transient once, does not replay it when the resume action changes, then resumes the latest activity', async () => {
+    const { view, root, present } = await mount('tool_error');
+    const animations = { tool_error: 'Success', working: 'Work', reading: 'Work' };
+    await present({ animations, restAction: 'working', replay: 'tool-1' });
+    await view.advanceFrames(3, .1); expect(root.position.y).toBeCloseTo(.225, 4);
+    await present({ animations, restAction: 'reading', replay: 'tool-1' });
+    await view.advanceFrames(1, .1); expect(root.position.y).toBeCloseTo(.3, 4);
+    await view.advanceFrames(8, .1); await view.advanceFrames(3, .1);
+    expect(root.position.x).toBeCloseTo(.06, 4); expect(root.position.y).toBeCloseTo(.08, 4);
+  });
+
+  it('does not replay an already observed business result after waiting or remount, but plays a new work result', async () => {
+    const { view, root, present, switchMotion } = await mount('success');
+    await present({ replay: 'business-success-one' });
+    await view.advanceFrames(3, .1); expect(root.position.y).toBeCloseTo(.225, 4);
+    await switchMotion('waiting_input'); await view.advanceFrames(2, .1);
+    await switchMotion('success'); await view.advanceFrames(3, .1);
+    expect(root.position.y).toBeLessThan(.05);
+    await view.unmount(); mounted.splice(mounted.indexOf(view), 1);
+    const other = await mount('success');
+    await other.present({ replay: 'business-success-one' });
+    await other.view.advanceFrames(3, .1); expect(other.root.position.y).toBeLessThan(.05);
+    await other.present({ replay: 'business-success-two' });
+    await other.view.advanceFrames(3, .1); expect(other.root.position.y).toBeCloseTo(.225, 4);
   });
 
   it('refits after an authoritative size change without replacing the animated instance', async () => {

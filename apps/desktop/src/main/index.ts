@@ -3,6 +3,7 @@ import type { AdapterHandle, SessionRef } from '@agent-pet/adapter-core';
 import { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import { createApplication } from '@agent-pet/application';
 import { join } from 'node:path';
+import { createDevObservationEvidence } from './dev-observation-evidence.js';
 import { createManagement } from './management.js';
 import { assertWindowSender, loadTrustedEntry } from './window-trust.js';
 import { createPetWindowOptions } from './window-options.js';
@@ -78,7 +79,11 @@ function startPrimaryInstance(): void {
   // Partial/invalid env configuration also reserves the dev path: never silently replace it.
   const developmentEnvironment = process.env.AGENT_PET_PI_ENDPOINT !== undefined ||
     process.env.AGENT_PET_PI_TOKEN !== undefined || piConfig !== undefined;
+  const evidence = !app.isPackaged && process.env.AGENT_PET_DEV_EVIDENCE_DIR
+    ? createDevObservationEvidence(process.env.AGENT_PET_DEV_EVIDENCE_DIR) : undefined;
+  app.once('will-quit', () => evidence?.close());
   application.subscribe((snapshot) => {
+    evidence?.observe(snapshot);
     management?.publishSessions(snapshot);
     if (petWindow && !petWindow.isDestroyed()) {
       petWindow.webContents.send('pet:snapshot', snapshot);

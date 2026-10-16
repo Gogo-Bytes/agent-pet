@@ -378,3 +378,21 @@ loading with the same endpoint/token. No startup scan, automatic installation or
 edit is performed. Do not run these commands or reload an active pi session on the
 user's behalf. The Adapter never starts or resumes pi and `openSession` remains
 unsupported.
+
+## Explicit dev-only extension update / event evidence
+
+The host/operator helper `PiExtensionUpdate` is not a startup task or Renderer IPC.
+It requires a valid private receipt, exact owned file, inactive receiver and unchanged
+settings/receipt; it retains private backups and updates actual ownership after an
+atomic replacement. Its explicit `restore()` validates private backup identity and
+content. Uncertain publication preserves files and fails closed, without automatic
+repair. See [the current real-target preview](../../docs/PI-EXTENSION-UPDATE-PREVIEW.md)
+before any daily target action. `scripts/pi-extension-update.mjs` requires an explicit
+connection directory, expected target, UUID operation and `preview|apply|restore` mode;
+it never discovers targets, starts pi, prints credentials or sends model requests.
+
+For explicitly authorized live checks, a non-packaged dev may set
+`AGENT_PET_DEV_EVIDENCE_DIR` to a pre-created private 0700 directory. The evidence
+file is exclusive 0600, capped at 128 KiB, and contains enum observations/action
+intents with salted aliases only. It is not proof that a clip rendered, nor a task
+body recorder; no variable means no recording, and packaged apps ignore it.

@@ -30,11 +30,11 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 全量 **760 passed / 1 skipped / 77 files**、typecheck、desktop build、原型build、真实Electron缩放fixture通过；当前正式dev设置页实看比例恢复、无序号。未打包或推送，pi细分任务验证暂停待继续。见 [修复与验收边界](UI-SCALE-REGRESSION-ACCEPTANCE.md)。原设置停点与native fixtures保留。
 
-## 当前连接的扩展更新准备（2026-10-16）
+## 当前连接的扩展更新与真实事件验证（2026-10-16）
 
 用户要求更新当前pi扩展并做真实细分验证，保留配置，仅用dev。只读核对当前默认配置、私有receipt与现有扩展匹配，runtime有效/socket缺失。新增显式host/operator更新器：严格ownership与inactive保护、原目标绑定、700/600私有备份、原子替换及新receipt、显式校验恢复；保留接收配置与settings，不接Renderer/自动启动更新。dev可显式启用有界枚举证据，匿名身份、无正文/名称/凭据，打包应用忽略。
 
-工程工具已验证：全量 **756 passed / 1 skipped / 76 files**，typecheck、desktop build通过；独立重点19项通过，最终目标绑定补测20项通过。没有打包或依赖安装。真实替换/恢复连接/用户reload及任务矩阵尚未执行，精确范围确认待回复；见 [操作预览](PI-EXTENSION-UPDATE-PREVIEW.md)。原设置实机停点和native fixtures保留。
+工程工具已验证：全量 **756 passed / 1 skipped / 76 files**，typecheck、desktop build通过；独立重点19项通过，最终目标绑定补测20项通过。没有打包或依赖安装。用户已确认精确预览；真实扩展替换和原配置dev接收恢复完成，settings校验一致，新源码/receipt匹配，目标/凭据/runtime/disabled保留。用户reload后自行完成限定任务，真实收到读取、写入、执行6.027秒、单个工具出错、继续回答与正常完成，任务中途保持working，能力随实际事件确认。思考/查找仍unknown，整个任务失败/取消/等待/整理/长度中断及真实动画显示未验收；见 [操作预览](PI-EXTENSION-UPDATE-PREVIEW.md) 与 [实机记录](PI-EXTENSION-LIVE-ACCEPTANCE.md)。原设置实机停点和native fixtures保留。
 
 ## 多 Agent 动作与艺术家契约确认（2026-10-15）
 

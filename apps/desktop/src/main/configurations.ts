@@ -10,9 +10,10 @@ import { ConfigurationsStore, configurationName, configurationPath, MAX_CONFIGUR
 import { PiConnection } from './pi-connection.js';
 import { PiConnectionStore } from './pi-connection-store.js';
 import { inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
+import { ClaudePresence, type ClaudePresenceOptions } from './claude-presence.js';
 
 type Entry = { metadata: ConfigurationMetadata; inspection: Inspection | null; revision: number;
-  connection: PiConnection | null; unsubscribe?: () => void; controller?: AbortController };
+  connection: PiConnection | null; claude?: ClaudePresence; unsubscribe?: () => void; controller?: AbortController };
 
 /** Main owns persistence, inspection and PiConnection capabilities. Renderer selection is observational.
  * IPC accepts only explicitly approved native selections or Main-resolved detected defaults.
@@ -32,6 +33,7 @@ export class Configurations {
     publish: ObservationSink['publish'];
     developmentEnvironment?: boolean;
     legacy?: { connection: PiConnection; targetPath: string };
+    claude?: Omit<ClaudePresenceOptions, 'directory' | 'configurationId'>;
   }) {
     this.store = new ConfigurationsStore(options.directory);
     if (this.store.error) this.notice = 'saved-invalid';
@@ -72,13 +74,18 @@ export class Configurations {
         }, developmentEnvironment: this.options.developmentEnvironment ?? false,
         store });
     }
+    if (metadata.provider === 'claude' && this.options.claude) {
+      entry.claude = new ClaudePresence({ ...this.options.claude, directory: this.options.directory, configurationId: metadata.id });
+      entry.unsubscribe = entry.claude.subscribe(() => this.emit());
+    }
     if (entry.connection) entry.unsubscribe = entry.connection.subscribe(() => this.emit());
   }
   private receiverDirectory(id: string): string { return join(this.options.directory, `configuration-${id}`); }
   snapshot(): ConfigurationsState {
     const records: AgentConfiguration[] = [...this.entries.values()].map(entry => ({ ...structuredClone(entry.metadata),
       inspection: structuredClone(entry.inspection), connection: entry.connection?.snapshot() ?? null,
-      availability: entry.metadata.provider !== 'pi' ? 'unsupported' : entry.connection?.snapshot().saved === 'invalid' ? 'attention' : !entry.inspection ? 'unchecked' :
+      ...(entry.claude ? { claude: entry.claude.snapshot() } : {}),
+      availability: entry.claude ? entry.claude.snapshot().status === 'failed' ? 'attention' : 'available' : entry.metadata.provider !== 'pi' ? 'unsupported' : entry.connection?.snapshot().saved === 'invalid' ? 'attention' : !entry.inspection ? 'unchecked' :
         entry.inspection.findings.length ? 'attention' : 'available' }));
     return { revision: this.revision, records, notice: this.notice, busy: this.busy,
       sessionConfigurations: { ...this.sessionConfigurations } };
@@ -93,7 +100,7 @@ export class Configurations {
   }
   /** Window/navigation teardown revokes transient deployment consent; it does not stop active agents. */
   invalidateAll(): void {
-    for (const entry of this.entries.values()) { entry.controller?.abort(); entry.connection?.invalidate(); }
+    for (const entry of this.entries.values()) { entry.controller?.abort(); entry.connection?.invalidate(); entry.claude?.invalidate(); }
   }
   private emit(): ConfigurationsState {
     this.revision++; const state = this.snapshot();
@@ -132,7 +139,7 @@ export class Configurations {
   private update(id: string, change: (record: ConfigurationMetadata) => ConfigurationMetadata | ConfigurationNotice): ConfigurationsState {
     if (!this.available()) return this.result(this.blockedNotice());
     const entry = this.entry(id); if (!entry) return this.result('not-found');
-    if (entry.connection?.snapshot().busy) return this.result('busy');
+    if (entry.connection?.snapshot().busy || entry.claude?.snapshot().busy) return this.result('busy');
     const next = change(entry.metadata); if (typeof next === 'string') return this.result(next);
     if (!validMetadata(next)) return this.result('invalid');
     if (!this.persist(this.metadata().map(record => record.id === id ? next : record))) return this.emit();
@@ -151,6 +158,7 @@ export class Configurations {
   async changeTarget(id: string, value: string): Promise<ConfigurationsState> {
     const result = this.update(id, record => {
       const connection = this.entry(id)?.connection?.snapshot();
+      if (this.entry(id)?.claude?.snapshot().configured) return 'withdraw-first';
       // The injected legacy controller owns its original preflight closure. Remove and add a new record after withdrawal.
       if (record.id === 'legacy-pi' || connection?.deployedPath || connection?.saved === 'uncertain' || connection?.saved === 'invalid' ||
           connection?.receiving === 'unknown' || connection?.canConfigure === false) return 'withdraw-first';
@@ -160,7 +168,7 @@ export class Configurations {
     });
     if (result.notice === 'none') {
       const entry = this.entry(id)!; entry.controller?.abort(); entry.inspection = null;
-      entry.connection?.invalidate(); return this.emit();
+      entry.connection?.invalidate(); entry.claude?.invalidate(); return this.emit();
     }
     return result;
   }
@@ -192,11 +200,12 @@ export class Configurations {
     } finally { if (timer) clearTimeout(timer); }
     return this.emit();
   }
-  private async operation(id: string, work: (connection: PiConnection) => Promise<unknown> | unknown): Promise<ConfigurationsState> {
+  private async operation(id: string, work: (connection: PiConnection | ClaudePresence) => Promise<unknown> | unknown): Promise<ConfigurationsState> {
     if (!this.available()) return this.result(this.blockedNotice());
     const entry = this.entry(id); if (!entry) return this.result('not-found');
-    if (!entry.connection) return this.result('unsupported');
-    this.notice = 'none'; await work(entry.connection); return this.emit();
+    const connection = entry.claude ?? entry.connection;
+    if (!connection) return this.result('unsupported');
+    this.notice = 'none'; await work(connection); return this.emit();
   }
   preview(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.preview()); }
   cancel(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.invalidate()); }
@@ -206,9 +215,10 @@ export class Configurations {
   async remove(id: string): Promise<ConfigurationsState> {
     if (!this.available()) return this.result(this.blockedNotice());
     const entry = this.entry(id); if (!entry) return this.result('not-found');
-    if (entry.connection?.snapshot().busy) return this.result('busy');
+    if (entry.connection?.snapshot().busy || entry.claude?.snapshot().busy) return this.result('busy');
     this.busy = true; this.notice = 'none'; this.emit();
     try {
+      if (entry.claude && !await entry.claude.remove()) { this.notice = 'retained'; return this.snapshotAfterRemoval(); }
       const before = entry.connection?.snapshot();
       if (before?.deployedPath || before?.canRemove) {
         const removed = await entry.connection!.remove();
@@ -220,7 +230,7 @@ export class Configurations {
         this.notice = 'retained'; return this.snapshotAfterRemoval();
       }
       if (!this.persist(this.metadata().filter(record => record.id !== id))) return this.snapshotAfterRemoval();
-      entry.controller?.abort(); entry.unsubscribe?.(); await entry.connection?.stop(); this.entries.delete(id);
+      entry.controller?.abort(); entry.unsubscribe?.(); await entry.connection?.stop(); await entry.claude?.stop(); this.entries.delete(id);
       for (const session of Object.keys(this.sessionConfigurations)) if (this.sessionConfigurations[session] === id) delete this.sessionConfigurations[session];
       this.notice = 'none'; return this.snapshotAfterRemoval();
     } finally { if (this.busy) { this.busy = false; this.emit(); } }
@@ -229,7 +239,7 @@ export class Configurations {
   async stop(): Promise<void> {
     this.closed = true;
     for (const entry of this.entries.values()) { entry.controller?.abort(); entry.unsubscribe?.(); }
-    const results = await Promise.allSettled([...this.entries.values()].map(entry => entry.connection?.stop()));
+    const results = await Promise.allSettled([...this.entries.values()].flatMap(entry => [entry.connection?.stop(), entry.claude?.stop()]));
     this.listeners.clear();
     if (results.some(result => result.status === 'rejected')) throw new Error('Configuration receiver shutdown not confirmed');
   }

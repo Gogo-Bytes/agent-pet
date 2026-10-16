@@ -162,3 +162,19 @@ binding, work correlation or runtime event support.
 
 No dependencies, installation, running Agent, configuration access, model request,
 UI changes, dev restart or application package is required for this stage.
+
+
+## Current formal presence integration (supersedes the earlier stage limits)
+
+`launcher-entry.ts` is now the explicit user-terminal executable. A separate authenticated
+`presence-channel.ts` binds each live invocation to Main; only enum/run identity crosses
+that channel. Native exit metadata returns to the terminal only. Isolated PTY tests verify
+Ctrl-C is delivered once to the foreground child and observation loss leaves it running.
+Detached/re-exec descendants and background mode are unsupported.
+
+Main uses dedicated private materials/controller behind Configurations, never imports the
+executable entry or starts an Agent. Formal Connections and Home consume Claude-specific
+presence state, without publishing task observations or displaying task actions/reminders.
+Dev/build compile standalone CJS hook/launcher assets. Exact files, persistence, failure
+preservation and real acceptance limits are documented in [the current slice](../../docs/CLAUDE-CLI-PRESENCE-DESIGN.md).
+Earlier “not yet runnable/Main/UI” paragraphs describe their historical stage only.

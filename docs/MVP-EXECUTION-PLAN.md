@@ -24,6 +24,12 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 - 此前仅授权 M1/M2 部署与桌面授权入口的代码实现、自有临时目标/隔离 socket 验证。2026-10-08 用户另授权以 Computer-Use 操作桌面端验收，范围为本轮自建的独立测试目录；开发版 App 已运行。仍不读写日常 HOME/pi 配置或安装目标、不安装依赖。M2 的目标读写/部署/连接须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权；本轮已按预览确认写入并在同一桌面进程撤回自有测试扩展。
 - 普通实现与小修复由 Main 按范围推进，不逐项询问用户；只有结果/范围变化、真实环境权限、不可逆动作、新增依赖/实质成本或风险接受需要另行确认。打包依赖安装与签名账号/证书成本分开处理，不默认获准。
 
+## Claude CLI 正式连接与首页（2026-10-16）
+
+连接与静态陪伴已接入正式 Main/Configurations/连接页/首页；此节覆盖下方历史“尚未接通”的切片状态。用户终端显式启动，Main/UI不启动Agent；仅支持已核对的npm Claude2.1.301。私有材料精确预览/确认、认证控制通道、多运行身份、暂停/显式恢复/移除及保留运行文件已实现；任务动作和提醒仍未启用，不发布SessionObservation或伪造idle。原Claude/pi配置、hooks、shell和现有进程不变。
+
+一次有界完整低并行复验924 passed / 1 skipped / 87 files；typecheck和desktop build通过，独立重点140项通过。首次双并行终端fixture就绪超时、原文件5项复验与低并行结果分别保留；未削弱deadline/guard。隔离dev启动正式代码，自有Node程序验证完整连接流程；日常Claude前台运行及发布未验收，没有打包/推送。兼容范围、文件与剩余验收见[设计](CLAUDE-CLI-PRESENCE-DESIGN.md)和[验收记录](CLAUDE-CLI-ACCEPTANCE.md)。
+
 ## 多 Agent 最新实施顺序与 Claude 回调通道（2026-10-16）
 
 下一连接切片采用[明确用户终端启动、先连接与陪伴](CLAUDE-CLI-PRESENCE-DESIGN.md)，不在Main/UI启动Agent，不用idle冒充未知任务，不改Domain/Application。`launcher.ts`进程绑定库已实现：独立直接子进程/UUID/token，根hook观察和退出分别报告，断开观察不终止Agent，控制环境不继承；相关58项、最终全量822 passed / 1 skipped / 82 files、typecheck/desktop build通过，独立11项复验无确定问题；终端信号/原生参数及重入等覆盖限制见Claude记录。可执行入口、认证Main控制通道、私有材料部署/撤回和正式UI尚未完成，不能宣称Claude已连接。

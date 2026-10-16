@@ -1,0 +1,23 @@
+import * as fs from 'node:fs';
+import { join } from 'node:path';
+
+/** Compile-time-owned runtime artifacts; never reads an Agent installation or configuration. */
+export async function loadClaudeRuntimeAssets(): Promise<{ hook: string; launcher: string }> {
+  const read = (name: string): string => {
+    const path = join(__dirname, '../claude-runtime', name), before = fs.lstatSync(path);
+    if (!before.isFile() || before.size < 1 || before.size > 512 * 1024) throw new Error('Claude runtime unavailable');
+    const fd = fs.openSync(path, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+    try {
+      const buffer = Buffer.alloc(512 * 1024 + 1); let count = 0;
+      while (count < buffer.length) {
+        const size = fs.readSync(fd, buffer, count, buffer.length - count, count);
+        if (!size) break; count += size;
+      }
+      const after = fs.fstatSync(fd);
+      if (count > 512 * 1024 || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size ||
+          before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new Error('Claude runtime unavailable');
+      return buffer.subarray(0, count).toString('utf8');
+    } finally { fs.closeSync(fd); }
+  };
+  return { hook: read('hook.cjs'), launcher: read('launcher.cjs') };
+}

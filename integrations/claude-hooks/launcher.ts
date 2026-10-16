@@ -12,9 +12,12 @@ export type ClaudeInvocationEnd = {
   /** An exit is lifetime evidence only, never successful task completion. */
   outcome: 'child-ended' | 'spawn-failed';
   observation: 'closed' | 'unavailable';
+  /** Native process metadata only; never a task success/failure classification. */
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
 };
 
-/** For a future explicitly user-invoked terminal launcher only; never Main/UI.
+/** For the explicitly user-invoked terminal launcher only; never Main/UI.
  * Holds one direct child privately. No prompts, signals, transcript/config reads,
  * task state, persisted runtime, registration protocol or automatic retries.
  * Inherited terminal stdio preserves interactive CLI behavior; signal forwarding,
@@ -74,13 +77,13 @@ export async function observeClaudeInvocation(options: {
   } catch { throw new Error('Claude observation receiver unavailable'); }
 
   let ended = false;
-  const finish = (outcome: ClaudeInvocationEnd['outcome']) => {
+  const finish = (outcome: ClaudeInvocationEnd['outcome'], exitCode: number | null = null, signal: NodeJS.Signals | null = null) => {
     if (ended) return;
     ended = true;
     retired = true;
     report('child-ended');
     void stopObserving().then(() => resolveEnd({ runId, outcome,
-      observation: observationFailed ? 'unavailable' : 'closed' }));
+      observation: observationFailed ? 'unavailable' : 'closed', exitCode, signal }));
   };
   try {
     // User environment survives except every Agent Pet credential/control key.
@@ -98,7 +101,7 @@ export async function observeClaudeInvocation(options: {
     child = spawn(options.command, args, { ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
       env: environment, shell: false, stdio: 'inherit' });
     child.once('spawn', () => { spawned = true; report('child-started'); });
-    child.once('exit', () => finish('child-ended'));
+    child.once('exit', (code, signal) => finish('child-ended', code, signal));
     child.on('error', () => {
       void stopObserving();
       // A later process error is not proof of exit; only failed spawn has no child lifetime.

@@ -84,9 +84,9 @@ describe('explicit terminal invocation presence (own Node fixtures only)', () =>
     expect(registered.environment.AGENT_PET_CLAUDE_TOKEN).not.toBe('stale-hook-token');
     expect(events).toEqual([{ runId: invocation.runId, kind: 'child-started' }]);
     const result = await exit(7);
-    expect(result).toEqual({ runId: invocation.runId, outcome: 'child-ended', observation: 'closed' });
+    expect(result).toEqual({ runId: invocation.runId, outcome: 'child-ended', observation: 'closed', exitCode: 7, signal: null });
     expect(events).toEqual([{ runId: invocation.runId, kind: 'child-started' }, { runId: invocation.runId, kind: 'child-ended' }]);
-    expect(JSON.stringify({ events, result })).not.toMatch(/not-for-child|stale-hook|Bearer|token|url|exitCode|success/);
+    expect(JSON.stringify({ events, result })).not.toMatch(/not-for-child|stale-hook|Bearer|token|url|success/);
     expect(Object.keys(invocation).sort()).toEqual(['completed', 'runId', 'stopObserving']);
   });
 
@@ -164,7 +164,7 @@ describe('explicit terminal invocation presence (own Node fixtures only)', () =>
     const events = vi.fn();
     const invocation = await observeClaudeInvocation({ command: '/agent-pet-own-missing-fixture/absent', args: [],
       pluginDirectory: '/agent-pet-own-fixture-plugin', environment: {}, onPresence: events });
-    expect(await invocation.completed).toEqual({ runId: invocation.runId, outcome: 'spawn-failed', observation: 'closed' });
+    expect(await invocation.completed).toEqual({ runId: invocation.runId, outcome: 'spawn-failed', observation: 'closed', exitCode: null, signal: null });
     expect(events.mock.calls).toEqual([[{ runId: invocation.runId, kind: 'child-ended' }]]);
     await invocation.stopObserving();
   });
@@ -198,7 +198,7 @@ describe('explicit terminal invocation presence (own Node fixtures only)', () =>
     await new Promise<void>(resolve => setImmediate(resolve));
     expect(ended).toBe(false);
     const result = await exit();
-    expect(result).toEqual({ runId: invocation.runId, outcome: 'child-ended', observation: 'unavailable' });
+    expect(result).toEqual({ runId: invocation.runId, outcome: 'child-ended', observation: 'unavailable', exitCode: 0, signal: null });
     expect(events.map(event => event.kind)).toEqual(['child-started', 'hook-observed', 'child-ended']);
     expect(JSON.stringify(result)).not.toContain('PRIVATE');
   });
@@ -212,7 +212,7 @@ describe('explicit terminal invocation presence (own Node fixtures only)', () =>
     await invocation.stopObserving();
     expect(await sender(registered)('SessionStart', { source: 'startup' })).toBe('unavailable');
     expect(events.map(event => event.kind)).toEqual(['child-started']);
-    expect(await exit()).toEqual({ runId: invocation.runId, outcome: 'child-ended', observation: 'unavailable' });
+    expect(await exit()).toEqual({ runId: invocation.runId, outcome: 'child-ended', observation: 'unavailable', exitCode: 0, signal: null });
     expect(events.map(event => event.kind)).toEqual(['child-started', 'child-ended']);
   });
 

@@ -1,0 +1,10 @@
+.cfg-claude-scope{color:var(--menu-muted)}
+.cfg-claude-launch{width:100%;min-width:0}
+.cfg-claude-launch>label{display:block;margin-bottom:8px;font-weight:600}
+.cfg-claude-command{display:flex;gap:8px;align-items:center;min-width:0;margin-bottom:8px}
+.cfg-claude-command input{flex:1;min-width:0;width:0;height:40px;border:1px solid var(--menu-line);border-radius:8px;padding:0 10px;background:#f7f4fa;color:var(--menu-ink);font:11px ui-monospace,SFMono-Regular,Menlo,monospace;text-overflow:ellipsis}
+.cfg-claude-command button{flex:none;white-space:nowrap}
+.cfg-claude-files{list-style:none;margin:12px 0;padding:0}
+.cfg-claude-files li{min-width:0;padding:5px 0}
+.cfg-claude-files code{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+@media(forced-colors:active){.cfg-claude-command input{background:Canvas;color:CanvasText;border-color:CanvasText}}

@@ -18,7 +18,7 @@
 
 连接页先回答“现在是否连上、下一步点什么”，位置检查作为次要选项；保存信息、配置可用和实际在线继续分别表达。名称下方将 Agent 类型和连接状态放在同一行，不在正文再重复状态标签；需要时仍提供明确的下一步操作。默认文案使用“重新连接／暂停连接／继续连接”等日常用语，精确文件范围、技术原因和保存限制保留在展开说明与独立确认里。列表不再用“未检查”压缩名称。保留平铺页面及单行省略路径，实际画面见 [连接页记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 的最新修订。
 
-新增接入范围与顺序（2026-10-16）：用户确认Claude Code CLI、Codex CLI、Antigravity CLI优先依次实施，全部CLI先完成，Codex与Antigravity桌面端最后分别适配。CLI与桌面端属于同一Provider的不同宿主，兼容性、加载与实际事件分别验收；一端通过不代表另一端通过。保留现有配置，继续dev、不打包；当前Claude输入、回调传输和独立脚本已隔离验证，程序更新与manifest校验另有证据；尚无任一新Provider接通。执行证据与剩余条件见 [MVP计划](MVP-EXECUTION-PLAN.md) 和 [Claude记录](CLAUDE-CLI-ACCEPTANCE.md)。
+新增接入范围与顺序（2026-10-16）：用户确认Claude Code CLI、Codex CLI、Antigravity CLI优先依次实施，全部CLI先完成，Codex与Antigravity桌面端最后分别适配。CLI与桌面端属于同一Provider的不同宿主，兼容性、加载与实际事件分别验收；一端通过不代表另一端通过。保留现有配置，继续dev、不打包；当前Claude CLI已实现正式连接页与首页的连接/静态陪伴，隔离 dev 通过；真实日常前台接入和任务动作仍待验收。程序更新、manifest与隔离初始化另有证据。执行证据与剩余条件见 [MVP计划](MVP-EXECUTION-PLAN.md) 和 [Claude记录](CLAUDE-CLI-ACCEPTANCE.md)。
 
 ## 1. 产品一句话
 

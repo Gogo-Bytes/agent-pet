@@ -13,7 +13,7 @@ export function RemoveConnectionDialog({ record, busy, error, onClose, onRemove 
       <section className="cfg-dialog-body">
         <div className="cfg-remove-target"><strong>{record.name}</strong><code title={record.targetPath}>{record.targetPath}</code></div>
         <p>不会删除 Agent 程序或你的文件。</p>
-        <details className="cfg-operation-help"><summary>会移除什么？</summary><p>移除 Agent Pet 中的这条记录。{record.connection?.deployedPath ? '会先暂停连接，再删除本应用添加且未改动的连接文件：' : '没有本应用保存的连接文件需要清理。'}</p>
+        <details className="cfg-operation-help"><summary>会移除什么？</summary><p>{record.provider === 'claude' ? '只移除 Agent Pet 中的这条记录并停用观察。运行材料会保留，不影响正在运行的 Claude Code；不会删除用户文件。' : <>移除 Agent Pet 中的这条记录。{record.connection?.deployedPath ? '会先暂停连接，再删除本应用添加且未改动的连接文件：' : '没有本应用保存的连接文件需要清理。'}</>}</p>
           {record.connection?.deployedPath && <><code className="cfg-file-path" title={record.connection.deployedPath}>{record.connection.deployedPath}</code><p>被修改过或不能确认来源的文件会保留。移除未完成时，记录也会保留，方便重试。正在运行的 pi 不会自动重新加载；请在空闲时输入 /reload 或正常退出。</p></>}
         </details>
         {error && <p role="alert">{error}</p>}

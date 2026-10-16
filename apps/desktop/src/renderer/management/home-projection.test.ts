@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyObservation, createSessionState, type SessionObservation, type SessionState } from '@agent-pet/domain';
 import type { AgentConfiguration, ConfigurationsState } from '../../shared/configurations.js';
 import type { PiConnectionState } from '../../shared/pi-connection.js';
+import type { ClaudeConnectionState } from '../../shared/claude-connection.js';
 import { projectHomePets } from './home-projection.js';
 function config(id: string, status: PiConnectionState['status'] = 'connected'): AgentConfiguration {
   return { id, name: `项目 ${id}`, provider: 'pi', targetPath: `/isolated/${id}`, installation: null,
@@ -18,6 +19,17 @@ function sessions(values: Array<[string, SessionObservation['status']]>): Sessio
   }), createSessionState());
 }
 describe('home pet projection from shared configuration and Session state', () => {
+  it('projects each observing Claude configuration with neutral presence and no task facts, including zero Sessions', () => {
+    const claude = (id: string, status: ClaudeConnectionState['status']): AgentConfiguration => ({ ...config(id), provider: 'claude', connection: null,
+      claude: { revision: 0, scope: 'presence-only', status, busy: false, configured: true, observedRuns: status === 'observing' ? 1 : 0,
+        launchers: 1, preview: null, launchCommand: 'synthetic-launch', canConfigure: false, canResume: false, notice: 'none' } });
+    const source = collection([claude('one', 'observing'), claude('two', 'observing'), ...(['not-configured', 'waiting', 'disconnected', 'disabled', 'failed'] as const).map(status => claude(status, status))], { work: 'one', failure: 'two' });
+    for (const state of [createSessionState(), sessions([['work', 'working'], ['failure', 'error']])]) {
+      expect(projectHomePets(source, state, '默认').map(pet => [pet.id, pet.action, pet.restAction, pet.status])).toEqual([
+        ['one', 'presence', 'presence', '陪伴中 · 任务状态暂不可用'], ['two', 'presence', 'presence', '陪伴中 · 任务状态暂不可用'],
+      ]);
+    }
+  });
   it('preserves separate configuration identities for multiple installations of the same Provider', () => {
     const projected = projectHomePets(collection([config('one'), config('two')]), createSessionState(), '默认宠物');
     expect(projected.map(pet => [pet.id, pet.agent, pet.name, pet.configuration])).toEqual([

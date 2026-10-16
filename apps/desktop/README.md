@@ -420,3 +420,34 @@ entry in isolated configuration. Existing Agent settings/processes and pi remain
 Separately approved native manifest validation and isolated `--init-only` loading
 passed with real startup/end callbacks. Normal tasks, trusted native work binding
 and product Provider integration remain unverified. No application package was built.
+
+
+## Claude CLI connection and home presence (2026-10-16)
+
+Run `pnpm --filter @agent-pet/desktop dev` (no packaging). Add a Claude Code record
+in Connections, then choose **设置连接** and explicitly select the Claude executable.
+The initial supported layout is npm Claude Code2.1.301, resolving to `bin/claude.exe`;
+unknown versions/layouts are rejected without executing them. The configuration
+folder is a saved label only; it does not select a new Claude HOME or read its settings.
+
+Review the exact app-private files before confirming. Copy the displayed terminal
+command and run it yourself, with your usual cwd and arguments. It adds an independent
+`--plugin-dir`; existing settings/hooks/shell files and already-running Claude processes
+are preserved. Main and Renderer never spawn Claude. The Electron executable runs the
+standalone launcher/hook in Node mode; no separate Node installation is required for
+these two observers. Native Claude still uses its ordinary environment.
+
+A live direct child plus an observed root startup hook makes this configuration online.
+Home shows a static companion, with task state explicitly unavailable. Task actions and
+completion/error reminders are not yet enabled. Multiple invocations retain separate
+identity; closing one does not remove another. Pause, app exit or channel loss stops
+observation without terminating Claude. After restart, explicitly resume and launch a
+new Claude; old credentials/runs are not automatically adopted.
+
+Files live only in `userData/claude-<UUID>` (directories0700/files0600). Removing a
+configuration revokes observation and removes its product metadata; runtime/plugin
+files remain so a running CLI has no missing hook. Unknown, edited or uncertain files
+are preserved and block unsafe operations. No automatic runtime cleanup in this slice.
+Never print or copy `activation.json` into diagnostics; Renderer receives only public
+paths and a credential-free launch command. See [design](../../docs/CLAUDE-CLI-PRESENCE-DESIGN.md)
+and [formal/real acceptance boundaries](../../docs/CLAUDE-CLI-ACCEPTANCE.md).

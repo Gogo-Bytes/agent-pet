@@ -1,12 +1,12 @@
 /** Inert native plugin documents. No installation, settings merge, credential or launch.
  * Hook compatibility must be verified against the selected CLI before activation.
  */
-export function createClaudePluginDocuments(nodeExecutable: string): { manifest: string; hooks: string } {
+export function createClaudePluginDocuments(nodeExecutable: string, options: { runAsNode?: boolean } = {}): { manifest: string; hooks: string } {
   if (!nodeExecutable.startsWith('/') || nodeExecutable.length > 4096 || /[\u0000-\u001f\u007f]/u.test(nodeExecutable)) {
     throw new Error('An absolute Node executable is required');
   }
   const quotedNode = `'${nodeExecutable.replaceAll("'", "'\"'\"'")}'`;
-  const command = `${quotedNode} "\${CLAUDE_PLUGIN_ROOT}/runtime/hook.cjs"`;
+  const command = `${options.runAsNode ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quotedNode} "\${CLAUDE_PLUGIN_ROOT}/runtime/hook.cjs"`;
   const events = ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
     'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact'];
   return {

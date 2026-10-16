@@ -24,6 +24,16 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 - 此前仅授权 M1/M2 部署与桌面授权入口的代码实现、自有临时目标/隔离 socket 验证。2026-10-08 用户另授权以 Computer-Use 操作桌面端验收，范围为本轮自建的独立测试目录；开发版 App 已运行。仍不读写日常 HOME/pi 配置或安装目标、不安装依赖。M2 的目标读写/部署/连接须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权；本轮已按预览确认写入并在同一桌面进程撤回自有测试扩展。
 - 普通实现与小修复由 Main 按范围推进，不逐项询问用户；只有结果/范围变化、真实环境权限、不可逆动作、新增依赖/实质成本或风险接受需要另行确认。打包依赖安装与签名账号/证书成本分开处理，不默认获准。
 
+## 新 Agent 接入准备与 Claude 输入边界（2026-10-16）
+
+用户新增需求为Codex CLI、Claude Code与Antigravity桌面端/CLI接入，覆盖上文历史“新Provider不在当前范围”的工程排期限制；现有pi MVP与尚缺验收保持原状态。继续dev，不打包。真实安装读取/配置写入仍按各自精确预览授权，不因此放宽managed guard或数据保留契约。
+
+已按用户精确授权只读检查72候选/132次metadata与链接/1份Node manifest：Claude包2.1.143、Antigravity桌面端2.22.0；agy入口存在但版本未确认，Codex入口进入排除的.codex目录而停止，未读配置/凭据/会话、启动Agent或改文件。[安装范围与实际结果](AGENT-INSTALLATION-CHECK-PREVIEW.md)。
+
+第一阶段为独立Claude原生hook白名单输入边界：限定64KiB、丢弃正文/路径/工具内容，保留安全事实，未知事件忽略。区分无tool ID的PermissionRequest、实际permission_prompt、工具失败/中止和整个任务失败；Stop只是结束候选，不直接伪造完成未读，子任务不完成父Session。本阶段不注册Adapter、不改Main或UI、不启用回调、不建立在线连接；不能标为Claude已接通。本机版本只是metadata证据，真实加载与字段兼容性仍需另验。
+
+相关24项测试、pnpm typecheck与desktop build通过，无新增依赖或打包。后续按独立阶段实施认证接收/运行与工作身份/排序、Provider连接管理和安全部署，再做真实加载验收；随后Codex CLI与Antigravity两种宿主分别推进。模块及下一阶段条件见 [Claude输入边界](../integrations/claude-hooks/README.md)。既有未完成设置记录与历史native fixtures保留。
+
 ## dev 显示比例与设置序号修复（2026-10-16）
 
 当前应用的localhost保存了-1.5级缩放（约76%），同时影响管理页和桌宠；缩小还触发宽屏规则，暴露一直残留的设置序号。已在实际dev恢复100%，正式/原型都彻底删除序号节点和CSS；Main窗口入口恢复正常比例、View菜单移除放大/缩小，保留宠物大小偏好。当前dev未重启，Main保护下次启动生效，已用独立Electron验证同host双窗口及重载。没有修改pi配置、扩展或用户宠物大小。

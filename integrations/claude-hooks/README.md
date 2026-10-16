@@ -1,9 +1,9 @@
-# Claude Code passive observation — isolated stages 1–2
+# Claude Code passive observation — isolated stages 1–3
 
-**Implemented and isolated-tested normalization and local delivery only. Not a connected
+**Normalization, local delivery and a standalone hook command are implemented for isolated verification. Not a connected
 Adapter, installed hook, Main registration, or native compatibility acceptance.** Nothing
-in this directory is loaded by the running desktop or Claude Code. There is no executable
-hook command or hook configuration to install at this stage.
+in this directory is loaded by the running desktop or Claude Code. Generated plugin documents
+are not an installation or an authorization to load them.
 
 `normalizeClaudeHook()` accepts one JSON payload capped at 64 KiB (UTF-8 bytes),
 then returns a new object containing only bounded IDs, fixed categories and booleans. Explicit native
@@ -74,9 +74,40 @@ Resource bounds and rejection behavior live in the executable constants/schema a
 of cross-user isolation, peer process identity, trusted hook activation or production
 security acceptance. No credential persistence/installer is implemented yet.
 
+## Standalone command and plugin documents
+
+`command-entry.ts` is a dedicated, compiled Node hook process. It reads only the three
+`AGENT_PET_CLAUDE_URL`, `AGENT_PET_CLAUDE_TOKEN` and `AGENT_PET_CLAUDE_RUN_ID`
+environment values plus one bounded stdin message. It does not read files, enumerate
+environment variables or persist credentials. Missing binding data, malformed/oversized
+input, stdin failure/deadline and receiver failures remain silent and exit0. An inherited
+run UUID is not authority: the receiver still requires its independent trusted binding.
+The command does not emit decisions, context, prompts, logs or retry instructions.
+
+`runClaudeHook` takes exclusive ownership of an input stream when configuration is
+present. The supported input is native stdin with close events enabled; custom streams
+that suppress close while destroying asynchronously are not supported and may retain
+guard listeners. The dedicated command exits immediately after settlement.
+Settlement pauses/destroys that stream. A queued I/O error can outlive the
+stream's `closed` flag, so a silent error guard remains through close-event delivery,
+with deferred cleanup for an already-closed input. The library function never exits
+the process; only the dedicated entry does. Do not import that entry in Main.
+
+`createClaudePluginDocuments` is a pure document generator: the standard
+`.claude-plugin/plugin.json` and `hooks/hooks.json` contain passive command hooks, a
+quoted absolute Node executable and a runtime path under `${CLAUDE_PLUGIN_ROOT}`.
+No credential, run identity, setting overwrite, permission decision or Agent launch is
+embedded. Synthetic shell tests cover literal spaces/quotes/metacharacters; installed
+Claude's variable expansion and event support still require native acceptance.
+
+Tests compile the entry with the existing Vite toolchain and run it in fresh Node
+children against test-owned loopback receivers. This proves the command behavior,
+not Claude plugin validation/loading or config/run/work correlation. No production
+plugin builder, installer, invocation launcher or Provider controller exists yet.
+
 ## Next independently verifiable stage
 
-Before enabling the product flow, prove a native producer and bind
+Before enabling the product flow, validate/load the native plugin and bind
 configuration/run/work identity at the transport interface. Short-lived hook clients closing must not mark the Agent offline.
 Validate duplicate/late events, multiple concurrent sessions, pending permission
 resolution, Stop-hook continuation and true terminal evidence. If final success or
@@ -92,7 +123,7 @@ future adapters and host/version acceptance matrices.
 
 ## Verification
 
-`pnpm exec vitest run integrations/claude-hooks/normalize.test.ts integrations/claude-hooks/transport.test.ts` tests official-shape
+`pnpm exec vitest run integrations/claude-hooks/normalize.test.ts integrations/claude-hooks/transport.test.ts integrations/claude-hooks/command.test.ts` tests official-shape
 synthetic payloads, never real Agent input. Coverage includes permission events without
 tool IDs, local error vs turn failure, missing optional fields, Stop continuation,
 unknown and oversized/malformed inputs, UTF-8 limits, special JSON keys and private

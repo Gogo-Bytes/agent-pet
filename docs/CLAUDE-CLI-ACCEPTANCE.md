@@ -1,28 +1,34 @@
 # Claude Code CLI 实施与验收 · 2026-10-16
 
-状态：**输入白名单与本机回调传输已实现并隔离验证；尚未接通真实Claude，不注册Main/连接页面，不部署hook。** 仍使用dev，不打包；日常配置、pi和既有Agent进程保持原状。
+状态：**输入白名单、本机回调传输、独立调用脚本与插件文档生成器已实现并隔离验证。真实Claude尚未接通；未注册Main/连接页面、未部署或加载hook。** 继续dev，不打包；日常Agent配置、pi及既有Agent进程保持原状。
 
-## 当前范围与实施顺序
+## 顺序与边界
 
-用户最新要求：Claude Code CLI → Codex CLI → Antigravity CLI；全部CLI先做，Codex桌面端与Antigravity桌面端最后分别验证。不从一种宿主的通过推断另一种通过。未实施的新Provider继续如实显示不支持，不把新增类型/安装metadata当作在线连接。
+用户确认Claude Code CLI → Codex CLI → Antigravity CLI，全部CLI先做，Codex与Antigravity桌面端最后分别验证。一种宿主通过不能推断另一种通过。未实施的新Provider继续如实显示不支持，不把安装、配置可用或回调送达当在线连接。
 
-## 已实施与隔离证据
+## 已实施
 
-- 第一阶段6f03314已实现Claude安全输入白名单；当前补充保留原生prompt_id和子任务agent_id，缺失时不补造，agent_type不当作子任务身份。原生会话编号不是进程运行编号。
-- transport.ts的发送端先丢弃原始内容再传输，接收端再严格校验，只接受安全事实。固定127.0.0.1、临时端口、独立凭据和运行身份许可，禁止浏览器来源、任意URL/重定向/额外字段；没有落盘凭据或安装器。pi原传输及managed guard完全未改。
-- 外部可信运行绑定是必需依赖，消息本身不能认领一个运行。退役运行先拒绝，再处理近期去重。接收先后不冒充原生因果顺序；短命hook连接断开不发Agent离线，Stop/工具错误/工具中止不冒充整轮成功或取消。
-- 独立Architecture指出工作编号/子任务/Stop终态限制，已按保守语义保留，缺可靠信号不接到SessionObservation。独立Review复现了async回调被提前成功确认、关闭重入后仍回调两处问题；Main先用真实loopback红测试复现，再约束同步提交和停止后拒绝处理，并覆盖JS错误调用的拒绝Promise清理。
+- 第一阶段`6f03314`：64KiB原生输入白名单，只保留安全事实；后补原生prompt_id/agent_id，缺失时不补造，agent_type不当子任务身份。原生会话编号不是进程运行编号。
+- 第二阶段`d8bdf26`：发送前/接收后两次收窄字段、认证loopback回调、近期去重、资源上限、关闭/回调重入保护。外部可信运行绑定必需，消息不能自行登记；不把接收顺序冒充原生因果顺序。没有凭据持久化或安装器，pi原传输及managed guard不变。
+- 第三阶段：独立Node入口限定stdin/时间/显式接收环境，只传安全事实，无文件读取、输出、重试、许可决定或任务控制。插件文档生成器只返回标准文件内容，不写入现有设置，也不启动Agent。库入口不退出宿主，仅独立进程入口安静退出0。
 
-当前相关41项测试通过；全量`pnpm test --maxWorkers=2`为805 passed / 1 skipped / 80 files，`pnpm typecheck`和`pnpm --filter @agent-pet/desktop build`通过。独立Review另复验41项通过，文档可恢复性审查通过。build仅编译，没有打包。测试均为合成官方形状及自有loopback服务，无真实Agent、HOME、凭据、会话或模型任务。
+Stop、工具失败和工具中止不冒充整个任务成功或取消；短命hook退出不发Agent离线。缺可靠运行/工作关联时不发布SessionObservation，不猜最近任务或在线状态。模块契约以 [README](../integrations/claude-hooks/README.md)、[输入](../integrations/claude-hooks/normalize.ts)、[传输](../integrations/claude-hooks/transport.ts)、[调用脚本](../integrations/claude-hooks/command.ts)及行为测试为准。
 
-实现和可恢复契约以 [模块README](../integrations/claude-hooks/README.md)、[输入代码](../integrations/claude-hooks/normalize.ts)、[传输代码](../integrations/claude-hooks/transport.ts) 及行为测试为准。此处不复制协议阈值或数据schema。
+## 验证与修复
+
+- 相关`pnpm exec vitest run integrations/claude-hooks/normalize.test.ts integrations/claude-hooks/transport.test.ts integrations/claude-hooks/command.test.ts`：47通过。实际编译脚本在独立Node进程运行，覆盖正常、未知运行、拒绝/失联接收器、畸形/过大/未关闭输入、管道异常、清理和路径引用。均为自有合成输入/loopback，不启动真实Agent。
+- `pnpm test --maxWorkers=2`：**811 passed / 1 skipped / 81 files**。
+- `pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`通过；build仅编译，没有打包。
+- 独立Review复验47项通过，确认排队错误回归已修复；没有将原生加载标为通过。
+
+上一轮因标准Readable超限后排队I/O错误导致退出1/stderr而安全停止；用户本轮要求继续后，重新运行原失败回归并用标准Readable探针证明closed标志早于error/close事件。保留错误处理至事件送达、延后已关闭流清理后，原回归通过；没有删除/放宽静默退出断言，没有生产探针。
+
+输入契约明确限本机stdin（启用close事件）。独立Review发现的P3为自定义emitClose:false异步销毁流可能保留监听，已明确不支持这种自定义输入；独立入口立即退出，不存在该进程内残留。旧`/tmp/agent-pet-claude-plugin-review-20261016-f38b9d`来自未修复初版，STOPPED标记保留，不能加载。
 
 ## 尚缺的正式接入条件
 
-1. 核对本机CLI能力及实际加载的版本：用户已按[精确预览](CLI-VERSION-HELP-CHECK-PREVIEW.md)授权执行版本/帮助；Claude实际返回2.1.143并支持`--plugin-dir`。检查脚本重复核对路径耗尽96次metadata预算，Codex/agy已跳过、未执行；版本仍未确认。没有借此加载插件或启动会话。
-2. 证明原生producer的运行身份与工作/子任务关联；运行身份不可来自hook子进程PID，缺失prompt_id不能归到“最近一轮”。本机2.1.143是否提供这些字段尚未验证。
-3. 在允许的原生接口上建立诚实的生命周期与在线表达：没有后置结束证据时，Stop不是completed-unread；等待提示、实际工作、整个任务失败和取消分别验证，不用定时器补造。
-4. 再接Main的Provider controller、Configurations和正式UI，明确预览/授权、激活与重启恢复、选择性撤回和现有设置保留；部署代码与隔离验证必须先完成，再申请真实目标变更。
-5. 真实CLI验证通过后再依次做Codex CLI、Antigravity CLI。桌面端保留在最后；不自动启动已有Agent、发送模型请求或替用户操作任务。
-
-当前没有可供用户安装的hook命令，也没有新的成功连接操作。真实Claude支持、其他CLI支持、桌面端支持与发布验收全部保持未通过。
+1. 原生插件语法校验及实际加载，按更新后的本机CLI分别核对字段/事件。历史[版本帮助检查](CLI-VERSION-HELP-CHECK-PREVIEW.md)不是加载或修改配置授权。
+2. 原生producer的运行身份及工作/子任务关联；不能用hook子进程PID、会话编号或最近事件冒充运行绑定，缺失prompt_id不归到最近一轮。
+3. 可靠生命周期/在线表达及真实等待、失败、取消；没有后置结束证据时Stop不是completed-unread，不用定时器补造。
+4. Provider controller、Configurations、Main/UI接线，以及精确部署预览、独立授权、激活、重启恢复、选择性撤回和现有设置保留。
+5. Claude验证后依次实施Codex CLI与Antigravity CLI；桌面端最后。真实新Provider与发布验收均保持未通过。

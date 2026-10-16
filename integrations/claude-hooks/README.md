@@ -1,20 +1,22 @@
-# Claude Code observation input — stage 1
+# Claude Code passive observation — isolated stages 1–2
 
-**Implemented and isolated-tested input normalization only. Not a connected Adapter,
-installed hook, Main receiver, or native compatibility acceptance.** Nothing in this
-directory is loaded by the running desktop or Claude Code. There is no executable
+**Implemented and isolated-tested normalization and local delivery only. Not a connected
+Adapter, installed hook, Main registration, or native compatibility acceptance.** Nothing
+in this directory is loaded by the running desktop or Claude Code. There is no executable
 hook command or hook configuration to install at this stage.
 
 `normalizeClaudeHook()` accepts one JSON payload capped at 64 KiB (UTF-8 bytes),
-then returns a new object containing only bounded IDs, fixed categories and booleans.
+then returns a new object containing only bounded IDs, fixed categories and booleans. Explicit native
+`prompt_id` and child `agent_id` are retained as `promptId`/`childId` when present;
+missing identity stays absent. Root `agent_type` is not child identity.
 It returns enum-only rejection reasons and does not log its input. Unknown event and
 notification names are ignored. No prompt, path, tool arguments/results, assistant
 text, free-form tool error or permission decision reaches its output. It does not
 open `transcript_path`, discover files, contact a receiver, or write to Agent stdout.
 
-The approved installation check found package metadata for Claude Code 2.1.143.
-The candidate first host is its interactive CLI. This is metadata evidence, not an
-execution or hook-loading test. The current [official hook reference](https://code.claude.com/docs/en/hooks)
+The approved isolated version/help check returned Claude Code 2.1.143 and advertised
+`--plugin-dir`. The candidate first host is its interactive CLI. This is version/help
+evidence, not a hook-loading test. The current [official hook reference](https://code.claude.com/docs/en/hooks)
 contains newer-version fields too; absent optional fields remain unknown.
 [Official release notes](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md#2178)
 record the addition of `StopFailure` in 2.1.78; this is supporting release evidence,
@@ -42,11 +44,40 @@ SubagentStop and TaskCompleted are ignored; they cannot complete a parent Sessio
 This module does not publish SessionObservation, grant capabilities or pick animation
 clips. It cannot add online pets to the home scene.
 
+## Authenticated local delivery
+
+`transport.ts` exposes `startClaudeHookReceiver()` and `deliverClaudeHook()`. The sender
+normalizes raw input before sending; the receiver independently validates a strict,
+flat metadata schema. It listens only on an ephemeral 127.0.0.1 HTTP port, requires a
+private token and rejects browser Origin headers, alternate routes/authorities and raw
+payload fields. The sender refuses external destinations, redirects and response-body
+instructions; it has a bounded wait and performs no automatic retry or Agent output.
+This new callback transport does not replace or weaken pi's socket/managed paths.
+
+A trusted invocation binding must already exist outside this module. `acceptRun` must
+return exactly true for the supplied per-invocation UUID; the request cannot register
+itself. Native conversation IDs, hook-process PIDs and whichever SessionStart arrived
+last are not run identity. Retired bindings are checked even for duplicate events.
+Per-run event IDs are deduplicated within a bounded recent window, not an exactly-once
+or causal-ordering guarantee. It cannot attach delayed data to a guessed latest work.
+
+`onFact` must commit synchronously and return undefined; both its type and runtime
+reject async results. Rejected promises are consumed without logging their contents,
+and failed commits are not acknowledged or cached. It must not partially commit and
+then throw: the sender has no transaction over external effects. Shutdown invalidates
+processing before external validation/callback reentry and closes partial peers.
+Individual hook client closure never declares Agent offline or completed. Callback
+facts do not grant observation capabilities or publish SessionObservation.
+
+Resource bounds and rejection behavior live in the executable constants/schema and
+`transport.test.ts`. This is token-authenticated loopback metadata delivery, not proof
+of cross-user isolation, peer process identity, trusted hook activation or production
+security acceptance. No credential persistence/installer is implemented yet.
+
 ## Next independently verifiable stage
 
-Before enabling the product flow, implement an authenticated, bounded passive hook
-receiver and delivery envelope; bind configuration/run/work identity and ordering at
-that boundary. Short-lived hook clients closing must not mark the Agent offline.
+Before enabling the product flow, prove a native producer and bind
+configuration/run/work identity at the transport interface. Short-lived hook clients closing must not mark the Agent offline.
 Validate duplicate/late events, multiple concurrent sessions, pending permission
 resolution, Stop-hook continuation and true terminal evidence. If final success or
 cancellation cannot be proven from the permitted native surface, report the limit;
@@ -61,11 +92,14 @@ future adapters and host/version acceptance matrices.
 
 ## Verification
 
-`pnpm exec vitest run integrations/claude-hooks/normalize.test.ts` tests official-shape
+`pnpm exec vitest run integrations/claude-hooks/normalize.test.ts integrations/claude-hooks/transport.test.ts` tests official-shape
 synthetic payloads, never real Agent input. Coverage includes permission events without
 tool IDs, local error vs turn failure, missing optional fields, Stop continuation,
 unknown and oversized/malformed inputs, UTF-8 limits, special JSON keys and private
-content stripping. It cannot prove actual Agent loading or runtime event support.
+content stripping. Actual loopback tests cover authentication, unknown/retired runs,
+strict schema, duplicate events, sink failure/reentry, peer/body bounds, deadlines,
+client failure and idempotent stop. They cannot prove native Agent loading, invocation
+binding, work correlation or runtime event support.
 
 No dependencies, installation, running Agent, configuration access, model request,
 UI changes, dev restart or application package is required for this stage.

@@ -401,13 +401,14 @@ body recorder; no variable means no recording, and packaged apps ignore it.
 
 ## Additional Agent preparation (2026-10-16)
 
-Claude Code, Codex CLI, and Antigravity app/CLI are now requested follow-on scope.
+Claude Code CLI, Codex CLI, Antigravity CLI, then Codex and Antigravity desktop
+hosts are the confirmed order. Continue dev without packaging; retain existing settings.
 The approved [metadata check](../../docs/AGENT-INSTALLATION-CHECK-PREVIEW.md) found
 Claude package 2.1.143 and Antigravity app 2.22.0; agy/Codex versions remain unconfirmed
 within that permission boundary. No Agent was executed or configured.
 
-Only the [Claude input normalizer](../../integrations/claude-hooks/README.md) is
-implemented and isolated-tested. It strips private hook contents and retains native
+The [Claude input normalizer and callback transport](../../integrations/claude-hooks/README.md)
+are implemented and isolated-tested; no native producer binding or installation exists. It strips private hook contents and retains native
 facts without fabricating terminal success, cancellation or online state. Main,
 Configurations, discovery, deployment and the renderer remain unchanged; non-pi
 records still honestly report unsupported. Do not claim a new Provider is connected

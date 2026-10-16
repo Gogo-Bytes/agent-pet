@@ -7,7 +7,7 @@ export const claudeFailureKinds = ['rate_limit', 'overloaded', 'authentication_f
 export type ClaudeFailureKind = typeof claudeFailureKinds[number];
 
 /** These are native facts, not authoritative Session terminal states. */
-export type ClaudeHookFact = { providerSessionId: string } & (
+export type ClaudeHookFact = { providerSessionId: string; promptId?: string; childId?: string } & (
   | { kind: 'session-started'; source: 'startup' | 'resume' | 'clear' | 'compact' }
   | { kind: 'session-ended' }
   | { kind: 'turn-submitted' }
@@ -55,8 +55,15 @@ export function normalizeClaudeHook(input: string): ClaudeHookResult {
     return { status: 'ignored', reason: 'event' };
   }
   if (!identifier(value.session_id)) return { status: 'invalid', reason: 'identity' };
+  for (const key of ['prompt_id', 'agent_id']) {
+    if (value[key] !== undefined && value[key] !== null && !identifier(value[key])) return { status: 'invalid', reason: 'identity' };
+  }
   const providerSessionId = value.session_id;
-  const accepted = (fact: ClaudeHookFact): ClaudeHookResult => ({ status: 'accepted', fact });
+  const accepted = (fact: ClaudeHookFact): ClaudeHookResult => ({ status: 'accepted', fact: {
+    ...fact,
+    ...(typeof value.prompt_id === 'string' ? { promptId: value.prompt_id } : {}),
+    ...(typeof value.agent_id === 'string' ? { childId: value.agent_id } : {}),
+  } });
   switch (value.hook_event_name) {
     case 'SessionStart': {
       const source = value.source;

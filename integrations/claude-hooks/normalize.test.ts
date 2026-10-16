@@ -81,6 +81,17 @@ describe('Claude passive hook facts (synthetic official-shape fixtures, no real 
     }
   });
 
+  it('preserves explicit prompt and child correlation without guessing missing identity or using agent_type', () => {
+    expect(normalizeClaudeHook(payload('PostToolUse', { ...tool, prompt_id: 'prompt-a', agent_id: 'child-a', agent_type: 'PRIVATE' })))
+      .toEqual({ status: 'accepted', fact: { providerSessionId: 'session-a', kind: 'tool-succeeded',
+        toolCallId: 'tool-a', activity: 'reading', promptId: 'prompt-a', childId: 'child-a' } });
+    expect(normalizeClaudeHook(payload('UserPromptSubmit', { agent_type: 'custom-root-agent', prompt_id: null, agent_id: null })))
+      .toEqual({ status: 'accepted', fact: { providerSessionId: 'session-a', kind: 'turn-submitted' } });
+    for (const field of ['prompt_id', 'agent_id']) {
+      expect(normalizeClaudeHook(payload('UserPromptSubmit', { [field]: 'bad\nidentity' }))).toEqual({ status: 'invalid', reason: 'identity' });
+    }
+  });
+
   it('retains safe prompt/compaction facts without accessing or forwarding their text', () => {
     for (const [event, kind] of [['UserPromptSubmit', 'turn-submitted'], ['PreCompact', 'compact-started'], ['PostCompact', 'compact-finished']]) {
       expect(normalizeClaudeHook(payload(event!, { prompt: 'PRIVATE', custom_instructions: 'PRIVATE', compact_summary: 'PRIVATE' })))

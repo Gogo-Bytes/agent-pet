@@ -34,7 +34,7 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 用户继续实机验证取消，按Esc后pi显示“Error: This operation was aborted”；私有枚举记录先tool_error再error，取消验收失败，不能作为正常任务出错通过。观察扩展已改为只读保留当前运行的原生AbortSignal，settled时用真实aborted区分取消，取消工具不冒充tool_error；续跑替换signal、结束/卸载释放引用，不加监听或Agent控制。能力表按扩展实例隔离，避免多个实例相互虚增支持状态。
 
-另备好独立test-support helper：用户显式命令打开真正确认框、用户自行选择的本机抛错模型触发受控失败；不发观察假事件，不自动选模型或请求，不进入正式部署源。独立focused10项、typecheck、desktop build通过。最终全量并行有1项原Worker启动unavailable（763通过/1跳过），原文件4项复验通过，一次有界完整低并行复验764通过/1跳过/78文件，未改guard或阈值。当前用户扩展尚未再次替换、helper尚未加载，真实取消/等待/受控任务出错仍未通过。新的精确真实操作范围见 [预览](PI-CANCEL-WAIT-CHECK-PREVIEW.md)，原实机证据见 [记录](PI-EXTENSION-LIVE-ACCEPTANCE.md)。仍用dev，不打包。
+另备好独立test-support helper：用户显式命令打开真正确认框、用户自行选择的本机抛错模型触发受控失败；不发观察假事件，不自动选模型或请求，不进入正式部署源。独立focused10项、typecheck、desktop build通过。最终全量并行有1项原Worker启动unavailable（763通过/1跳过），原文件4项复验通过，一次有界完整低并行复验764通过/1跳过/78文件，未改guard或阈值。用户已精确授权；已正常停止dev、原子替换取消修复版扩展、独占创建0600临时helper及私有撤回记录，settings摘要不变；同profile的dev已重启并恢复原socket，原配置/凭据/runtime/disabled一致。用户reload后12:23真实取消复验通过：executing→idle/cancelled，无tool_error或整个任务error；12:17另收到真实thinking。临时命令两次reload仍无法识别且无相关错误，等待/受控任务出错未通过。已按原授权校验身份/摘要/权限/父目录，只撤回临时helper；settings摘要一致，正式观察扩展保留，用户空闲reload卸载待确认。不改发现规则或换协议绕过，按有界规则记录停点。新的精确真实操作范围见 [预览](PI-CANCEL-WAIT-CHECK-PREVIEW.md)，原实机证据见 [记录](PI-EXTENSION-LIVE-ACCEPTANCE.md)。仍用dev，不打包。
 
 ## 当前连接的扩展更新与真实事件验证（2026-10-16）
 

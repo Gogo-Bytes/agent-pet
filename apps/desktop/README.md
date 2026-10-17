@@ -398,3 +398,95 @@ For explicitly authorized live checks, a non-packaged dev may set
 file is exclusive 0600, capped at 128 KiB, and contains enum observations/action
 intents with salted aliases only. It is not proof that a clip rendered, nor a task
 body recorder; no variable means no recording, and packaged apps ignore it.
+
+## Additional Agent preparation (2026-10-16)
+
+Claude Code CLI, Codex CLI, Antigravity CLI, then Codex and Antigravity desktop
+hosts are the confirmed order. Continue dev without packaging; retain existing settings.
+The approved [metadata check](../../docs/AGENT-INSTALLATION-CHECK-PREVIEW.md) found
+Claude package 2.1.143 and Antigravity app 2.22.0; agy/Codex versions remain unconfirmed
+within that permission boundary. No Agent was executed or configured.
+
+The [Claude input normalizer, callback transport and standalone hook command](../../integrations/claude-hooks/README.md)
+are implemented and isolated-tested; no trusted native invocation binding or product installation exists. It strips private hook contents and retains native
+facts without fabricating terminal success, cancellation or online state. Main,
+Configurations, discovery, deployment and the renderer remain unchanged; non-pi
+records still honestly report unsupported. Do not claim a new Provider is connected
+or install the normalizer as a hook script. Continue dev; no application package.
+
+2026-10-16: the user separately authorized [CLI program updates](../../docs/CLI-UPDATE-PREVIEW.md):
+Claude2.1.301, Codex0.163.0, Antigravity CLI1.4.0, each verified through its original
+entry in isolated configuration. Existing Agent settings/processes and pi remain untouched.
+Separately approved native manifest validation and isolated `--init-only` loading
+passed with real startup/end callbacks. Normal tasks, trusted native work binding
+and product Provider integration remain unverified. No application package was built.
+
+
+## Claude CLI connection and home presence (2026-10-16)
+
+Run `pnpm --filter @agent-pet/desktop dev` (no packaging). Add a Claude Code record
+in Connections, then choose **设置连接** and explicitly select the Claude executable.
+The initial supported layout is npm Claude Code2.1.301, resolving to `bin/claude.exe`;
+unknown versions/layouts are rejected without executing them. The configuration
+folder is a saved label only; it does not select a new Claude HOME or read its settings.
+
+Review the exact app-private files before confirming. Copy the displayed terminal
+command and run it yourself, with your usual cwd and arguments. It adds an independent
+`--plugin-dir`; existing settings/hooks/shell files and already-running Claude processes
+are preserved. Main and Renderer never spawn Claude. The Electron executable runs the
+standalone launcher/hook in Node mode; no separate Node installation is required for
+these two observers. Native Claude still uses its ordinary environment.
+
+A live direct child plus an observed root startup hook makes this configuration online.
+Home shows a static companion, with task state explicitly unavailable. Task actions and
+completion/error reminders are not yet enabled. Multiple invocations retain separate
+identity; closing one does not remove another. Pause, app exit or channel loss stops
+observation without terminating Claude. After restart, explicitly resume and launch a
+new Claude; old credentials/runs are not automatically adopted.
+
+Files live only in `userData/claude-<UUID>` (directories0700/files0600). Removing a
+configuration revokes observation and removes its product metadata; runtime/plugin
+files remain so a running CLI has no missing hook. Unknown, edited or uncertain files
+are preserved and block unsafe operations. No automatic runtime cleanup in this slice.
+Never print or copy `activation.json` into diagnostics; Renderer receives only public
+paths and a credential-free launch command. See [design](../../docs/CLAUDE-CLI-PRESENCE-DESIGN.md)
+and [formal/real acceptance boundaries](../../docs/CLAUDE-CLI-ACCEPTANCE.md).
+
+
+## Claude ordinary startup (supersedes the wrapper flow above)
+
+The confirmed current flow is **configure once, then run `claude` normally**.
+Use `~/.claude` for your usual user-wide configuration (or a project's `.claude`
+for that project). Setup previews the selected `settings.json` and adds only one
+SessionStart hook. It does not change existing hooks, shell, HOME or Agent args.
+The supported selected executable remains npm2.1.301/bin/claude.exe; install or
+normal-start verification against a daily target requires its precise preview/consent.
+
+Main uses a bounded, built-in macOS exact-PID helper to verify the hook's ancestor
+and then watch the native Claude PID, microsecond birth identity, UID and executable.
+It does not scan process lists or read argv, env, cwd or conversation files. Hook exit
+and SessionEnd never terminate native presence. Identity/query failure removes the
+observation; no name/ps/timer-based guess. A positive liveness query is repeated each
+second. The helper uses libproc and must be verified per supported macOS/version.
+Dev/build compile it with the existing clang; no dependency installation or packaging.
+
+Normal mode never displays a special launch command. App restart resumes unpaused
+observation; explicit pause stays paused. Already-running processes without a startup
+callback to the new receiver are not adopted: open a new Claude session. Task actions
+and completion/error notifications remain unavailable, with a static Home pet only.
+
+Private files are in `userData/claude-normal-<UUID>`: observer.cjs, activation.json,
+hook.json, settings-before.json and receipt.json (0700 directory/0600 files).
+The original settings backup can contain secrets; keep it local, never log/copy to
+Renderer or Git, and never auto-restore it over later edits. Shared JSON is spliced
+losslessly with identity checks, exclusive pending publication and original permissions.
+There is no atomic compare-and-swap with external editors; do not save Claude settings
+concurrently with installation. Unknown/changed/pending data is retained.
+
+Removal withdraws only the exact unmodified owned hook and product record; recognizable
+modified references retain the record for review. Runtime files remain for already-loaded
+hook snapshots. Legacy launcher files are retained, but each production record uses only
+normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
+[real operation preview](../../docs/CLAUDE-NORMAL-START-PREVIEW.md).
+
+本机普通CLI启动、恢复未暂停观察及首页陪伴已在真实Claude2.1.301与正式dev验证；临时阶段检查随后完整撤回，原版再次连接通过。退出/并发/任务动作不因此视为通过，见[实测与范围](../../docs/CLAUDE-CLI-ACCEPTANCE.md)。若终端提示 `command not found: claude`，表示终端未找到程序入口；可先由用户直接运行已选择安装的绝对路径。产品不会自动改shell/PATH或新增重复安装。

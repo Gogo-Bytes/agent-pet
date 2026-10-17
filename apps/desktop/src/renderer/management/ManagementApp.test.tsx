@@ -328,6 +328,31 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getByRole('heading', { name: '项目二' })).toBeTruthy();
     expect(test.configs().records[0]?.name).toBe('配置 one');
   });
+  it('removes invalid leading whitespace from a pasted absolute path before requesting Main approval', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    await test.user.click(screen.getByRole('button', { name: '手动添加' }));
+    const dialog = screen.getByRole('dialog', { name: '手动添加' });
+    const path = '/isolated/Claude folder ';
+    test.bridge.locations.authorize.mockImplementationOnce(async value => {
+      if (value !== path) throw new Error('Invalid absolute path');
+      return value;
+    });
+    await test.user.type(within(dialog).getByRole('textbox', { name: '配置文件夹' }), `  ${path}`);
+    await test.user.click(within(dialog).getByRole('button', { name: '验证配置' }));
+    expect(test.bridge.locations.authorize).toHaveBeenCalledExactlyOnceWith(path);
+    expect(within(dialog).getByRole('combobox', { name: 'Agent 类型' })).toBeTruthy();
+    expect(within(dialog).getByText(path, { exact: true, normalizer: value => value })).toBeTruthy();
+    expect(test.bridge.configurations.create).not.toHaveBeenCalled();
+  });
+  it('explains an incomplete path without requesting access or reporting a permissions failure', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    await test.user.click(screen.getByRole('button', { name: '手动添加' }));
+    const dialog = screen.getByRole('dialog', { name: '手动添加' });
+    await test.user.type(within(dialog).getByRole('textbox', { name: '配置文件夹' }), '~/.claude');
+    await test.user.click(within(dialog).getByRole('button', { name: '验证配置' }));
+    expect(within(dialog).getByRole('alert').textContent).toContain('以 / 开头');
+    expect(test.bridge.locations.authorize).not.toHaveBeenCalled();
+  });
   it('blocks a duplicate manual configuration and returns to the same path selection for recovery', async () => {
     const test = await mount(); await page(test.user, '连接');
     test.bridge.locations.choose.mockResolvedValueOnce('/isolated/project-one');

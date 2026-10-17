@@ -24,6 +24,44 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 - 此前仅授权 M1/M2 部署与桌面授权入口的代码实现、自有临时目标/隔离 socket 验证。2026-10-08 用户另授权以 Computer-Use 操作桌面端验收，范围为本轮自建的独立测试目录；开发版 App 已运行。仍不读写日常 HOME/pi 配置或安装目标、不安装依赖。M2 的目标读写/部署/连接须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权；本轮已按预览确认写入并在同一桌面进程撤回自有测试扩展。
 - 普通实现与小修复由 Main 按范围推进，不逐项询问用户；只有结果/范围变化、真实环境权限、不可逆动作、新增依赖/实质成本或风险接受需要另行确认。打包依赖安装与签名账号/证书成本分开处理，不默认获准。
 
+## Claude CLI 一次配置、普通启动（2026-10-16）
+
+**日常配置与实测（覆盖下方历史待授权记录）：** 用户已按[配置预览](CLAUDE-NORMAL-START-PREVIEW.md)及[临时阶段检查](CLAUDE-LIVE-STAGE-CHECK-PREVIEW.md)分别授权。默认settings原先不存在，仅新建自有SessionStart hook；原pi配置保留且未自动恢复。真实Claude由用户运行原入口完整路径，检查版连接/首页通过；临时记录完整撤回后，原observer/原Main摘要和自有hook复核通过，原版再次新开会话为observing/1/notice none，实际首页有对应GLB宠物。CUA旧绑定曾返回过时空态，不能据旧截图认定同步bug或宣称根因修复；初始等待原因仍未确定。偏好仅初次配置时摘要一致，最终发现仅petSize160→80变化，未归因/覆盖/恢复该值。原回调边界20项、阶段记录9种输入/guard及自有安装撤回闭环通过；前导空格修复`434ae5c`的45项/typecheck/build结果保留。当前原dev与用户会话继续运行，无依赖安装/模型请求/打包/推送。普通启动/恢复观察/首页链路通过，退出/并发/任务动作/终端PATH/桌面宿主与发布仍未验收，详见[验收记录](CLAUDE-CLI-ACCEPTANCE.md)。
+
+用户后续明确覆盖专用launcher体验：仅追加自有SessionStart hook，保留原settings/hooks，以后正常运行claude。Main使用自有macOS helper核对hook真实祖先/Claude确切PID和微秒启动身份，只观察已知进程，不扫描参数/对话、不启动/控制Agent。正常模式已接正式页面与首页，启动命令不再显示；任务动作/提醒仍未启用。未暂停连接在应用启动时校验恢复，已运行但无新启动hook的旧进程不自动认领。
+
+最终完整单并行复验1016 passed / 1 skipped / 91 files，typecheck/desktop build通过；独立122项复验无剩余确定缺陷。首次最终全量的既有pi Bucket边界断言失败（其余1015通过/1跳过），原文件20项独立复验与一次有界完整复验均通过，未修改该用例/生产guard。独立发现的旧目标绑定、修改hook误报撤回已修复补测；Main实机发现的启动加载取消恢复也已修复，重开独立dev回到waiting而非disconnected。共享JSON保留原字节，发布前保存私有原始证据，不能整份自动回滚覆盖后来编辑。原生隔离首次未连接原因未明，一次原始命令复验及双进程部分退出通过，不能掩去首次失败。日常Claude设置尚未读写或启用；无真实Agent/模型调用、打包或推送。[设计](CLAUDE-NORMAL-START-DESIGN.md)、[验收](CLAUDE-CLI-ACCEPTANCE.md)、[待授权精确预览](CLAUDE-NORMAL-START-PREVIEW.md)。
+
+## Claude CLI 正式连接与首页（2026-10-16）
+
+连接与静态陪伴已接入正式 Main/Configurations/连接页/首页；此节覆盖下方历史“尚未接通”的切片状态。用户终端显式启动，Main/UI不启动Agent；仅支持已核对的npm Claude2.1.301。私有材料精确预览/确认、认证控制通道、多运行身份、暂停/显式恢复/移除及保留运行文件已实现；任务动作和提醒仍未启用，不发布SessionObservation或伪造idle。原Claude/pi配置、hooks、shell和现有进程不变。
+
+一次有界完整低并行复验924 passed / 1 skipped / 87 files；typecheck和desktop build通过，独立重点140项通过。首次双并行终端fixture就绪超时、原文件5项复验与低并行结果分别保留；未削弱deadline/guard。隔离dev启动正式代码，自有Node程序验证完整连接流程；日常Claude前台运行及发布未验收，没有打包/推送。兼容范围、文件与剩余验收见[设计](CLAUDE-CLI-PRESENCE-DESIGN.md)和[验收记录](CLAUDE-CLI-ACCEPTANCE.md)。
+
+## 多 Agent 最新实施顺序与 Claude 回调通道（2026-10-16）
+
+下一连接切片采用[明确用户终端启动、先连接与陪伴](CLAUDE-CLI-PRESENCE-DESIGN.md)，不在Main/UI启动Agent，不用idle冒充未知任务，不改Domain/Application。`launcher.ts`进程绑定库已实现：独立直接子进程/UUID/token，根hook观察和退出分别报告，断开观察不终止Agent，控制环境不继承；相关58项、最终全量822 passed / 1 skipped / 82 files、typecheck/desktop build通过，独立11项复验无确定问题；终端信号/原生参数及重入等覆盖限制见Claude记录。可执行入口、认证Main控制通道、私有材料部署/撤回和正式UI尚未完成，不能宣称Claude已连接。
+
+用户本轮明确授权更新CLI程序，已保留原安装方式完成Claude Code 2.1.143→2.1.301、Codex 0.161.0→0.163.0、Antigravity CLI 1.1.27→1.4.0；候选版本/帮助及切换后原入口版本全部通过，旧程序与Codex旧release保留。只处理程序/安装选择，不读写日常Agent配置、凭据、对话或shell配置，不重启dev/现有Agent、不操作pi、不打包。Claude原NVM位置未进入当前dev shell PATH，接入使用绝对路径，不新增第二份安装。见 [范围/备份/结果](CLI-UPDATE-PREVIEW.md)。
+
+用户另分别精确授权原生manifest校验和一次隔离`--init-only`：Claude2.1.301校验通过；修复版插件实际加载，退出0、无输出，真实收到startup及SessionEnd。接收绑定只接受本次实际创建且仍有效的child，退出立即退役，token/运行UUID未落盘，没有模型任务或原应用重启。原生工作/子任务身份、正常任务、正式连接和UI仍未通过；见 [manifest结果](CLAUDE-PLUGIN-CHECK-PREVIEW.md) 与 [启动回调证据](CLAUDE-NATIVE-START-PREVIEW.md)。
+
+后续调用脚本已恢复并完成隔离验证：标准Readable证明closed标志早于排队error事件，修复清理时机后保留原失败回归，47项通过；最终全量811 passed / 1 skipped / 81 files、typecheck、desktop build通过，独立47项复验通过。输入契约限本机stdin（启用close事件），自定义emitClose:false异步销毁流的清理限制已明示。脚本/插件文档生成器不注册Main、不启动或加载真实Claude；阶段2提交`d8bdf26`不变。详见 [Claude记录](CLAUDE-CLI-ACCEPTANCE.md)。
+
+用户进一步确认Codex桌面端与CLI均纳入，顺序为Claude Code CLI → Codex CLI → Antigravity CLI，桌面端（Codex、Antigravity）全部最后做；继续dev、不打包、保留现有配置。覆盖下方上一轮“Antigravity两宿主随后一起推进”的顺序，不放宽任何真实目标操作授权。
+
+Claude新增独立认证loopback回调通道，发送前/接收后两次收窄字段，必须有外部可信运行绑定，支持近期事件去重、资源限制、关闭和回调重入保护。保留原生prompt/子任务身份，不用SessionStart或短命hook退出猜运行/在线。此阶段仍不注册Adapter、Main或UI，不发布业务状态、不触碰日常Agent配置；真实生命周期/部署/恢复仍未实现。相关41项、全量805 passed / 1 skipped / 80 files、typecheck与desktop build通过；独立审查发现的回调问题已补红测试并修复，最终41项独立复验与文档可恢复性审查通过。详见 [Claude实施与缺口](CLAUDE-CLI-ACCEPTANCE.md)。用户已按 [新精确预览](CLI-VERSION-HELP-CHECK-PREVIEW.md)另行授权版本/帮助；实际Claude返回2.1.143、支持临时`--plugin-dir`。脚本重复核对路径耗尽96次metadata预算，Codex/agy跳过未执行；没有加载插件、启动Agent会话或改日常配置。
+
+## 新 Agent 接入准备与 Claude 输入边界（2026-10-16）
+
+用户新增需求为Codex CLI、Claude Code与Antigravity桌面端/CLI接入，覆盖上文历史“新Provider不在当前范围”的工程排期限制；现有pi MVP与尚缺验收保持原状态。继续dev，不打包。真实安装读取/配置写入仍按各自精确预览授权，不因此放宽managed guard或数据保留契约。
+
+已按用户精确授权只读检查72候选/132次metadata与链接/1份Node manifest：Claude包2.1.143、Antigravity桌面端2.22.0；agy入口存在但版本未确认，Codex入口进入排除的.codex目录而停止，未读配置/凭据/会话、启动Agent或改文件。[安装范围与实际结果](AGENT-INSTALLATION-CHECK-PREVIEW.md)。
+
+第一阶段为独立Claude原生hook白名单输入边界：限定64KiB、丢弃正文/路径/工具内容，保留安全事实，未知事件忽略。区分无tool ID的PermissionRequest、实际permission_prompt、工具失败/中止和整个任务失败；Stop只是结束候选，不直接伪造完成未读，子任务不完成父Session。本阶段不注册Adapter、不改Main或UI、不启用回调、不建立在线连接；不能标为Claude已接通。本机版本只是metadata证据，真实加载与字段兼容性仍需另验。
+
+相关24项测试、pnpm typecheck与desktop build通过，无新增依赖或打包。后续按独立阶段实施认证接收/运行与工作身份/排序、Provider连接管理和安全部署，再做真实加载验收；随后Codex CLI与Antigravity两种宿主分别推进。模块及下一阶段条件见 [Claude输入边界](../integrations/claude-hooks/README.md)。既有未完成设置记录与历史native fixtures保留。
+
 ## dev 显示比例与设置序号修复（2026-10-16）
 
 当前应用的localhost保存了-1.5级缩放（约76%），同时影响管理页和桌宠；缩小还触发宽屏规则，暴露一直残留的设置序号。已在实际dev恢复100%，正式/原型都彻底删除序号节点和CSS；Main窗口入口恢复正常比例、View菜单移除放大/缩小，保留宠物大小偏好。当前dev未重启，Main保护下次启动生效，已用独立Electron验证同host双窗口及重载。没有修改pi配置、扩展或用户宠物大小。

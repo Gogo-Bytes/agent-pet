@@ -1,6 +1,6 @@
 # Claude 安装发现与首次接入
 
-2026-10-17：实现与隔离验证完成，新增本机扫描尚未授权验证；不表示其他安装方式已通过连接验收。
+2026-10-17：实现、隔离验证及获授权后的本机扫描/已有配置查看完成；不表示其他安装方式已通过连接验收。
 
 ## 流程与模块
 
@@ -36,7 +36,7 @@ GUI 发现不代表终端 PATH 已修复。本轮不改 shell、不将固定 NVM
 - `pnpm typecheck`、项目原目录 `pnpm --filter @agent-pet/desktop build` 通过；没有制作安装包。临时构建副本因 node_modules/task-state 链接被 pnpm 拒绝，一次目录修正后仍拒绝子目录，停止该副本方案，未放宽校验。副本 pnpm 自动依赖检查报告 Already up to date，没有新增/升级依赖或修改项目锁文件。
 - 自建 HOME/userData 启动正式 Electron/Main/preload/Renderer，bootstrap 在测试边界排除宿主固定安装目录。确认启动和原生扫描授权入口；CUA 原生内容滞后，未据其旧画面宣称 Electron 全流程通过。
 - 已实际操作同一正式 React 页的浏览器测试边界：安装选择 → 只读确认 → 原设置预览 → 取消 → 已有配置查看；420×640 窄窗口页面宽度 420、首次选择器宽 330，无横向页面溢出。合成数据，不是真实扫描/连接；doubles 不进入 Electron 入口。
-- 原型认可、正式 React 隔离验证、此前真实 Claude 普通启动/首页证据分别记录。新增本机扫描、终端入口、其他安装方式真实加载、任务动作、桌面宿主和发布尚未验收。
+- 原型认可、正式 React 隔离验证、此前真实 Claude 普通启动/首页证据分别记录。本机扫描后来已获授权，实际发现 npm Claude 2.1.301 一处和 pi 0.85.1 两处，已有默认配置复用通过；原 UUID/路径和两条记录保留，未重新配置。pi 扫描 complete，Claude 受限，没有宣称完整覆盖。执行记录与正式 Electron 实际截图见 [本机检查结果](CLAUDE-DISCOVERY-CHECK-PREVIEW.md)。终端入口、其他安装方式真实加载、任务动作、桌面宿主和发布仍未验收。
 
 截图与隔离 bootstrap/profile：`/private/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/agent-pet-discovery-ui-ssrrkfix`，含 `scan-react-isolated.png`、`preview-react-isolated.png`、`narrow-new-react-isolated.png`。均为正式 React 代码，不是旧 prototype；数据为示例。
 

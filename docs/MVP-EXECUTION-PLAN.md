@@ -26,7 +26,7 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Claude 自动发现（2026-10-17）
 
-已将 Claude 接入自动扫描：有界 PATH/固定入口/NVM 发现，Main 候选重新核对后带入默认配置与原精确 hook 预览；多入口按程序去重，多安装可选，已有配置直接查看。原配置/hooks/进程与 pi 边界保留。npm 2.1.301 可准备；官方/Homebrew 仅显示待验证，不扩大真实兼容，终端 PATH 未修改。相关 118 项、独立复查 63 项、最终全量 1032 passed / 1 skipped / 92 files、最终界面复验 48 项、typecheck/项目标准源码 build 通过；临时副本 pnpm 拒绝和首次原终端测试超时证据保留。正式 React 浏览器隔离交互/窄窗口已检查，Electron 原生自动化滞后的覆盖限制已记录；新增本机扫描待授权，不打包。见 [设计与证据](CLAUDE-DISCOVERY-DESIGN.md)、[本机检查预览](CLAUDE-DISCOVERY-CHECK-PREVIEW.md)。此前完成的十个提交已推送至 `210ad8b`，本阶段独立本地提交。
+已将 Claude 接入自动扫描：有界 PATH/固定入口/NVM 发现，Main 候选重新核对后带入默认配置与原精确 hook 预览；多入口按程序去重，多安装可选，已有配置直接查看。原配置/hooks/进程与 pi 边界保留。npm 2.1.301 可准备；官方/Homebrew 仅显示待验证，不扩大真实兼容，终端 PATH 未修改。相关 118 项、独立复查 63 项、最终全量 1032 passed / 1 skipped / 92 files、最终界面复验 48 项、typecheck/项目标准源码 build 通过；临时副本 pnpm 拒绝和首次原终端测试超时证据保留。正式 React 浏览器隔离交互/窄窗口已检查，Electron 原生自动化滞后的覆盖限制已记录；本机扫描已获授权并完成：真实发现 npm Claude 2.1.301 一处、pi 0.85.1 两处；已有配置查看复用通过，原两条 UUID/路径保留，未部署或操作 Agent。pi 扫描 complete、Claude 受限，不宣称整机完整覆盖。原日常 dev 已启动并保持运行，Claude waiting、pi 未自动恢复，不打包。见 [设计与证据](CLAUDE-DISCOVERY-DESIGN.md)、[本机检查预览](CLAUDE-DISCOVERY-CHECK-PREVIEW.md)。此前完成的十个提交已推送至 `210ad8b`，本阶段独立本地提交。
 
 ## Claude CLI 一次配置、普通启动（2026-10-16）
 

@@ -423,7 +423,7 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getAllByRole('button', { name: '一键配置' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /选择配置位置/ })).toBeNull();
     expect(screen.getByText('2 处安装 · 共用此配置')).toBeTruthy();
-    expect(screen.getByText('已找到本机 pi，可使用默认配置接入。')).toBeTruthy();
+    expect(screen.getByText('查找本机的 pi 和 Claude Code。')).toBeTruthy();
     const disclosure = screen.getByText('程序安装详情').closest('summary')!;
     expect(disclosure.parentElement?.hasAttribute('open')).toBe(false);
     await test.user.click(disclosure);
@@ -473,7 +473,7 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getAllByRole('alert').some(value => value.textContent?.includes('检查未完成'))).toBe(true);
     await test.user.click(screen.getByRole('button', { name: '取消' }));
     act(() => test.pushConfigs({ ...test.configs(), records: [existing] }));
-    expect(screen.getByText('已找到本机 pi，默认配置已添加。')).toBeTruthy();
+    expect(screen.getByText('查找本机的 pi 和 Claude Code。')).toBeTruthy();
     expect(screen.queryByText(/一键配置会先检查/)).toBeNull();
     await test.user.click(screen.getByRole('button', { name: '查看配置' }));
     expect(screen.getByRole('heading', { name: existing.name })).toBeTruthy();
@@ -525,6 +525,7 @@ describe('ManagementApp formal four-page interface', () => {
     test.bridge.piPreflight.detect.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     await test.user.click(screen.getByRole('button', { name: '重新扫描' }));
     await test.user.click(screen.getByRole('button', { name: '取消扫描' }));
+    expect(test.bridge.configurations.cancelClaudeScan).toHaveBeenCalledExactlyOnceWith(expect.any(String));
     await act(async () => finish({ ...initialPreflight, scan: 'complete', installations: [] }));
     expect(screen.getByRole('heading', { name: /我的连接/ })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: '未找到安装' })).toBeNull();

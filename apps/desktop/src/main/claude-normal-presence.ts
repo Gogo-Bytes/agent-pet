@@ -58,11 +58,11 @@ export class ClaudeNormalPresence {
   subscribe(listener: (state: ClaudeConnectionState) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private emit(): ClaudeConnectionState { this.revision++; const state = this.snapshot(); for (const listener of this.listeners) listener(state); return state; }
   invalidate(): ClaudeConnectionState { this.generation++; this.plan = undefined; return this.emit(); }
-  async preview(): Promise<ClaudeConnectionState> {
+  async preview(detectedExecutable?: string): Promise<ClaudeConnectionState> {
     if (!this.snapshot().canConfigure) return this.snapshot();
     const generation = ++this.generation; this.plan = undefined; this.busy = true; this.notice = 'choose-executable'; this.emit();
     try {
-      const selected = await this.options.chooseExecutable();
+      const selected = detectedExecutable ?? await this.options.chooseExecutable();
       if (this.closed || generation !== this.generation) return this.snapshot();
       if (!selected) { this.notice = 'none'; return this.snapshot(); }
       const executable = (this.options.inspectExecutable ?? inspectClaudeExecutable)(selected);

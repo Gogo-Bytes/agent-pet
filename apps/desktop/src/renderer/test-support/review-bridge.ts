@@ -14,7 +14,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   const configListeners = new Set<(value: ConfigurationsState) => void>();
   const sessionListeners = new Set<(value: SessionState) => void>();
   const paths = scenario === 'detail-long-path' ? [`/test/AgentPet/${'a-very-long-project-directory/'.repeat(12)}pi-config`] : ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
-  if (scenario !== 'empty' && scenario !== 'scan-new') paths.forEach((path, index) => {
+  if (scenario !== 'empty' && scenario !== 'scan-new' && !scenario.startsWith('claude-scan')) paths.forEach((path, index) => {
     const id = `review-${index}`;
     const record: ConfigurationMetadata = { id, name: ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? 'pi 默认配置' : index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };
     configs.records.push({ ...record, availability: 'available', inspection: { target: { path, source: 'chosen' }, findings: [] }, connection: { ...base, status: 'connected', receiving: 'active', saved: 'ready', canConfigure: false, canRemove: true, deployedPath: `${path}/extensions/agent-pet.ts` } });
@@ -50,6 +50,22 @@ export function createReviewBridge(scenario: string): ManagementBridge {
     piConnection: { getState: async () => base, preview: async () => base, cancel: async () => base, confirm: async () => base, resume: async () => base, disable: async () => base, remove: async () => base, subscribe: () => () => {} },
     configurations: {
       getState: async () => configs, subscribe: listener => subscribe(configListeners, listener),
+      detectClaude: async () => ({ installations: scenario.startsWith('claude-scan') ? [
+        { id: 'review-claude-npm', entryPath: '/示例/.nvm/versions/node/v22.18.0/bin/claude', executable: '/示例/npm/bin/claude.exe', kind: 'npm', version: '2.1.301', compatibility: 'verified' },
+        ...(scenario === 'claude-scan-multiple' ? [{ id: 'review-claude-other', entryPath: '/示例/.nvm/versions/node/v24.20.0/bin/claude', executable: '/示例/npm-other/bin/claude.exe', kind: 'npm' as const, version: '2.1.301', compatibility: 'verified' as const }] : []),
+        { id: 'review-claude-native', entryPath: '/示例/.local/bin/claude', executable: '/示例/.local/share/claude/versions/2.1.301', kind: 'native', version: null, compatibility: 'unverified' },
+        { id: 'review-claude-brew', entryPath: '/示例/homebrew/bin/claude', executable: '/示例/homebrew/Caskroom/claude-code/2.1.286/claude', kind: 'homebrew', version: null, compatibility: 'unverified' },
+      ] : [], targetPath: '/示例/.claude', scan: 'complete', notice: 'none' }),
+      cancelClaudeScan: async () => {},
+      prepareDetectedClaude: async id => {
+        if (!scenario.startsWith('claude-scan')) throw new Error('Browser fixture cannot authorize real locations.');
+        const directory = '/示例/AgentPet/private/claude';
+        const value = { id: 'review-claude', name: 'Claude Code', provider: 'claude' as const, targetPath: '/示例/.claude', installation: null, pet: null, availability: 'available' as const, inspection: null, connection: null,
+          claude: { revision: 0, mode: 'normal-start' as const, scope: 'presence-only' as const, status: 'not-configured' as const, busy: false, configured: false, observedRuns: 0, launchers: 0, launchCommand: null, canConfigure: true, canResume: false, notice: 'none' as const,
+            preview: { id: 'review-claude-plan', executable: id === 'review-claude-other' ? '/示例/npm-other/bin/claude.exe' : '/示例/npm/bin/claude.exe', directory, files: ['observer.cjs','activation.json','hook.json','settings-before.json','receipt.json'].map(name => directory + '/' + name),
+              settings: { path: '/示例/.claude/settings.json', exists: true, canApply: true, reason: '' } } } };
+        configs.records = [value]; await pushConfigs(); return { state: configs, configurationId: value.id };
+      },
       cancelDetected: async () => {},
       prepareDetected: async () => { throw new Error('Browser fixture cannot authorize real locations. Verify detected setup with isolated Main IPC tests.'); },
       create: async input => {
@@ -61,7 +77,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
       bindPet: async (id, pet) => { record(id).pet = pet; return pushConfigs(); },
       inspect: async id => { const current = record(id); current.inspection = { target: { path: current.targetPath, source: 'chosen' }, findings: [] }; current.availability = 'available'; return pushConfigs(); },
       preview: async id => { const current = record(id); current.connection = { ...base, preview: { id: 'isolated-plan', path: `${current.targetPath}/extensions/agent-pet.ts`, target: { path: current.targetPath, source: 'chosen' }, action: 'create', findings: [], createDirectories: [] } }; return pushConfigs(); },
-      cancel: async id => { record(id).connection!.preview = null; return pushConfigs(); },
+      cancel: async id => { const value = record(id); if (value.claude) value.claude.preview = null; else value.connection!.preview = null; return pushConfigs(); },
       confirm: async () => { throw new Error('Browser fixture cannot deploy. Real Main deployment is verified in isolated filesystem tests.'); },
       resume: async () => { throw new Error('Browser fixture cannot start receivers.'); },
       disable: async id => { record(id).connection = { ...base, status: 'disconnected', saved: 'disabled', canResume: true }; return pushConfigs(); },

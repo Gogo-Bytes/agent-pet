@@ -223,6 +223,10 @@ export class Configurations {
     this.notice = 'none'; await work(connection); return this.emit();
   }
   preview(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.preview()); }
+  /** Main-owned discovery only. IPC never accepts an executable path from Renderer. */
+  previewDetectedClaude(id: string, executable: string): Promise<ConfigurationsState> {
+    return this.operation(id, connection => connection instanceof ClaudeNormalPresence ? connection.preview(executable) : undefined);
+  }
   cancel(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.invalidate()); }
   confirm(id: string, planId: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.confirm(planId)); }
   resume(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.resume()); }

@@ -68,6 +68,9 @@
 .cfg-detected code{display:block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.65;overflow-wrap:anywhere;color:var(--menu-muted)}
 .cfg-detected-header>.cfg-primary{white-space:nowrap;gap:8px;min-width:110px}.cfg-detected .ui-icon{flex:none}
 .cfg-installations{border-top:1px solid #eeebf7;background:#fcfbff}
+.cfg-installation-choice{display:flex;flex-direction:column;gap:8px;padding:0 24px 20px;font-size:12px;color:var(--menu-muted)}
+.cfg-installation-choice select{width:100%;min-width:0;padding:10px;border:1px solid var(--menu-line);border-radius:10px;background:#fff;color:var(--menu-ink);font:inherit}
+.cfg-installation-version small{display:block;font-size:10px;font-weight:400;color:var(--menu-muted)}
 .cfg-installations summary{display:flex;align-items:center;gap:12px;min-height:48px;padding:12px 24px;list-style:none;cursor:pointer;color:#625a7c;font-size:12px;font-weight:550}
 .cfg-installations summary::-webkit-details-marker{display:none}.cfg-installations summary::marker{content:''}
 .cfg-installations summary:hover{background:#f3f0fc}.cfg-installations summary:focus-visible{outline-offset:-4px;border-radius:8px}

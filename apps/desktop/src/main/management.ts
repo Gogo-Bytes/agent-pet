@@ -9,6 +9,7 @@ import { configurationOnline } from '../shared/configurations.js';
 import { registerConfigurationIpc } from './configuration-ipc.js';
 import { PreferenceStore } from './preferences.js';
 import { PiPreflight } from './pi-preflight.js';
+import { ClaudeDiscovery } from './claude-discovery.js';
 import { PiConnectionStore } from './pi-connection-store.js';
 import { PiConnection } from './pi-connection.js';
 import type { PiBridgeAdapter } from '@agent-pet/adapter-pi';
@@ -62,7 +63,8 @@ export function createManagement(options: {
     options.onlineChanged?.(snapshot.records.some(configurationOnline));
     if (window && !window.isDestroyed()) window.webContents.send('management:configurations-state', snapshot);
   });
-  const configurationIpc = registerConfigurationIpc({ window: () => window, configurations, preflight,
+  const claudeDiscovery = new ClaudeDiscovery({ home: app.getPath('home'), guiPath: process.env.PATH ?? '' });
+  const configurationIpc = registerConfigurationIpc({ window: () => window, configurations, preflight, claudeDiscovery,
     sessions: () => options.sessions?.() ?? { sessions: {}, bubbles: [] }, quitting: () => quitting });
   let tray: Tray | undefined;
   let runtimeError: string | null = null;

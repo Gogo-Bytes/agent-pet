@@ -184,3 +184,53 @@ describe('Claude formal connection controls', () => {
     expect(test.bridge.configurations.preview).not.toHaveBeenCalled();
   });
 });
+
+const discoveredClaude = { id: 'found-claude', entryPath: '/synthetic/nvm/bin/claude', executable: '/synthetic/npm/bin/claude.exe', kind: 'npm' as const, version: '2.1.301', compatibility: 'verified' as const };
+it('takes a discovered Claude straight to its existing write preview, with no folder or executable picker', async () => {
+  const test = await mount(claude({ mode: 'normal-start' }));
+  const targetPath = '/synthetic/.claude';
+  test.bridge.configurations.detectClaude.mockResolvedValueOnce({ installations: [discoveredClaude], targetPath, scan: 'complete', notice: 'none' });
+  test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...await test.bridge.piPreflight.getState(), installations: [] });
+  const record = { ...claude({ mode: 'normal-start', preview: { ...preview, settings: { path: targetPath + '/settings.json', exists: true, canApply: true, reason: '' } } }, 'auto-claude'), targetPath };
+  test.bridge.configurations.prepareDetectedClaude.mockImplementationOnce(async () => {
+    const next = { ...test.configs(), revision: test.configs().revision + 1, records: [...test.configs().records, record] };
+    test.pushConfigs(next); return { state: next, configurationId: record.id };
+  });
+  await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+  const card = screen.getByRole('article', { name: 'Claude Code 默认配置' });
+  await test.user.click(within(card).getByRole('button', { name: '一键配置' }));
+  const consent = screen.getByRole('dialog', { name: '连接 Claude Code' });
+  expect(consent.textContent).toContain(targetPath);
+  expect(test.bridge.configurations.prepareDetectedClaude).not.toHaveBeenCalled();
+  await test.user.click(within(consent).getByRole('button', { name: '检查并预览' }));
+  expect(test.bridge.configurations.prepareDetectedClaude).toHaveBeenCalledExactlyOnceWith(discoveredClaude.id, expect.any(String));
+  expect(screen.getByRole('dialog').textContent).toContain('追加一条 Agent Pet 的 SessionStart hook');
+  expect(test.bridge.locations.choose).not.toHaveBeenCalled(); expect(test.bridge.configurations.preview).not.toHaveBeenCalled();
+  expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+});
+it('keeps unverified native installs visible but disabled, and opens an existing default without creating it again', async () => {
+  const test = await mount(claude({ mode: 'normal-start' }));
+  const state = { installations: [{ ...discoveredClaude, kind: 'native' as const, compatibility: 'unverified' as const, version: null }], targetPath: '/synthetic/.claude', scan: 'complete' as const, notice: 'none' as const };
+  test.bridge.configurations.detectClaude.mockResolvedValueOnce(state);
+  await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+  let card = screen.getByRole('article', { name: 'Claude Code 默认配置' });
+  expect(within(card).getByRole('button', { name: '一键配置' }).hasAttribute('disabled')).toBe(true);
+  expect(within(card).getByText('已找到 Claude，当前安装的兼容性尚未确认。')).toBeTruthy();
+  test.bridge.configurations.detectClaude.mockResolvedValueOnce({ ...state, installations: [discoveredClaude, { ...discoveredClaude, id: 'another-verified' }], targetPath: test.configs().records[0]!.targetPath });
+  await test.user.click(screen.getByRole('button', { name: '重新扫描' }));
+  card = screen.getByRole('article', { name: 'Claude Code 默认配置' });
+  expect(within(card).queryByRole('combobox')).toBeNull();
+  await test.user.click(within(card).getByRole('button', { name: '查看配置' }));
+  expect(screen.getByRole('button', { name: '设置连接' })).toBeTruthy();
+  expect(test.bridge.configurations.create).not.toHaveBeenCalled();
+  expect(test.bridge.configurations.prepareDetectedClaude).not.toHaveBeenCalled();
+});
+it('lets users choose between verified Claude installations rather than silently preferring an NVM version', async () => {
+  const test = await mount();
+  test.bridge.configurations.detectClaude.mockResolvedValueOnce({ installations: [discoveredClaude, { ...discoveredClaude, id: 'other-claude', entryPath: '/synthetic/other/bin/claude' }], targetPath: '/synthetic/.claude', scan: 'complete', notice: 'none' });
+  await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+  await test.user.selectOptions(screen.getByRole('combobox', { name: 'Claude 程序安装' }), 'other-claude');
+  await test.user.click(within(screen.getByRole('article', { name: 'Claude Code 默认配置' })).getByRole('button', { name: '一键配置' }));
+  await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
+  expect(test.bridge.configurations.prepareDetectedClaude).toHaveBeenCalledExactlyOnceWith('other-claude', expect.any(String));
+});

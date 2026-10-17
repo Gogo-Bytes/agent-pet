@@ -1,5 +1,7 @@
 # Desktop development
 
+Claude 自动扫描（2026-10-17）：省去默认配置和隐藏程序路径选择；多安装可选、已有配置直接查看。当前可接入仍仅 npm 2.1.301，官方安装/Homebrew 显示待验证；未改 shell/PATH，未要求重装。源码/隔离验证完成，本机新增扫描尚待授权，不表示发布通过。见 [设计与验证](../../docs/CLAUDE-DISCOVERY-DESIGN.md)。
+
 当前范围、进度与下一步见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。此页开发命令不是安装许可；完整真实端到端仍待验收，managed 入口仍关闭。
 
 2026-10-16 当前日常pi已按精确授权更新扩展，用户reload后在dev完成限定任务：实际收到读取、写入、执行、工具出错、继续回答和完成，工具出错未误判整任务失败。思考/查找及其余未触发状态、实际专用动画显示仍待验；本轮没有打包。范围与时间线见 [实机记录](../../docs/PI-EXTENSION-LIVE-ACCEPTANCE.md)。

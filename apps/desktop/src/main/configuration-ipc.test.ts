@@ -7,6 +7,7 @@ import { Configurations } from './configurations.js';
 import { registerConfigurationIpc } from './configuration-ipc.js';
 import { loadTrustedEntry } from './window-trust.js';
 import { PiPreflight } from './pi-preflight.js';
+import { ClaudeDiscovery } from './claude-discovery.js';
 import { PiConnectionStore } from './pi-connection-store.js';
 import { ConfigurationsStore } from './configurations-store.js';
 import { limits, ReadBudget } from './pi-preflight-files.js';
@@ -19,26 +20,33 @@ let window: BrowserWindow;
 let event: { sender: BrowserWindow['webContents']; senderFrame: BrowserWindow['webContents']['mainFrame'] };
 let closed: boolean;
 let preflight: PiPreflight;
+let claudeDiscovery: ClaudeDiscovery;
 let capabilities: ReturnType<typeof registerConfigurationIpc>;
 let visible: boolean;
 const start = vi.fn(async () => ({ stop: vi.fn(async () => {}) }));
+const chooseClaude = vi.fn(async () => null);
 beforeEach(() => {
   native.handlers.clear(); native.pick.mockReset(); native.approve.mockReset(); native.open.mockReset();
   directory = realpathSync(mkdtempSync(join(tmpdir(), 'agent-pet-ipc-')));
   const profile = join(directory, 'profile'); mkdirSync(profile, { mode: 0o700 });
   start.mockClear();
-  registry = new Configurations({ directory: profile, adapter: () => ({ start }), publish: vi.fn() });
+  chooseClaude.mockClear();
+  registry = new Configurations({ directory: profile, adapter: () => ({ start }), publish: vi.fn(),
+    claude: { nodeExecutable: process.execPath, runAsNode: false, chooseExecutable: chooseClaude,
+      runtimeAssets: async () => ({ hook: '// legacy fixture', launcher: '// legacy fixture', nativeHook: '// isolated observer fixture' }),
+      normal: { probePath: '/isolated/probe', observerExecutable: process.execPath } } });
   preflight = new PiPreflight({ home: directory, guiPath: join(directory, 'bin'), pick: async () => null });
+  claudeDiscovery = new ClaudeDiscovery({ home: directory, guiPath: join(directory, 'bin') });
   const contents = { mainFrame: { url: 'file:///review.html' }, setWindowOpenHandler: vi.fn(), on: vi.fn() };
   visible = true;
   window = { webContents: contents, isDestroyed: () => false, isVisible: () => visible, loadFile: vi.fn(), loadURL: vi.fn() } as unknown as BrowserWindow;
   loadTrustedEntry(window, '/review.html'); closed = false;
   event = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
-  capabilities = registerConfigurationIpc({ window: () => window, configurations: registry, preflight, sessions: () => ({ sessions: {}, bubbles: [] }), quitting: () => closed });
+  capabilities = registerConfigurationIpc({ window: () => window, configurations: registry, preflight, claudeDiscovery, sessions: () => ({ sessions: {}, bubbles: [] }), quitting: () => closed });
 });
 afterEach(async () => {
   vi.useRealTimers();
-  preflight.close(); await registry.stop();
+  preflight.close(); claudeDiscovery.invalidate(); await registry.stop();
   for (const record of registry.snapshot().records) {
     const saved = new PiConnectionStore(join(directory, 'profile', `configuration-${record.id}`)).snapshot();
     if (saved) rmSync(dirname(saved.config.endpoint), { recursive: true, force: true });
@@ -240,4 +248,93 @@ describe('configuration host capability boundary', () => {
     expect(native.open).toHaveBeenCalledExactlyOnceWith('https://github.com/Gogo-Bytes/agent-pet');
     closed = true; expect(() => invoke('configurations-state')).toThrow('quitting');
   });
+});
+
+async function claudeFixture() {
+  const stat = ReadBudget.prototype.stat;
+  vi.spyOn(ReadBudget.prototype, 'stat').mockImplementation(function(this: ReadBudget, path) {
+    if (path.startsWith('/opt') || path.startsWith('/usr/local')) return Promise.resolve(null);
+    return stat.call(this, path);
+  });
+  const pkg = join(directory, '.nvm/versions/node/v22.18.0/lib/node_modules/@anthropic-ai/claude-code');
+  mkdirSync(join(pkg, 'bin'), { recursive: true, mode: 0o700 });
+  const executable = join(pkg, 'bin/claude.exe'), manifest = join(pkg, 'package.json');
+  writeFileSync(executable, 'throw new Error("DO NOT EXECUTE")', { mode: 0o700 });
+  writeFileSync(manifest, JSON.stringify({ name: '@anthropic-ai/claude-code', version: '2.1.301', bin: { claude: 'bin/claude.exe' } }), { mode: 0o600 });
+  mkdirSync(join(directory, 'bin')); const entry = join(directory, 'bin/claude'); symlinkSync(executable, entry);
+  const target = join(directory, '.claude'); mkdirSync(target, { mode: 0o700 });
+  const settings = join(target, 'settings.json'), original = '{"hooks":{},"keep":"original"}\n';
+  writeFileSync(settings, original, { mode: 0o600 });
+  native.approve.mockResolvedValue({ response: 1 });
+  const detected = await invoke('configurations-detect-claude', 'scan-request') as Awaited<ReturnType<ClaudeDiscovery['detect']>>;
+  return { id: detected.installations[0]!.id, executable, entry, manifest, target, settings, original };
+}
+it('discovers Claude only after explicit scope approval and never inspects after cancellation or window invalidation', async () => {
+  const detect = vi.spyOn(claudeDiscovery, 'detect');
+  native.approve.mockResolvedValueOnce({ response: 0 });
+  expect(await invoke('configurations-detect-claude', 'scan-request')).toMatchObject({ notice: 'cancelled' });
+  expect(detect).not.toHaveBeenCalled();
+  native.approve.mockImplementationOnce(async () => { capabilities.invalidate(); return { response: 1 }; });
+  expect(await invoke('configurations-detect-claude', 'scan-request')).toMatchObject({ notice: 'cancelled' });
+  expect(detect).not.toHaveBeenCalled();
+});
+it('prepares the discovered Claude default with no picker and keeps both settings and runtime untouched until confirmation', async () => {
+  const f = await claudeFixture();
+  const result = await invoke('configurations-prepare-detected-claude', f.id, 'claude-first') as { state: ReturnType<Configurations['snapshot']>; configurationId: string };
+  expect(result.state.records[0]).toMatchObject({ name: 'Claude Code', provider: 'claude', targetPath: f.target,
+    claude: { configured: false, status: 'not-configured', preview: { executable: f.executable, settings: { path: f.settings, canApply: true } } } });
+  expect(chooseClaude).not.toHaveBeenCalled(); expect(native.pick).not.toHaveBeenCalled();
+  expect(readFileSync(f.settings, 'utf8')).toBe(f.original);
+  expect(existsSync(join(directory, 'profile', 'claude-normal-' + result.configurationId))).toBe(false);
+  const second = await invoke('configurations-prepare-detected-claude', f.id, 'claude-next') as typeof result;
+  expect(second.configurationId).toBe(result.configurationId); expect(second.state.records).toHaveLength(1);
+  const plan = second.state.records[0]!.claude!.preview!.id;
+  await invoke('configurations-cancel-detected', 'claude-first');
+  expect(registry.snapshot().records[0]!.claude!.preview?.id).toBe(plan);
+  await invoke('configurations-cancel-detected', 'claude-next');
+  expect(registry.snapshot().records[0]!.claude!.preview).toBeNull();
+  expect(readFileSync(f.settings, 'utf8')).toBe(f.original); expect(start).not.toHaveBeenCalled();
+});
+it('rejects stale Claude candidates, changed installation and arbitrary executable paths', async () => {
+  const f = await claudeFixture();
+  await expect(invoke('configurations-prepare-detected-claude', '/arbitrary/claude', 'request')).rejects.toThrow('重新扫描');
+  writeFileSync(f.manifest, JSON.stringify({ name: '@anthropic-ai/claude-code', version: '9.0.0', bin: { claude: 'bin/claude.exe' } }));
+  await expect(invoke('configurations-prepare-detected-claude', f.id, 'request')).rejects.toThrow('已变化');
+  expect(registry.snapshot().records).toEqual([]);
+  claudeDiscovery.invalidate();
+  await expect(invoke('configurations-prepare-detected-claude', f.id, 'request')).rejects.toThrow('重新扫描');
+  expect(readFileSync(f.settings, 'utf8')).toBe(f.original);
+});
+it('cancels a pending Claude preparation without creating a late record and releases the visible request', async () => {
+  const f = await claudeFixture(), finish = delayInstallation(f.entry);
+  const pending = invoke('configurations-prepare-detected-claude', f.id, 'cancel-claude');
+  await invoke('configurations-cancel-detected', 'cancel-claude');
+  expect(await pending).toMatchObject({ configurationId: null, reason: 'cancelled' });
+  finish(); await new Promise(resolve => setImmediate(resolve)); await flushSetup();
+  expect(registry.snapshot().records).toEqual([]);
+  expect(readFileSync(f.settings, 'utf8')).toBe(f.original);
+});
+it('cancels a Claude scan in Main before further reads and rejects old cancellation against a newer scan', async () => {
+  const f = await claudeFixture();
+  // A completed scan can be canceled while the combined UI still waits for pi.
+  await invoke('configurations-cancel-claude-scan', 'scan-request');
+  expect(claudeDiscovery.candidate(f.id)).toBeNull();
+  const stat = ReadBudget.prototype.stat;
+  const finish = delayInstallation(f.entry);
+  let manifestReads = 0;
+  const json = ReadBudget.prototype.json;
+  vi.spyOn(ReadBudget.prototype, 'json').mockImplementation(function(this: ReadBudget, path) {
+    if (path === f.manifest) manifestReads++;
+    return json.call(this, path);
+  });
+  const pending = invoke('configurations-detect-claude', 'pending-scan');
+  await flushSetup();
+  await invoke('configurations-cancel-claude-scan', 'pending-scan');
+  finish();
+  expect(await pending).toMatchObject({ notice: 'cancelled', installations: [] });
+  expect(manifestReads).toBe(0); expect(claudeDiscovery.candidate(f.id)).toBeNull();
+  vi.mocked(ReadBudget.prototype.stat).mockImplementation(stat);
+  const next = await invoke('configurations-detect-claude', 'new-scan') as Awaited<ReturnType<ClaudeDiscovery['detect']>>;
+  await invoke('configurations-cancel-claude-scan', 'pending-scan');
+  expect(claudeDiscovery.candidate(next.installations[0]!.id)).not.toBeNull();
 });

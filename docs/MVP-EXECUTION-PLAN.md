@@ -54,6 +54,8 @@ Codex只读hooks/list已获授权并执行：精确匹配的本产品hook10条�
 
 Codex隔离审核首轮已获授权，由用户运行后在进入审核前失败：pid-managed后台服务调用ps返回EPERM。自有Node在同款系统沙箱中仅查询自身PID复现spawn EPERM；未检查其他应用。审核脚本按官方建议添加--no-daemon，保留沙箱/信任边界，并使用review-r1独占助手保留首轮文件。[同一预览](CODEX-HOOK-TRUST-REVIEW-PREVIEW.md)已更新唯一有界复验范围；真实复验尚未运行，未声明Codex接通。原dev与日常配置保持。
 
+Codex审核r1已获授权，用户运行后在Codex启动前被准备检查拒绝。固定隔离文件只读核对：observer内容一致、权限/归属有效；仅config多了首轮CLI正常写入的tui.screen_reader_detection_done=true，review-r1仅文档助手存在、checker和结果均未生成。已修正精确UI增量校验、r1同字节助手安全续接及固定失败类别；33项测试/typecheck/源码build通过，收窄复用后两项回归通过。未再次启动真实Codex；按有界失败规则在[审核记录](CODEX-HOOK-TRUST-REVIEW-PREVIEW.md)留停点，不自动重试或扩范围。--no-daemon真实启动、审核和回调仍未验收，dev/日常配置保留。
+
 ## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 
 用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。随后用户精确授权日常升级并完成：12组自有hooks已保存，其他设置及原备份核对一致；新版dev已启动，用户确认原路径新开的Claude已连接。真实读取、写入/修改、Bash执行及模型出错反馈已核对；Glob/Grep在当前会话不可用，查找未验收。

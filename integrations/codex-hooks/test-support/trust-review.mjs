@@ -34,5 +34,18 @@ if ((!retry && process.argv[2] !== '--run-authorized-review') || process.argv.le
       console.log(JSON.stringify(result));
       if (!result.threadStarted || !result.events.some(event => event.kind === 'session-started')) process.exitCode = 1;
     }
-  } catch { console.error('REVIEW_STOPPED; daily configuration untouched'); process.exitCode = 1; }
+  } catch(error) {
+    const known = new Map([
+      ['Isolated configuration changed','isolated-configuration-changed'],
+      ['Existing helper changed','existing-helper-changed'],
+      ['Unsafe isolated directory','unsafe-isolated-directory'],
+      ['Unsafe isolated file','unsafe-isolated-file'],
+      ['Observer changed','observer-changed'],
+      ['Program changed','program-changed'],
+      ['Isolated target changed','isolated-target-changed'],
+      ['Review interrupted','review-interrupted'],
+    ]);
+    const category = known.get(error?.message) ?? (['EEXIST','ENOENT','EACCES','EPERM'].includes(error?.code) ? error.code : 'internal-check-failed');
+    console.error(`REVIEW_STOPPED: ${category}; daily configuration untouched`); process.exitCode = 1;
+  }
 }

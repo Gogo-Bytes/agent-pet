@@ -5,6 +5,22 @@ import { join, resolve } from 'node:path';
 import { build } from 'vite';
 import { environment, resolveEntry } from './cli-check.mjs';
 export const ROOT = '/tmp/agent-pet-codex-start-20261019-5f92c8-r2';
+const BASE_CONFIG = 'cli_auth_credentials_store = "ephemeral"\ncheck_for_update_on_startup = false\n';
+/** Codex saves this harmless UI detection result before its interactive startup completes. */
+export function isExpectedIsolatedConfig(text) {
+  return text === BASE_CONFIG || text === BASE_CONFIG + '\n[tui]\nscreen_reader_detection_done = true\n';
+}
+/** Resume an interrupted preparation only when its existing own helper is byte-identical. */
+export async function writeOrVerifyHelper(file, content, resume = false) {
+  try { await writeFile(file, content, {flag:'wx',mode:0o600}); }
+  catch(error) {
+    if(error.code !== 'EEXIST' || !resume) throw error;
+    const stat = await lstat(file);
+    if(!stat.isFile() || stat.nlink !== 1 || stat.uid !== process.getuid() ||
+      (stat.mode & 0o7777) !== 0o600 || stat.size > 256 * 1024 ||
+      await readFile(file,'utf8') !== content) throw new Error('Existing helper changed');
+  }
+}
 export async function prepareIsolated(prefix) {
   if (!['status', 'review', 'review-r1'].includes(prefix)) throw new Error('Invalid isolated operation');
   const before = await resolveEntry();
@@ -28,14 +44,14 @@ export async function prepareIsolated(prefix) {
   const hash = text => createHash('sha256').update(text).digest('hex');
   if (hash(observer) !== hash(installed)) throw new Error('Observer changed');
   const documents = await compile('integrations/codex-hooks/hook-source.ts', `${prefix}-documents.cjs`);
-  await writeFile(join(ROOT, `runtime/${prefix}-documents.cjs`), documents, { flag: 'wx', mode: 0o600 });
+  await writeOrVerifyHelper(join(ROOT, `runtime/${prefix}-documents.cjs`), documents, prefix === 'review-r1');
   const require = createRequire(import.meta.url);
   const { createCodexHookDocument } = require(join(ROOT, `runtime/${prefix}-documents.cjs`));
   const expected = createCodexHookDocument(process.execPath, join(ROOT, 'runtime/observer.cjs'));
   if (await readOwn(join(ROOT, 'config/hooks.json'), 64 * 1024) !== expected ||
-    await readOwn(join(ROOT, 'config/config.toml'), 1024) !== 'cli_auth_credentials_store = "ephemeral"\ncheck_for_update_on_startup = false\n') throw new Error('Isolated configuration changed');
+    !isExpectedIsolatedConfig(await readOwn(join(ROOT, 'config/config.toml'), 1024))) throw new Error('Isolated configuration changed');
   const checker = await compile('integrations/codex-hooks/test-support/native-start.ts', `${prefix}-check.cjs`);
-  await writeFile(join(ROOT, `runtime/${prefix}-check.cjs`), checker, { flag: 'wx', mode: 0o600 });
+  await writeOrVerifyHelper(join(ROOT, `runtime/${prefix}-check.cjs`), checker, prefix === 'review-r1');
   const now = await resolveEntry();
   if (now.executable !== before.executable || now.identity !== before.identity) throw new Error('Program changed');
   const { probeCodexStart, launchIsolatedCodex, LOOPBACK_ONLY_PROFILE, hasReviewedOwnHooks } = require(join(ROOT, `runtime/${prefix}-check.cjs`));
@@ -47,6 +63,6 @@ export async function prepareIsolated(prefix) {
       if (current.executable !== before.executable || current.identity !== before.identity ||
         await readOwn(join(ROOT, 'runtime/observer.cjs'), 256 * 1024) !== installed ||
         await readOwn(join(ROOT, 'config/hooks.json'), 64 * 1024) !== expected ||
-        await readOwn(join(ROOT, 'config/config.toml'), 1024) !== 'cli_auth_credentials_store = "ephemeral"\ncheck_for_update_on_startup = false\n') throw new Error('Isolated target changed');
+        !isExpectedIsolatedConfig(await readOwn(join(ROOT, 'config/config.toml'), 1024))) throw new Error('Isolated target changed');
     } };
 }

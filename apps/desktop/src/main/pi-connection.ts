@@ -1,3 +1,4 @@
+import { samePersistedIdentity, withVolumeIdentity } from './durable-file-identity.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { lstat, mkdir, rmdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -165,8 +166,13 @@ export class PiConnection {
       this.owned = { deployment: plan.deployment, receipt: applied.receipt };
       this.state.deployedPath = applied.receipt.path; this.state.canRemove = true;
       if (this.options.store) {
-        this.saved = { target: plan.preview.target.path, config: plan.config, runtime: this.runtime!.stat,
-          ownership: plan.deployment.exportOwnership(applied.receipt), disabled: false };
+        try {
+          this.saved = { target: plan.preview.target.path, config: plan.config, runtime: withVolumeIdentity(this.runtime!.path, this.runtime!.stat),
+            ownership: plan.deployment.exportOwnership(applied.receipt), disabled: false };
+        } catch {
+          this.state.saved = 'uncertain'; this.state.notice = 'save-failed'; this.state.status = 'failed';
+          this.state.canResume = false; return;
+        }
         if (!this.persist(false)) return;
       }
       if (this.closed) { this.state.status = 'disconnected'; return; }
@@ -207,11 +213,27 @@ export class PiConnection {
     return this.run(async () => {
       if (!this.state.canResume || !this.saved || !this.runtime || !this.owned) return;
       try {
-        const now = await lstat(this.runtime.path);
-        if (!now.isDirectory() || !sameIdentity(now, this.runtime.stat) || (now.mode & 0o7777) !== 0o700 || now.uid !== process.getuid?.()) throw new Error();
+        // Revalidate the owned extension before recreating a lost temporary
+        // directory. The endpoint and credential embedded in it stay unchanged.
+        if (!await this.owned.deployment.matches(this.owned.receipt) || this.closed) throw new Error();
+        let now;
+        try { now = await lstat(this.runtime.path); }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          await mkdir(this.runtime.path, { mode: 0o700 }); // Exclusive; never adopt a racing creator.
+          now = await lstat(this.runtime.path);
+          if (!now.isDirectory() || (now.mode & 0o7777) !== 0o700 || now.uid !== process.getuid?.()) throw new Error();
+          this.runtime.stat = saveStat(now);
+        }
+        if (!now.isDirectory() || !samePersistedIdentity(this.runtime.stat, now, this.runtime.path) ||
+            (now.mode & 0o7777) !== 0o700 || now.uid !== process.getuid?.()) throw new Error();
+        const current = saveStat(now);
         try { await lstat(this.saved.config.endpoint); throw new Error('Existing socket'); }
         catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
-        if (!await this.owned.deployment.matches(this.owned.receipt)) throw new Error();
+        const runtime = withVolumeIdentity(this.runtime.path, current);
+        if (!sameIdentity(current, await lstat(this.runtime.path))) throw new Error();
+        this.runtime.stat = current;
+        this.saved = { ...this.saved, runtime, ownership: this.owned.deployment.exportOwnership(this.owned.receipt) };
       } catch { this.state.status = 'failed'; this.state.notice = 'resume-refused'; return; }
       if (!this.persist(false) || this.closed) return;
       await this.startAdapter(this.saved.config);

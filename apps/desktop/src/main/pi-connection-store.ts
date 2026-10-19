@@ -1,3 +1,4 @@
+import { samePersistedIdentity, withVolumeIdentity } from './durable-file-identity.js';
 import * as fs from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, isAbsolute, join, normalize } from 'node:path';
@@ -15,9 +16,12 @@ export const sameIdentity = (a: SavedStat, b: SavedStat) => a.dev === b.dev && a
   a.birthtimeMs === b.birthtimeMs && a.mode === b.mode && a.uid === b.uid && a.gid === b.gid;
 const sameFile = (a: SavedStat, b: SavedStat) => sameIdentity(a, b) && a.size === b.size && a.nlink === b.nlink &&
   a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs;
-function validStat(v: unknown, kind: 'file' | 'directory'): v is SavedStat {
-  if (!keys(v, 'dev,ino,birthtimeMs,mode,uid,gid,size,nlink,mtimeMs,ctimeMs') ||
-    !Object.values(v).every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0)) return false;
+export function validStat(v: unknown, kind: 'file' | 'directory'): v is SavedStat {
+  if (!v || typeof v !== 'object') return false;
+  const names = 'dev,ino,birthtimeMs,mode,uid,gid,size,nlink,mtimeMs,ctimeMs';
+  if (!keys(v, 'volumeId' in v ? names + ',volumeId' : names) ||
+    ('volumeId' in v && (typeof v.volumeId !== 'string' || !/^[a-f0-9-]{36}$/i.test(v.volumeId))) ||
+    !Object.entries(v).filter(([key]) => key !== 'volumeId').every(([, n]) => typeof n === 'number' && Number.isFinite(n) && n >= 0)) return false;
   const s = v as SavedStat;
   if (![s.dev, s.ino, s.mode, s.uid, s.gid, s.size, s.nlink].every(Number.isSafeInteger)) return false;
   return s.uid === uid() && (s.mode & 0o7777) === (kind === 'file' ? 0o600 : 0o700) &&
@@ -99,7 +103,7 @@ export class PiConnectionStore {
       if (count > MAX_BYTES || !sameFile(before, fs.fstatSync(fd)) || !sameFile(before, fs.lstatSync(this.path))) throw new Error();
       const v: unknown = JSON.parse(bytes.subarray(0, count).toString('utf8'));
       if (!keys(v, 'version,host,uid,directory,connection') || v.version !== 1 || v.host !== hostname() || v.uid !== uid() ||
-        !validStat(v.directory, 'directory') || !sameIdentity(v.directory, this.directoryStat) ||
+        !validStat(v.directory, 'directory') || !samePersistedIdentity(v.directory, this.directoryStat, this.directory) ||
         (v.connection !== null && !validSavedConnection(v.connection))) throw new Error();
       fs.closeSync(fd); fd = undefined;
       this.value = v.connection as SavedConnection | null; this.fileStat = saveStat(before);
@@ -119,7 +123,7 @@ export class PiConnectionStore {
       }
       if (!sameIdentity(this.directoryStat, privateStat(this.directory, 'directory')) || !absent(this.pendingPath)) throw new Error();
       if (this.fileStat ? !sameFile(this.fileStat, privateStat(this.path, 'file')) : !absent(this.path)) throw new Error();
-      const record: RecordValue = { version: 1, host: hostname(), uid: uid(), directory: this.directoryStat, connection };
+      const record: RecordValue = { version: 1, host: hostname(), uid: uid(), directory: withVolumeIdentity(this.directory, this.directoryStat), connection };
       const text = JSON.stringify(record) + '\n';
       if (Buffer.byteLength(text) > MAX_BYTES) throw new Error();
       fd = fs.openSync(this.pendingPath, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600);

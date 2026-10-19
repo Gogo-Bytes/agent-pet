@@ -494,3 +494,7 @@ normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
 [real operation preview](../../docs/CLAUDE-NORMAL-START-PREVIEW.md).
 
 本机普通CLI启动、恢复未暂停观察及首页陪伴已在真实Claude2.1.301与正式dev验证；临时阶段检查随后完整撤回，原版再次连接通过。退出/并发/任务动作不因此视为通过，见[实测与范围](../../docs/CLAUDE-CLI-ACCEPTANCE.md)。若终端提示 `command not found: claude`，表示终端未找到程序入口；可先由用户直接运行已选择安装的绝对路径。产品不会自动改shell/PATH或新增重复安装。
+
+### 重启后的连接恢复
+
+新连接记录以磁盘 UUID 核对跨重启身份；操作期间仍严格核对文件身份和内容。旧格式因设备编号变化失效时需要显式迁移，不能重新添加同一配置或删除未知文件来绕过检查。pi 显式恢复可在原临时目录缺失时排他重建，保留原地址和凭据；Claude 按原规则恢复接收。详见[恢复行为与验证](../../docs/CONNECTION-RESTART-RECOVERY.md)。继续使用 `pnpm --filter @agent-pet/desktop dev`，源码 build 不等于安装包。

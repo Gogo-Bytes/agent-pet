@@ -1,3 +1,4 @@
+import './test-support/mock-volume-queries.js';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
@@ -112,10 +113,10 @@ it.each(['edit', 'replace'])('restart withdrawal preserves %s and retained evide
   expect(new PiConnectionStore(f.root).snapshot()?.ownership).toEqual(first.saved.ownership);
 });
 
-it.each(['missing-runtime', 'replaced-runtime', 'permissive-runtime', 'unknown-socket'])('refuses %s without unlink, reconstruction or listener', async kind => {
+it.each(['replaced-runtime', 'permissive-runtime', 'unknown-socket'])('refuses %s without unlink, reconstruction or listener', async kind => {
   const f = fixture(); const first = await f.deploy(); await first.connection.stop();
   const runtime = dirname(first.saved.config.endpoint);
-  if (kind === 'missing-runtime' || kind === 'replaced-runtime') fs.rmdirSync(runtime);
+  if (kind === 'replaced-runtime') fs.rmdirSync(runtime);
   if (kind === 'replaced-runtime') fs.mkdirSync(runtime, { mode: 0o700 });
   if (kind === 'permissive-runtime') fs.chmodSync(runtime, 0o755);
   if (kind === 'unknown-socket') fs.writeFileSync(first.saved.config.endpoint, 'unknown');
@@ -123,7 +124,6 @@ it.each(['missing-runtime', 'replaced-runtime', 'permissive-runtime', 'unknown-s
   expect(await second.connection.resume()).toMatchObject({ notice: 'resume-refused', receiving: 'stopped' });
   expect(second.start).not.toHaveBeenCalled();
   if (kind === 'unknown-socket') expect(fs.readFileSync(first.saved.config.endpoint, 'utf8')).toBe('unknown');
-  if (kind === 'missing-runtime') expect(fs.existsSync(runtime)).toBe(false);
   expect(await second.connection.remove()).toMatchObject({ notice: 'removed' });
 });
 
@@ -258,4 +258,63 @@ it('retries a failed local activity cleanup while preserving the closed callback
   second.start.mock.calls[0]![1].publish({ ...piObservation(), status: 'working', revision: 100 });
   expect(second.app.snapshot().bubbles).toEqual([]);
   offCount();
+});
+
+it('explicit resume recreates a missing runtime only after ownership validation and retains the credential and extension', async () => {
+  const f = fixture(), first = await f.deploy(); await first.connection.stop();
+  const bytes = fs.readFileSync(first.path), runtime = dirname(first.saved.config.endpoint);
+  fs.rmdirSync(runtime);
+  const second = f.controller();
+  expect(fs.existsSync(runtime)).toBe(false); expect(second.start).not.toHaveBeenCalled();
+  expect(await second.connection.resume()).toMatchObject({ receiving: 'active', saved: 'ready' });
+  expect(second.start.mock.calls[0]![0]).toEqual(first.saved.config);
+  expect(second.store.snapshot()!.config).toEqual(first.saved.config);
+  expect(fs.readFileSync(first.path)).toEqual(bytes);
+  expect(fs.statSync(runtime).mode & 0o7777).toBe(0o700);
+});
+it('missing runtime is not recreated for an edited extension', async () => {
+  const f = fixture(), first = await f.deploy(); await first.connection.stop();
+  const runtime = dirname(first.saved.config.endpoint); fs.rmdirSync(runtime);
+  fs.appendFileSync(first.path, '// user edit');
+  const second = f.controller();
+  expect(await second.connection.resume()).toMatchObject({ notice: 'resume-refused', receiving: 'stopped' });
+  expect(fs.existsSync(runtime)).toBe(false); expect(second.start).not.toHaveBeenCalled();
+});
+it('runtime recreation never adopts a concurrent creator or listens after persistence fails', async () => {
+  const f = fixture(), first = await f.deploy(); await first.connection.stop();
+  const runtime = dirname(first.saved.config.endpoint); fs.rmdirSync(runtime);
+  const second = f.controller();
+  const mkdir = asyncFs.mkdir;
+  vi.spyOn(asyncFs, 'mkdir').mockImplementationOnce(async (...args: Parameters<typeof asyncFs.mkdir>) => {
+    await mkdir(...args); throw Object.assign(new Error('exists'), { code: 'EEXIST' });
+  });
+  expect(await second.connection.resume()).toMatchObject({ notice: 'resume-refused' });
+  expect(second.start).not.toHaveBeenCalled();
+  vi.restoreAllMocks(); fs.rmdirSync(runtime);
+  const third = f.controller(); vi.spyOn(third.store, 'save').mockReturnValue(false);
+  expect(await third.connection.resume()).toMatchObject({ notice: 'save-failed', receiving: 'stopped' });
+  expect(third.start).not.toHaveBeenCalled(); expect(fs.existsSync(runtime)).toBe(true);
+});
+
+it('restores deployment and runtime after device renumbering with stable volume evidence', async () => {
+  const f = fixture(), first = await f.deploy(); await first.connection.stop();
+  const record = JSON.parse(fs.readFileSync(f.record, 'utf8'));
+  if (!record.directory.volumeId) return;
+  record.directory.dev++; record.connection.runtime.dev++;
+  record.connection.ownership.file.dev++;
+  for (const [, stat] of record.connection.ownership.directories) stat.dev++;
+  fs.writeFileSync(f.record, JSON.stringify(record));
+  const second = f.controller();
+  expect(await second.connection.resume()).toMatchObject({ receiving: 'active', saved: 'ready' });
+  expect(second.store.snapshot()!.config).toEqual(first.saved.config);
+  expect(await second.connection.remove()).toMatchObject({ notice: 'removed' });
+});
+
+it('reports identity capture failure after deployment and preserves withdrawal without listening', async () => {
+  const f = fixture(), c = f.controller(), preview = await c.connection.preview();
+  vi.spyOn(PiTemporaryDeployment.prototype, 'exportOwnership').mockImplementationOnce(() => { throw new Error('identity unavailable'); });
+  expect(await c.connection.confirm(preview.preview!.id)).toMatchObject({ status: 'failed', notice: 'save-failed',
+    receiving: 'stopped', saved: 'uncertain', canRemove: true, canResume: false });
+  expect(c.start).not.toHaveBeenCalled(); expect(fs.existsSync(join(f.target, 'extensions/agent-pet.ts'))).toBe(true);
+  expect(await c.connection.remove()).toMatchObject({ notice: 'removed' });
 });

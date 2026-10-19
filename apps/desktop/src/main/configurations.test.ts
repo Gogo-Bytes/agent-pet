@@ -1,3 +1,4 @@
+import './test-support/mock-volume-queries.js';
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';

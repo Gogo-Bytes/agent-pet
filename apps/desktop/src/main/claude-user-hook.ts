@@ -1,3 +1,4 @@
+import { samePersistedIdentity, withVolumeIdentity } from './durable-file-identity.js';
 import * as fs from 'node:fs';
 import { basename, isAbsolute, join, normalize } from 'node:path';
 import { TextDecoder } from 'node:util';
@@ -6,7 +7,7 @@ const MAX_BYTES = 64 * 1024, MATCHER = 'startup|resume|clear|compact';
 export const CLAUDE_USER_HOOK_EVENTS = Object.freeze(['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
   'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact'] as const);
 export type ClaudeUserHookEvent = typeof CLAUDE_USER_HOOK_EVENTS[number];
-type Identity = { dev: number; ino: number; birthtimeMs: number; uid: number; gid: number; mode: number };
+type Identity = { dev: number; ino: number; birthtimeMs: number; uid: number; gid: number; mode: number; volumeId?: string };
 type HookEntry = { matcher: typeof MATCHER; hooks: [{ type: 'command'; command: string; timeout: 2 }] };
 type HookOwnershipBase = {
   directory: string; path: string; command: string; entry: HookEntry;
@@ -43,7 +44,8 @@ const exact = (value: unknown, names: readonly string[]): value is Record<string
   !Array.isArray(value) && Object.keys(value).length === names.length && Object.keys(value).every(key => names.includes(key));
 const identity = (stat: fs.Stats): Identity => ({ dev: stat.dev, ino: stat.ino, birthtimeMs: stat.birthtimeMs,
   uid: stat.uid, gid: stat.gid, mode: stat.mode });
-const sameIdentity = (a: Identity, b: Identity) => Object.keys(a).every(key => a[key as keyof Identity] === b[key as keyof Identity]);
+const sameIdentity = (a: Identity, b: Identity) => a.dev === b.dev && a.ino === b.ino &&
+  a.birthtimeMs === b.birthtimeMs && a.mode === b.mode && a.uid === b.uid && a.gid === b.gid;
 const sameFile = (a: fs.Stats, b: fs.Stats) => sameIdentity(identity(a), identity(b)) && a.size === b.size &&
   a.nlink === b.nlink && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs;
 const commandValid = (value: unknown): value is string => typeof value === 'string' && value.trim() === value && value.length > 0 &&
@@ -280,8 +282,10 @@ export function isClaudeUserHookOwnership(value: unknown): value is HookOwnershi
     }
     const paths = directoryPaths(value.directory);
     if (paths.length !== value.directories.length || value.directories.some((item: unknown, index: number) => !Array.isArray(item) ||
-        item.length !== 2 || item[0] !== paths[index] || !exact(item[1], ['dev', 'ino', 'birthtimeMs', 'uid', 'gid', 'mode']) ||
-        !Object.values(item[1]).every(number => typeof number === 'number' && Number.isFinite(number) && number >= 0))) return false;
+        item.length !== 2 || item[0] !== paths[index] || !item[1] || typeof item[1] !== 'object' ||
+        !exact(item[1], ['dev', 'ino', 'birthtimeMs', 'uid', 'gid', 'mode', ...('volumeId' in item[1] ? ['volumeId'] : [])]) ||
+        ('volumeId' in item[1] && (typeof item[1].volumeId !== 'string' || !/^[a-f0-9-]{36}$/i.test(item[1].volumeId))) ||
+        !Object.entries(item[1]).filter(([key]) => key !== 'volumeId').every(([, number]) => typeof number === 'number' && Number.isFinite(number) && number >= 0))) return false;
     const own = value.entry;
     return exact(own, ['matcher', 'hooks']) && own.matcher === MATCHER && Array.isArray(own.hooks) && own.hooks.length === 1 &&
       exact(own.hooks[0], ['type', 'command', 'timeout']) && own.hooks[0].type === 'command' &&
@@ -291,7 +295,11 @@ export function isClaudeUserHookOwnership(value: unknown): value is HookOwnershi
 function contextFromOwnership(ownership: HookOwnership): Context {
   if (!isClaudeUserHookOwnership(ownership)) throw new Error();
   return { directory: ownership.directory, path: ownership.path, pending: join(ownership.directory, 'settings.agent-pet.pending.json'),
-    directories: structuredClone(ownership.directories) };
+    directories: ownership.directories.map(([path, saved]) => {
+      const current = identity(safeDirectory(path));
+      if (!samePersistedIdentity(saved, current, path)) throw new Error();
+      return [path, current];
+    }) };
 }
 
 /** Read-only preparation against a precisely authorized directory. The caller supplies a
@@ -311,7 +319,7 @@ export function prepareClaudeUserHook(options: { directory: string; command: str
     if (shape.disabled || referenceCount(shape.hooks, options.command) !== 0) throw new Error();
     const patched = appendEvents(text, options.events === undefined ? ['SessionStart'] : CLAUDE_USER_HOOK_EVENTS, options.command);
     const base: HookOwnershipBase = { directory: options.directory, path, command: options.command, entry: entry(options.command),
-      createdFields: { hooks: !shape.hooks, sessionStart: !shape.session }, directories: structuredClone(context.directories) };
+      createdFields: { hooks: !shape.hooks, sessionStart: !shape.session }, directories: context.directories.map(([path, stat]) => [path, withVolumeIdentity(path, stat)]) };
     const ownership: HookOwnership = options.events === undefined ? { ...base, schemaVersion: 1 } :
       { ...base, schemaVersion: 2, events: [...CLAUDE_USER_HOOK_EVENTS], createdEvents: patched.createdEvents };
     const plan = makePlan({ path, exists, canApply: true, notice: options.events === undefined ?

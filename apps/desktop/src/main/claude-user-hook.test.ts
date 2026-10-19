@@ -1,3 +1,4 @@
+import './test-support/mock-volume-queries.js';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -360,4 +361,19 @@ it('rejects upgrade apply after the authorized directory identity changes', () =
   fs.renameSync(directory, moved); retained.push(moved); fs.mkdirSync(directory, { mode: 0o700 }); fs.writeFileSync(path, text, { mode: 0o600 });
   expect(applyClaudeUserHook(plan)).toBeNull(); expect(fs.readFileSync(path, 'utf8')).toBe(text);
   expect(inspectClaudeUserHook(plan.ownership!)).toBe(false); expect(withdrawClaudeUserHook(plan.ownership!)).toBe(false);
+});
+
+it.each([1, 2])('recovers schema %s hooks across device renumbering without rewriting settings', version => {
+  fs.writeFileSync(path, '{"env":{"TOKEN":"fixture-only"},"hooks":{"Stop":[]}}', { mode: 0o600 });
+  const plan = prepareClaudeUserHook({ directory, command, ...(version === 2 ? { events: CLAUDE_USER_HOOK_EVENTS } : {}) });
+  const ownership = applyClaudeUserHook(plan)!;
+  expect(ownership).not.toBeNull();
+  const original = fs.readFileSync(path);
+  if (!ownership.directories.every(([, stat]) => stat.volumeId)) return;
+  for (const [, stat] of ownership.directories) stat.dev++;
+  expect(inspectClaudeUserHook(ownership)).toBe(true);
+  expect(fs.readFileSync(path)).toEqual(original);
+  ownership.directories.at(-1)![1].ino++;
+  expect(inspectClaudeUserHook(ownership)).toBe(false);
+  expect(fs.readFileSync(path)).toEqual(original);
 });

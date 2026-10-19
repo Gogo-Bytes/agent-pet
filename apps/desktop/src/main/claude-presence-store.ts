@@ -228,6 +228,19 @@ export class ClaudePresenceStore {
       this.replace('activation.json', text); this.replace('receipt.json', receipt); this.value = next; return true;
     } catch { this.failed = true; this.value = null; return false; }
   }
+  /** Explicit receipt-identity migration only; caller has revalidated the old
+   * registration and saved an external private backup. Never writes settings.
+   */
+  replaceHookIdentity(text: string): boolean {
+    if (this.failed) return false;
+    try {
+      if (this.layout !== 'normal' || !this.value || !this.verify() || typeof text !== 'string') throw new Error();
+      const next: Receipt = { ...this.value, files: { ...this.value.files, 'hook.json': hash(text) } };
+      const receipt = this.receiptText(next);
+      this.ensureSize({ 'hook.json': text, 'receipt.json': receipt });
+      this.replace('hook.json', text); this.replace('receipt.json', receipt); this.value = next; return true;
+    } catch { this.failed = true; this.value = null; return false; }
+  }
   /** Explicit one-time registration upgrade only. Keep original settings evidence
    * untouched and save old private materials before replacing any of them. A
    * partial publication fails closed with recovery evidence retained on disk.

@@ -1,3 +1,4 @@
+import './test-support/mock-volume-queries.js';
 import net from 'node:net';
 import { once } from 'node:events';
 import { mkdtemp, mkdir, realpath, rm } from 'node:fs/promises';

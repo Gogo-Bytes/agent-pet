@@ -1,6 +1,6 @@
 # Codex CLI 正式接线与验收
 
-2026-10-19。**正式连接页/Home已接代码；0.163.0隔离默认后台两轮实测通过，日常目标尚未部署。** 前台与默认模式分别保存证据，不将隔离结论扩大为日常安装或桌面端通过。见[前台证据](CODEX-NORMAL-START-MOCK-PREVIEW.md)和[默认模式精确预览](CODEX-DEFAULT-START-PREVIEW.md)。
+2026-10-19。**正式连接页/Home已接代码；0.163.0隔离默认后台两轮实测通过，日常CLI基础接入已由用户任务验证通过。** 前台与默认模式分别保存证据，不将隔离结论扩大为日常安装或桌面端通过。见[前台证据](CODEX-NORMAL-START-MOCK-PREVIEW.md)和[默认模式精确预览](CODEX-DEFAULT-START-PREVIEW.md)。
 
 ## 接入方式与边界
 
@@ -32,3 +32,8 @@
 - [连接详情](../.agent-work/codex-connection-ui-20261019/connected.jpg)
 
 日常dev/Agent仍保持，未读写日常Codex配置或凭据、未打包/推送。默认后台隔离检查已按精确授权执行，两轮退出0、可信连接true、各1任务+1标题请求；正式Configurations重建接收器成功且hooks不变，隔离后台与接收器停止成功。没有登录凭据/真实模型；原生初始化未OS过滤，未断言零外网。结果与覆盖限制见[默认实测](CODEX-DEFAULT-START-PREVIEW.md#本次执行结果2026-10-19)。日常目标需另给具体写入/撤回预览，不从本次隔离测试推断已允许部署。
+
+
+## 日常基础接入结果（2026-10-19）
+
+已按精确授权在日常CODEX_HOME追加同一10条自有通知，保留config.toml、登录与其他配置；用户审核并在正常codex中发送任务后，确认“已连接，首页有宠物”。实际普通Electron dev的AX与真实宠物截图再次确认首页Codex配置在线，并非示例数据。临时状态记录已关闭，普通dev继续运行，未打包/推送。12项相关回归、typecheck、desktop源码build通过。具体授权、终端killed的未定原因、撤回恢复过程与覆盖限制见[日常验收](CODEX-DAILY-CONNECTION-PREVIEW.md#最终结果2026-10-19)；本条覆盖前阶段“日常未部署”的历史快照，不将基础上线等同于完整动作矩阵或桌面端/发布验收。

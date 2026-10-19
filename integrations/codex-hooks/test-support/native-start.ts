@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { startCodexHookReceiver } from '../transport.js';
+export { hasReviewedOwnHooks } from './hook-status.js';
 import { summarizeHooks, type HookStatusSummary } from './hook-status.js';
 
 /** Fixed categories only. Arbitrary error messages never leave this function. */
@@ -27,8 +28,10 @@ export async function probeCodexStart(options: {
   timeoutMs?: number;
   sandboxMode?: 'read-only' | 'readOnly';
   mode?: 'start' | 'hooks-only';
+  resultFileName?: 'review-status.json' | 'review-start.json';
   expectedHookCommand?: string;
 }) {
+  if (options.resultFileName && !['review-status.json', 'review-start.json'].includes(options.resultFileName)) throw new Error('Invalid isolated result path');
   const token = randomBytes(32).toString('hex'), runId = randomUUID();
   let child: ChildProcessWithoutNullStreams | undefined, live = false, stopping = false;
   const events: { kind: string; hasTurnId: boolean; hasChildId: boolean; source?: string }[] = [];
@@ -124,7 +127,7 @@ export async function probeCodexStart(options: {
     live = false; await receiver.stop();
   }
   // Never persist native IDs, arbitrary server text, stdout/stderr or credentials.
-  await writeFile(join(options.root, options.mode === 'hooks-only' ? 'hook-status.json' : 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
+  await writeFile(join(options.root, options.resultFileName ?? (options.mode === 'hooks-only' ? 'hook-status.json' : 'result.json')), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   return result;
 }
 export const LOOPBACK_ONLY_PROFILE = '(version 1)(allow default)(deny network*)(allow network-outbound (remote ip "localhost:*"))(allow network-inbound (local ip "localhost:*"))';

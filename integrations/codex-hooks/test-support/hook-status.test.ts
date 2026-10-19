@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { summarizeHooks } from './hook-status.js';
+import { summarizeHooks, hasReviewedOwnHooks } from './hook-status.js';
 const hook = { enabled: true, trustStatus: 'untrusted', eventName: 'sessionStart', handlerType: 'command', source: 'user',
   sourcePath: '/isolated/hooks.json', command: 'known command', currentHash: 'SECRET', key: 'SECRET' };
 const data = (hooks: unknown[]) => ({ data: [{ hooks, errors: [{message:'SECRET'}], warnings:['SECRET'] }] });
@@ -21,4 +21,14 @@ it('bounds native lists and rejects malformed trust/enabled fields', () => {
 it('recognizes only the known macOS tmp alias without merging unrelated sources', () => {
   expect(summarizeHooks(data([{...hook,sourcePath:'/private/tmp/owned/hooks.json'}]),'/tmp/owned/hooks.json','known command')).toMatchObject({own:1,foreign:0});
   expect(summarizeHooks(data([{...hook,sourcePath:'/private/tmp/other/hooks.json'}]),'/tmp/owned/hooks.json','known command')).toMatchObject({own:0,foreign:1});
+});
+
+it('permits verification only after all ten own hooks are trusted with no foreign entries or diagnostics', () => {
+  const trusted = {own:10,foreign:0,enabled:10,disabled:0,trusted:10,untrusted:0,modified:0,managed:0,errors:0,warnings:0};
+  expect(hasReviewedOwnHooks(trusted)).toBe(true);
+  expect(hasReviewedOwnHooks(null)).toBe(false);
+  for (const key of ['foreign','disabled','untrusted','modified','managed','errors','warnings'] as const)
+    expect(hasReviewedOwnHooks({...trusted,[key]:1})).toBe(false);
+  for (const key of ['own','enabled','trusted'] as const)
+    expect(hasReviewedOwnHooks({...trusted,[key]:9})).toBe(false);
 });

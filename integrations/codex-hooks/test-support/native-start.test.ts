@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { probeCodexStart, classifyRpcError } from './native-start.js';
 const source = `
 const readline = require('node:readline');
@@ -80,3 +80,22 @@ it('queries only hook status without creating a thread or changing trust', async
   expect(result).toMatchObject({initialized:true,threadStarted:false,outcome:'hooks-listed',hookStatus:{own:1,untrusted:1,trusted:0}});
   expect(await readFile(join(root,'hook-status.json'),'utf8')).not.toContain('SECRET');
 }));
+
+it('rejects arbitrary result paths before launching and preserves exclusive review evidence', async () => {
+  const launch = vi.fn();
+  await expect(probeCodexStart({root:'/unused',launch,
+    // @ts-expect-error Exercise the JavaScript caller boundary.
+    resultFileName:'../outside.json'})).rejects.toThrow('Invalid isolated result path');
+  expect(launch).not.toHaveBeenCalled();
+  const root = await mkdtemp(join(tmpdir(), 'agent-pet-codex-review-fixture-'));
+  try {
+    await mkdir(join(root,'work'));
+    const run = () => probeCodexStart({root,resultFileName:'review-status.json',mode:'hooks-only',expectedHookCommand:'known command',
+      launch: () => spawn(process.execPath,['-e',source],{detached:true,env:{MODE:'hooks',ROOT:root},stdio:['pipe','pipe','pipe']})});
+    await run();
+    const first = await readFile(join(root,'review-status.json'),'utf8');
+    expect(first).not.toContain('SECRET');
+    await expect(run()).rejects.toMatchObject({code:'EEXIST'});
+    expect(await readFile(join(root,'review-status.json'),'utf8')).toBe(first);
+  } finally { await rm(root,{recursive:true,force:true}); }
+});

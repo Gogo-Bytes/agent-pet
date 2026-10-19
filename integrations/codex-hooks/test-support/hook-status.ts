@@ -26,3 +26,11 @@ export function summarizeHooks(value: unknown, expectedSource: string, expectedC
   }
   return summary;
 }
+
+/** Review must be complete before the bounded empty-thread verification may run. */
+export function hasReviewedOwnHooks(summary: HookStatusSummary | null): boolean {
+  return summary !== null && summary.own === codexHookEvents.length &&
+    summary.enabled === codexHookEvents.length && summary.trusted === codexHookEvents.length &&
+    summary.disabled === 0 && summary.untrusted === 0 && summary.modified === 0 &&
+    summary.managed === 0 && summary.foreign === 0 && summary.errors === 0 && summary.warnings === 0;
+}

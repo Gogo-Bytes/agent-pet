@@ -1,6 +1,6 @@
 # Codex 隔离hook状态只读核对
 
-2026-10-19，待本次精确授权。r2已经成功初始化并创建空会话，但没有收到hook；不能只凭这一点归因于未信任或禁用。本机导出的协议明确提供hooks/list，支持分别读取enabled、trustStatus和source元数据。
+2026-10-19，用户已精确授权并完成本次只读查询。r2已经成功初始化并创建空会话，但没有收到hook；不能只凭这一点归因于未信任或禁用。本机导出的协议明确提供hooks/list，支持分别读取enabled、trustStatus和source元数据。
 
 ## 唯一操作
 
@@ -23,3 +23,9 @@ node integrations/codex-hooks/test-support/hook-status-check.mjs --run-authorize
 结果只用于定位“未发现、未启用、未信任或其他错误”，不自动改配置或信任，不发布在线状态。需要用户审核信任或其他范围变化时停止，由用户决定。脚本已有25项检查程序测试、类型检查和源码build验证；r2原记录保留。
 
 AGENTS.md要求真实目标操作有精确范围、预览与授权。此前r2只有schema导出及空会话；本次新增hooks/list、三个独占文件及原隔离自有材料只读核对，因此确认这一范围。
+
+## 实际结果
+
+`hook-status.json`：初始化成功；本产品条目10、启用10、未信任10、已信任0；其他来源0、错误0、警告0。stdout7178字节、stderr0；没有创建会话或收到hook事件。确认Codex已识别本产品文档，但未批准执行；不再把无回调归因于配置未被发现。
+
+本次没有改写信任。按[官方hook说明](https://learn.chatgpt.com/docs/hooks)，下一步由用户通过Codex自己的审核界面决定是否信任。已准备[隔离审核与条件复验](CODEX-HOOK-TRUST-REVIEW-PREVIEW.md)，尚未运行，不属于本次只读授权。

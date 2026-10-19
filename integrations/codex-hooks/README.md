@@ -74,3 +74,7 @@ Validation for startup diagnostics:53 test-support fixtures pass; typecheck and 
 ## Research correction: startup acceptance (2026-10-19)
 
 [Same-version source research](../../docs/CODEX-CONNECTION-RESEARCH.md) confirms that SessionStart is queued at session creation and drained in the first-turn path. An empty thread/CLI with no turn is therefore the wrong acceptance trigger; do not keep retrying the empty-start probe or treating its missing callback as transport failure. Ordinary-start activation and host identity are also still missing from the environment-only prototype seam. Research recommends an isolated first-turn mock/stop check with zero real model requests, then a persistent activation bridge and independently verified presence. Existing daemon observation remains a candidate with privacy/permission limits, not a completed implementation. No production code or native configuration was changed for this research.
+
+## Native first turn with local mock: passed
+
+[Exact scope and evidence](../../docs/CODEX-FIRST-TURN-MOCK-PREVIEW.md): the installed Codex completed one isolated first turn against a fixed loopback Responses fixture. Authenticated event order was session-started → turn-submitted → stop-requested → session-ended; one local model request, no credentials/external access, unchanged reviewed hooks/config.56 harness fixtures/typecheck/source build pass. This replaces the empty-start probe as the successful trigger check, not ordinary-start or real-model acceptance.

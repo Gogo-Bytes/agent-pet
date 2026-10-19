@@ -30,6 +30,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Codex CLI 输入边界（2026-10-19）
 
+**首轮本机模拟已通过：** 固定本机Codex复用已审核隔离hooks，不改config/信任、不读凭据、OS仅回环；空线程150ms负对照后提交首轮，真实认证事件依次SessionStart/UserPromptSubmit/Stop/SessionEnd，任务完成，本地模拟Responses仅1次、stderr0。56项test-support/typecheck/源码build及独立3项复核通过。未打包/推送。普通启动与身份模块继续实施，日常接入/真实模型/正式UI未验收。[范围与结果](CODEX-FIRST-TURN-MOCK-PREVIEW.md)。
+
 **后续方案复核纠正验收前提：** 用户要求独立research后，同版本0.163.0官方源码/测试确认SessionStart在首轮任务路径执行，空thread/start或空CLI等待不能判定此hook损坏。现有环境变量注入也仅覆盖自建探针，不是普通启动接入。停止沿用空启动验收，先准备不调用真实模型的首轮mock/停轮验证，再补持久激活与宿主/存在性；共享daemon须先证明状态范围、权限和正文边界，仍未采用。完整证据、方案比较及实施建议集中在[连接方案复核](CODEX-CONNECTION-RESEARCH.md)；下方历史实测保留，不表示首轮/正式UI已验收。本阶段仅调研，没有真实Agent/凭据操作、模型请求、dev重启或打包。
 
 按用户“继续下一项”进入既定的Codex CLI阶段，桌面端仍最后。已根据当前官方文档实现独立64KiB输入白名单与33项行为测试；保留会话/轮次/工具身份与明确中断事实，丢弃正文/路径/参数。工具返回不等于成功，Stop不等于任务完成，审批检查不等于持续等待；未知工具不猜动作。没有接入Main或发布在线状态。与Claude输入边界合计58项、typecheck及desktop源码build通过，无打包。

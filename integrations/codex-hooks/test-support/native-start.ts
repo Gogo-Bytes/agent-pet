@@ -96,7 +96,7 @@ export async function probeCodexStart(options: {
   await writeFile(join(options.root, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   return result;
 }
-export const LOOPBACK_ONLY_PROFILE = '(version 1)(allow default)(deny network*)(allow network-outbound (remote ip "127.0.0.1:*"))(allow network-inbound (local ip "127.0.0.1:*"))';
+export const LOOPBACK_ONLY_PROFILE = '(version 1)(allow default)(deny network*)(allow network-outbound (remote ip "localhost:*"))(allow network-inbound (local ip "localhost:*"))';
 export function launchIsolatedCodex(executable: string, root: string, environment: Record<string, string>, hookEnvironment: Record<string, string>) {
   return spawn('/usr/bin/sandbox-exec', ['-p', LOOPBACK_ONLY_PROFILE, executable, 'app-server'], {
     cwd: join(root, 'work'), env: { ...environment, ...hookEnvironment }, stdio: ['pipe', 'pipe', 'pipe'], detached: true,

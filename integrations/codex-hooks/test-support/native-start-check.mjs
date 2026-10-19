@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { build } from 'vite';
 import { environment, resolveEntry } from './cli-check.mjs';
-const ROOT = '/tmp/agent-pet-codex-start-20261019-5f92c8';
+const ROOT = '/tmp/agent-pet-codex-start-20261019-5f92c8-r1';
 if (process.argv[2] !== '--run-authorized-check' || process.argv.length !== 3) {
   console.error('Explicit authorized-check argument required.'); process.exitCode = 1;
 } else {

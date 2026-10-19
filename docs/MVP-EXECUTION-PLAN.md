@@ -44,6 +44,8 @@ Codex下一阶段的版本/帮助检查脚本已就绪：固定入口、独占�
 
 外部Main必须先独立核对宿主身份和存活；此阶段未启用Codex正式连接页，也不从hook短命进程猜Agent在线。已准备 [原生加载精确预览](CODEX-NATIVE-START-CHECK-PREVIEW.md) 和可执行脚本：在独占隔离HOME创建空会话，网络限127.0.0.1，不发turn/start、不绕过信任；等待本次新增真实加载授权。现有dev、token、hooks、配置及历史native fixtures保留，无打包。
 
+Codex原生首轮已获授权并尝试，初始化前退出，未收到事件，不标为通过。系统true复现证明本产品沙箱地址语法非法；改为macOS支持的localhost IPv4规则后，真实自有Node测试证实回环可连、外网EPERM。13项相关测试/typecheck/源码build通过。原失败目录保留，不放开网络或自动重试；[同一预览](CODEX-NATIVE-START-CHECK-PREVIEW.md)已列出r1新目录，等待复验范围确认。
+
 ## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 
 用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。随后用户精确授权日常升级并完成：12组自有hooks已保存，其他设置及原备份核对一致；新版dev已启动，用户确认原路径新开的Claude已连接。真实读取、写入/修改、Bash执行及模型出错反馈已核对；Glob/Grep在当前会话不可用，查找未验收。

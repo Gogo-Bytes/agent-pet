@@ -30,6 +30,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Codex CLI 输入边界（2026-10-19）
 
+最新原生普通启动实测：用户授权Main审核新版10条，原生信任完成、固定本机任务OK、正常退出0；检查因Responses=2而停止，第二轮未启动。旧失败记录漏存连接计数，不能判定桥接成功/失败。同版本官方源码有隐藏标题请求，测试程序已改为任务/标题与真实连接独立计数、失败留证；额外请求实际类别仍待一次精确授权复验。原始证据保留、日常配置/dev未变，不打包。[结果和复验精确范围](CODEX-NORMAL-START-MOCK-PREVIEW.md)。
+
 **普通启动基础模块已实现，日常接入未启用：** 新hook每次读取本应用私有activation，无需连接环境变量；原生helper核对UID/精确程序/完整祖先链/出生时间，独立区分宿主与多会话；首次可信非启动事件可建立unknown基线。Main私有记录轮换有完整性、编辑保留与pending失败关闭，停止等待尚在启动的receiver；dev编译新hook资产。自有Node与实际macOS自建宿主fixture通过，全量1288 passed/1 skipped、typecheck/源码build通过；新增聚焦16项通过。独立审查两处生命周期缺陷已修，最终22项自有fixture复核通过。Configurations/IPC/Renderer和日常hook尚未注册；新命令的原生信任需按[新隔离预览](CODEX-NORMAL-START-MOCK-PREVIEW.md)授权，不能复用旧10条。见[实现/边界](CODEX-NORMAL-START-IMPLEMENTATION.md)。
 
 **首轮本机模拟已通过：** 固定本机Codex复用已审核隔离hooks，不改config/信任、不读凭据、OS仅回环；空线程150ms负对照后提交首轮，真实认证事件依次SessionStart/UserPromptSubmit/Stop/SessionEnd，任务完成，本地模拟Responses仅1次、stderr0。56项test-support/typecheck/源码build及独立3项复核通过。未打包/推送。普通启动与身份模块继续实施，日常接入/真实模型/正式UI未验收。[范围与结果](CODEX-FIRST-TURN-MOCK-PREVIEW.md)。

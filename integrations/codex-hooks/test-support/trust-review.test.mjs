@@ -9,3 +9,9 @@ it.each([{args:[]}, {args:['--run-authorized-review']}, {args:['--run-authorized
     [fileURLToPath(new URL('./trust-review.mjs', import.meta.url)), ...args], {cwd:'/tmp',timeout:3000}))
     .rejects.toMatchObject({code:1,stdout:'',stderr:expect.stringContaining('interactive terminal')});
 });
+
+it.each([[],['--run-authorized-interactive-start'],['--run-authorized-interactive-start-r1']])('refuses noninteractive startup check before inspecting real targets (%j)', async (...args) => {
+  await expect(run(process.execPath,
+    [fileURLToPath(new URL('./interactive-start-check.mjs', import.meta.url)), ...args], {cwd:'/tmp',timeout:3000}))
+    .rejects.toMatchObject({code:1,stdout:'',stderr:expect.stringContaining('terminal required')});
+});

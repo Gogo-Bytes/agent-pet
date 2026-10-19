@@ -29,10 +29,10 @@ export async function probeCodexStart(options: {
   sandboxMode?: 'read-only' | 'readOnly';
   mode?: 'start' | 'hooks-only';
   waitForSessionStart?: boolean;
-  resultFileName?: 'review-status.json' | 'review-start.json' | 'auth-review-status.json' | 'auth-review-start.json' | 'network-review-status.json' | 'network-review-start.json' | 'wait-review-start.json';
+  resultFileName?: 'review-status.json' | 'review-start.json' | 'auth-review-status.json' | 'auth-review-start.json' | 'network-review-status.json' | 'network-review-start.json' | 'wait-review-start.json' | 'shape-review-start.json';
   expectedHookCommand?: string;
 }) {
-  if (options.resultFileName && !['review-status.json', 'review-start.json', 'auth-review-status.json', 'auth-review-start.json', 'network-review-status.json', 'network-review-start.json', 'wait-review-start.json'].includes(options.resultFileName)) throw new Error('Invalid isolated result path');
+  if (options.resultFileName && !['review-status.json', 'review-start.json', 'auth-review-status.json', 'auth-review-start.json', 'network-review-status.json', 'network-review-start.json', 'wait-review-start.json', 'shape-review-start.json'].includes(options.resultFileName)) throw new Error('Invalid isolated result path');
   const token = randomBytes(32).toString('hex'), runId = randomUUID();
   let child: ChildProcessWithoutNullStreams | undefined, live = false, stopping = false;
   const events: { kind: string; hasTurnId: boolean; hasChildId: boolean; source?: string }[] = [];

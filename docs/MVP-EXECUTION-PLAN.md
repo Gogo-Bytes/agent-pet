@@ -28,11 +28,11 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 已修复新记录跨重启设备编号变化的持久身份，保留当前操作的严格文件检查；旧记录不自动绕过检查，提供显式私有记录迁移。pi 原临时目录缺失时可在显式恢复中核对原扩展并排他重建，token/地址/扩展保持；未知路径不接管。旧空 legacy 记录迁移后不再生成多余 pi，不删除配置。此项覆盖下方历史“缺失 runtime 一律拒绝”的恢复策略，不放宽未知目录/socket 或文件归属检查。全量 1157 passed / 1 skipped；首轮系统查询导致的测试超时及修复记录保留。用户已精确授权并完成三组迁移，保护文件前后摘要一致；dev实际列表恢复原两条，pi显式恢复后真实已连接。正常退出/重开后记录与hooks核对有效，最终由用户确认pi已连接、Claude等待启动。pi重开恢复通过；用户随后使用原入口新开Claude并确认已连接，接收恢复与新会话在线通过。旧会话不自动认领的限制保留，系统重启实测与Claude任务反馈未在本次完成。[实现与证据](CONNECTION-RESTART-RECOVERY.md)、[精确预览](CONNECTION-RESTART-REPAIR-PREVIEW.md)。
 
-## Claude 任务反馈（2026-10-19，隔离验证与代码复核完成）
+## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 
-用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。尚未升级日常Claude配置或重新启动日常dev。
+用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。随后用户精确授权日常升级并完成：12组自有hooks已保存，其他设置及原备份核对一致；新版dev已启动，用户确认原路径新开的Claude已连接。真实读取、写入/修改、Bash执行及模型出错反馈已核对；Glob/Grep在当前会话不可用，查找未验收。
 
-已实现任务事实→Main私有关联/随机别名→Configurations/Application→共享宠物反馈，以及保留原hooks的显式升级。动作可选、缺动画静态回退；工具反馈不伪造整个任务完成、取消或持续等待。原正式Renderer隔离dev已检查升级/取消回焦/首页GLB反馈；普通Claude启动/Home已有真实确认，任务字段和任务动作仍待真实验收。独立代码复核无新确定缺陷；检索性审查发现的一处过时验证摘要已修正。真实升级仍需按精确预览另行授权。[实现、历史失败与最新证据](CLAUDE-TASK-OBSERVATION.md)、[升级预览](CLAUDE-TASK-UPGRADE-PREVIEW.md)。既有设置实机停点及native fixtures保持。
+已实现任务事实→Main私有关联/随机别名→Configurations/Application→共享宠物反馈，以及保留原hooks的显式升级。动作可选、缺动画静态回退；工具反馈不伪造整个任务完成、取消或持续等待。原正式Renderer隔离dev已检查升级/取消回焦/首页GLB反馈；普通Claude启动/Home已有真实确认，本轮匿名状态记录验证常用动作请求，不证明模型资产具有对应动画。独立代码复核无新确定缺陷；检索性审查发现的一处过时验证摘要已修正。真实升级已按精确预览授权完成；实测后正常退出记录版并切回普通dev，未改token/hooks/配置，不打包。[实现、历史失败与最新证据](CLAUDE-TASK-OBSERVATION.md)、[升级预览](CLAUDE-TASK-UPGRADE-PREVIEW.md)。既有设置实机停点及native fixtures保持。
 
 ## Claude 自动发现（2026-10-17）
 

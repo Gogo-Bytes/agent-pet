@@ -1,5 +1,7 @@
 # Codex 启动事件形状检查
 
+> 后续方案调研已纠正本轮的验收前提：同版本官方源码将SessionStart排队并在首轮任务中执行，空会话等待不能作为此hook失效的证据。详见[Codex连接方案复核](CODEX-CONNECTION-RESEARCH.md)。下文保留当时真实结果与推断，不据此继续空启动重试，也不将源码结论冒充本机首轮验收。
+
 2026-10-19。用户明确要求继续定位并修复、保持隔离/dev、由Main终端验证，只有必要操作才交用户。本轮复用已授权的 `/tmp/agent-pet-codex-start-20261019-5f92c8-r2` 和固定Codex程序，只创建空会话，不带登录凭据、不开外网、不发送模型任务、不改日常配置/原hooks/observer/信任。旧证据保留。
 
 本次准备新增runtime/review-shape-documents.cjs、runtime/review-shape-check.cjs、runtime/shape-preload.cjs、runtime/startup-shape.ndjson、shape-review-start.json，全部0600排他创建；不覆盖已有文件。Native只启动一次（10秒总限、2500ms真实启动事件等待），仍为loopback-only系统沙箱。

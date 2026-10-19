@@ -34,6 +34,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 旧本机版本0.163.0仅证明当时程序版本，当前文档不能代替该版本原生兼容验证。下一步为隔离原生hook形状/信任/宿主身份验证，再做认证传输、配置保留和正式UI接线；真实安装操作仍需精确预览授权。本阶段不读写日常Codex配置、不启动Agent，原dev保持运行。见 [模块与契约边界](../integrations/codex-hooks/README.md)。Claude查找/退出/并发等剩余矩阵保留，不因推进新Provider标为通过。
 
+Codex下一阶段的版本/帮助检查脚本已就绪：固定入口、独占隔离HOME、输出与时间限制，不继承凭据、不读日常配置。40项相关测试、typecheck、desktop源码build通过；本机Codex尚未执行，待 [精确预览](CODEX-CLI-COMPATIBILITY-CHECK-PREVIEW.md) 授权。此检查只确定实际可用入口，不能代替hook加载及任务验收。
+
 ## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 
 用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。随后用户精确授权日常升级并完成：12组自有hooks已保存，其他设置及原备份核对一致；新版dev已启动，用户确认原路径新开的Claude已连接。真实读取、写入/修改、Bash执行及模型出错反馈已核对；Glob/Grep在当前会话不可用，查找未验收。

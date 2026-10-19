@@ -15,3 +15,7 @@ Design decisions:
 Tests use synthetic inputs. The earlier installed CLI version check (0.163.0) does not prove this current documented contract is supported there. Native compatibility, hook trust, passive process binding, private authenticated delivery, preserving existing hook configuration, UI and real actions remain separate stages. Do not bypass hook trust or use a new app-server process to claim observation of an existing CLI. Desktop stays out of this stage.
 
 Validation: `pnpm test integrations/codex-hooks/normalize.test.ts integrations/claude-hooks/normalize.test.ts --maxWorkers=1` (58 passed), `pnpm typecheck`, `pnpm --filter @agent-pet/desktop build` (source build only). No dependencies, daily configuration reads/writes, Agent execution, model requests or packaging.
+
+## Bounded installed-CLI check harness
+
+`test-support/cli-check.mjs` prepares only fixed version/help commands in an exclusive temporary profile. It never executes on import; its explicit entry requires authorization under the [precise preview](../../docs/CODEX-CLI-COMPATIBILITY-CHECK-PREVIEW.md). Seven self-owned process/filesystem tests cover output limits, deadlines, secret-free summaries and bounded installation links. Together with input tests: 40 passed; typecheck and desktop source build passed. The installed Codex has not been executed in this stage.

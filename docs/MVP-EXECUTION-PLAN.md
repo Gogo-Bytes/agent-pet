@@ -34,7 +34,7 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 旧本机版本0.163.0仅证明当时程序版本，当前文档不能代替该版本原生兼容验证。下一步为隔离原生hook形状/信任/宿主身份验证，再做认证传输、配置保留和正式UI接线；真实安装操作仍需精确预览授权。本阶段不读写日常Codex配置、不启动Agent，原dev保持运行。见 [模块与契约边界](../integrations/codex-hooks/README.md)。Claude查找/退出/并发等剩余矩阵保留，不因推进新Provider标为通过。
 
-Codex下一阶段的版本/帮助检查脚本已就绪：固定入口、独占隔离HOME、输出与时间限制，不继承凭据、不读日常配置。40项相关测试、typecheck、desktop源码build通过；本机Codex尚未执行，待 [精确预览](CODEX-CLI-COMPATIBILITY-CHECK-PREVIEW.md) 授权。此检查只确定实际可用入口，不能代替hook加载及任务验收。
+Codex下一阶段的版本/帮助检查脚本已就绪：固定入口、独占隔离HOME、输出与时间限制，不继承凭据、不读日常配置。40项相关测试、typecheck、desktop源码build通过；用户已按 [精确预览](CODEX-CLI-COMPATIBILITY-CHECK-PREVIEW.md) 授权并完成：本机0.163.0、版本与帮助均退出0，帮助提及hooks；仅保存白名单摘要。没有加载hook或启动任务、改日常配置、重启dev。此检查不能代替hook加载及任务验收。
 
 ## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 

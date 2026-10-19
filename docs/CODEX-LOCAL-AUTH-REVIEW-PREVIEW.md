@@ -28,3 +28,7 @@ cd '/Users/gan/Desktop/🥷/agent-pet'
 `pnpm test integrations/codex-hooks/test-support --maxWorkers=1` 37项、`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`通过（源码build，不打包）。凭证测试只用自有临时假数据，覆盖正常/失败清理、原文件不变、600、拒绝已有目标/过宽权限/链接/超限文件。尚未实际使用日常凭证运行审核，不能宣称登录、信任或原生回调通过。日常认证缓存本次只做metadata检查，内容未进入工具输出。
 
 实际准备检查已通过，两个review-auth助手已排他创建；未读取凭据内容或启动Codex。用户入口会核对并复用相同助手。收窄后的凭据与助手/入口相关9项回归通过。
+
+## 实际失败停点
+
+用户已实际运行本机登录版，TUI bootstrap在account/read的workspace routing discovery失败（-32603）。临时config/auth.json已通过metadata确认删除；原auth权限/归属保持，内容未输出。两个auth-review结果均不存在，审核未完成。原网络限制与账号初始化存在冲突的可能，尚不排除上游错误；不重新登录、不自动重跑。下一步[受限联网对照](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)代码已准备，但涉及外部账号请求的权限变化，待用户明确授权。

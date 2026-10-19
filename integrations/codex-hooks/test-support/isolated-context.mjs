@@ -22,7 +22,7 @@ export async function writeOrVerifyHelper(file, content, resume = false) {
   }
 }
 export async function prepareIsolated(prefix) {
-  if (!['status', 'review', 'review-r1', 'review-auth'].includes(prefix)) throw new Error('Invalid isolated operation');
+  if (!['status', 'review', 'review-r1', 'review-auth', 'review-network'].includes(prefix)) throw new Error('Invalid isolated operation');
   const before = await resolveEntry();
   for (const name of ['', 'runtime', 'config', 'work', 'home', 'cache', 'tmp']) {
     const stat = await lstat(join(ROOT, name));

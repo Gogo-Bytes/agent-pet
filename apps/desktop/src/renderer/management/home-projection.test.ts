@@ -19,6 +19,21 @@ function sessions(values: Array<[string, SessionObservation['status']]>): Sessio
   }), createSessionState());
 }
 describe('home pet projection from shared configuration and Session state', () => {
+  it('projects task-enabled Claude recent feedback and response errors through the shared pet source', () => {
+    const record: AgentConfiguration = { ...config('claude'), provider: 'claude', connection: null,
+      claude: { revision: 0, scope: 'task-events', mode: 'normal-start', status: 'observing', busy: false, configured: true,
+        observedRuns: 1, launchers: 1, preview: null, launchCommand: null, canConfigure: false, canResume: false, notice: 'none' } };
+    const source = collection([record], { observed: 'claude', foreign: 'other' });
+    let state = applyObservation(createSessionState(), { sessionId: 'observed', provider: 'claude', status: 'unknown', observedAt: '2026-10-18T00:00:00Z', revision: 1,
+      capabilities: { reading: 'supported' }, facts: { activities: [], waitingForInput: false, recentActivity: { id: 'one', kind: 'reading' } } });
+    expect(projectHomePets(source, state, '默认')[0]).toMatchObject({ action: 'reading', status: '刚刚读取了文件', replay: 'observed:one' });
+    state = applyObservation(state, { ...state.sessions.observed!, revision: 2, facts: { activities: [], waitingForInput: false } });
+    expect(projectHomePets(source, state, '默认')[0]).toMatchObject({ action: 'idle', status: '陪伴中', replay: '' });
+    state = applyObservation(state, { ...state.sessions.observed!, revision: 3, status: 'error', workId: 'response' });
+    expect(projectHomePets(source, state, '默认')[0]).toMatchObject({ action: 'error', status: '回答出错了' });
+    const disconnected = { ...record, claude: { ...record.claude!, status: 'waiting' as const, observedRuns: 0 } };
+    expect(projectHomePets(collection([disconnected], { observed: 'claude' }), state, '默认')).toEqual([]);
+  });
   it('projects each observing Claude configuration with neutral presence and no task facts, including zero Sessions', () => {
     const claude = (id: string, status: ClaudeConnectionState['status']): AgentConfiguration => ({ ...config(id), provider: 'claude', connection: null,
       claude: { revision: 0, scope: 'presence-only', status, busy: false, configured: true, observedRuns: status === 'observing' ? 1 : 0,

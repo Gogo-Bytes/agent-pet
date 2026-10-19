@@ -84,7 +84,9 @@ test('real socket output queue refuses excess bytes even while corked (determini
 test('limits only decrease; token bucket refills without unbounded accumulation', () => {
   expect(() => lowerLimits({ sockets: 65 })).toThrow('limit-exceeded');
   expect(() => lowerLimits({ framesPerTurn: 0 })).toThrow('limit-exceeded');
-  const bucket = new Bucket(2, 2); const now = performance.now();
+  // Integer synthetic timestamps keep the exact 500ms boundary independent of
+  // floating-point cancellation in two fractional performance.now() values.
+  const bucket = new Bucket(2, 2); const now = Math.ceil(performance.now());
   expect(bucket.take(2, now)).toBe(true); expect(bucket.take(1, now)).toBe(false);
   expect(bucket.take(1, now + 500)).toBe(true); expect(bucket.take(3, now + 100000)).toBe(false);
 });

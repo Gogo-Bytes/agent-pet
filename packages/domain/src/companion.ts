@@ -8,5 +8,7 @@ export type ObservationCapabilities = Partial<Record<ActivityKind | OccurrenceKi
 export type CompanionFacts = {
   activities: readonly ActivityKind[];
   waitingForInput: boolean;
+  /** Brief feedback for an observed result, not evidence of continuing activity. */
+  recentActivity?: { id: string; kind: ActivityKind };
   occurrence?: { id: string; kind: OccurrenceKind };
 };

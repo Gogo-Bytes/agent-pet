@@ -5,6 +5,8 @@ const priority: readonly ActivityKind[] = ['compacting', 'executing', 'writing',
 function current(record: SessionRecord): PetAction {
   if (record.facts?.waitingForInput && record.capabilities?.waiting_input === 'supported') return 'waiting_input';
   const activity = priority.find(kind => record.capabilities?.[kind] === 'supported' && record.facts?.activities.includes(kind));
+  const recent = record.facts?.recentActivity;
+  if (!activity && recent && record.capabilities?.[recent.kind] === 'supported') return recent.kind;
   return activity ?? (record.status === 'working' ? 'working' : 'idle');
 }
 /** One projection for desktop and home; capabilities constrain fine facts, never unread results. */
@@ -20,5 +22,5 @@ export function projectPetPresentation(state: SessionState): PetPresentation {
   const occurrence = event && record?.capabilities?.[event.kind] === 'supported' ? event : undefined;
   const action = occurrence?.kind ?? base;
   return { action, restAction: occurrence ? (base === 'error' || base === 'success' ? 'idle' : base) : 'idle',
-    replay: occurrence ? `${record!.sessionId}:${occurrence.id}` : (base === 'error' || base === 'success') ? `${bubble?.sessionId}:${bubble ? state.sessions[bubble.sessionId]?.workId ?? 'legacy' : 'legacy'}:${base}` : '' };
+    replay: occurrence ? `${record!.sessionId}:${occurrence.id}` : record?.facts?.recentActivity && record.capabilities?.[record.facts.recentActivity.kind] === 'supported' ? `${record.sessionId}:${record.facts.recentActivity.id}` : (base === 'error' || base === 'success') ? `${bubble?.sessionId}:${bubble ? state.sessions[bubble.sessionId]?.workId ?? 'legacy' : 'legacy'}:${base}` : '' };
 }

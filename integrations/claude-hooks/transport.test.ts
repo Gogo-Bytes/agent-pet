@@ -175,6 +175,7 @@ describe('authenticated local callback delivery (no native CLI, configuration or
   it('keeps normalizer rejection and unavailable receivers silent, with no automatic retry', async () => {
     const observed = vi.fn(), server = await receiver(observed);
     expect(await send(server.url, native('SubagentStop'))).toBe('ignored');
+    expect(await send(server.url, native('SubagentStop'), { runId: '' })).toBe('invalid');
     expect(await send(server.url, '{PRIVATE')).toBe('invalid');
     expect(await send('https://example.com/claude-hooks', native('SessionEnd'))).toBe('invalid');
     expect(await send(server.url + '?token=PRIVATE', native('SessionEnd'))).toBe('invalid');

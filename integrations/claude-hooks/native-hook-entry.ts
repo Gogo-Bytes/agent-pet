@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { dirname, isAbsolute, join, normalize } from 'node:path';
 import type { Readable } from 'node:stream';
@@ -75,9 +76,9 @@ async function main(): Promise<void> {
   const message = await readMessage(process.stdin);
   if (message === undefined) return;
   const parsed = normalizeClaudeHook(message);
-  if (parsed.status !== 'accepted' || parsed.fact.kind !== 'session-started' || parsed.fact.childId !== undefined) return;
+  if (parsed.status !== 'accepted' || parsed.fact.childId !== undefined) return;
   const configured = activation(process.argv[2]);
-  const body = JSON.stringify({ schemaVersion: 1, hookPid: process.pid, fact: { kind: parsed.fact.kind, source: parsed.fact.source } });
+  const body = JSON.stringify({ schemaVersion: 2, hookPid: process.pid, eventId: randomUUID(), fact: parsed.fact });
   await new Promise<void>(resolve => {
     let done = false;
     const finish = () => { if (done) return; done = true; clearTimeout(timer); request.destroy(); resolve(); };

@@ -4,14 +4,17 @@ import { dialog, ipcMain, shell, type BrowserWindow } from 'electron';
 import type { SessionState } from '@agent-pet/domain';
 import type { Configurations } from './configurations.js';
 import type { PiPreflight } from './pi-preflight.js';
+import { inspectClaudeInstallation, type ClaudeDiscovery } from './claude-discovery.js';
+import { dirname } from 'node:path';
 import { configurationName, configurationPath } from './configurations-store.js';
 import { assertWindowSender } from './window-trust.js';
 import { identifyInstallation, inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
 import { configurationProviders, type CreateConfiguration, type DetectedSetupResult, type PetBinding } from '../shared/configurations.js';
 
-export function registerConfigurationIpc({ window, configurations, sessions, quitting, preflight }: {
+export function registerConfigurationIpc({ window, configurations, sessions, quitting, preflight, claudeDiscovery }: {
   window: () => BrowserWindow | undefined; configurations: Configurations; sessions: () => SessionState; quitting: () => boolean;
   preflight?: Pick<PiPreflight, 'detectedConfiguration'>;
+  claudeDiscovery?: Pick<ClaudeDiscovery, 'detect' | 'candidate' | 'targetPath' | 'invalidate'>;
 }) {
   const chosen = new Set<string>();
   let inspectionPending = false;
@@ -19,6 +22,9 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
   let setup: { requestId: string; cancel(reason?: 'cancelled' | 'timeout'): void } | undefined;
   let prepared: { requestId: string; configurationId: string; planId: string } | undefined;
   let generation = 0;
+  let claudeScanPending = false;
+  let claudeScanJob: { requestId: string; cancelled: boolean } | undefined;
+  let completedClaudeScanId: string | undefined;
   async function canonicalLocation(value: string): Promise<string> {
     // Read only an explicitly selected/approved path. Preserve the no-symlink contract before canonicalizing case.
     let current = '/';
@@ -66,14 +72,89 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     assert(event); if (!input || typeof input !== 'object') throw new TypeError('Invalid configuration');
     const targetPath = path(input.targetPath); return configurations.create({ name: input.name, provider: input.provider, targetPath });
   });
+  ipcMain.handle('management:configurations-detect-claude', async (event, ...args: unknown[]) => {
+    assert(event); if (args.length !== 1 || !claudeDiscovery) throw new Error('Claude discovery unavailable');
+    const requestId = id(args[0]);
+    if (claudeScanPending) throw new Error('扫描正在进行，请稍候。');
+    claudeScanPending = true; claudeDiscovery.invalidate();
+    completedClaudeScanId = undefined;
+    const job = { requestId, cancelled: false }; claudeScanJob = job;
+    const current = window()!, revision = generation;
+    try {
+      const consent = await dialog.showMessageBox(current, { type: 'question', title: '查找 Claude Code',
+        message: '允许检查本机的 Claude 安装？',
+        detail: '只读 GUI PATH（最多 32 项）、~/.local/bin/claude、/opt/homebrew/bin/claude、/usr/local/bin/claude，以及 ~/.nvm/versions/node 一层（最多 64 项、16 个版本）。仅检查程序链接、安全 metadata 和对应 package.json（每个最多 64 KiB）；不执行 Claude，不读取配置、凭据或对话，不安装或修改文件。',
+        buttons: ['取消', '允许扫描'], defaultId: 0, cancelId: 0 });
+      if (job.cancelled || consent.response !== 1 || revision !== generation || quitting() || window() !== current || current.isDestroyed() || !current.isVisible()) {
+        return { installations: [], targetPath: claudeDiscovery.targetPath, scan: 'complete', notice: 'cancelled' };
+      }
+      assert(event); const result = await claudeDiscovery.detect();
+      if (!job.cancelled && revision === generation) completedClaudeScanId = requestId;
+      return result;
+    } finally { claudeScanPending = false; if (claudeScanJob === job) claudeScanJob = undefined; }
+  });
+  ipcMain.handle('management:configurations-cancel-claude-scan', (event, value: unknown) => {
+    assert(event); const requestId = id(value);
+    if (claudeScanJob?.requestId === requestId) claudeScanJob.cancelled = true;
+    if (claudeScanJob?.requestId === requestId || completedClaudeScanId === requestId) {
+      claudeDiscovery?.invalidate(); completedClaudeScanId = undefined;
+    }
+  });
   ipcMain.handle('management:configurations-cancel-detected', async (event, value: unknown) => {
     assert(event); const requestId = id(value);
     if (setup?.requestId === requestId) setup.cancel();
     if (prepared?.requestId === requestId) {
       const record = configurations.snapshot().records.find(value => value.id === prepared!.configurationId);
-      if (record?.connection?.preview?.id === prepared.planId) await configurations.cancel(record.id);
+      if ((record?.claude?.preview?.id ?? record?.connection?.preview?.id) === prepared.planId) await configurations.cancel(record!.id);
       if (prepared?.requestId === requestId) prepared = undefined;
     }
+  });
+  ipcMain.handle('management:configurations-prepare-detected-claude', async (event, ...args: unknown[]) => {
+    assert(event);
+    if (args.length !== 2 || typeof args[1] !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(args[1])) throw new TypeError('Invalid detected configuration');
+    const candidateId = id(args[0]), requestId = args[1];
+    const candidate = claudeDiscovery?.candidate(candidateId);
+    if (!candidate) throw new Error('Claude 安装已变化，请重新扫描。');
+    if (setupWorkPending) throw new Error('配置检查正在结束，请稍候重试。');
+    setupWorkPending = true;
+    const current = window()!, revision = generation, target = claudeDiscovery!.targetPath;
+    const controller = new AbortController(); let cancelled = false;
+    let settle!: (value: DetectedSetupResult) => void;
+    const cancellation = new Promise<DetectedSetupResult>(done => { settle = done; });
+    const job = { requestId, cancel(reason: 'cancelled' | 'timeout' = 'cancelled') {
+      cancelled = true; controller.abort(); settle({ state: configurations.snapshot(), configurationId: null, reason });
+    } };
+    setup = job;
+    const active = () => {
+      if (cancelled || revision !== generation || quitting() || window() !== current || current.isDestroyed() || !current.isVisible()) return false;
+      assert(event); const latest = claudeDiscovery?.candidate(candidateId);
+      return latest?.executable === candidate.executable && latest.entryPath === candidate.entryPath;
+    };
+    // The trusted Renderer presents the default target/settings read scope first. Deployment still requires confirm.
+    const work = (async (): Promise<DetectedSetupResult> => {
+      const stopped = (): DetectedSetupResult => ({ state: configurations.snapshot(), configurationId: null, reason: 'cancelled' });
+      const checked = await inspectClaudeInstallation(candidate.entryPath, dirname(target), new ReadBudget(controller.signal));
+      if (!active()) return stopped();
+      if (checked?.compatibility !== 'verified' || checked.executable !== candidate.executable) throw new Error('Claude 安装已变化，请重新扫描。');
+      const targetPath = await canonicalLocation(target);
+      if (!active()) return stopped();
+      const existing = configurations.snapshot().records.find(record => record.provider === 'claude' && record.targetPath === targetPath);
+      const created = existing ? configurations.snapshot() : await configurations.create({ name: 'Claude Code', provider: 'claude', targetPath });
+      if (created.notice !== 'none') return { state: created, configurationId: null };
+      const record = created.records.find(value => value.provider === 'claude' && value.targetPath === targetPath);
+      if (!record || !active()) return stopped();
+      const state = record.claude?.canConfigure ? await configurations.previewDetectedClaude(record.id, candidate.executable) : created;
+      const planId = state.records.find(value => value.id === record.id)?.claude?.preview?.id;
+      if (!active()) {
+        if (planId && configurations.snapshot().records.find(value => value.id === record.id)?.claude?.preview?.id === planId) await configurations.cancel(record.id);
+        return stopped();
+      }
+      prepared = planId ? { requestId, configurationId: record.id, planId } : undefined;
+      return { state, configurationId: record.id };
+    })().finally(() => { setupWorkPending = false; });
+    const timer = setTimeout(() => job.cancel('timeout'), limits.milliseconds);
+    try { return await Promise.race([work, cancellation]); }
+    finally { clearTimeout(timer); if (setup === job) setup = undefined; }
   });
   ipcMain.handle('management:configurations-prepare-detected', async (event, ...args: unknown[]) => {
     assert(event);
@@ -137,5 +218,5 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     disable: (value: string) => configurations.disable(value), remove: (value: string) => configurations.remove(value) };
   for (const [action, operation] of Object.entries(operations)) ipcMain.handle(`management:configurations-${action}`, (event, value: unknown) => { assert(event); return operation(id(value)); });
   ipcMain.handle('management:configurations-confirm', (event, value: unknown, plan: unknown) => { assert(event); return configurations.confirm(id(value), id(plan)); });
-  return { invalidate() { generation++; setup?.cancel(); } };
+  return { invalidate() { generation++; setup?.cancel(); claudeDiscovery?.invalidate(); } };
 }

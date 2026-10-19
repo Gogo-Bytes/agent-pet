@@ -1,6 +1,7 @@
 import type { PiConnectionState } from './pi-connection.js';
 import type { ClaudeConnectionState } from './claude-connection.js';
 import type { Inspection, InstallationCandidate } from './pi-preflight.js';
+import type { ClaudeDiscoveryState } from './claude-discovery.js';
 
 export const configurationProviders = ['pi', 'codex', 'claude', 'opencode', 'gemini', 'cursor'] as const;
 export type ConfigurationProvider = typeof configurationProviders[number];
@@ -43,6 +44,9 @@ export interface ConfigurationsApi {
   getState(): Promise<ConfigurationsState>;
   create(input: CreateConfiguration): Promise<ConfigurationsState>;
   prepareDetected(installationId: string, requestId: string): Promise<DetectedSetupResult>;
+  detectClaude(requestId: string): Promise<ClaudeDiscoveryState>;
+  cancelClaudeScan(requestId: string): Promise<void>;
+  prepareDetectedClaude(installationId: string, requestId: string): Promise<DetectedSetupResult>;
   cancelDetected(requestId: string): Promise<void>;
   rename(id: string, name: string): Promise<ConfigurationsState>;
   changeTarget(id: string, path: string): Promise<ConfigurationsState>;

@@ -1,3 +1,4 @@
+import './test-support/mock-volume-queries.js';
 import * as fs from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -69,4 +70,22 @@ it('refuses substituted committed file or parent symlink rather than overwrite/a
   expect(store.save(null)).toBe(false); expect(fs.readFileSync(path)).toEqual(bytes);
   fs.symlinkSync(root, join(root, 'alias'));
   expect(new PiConnectionStore(join(root, 'alias')).error).toBe(true);
+});
+
+it('restores an empty legacy record with stable volume identity after device renumbering', () => {
+  expect(new PiConnectionStore(root).save(null)).toBe(true);
+  const value = JSON.parse(fs.readFileSync(path, 'utf8'));
+  if (!value.directory.volumeId) return; // Non-macOS keeps strict device identity.
+  value.directory.dev++;
+  fs.writeFileSync(path, JSON.stringify(value));
+  const restored = new PiConnectionStore(root);
+  expect(restored.error).toBe(false); expect(restored.snapshot()).toBeNull();
+  expect(restored.save(null)).toBe(true);
+});
+it('does not silently migrate legacy device changes without stable volume evidence', () => {
+  expect(new PiConnectionStore(root).save(null)).toBe(true);
+  const value = JSON.parse(fs.readFileSync(path, 'utf8'));
+  delete value.directory.volumeId; value.directory.dev++;
+  fs.writeFileSync(path, JSON.stringify(value));
+  expect(new PiConnectionStore(root).error).toBe(true);
 });

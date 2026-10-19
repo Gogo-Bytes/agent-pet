@@ -12,9 +12,11 @@ import { PiConnectionStore } from './pi-connection-store.js';
 import { inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
 import { ClaudePresence, type ClaudePresenceOptions } from './claude-presence.js';
 import { ClaudeNormalPresence } from './claude-normal-presence.js';
+import { createClaudeObservations } from '../../../../integrations/claude-hooks/observations.js';
 
 type Entry = { metadata: ConfigurationMetadata; inspection: Inspection | null; revision: number;
-  connection: PiConnection | null; claude?: ClaudePresence | ClaudeNormalPresence; unsubscribe?: () => void; controller?: AbortController };
+  connection: PiConnection | null; claude?: ClaudePresence | ClaudeNormalPresence;
+  claudeObservations?: ReturnType<typeof createClaudeObservations>; unsubscribe?: () => void; controller?: AbortController };
 
 /** Main owns persistence, inspection and PiConnection capabilities. Renderer selection is observational.
  * IPC accepts only explicitly approved native selections or Main-resolved detected defaults.
@@ -84,7 +86,14 @@ export class Configurations {
   }
   private attachClaude(entry: Entry): void {
     const options = this.options.claude!;
+    if (options.normal) entry.claudeObservations = createClaudeObservations({ name: () => entry.metadata.name,
+      publish: observation => {
+        const sessionId = `${entry.metadata.id}:${observation.sessionId}`;
+        this.sessionConfigurations[sessionId] = entry.metadata.id;
+        this.options.publish({ ...observation, sessionId }); this.emit();
+      } });
     entry.claude = options.normal ? new ClaudeNormalPresence({ ...options, ...options.normal,
+      onFact: delivery => entry.claudeObservations!.accept(delivery), onRetire: runId => entry.claudeObservations!.retire(runId),
       directory: this.options.directory, configurationId: entry.metadata.id, targetDirectory: entry.metadata.targetPath }) :
       new ClaudePresence({ ...options, directory: this.options.directory, configurationId: entry.metadata.id });
     entry.unsubscribe = entry.claude.subscribe(() => this.emit());
@@ -180,7 +189,7 @@ export class Configurations {
       const entry = this.entry(id)!; entry.controller?.abort(); entry.inspection = null;
       entry.connection?.invalidate(); entry.claude?.invalidate();
       if (entry.claude instanceof ClaudeNormalPresence) {
-        entry.unsubscribe?.(); await entry.claude.stop();
+        entry.unsubscribe?.(); await entry.claude.stop(); entry.claudeObservations?.stop();
         if (!this.closed) this.attachClaude(entry);
       }
       return this.emit();
@@ -223,6 +232,10 @@ export class Configurations {
     this.notice = 'none'; await work(connection); return this.emit();
   }
   preview(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.preview()); }
+  /** Main-owned discovery only. IPC never accepts an executable path from Renderer. */
+  previewDetectedClaude(id: string, executable: string): Promise<ConfigurationsState> {
+    return this.operation(id, connection => connection instanceof ClaudeNormalPresence ? connection.preview(executable) : undefined);
+  }
   cancel(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.invalidate()); }
   confirm(id: string, planId: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.confirm(planId)); }
   resume(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.resume()); }
@@ -245,7 +258,7 @@ export class Configurations {
         this.notice = 'retained'; return this.snapshotAfterRemoval();
       }
       if (!this.persist(this.metadata().filter(record => record.id !== id))) return this.snapshotAfterRemoval();
-      entry.controller?.abort(); entry.unsubscribe?.(); await entry.connection?.stop(); await entry.claude?.stop(); this.entries.delete(id);
+      entry.controller?.abort(); entry.unsubscribe?.(); await entry.connection?.stop(); await entry.claude?.stop(); entry.claudeObservations?.stop(); this.entries.delete(id);
       for (const session of Object.keys(this.sessionConfigurations)) if (this.sessionConfigurations[session] === id) delete this.sessionConfigurations[session];
       this.notice = 'none'; return this.snapshotAfterRemoval();
     } finally { if (this.busy) { this.busy = false; this.emit(); } }
@@ -255,6 +268,7 @@ export class Configurations {
     this.closed = true;
     for (const entry of this.entries.values()) { entry.controller?.abort(); entry.unsubscribe?.(); }
     const results = await Promise.allSettled([...this.entries.values()].flatMap(entry => [entry.connection?.stop(), entry.claude?.stop()]));
+    for (const entry of this.entries.values()) entry.claudeObservations?.stop();
     this.listeners.clear();
     if (results.some(result => result.status === 'rejected')) throw new Error('Configuration receiver shutdown not confirmed');
   }

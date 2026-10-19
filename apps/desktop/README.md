@@ -1,5 +1,9 @@
 # Desktop development
 
+Claude 任务反馈（2026-10-19）：近期工具动作、回答出错和旧连接显式升级已实现，恢复旧连接不会自动改 hooks。本轮全量1121通过/1跳过、类型检查和源码构建通过，待真实任务验收；此前冷启动超时仍作为已知风险保留。继续 dev、不打包。见 [实现与验证](../../docs/CLAUDE-TASK-OBSERVATION.md)。
+
+Claude 自动扫描（2026-10-17）：省去默认配置和隐藏程序路径选择；多安装可选、已有配置直接查看。当前可接入仍仅 npm 2.1.301，官方安装/Homebrew 显示待验证；未改 shell/PATH，未要求重装。源码/隔离验证及已授权的本机发现、已有配置查看通过：Claude 一处、pi 两处，原记录保留。Claude 扫描仍有受限提示，终端 PATH/其他安装方式真实加载和发布未因此通过。见 [设计与验证](../../docs/CLAUDE-DISCOVERY-DESIGN.md)。
+
 当前范围、进度与下一步见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。此页开发命令不是安装许可；完整真实端到端仍待验收，managed 入口仍关闭。
 
 2026-10-16 当前日常pi已按精确授权更新扩展，用户reload后在dev完成限定任务：实际收到读取、写入、执行、工具出错、继续回答和完成，工具出错未误判整任务失败。思考/查找及其余未触发状态、实际专用动画显示仍待验；本轮没有打包。范围与时间线见 [实机记录](../../docs/PI-EXTENSION-LIVE-ACCEPTANCE.md)。
@@ -490,3 +494,7 @@ normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
 [real operation preview](../../docs/CLAUDE-NORMAL-START-PREVIEW.md).
 
 本机普通CLI启动、恢复未暂停观察及首页陪伴已在真实Claude2.1.301与正式dev验证；临时阶段检查随后完整撤回，原版再次连接通过。退出/并发/任务动作不因此视为通过，见[实测与范围](../../docs/CLAUDE-CLI-ACCEPTANCE.md)。若终端提示 `command not found: claude`，表示终端未找到程序入口；可先由用户直接运行已选择安装的绝对路径。产品不会自动改shell/PATH或新增重复安装。
+
+### 重启后的连接恢复
+
+新连接记录以磁盘 UUID 核对跨重启身份；操作期间仍严格核对文件身份和内容。旧格式因设备编号变化失效时需要显式迁移，不能重新添加同一配置或删除未知文件来绕过检查。pi 显式恢复可在原临时目录缺失时排他重建，保留原地址和凭据；Claude 按原规则恢复接收。详见[恢复行为与验证](../../docs/CONNECTION-RESTART-RECOVERY.md)。继续使用 `pnpm --filter @agent-pet/desktop dev`，源码 build 不等于安装包。

@@ -1,4 +1,5 @@
 import { constants, type Stats } from 'node:fs';
+import { samePersistedIdentity, withVolumeIdentity } from './durable-file-identity.js';
 import { createHash } from 'node:crypto';
 import { mkdir, open, rmdir, unlink, type FileHandle } from 'node:fs/promises';
 import { dirname, join, normalize } from 'node:path';
@@ -17,9 +18,9 @@ export interface TemporaryDeploymentPreview {
 export interface TemporaryDeploymentReceipt { readonly path: string; readonly status: 'deployed-awaiting-load' }
 type Evidence = Map<string, string | null>;
 type Plan = { source: string; evidence: Evidence; directories: readonly string[] };
-export type SavedStat = Pick<Stats, 'dev' | 'ino' | 'birthtimeMs' | 'mode' | 'uid' | 'gid' | 'size' | 'nlink' | 'mtimeMs' | 'ctimeMs'>;
+export type SavedStat = Pick<Stats, 'dev' | 'ino' | 'birthtimeMs' | 'mode' | 'uid' | 'gid' | 'size' | 'nlink' | 'mtimeMs' | 'ctimeMs'> & { volumeId?: string };
 export const saveStat = (s: SavedStat): SavedStat => ({ dev: s.dev, ino: s.ino, birthtimeMs: s.birthtimeMs,
-  mode: s.mode, uid: s.uid, gid: s.gid, size: s.size, nlink: s.nlink, mtimeMs: s.mtimeMs, ctimeMs: s.ctimeMs });
+  mode: s.mode, uid: s.uid, gid: s.gid, size: s.size, nlink: s.nlink, mtimeMs: s.mtimeMs, ctimeMs: s.ctimeMs, ...(s.volumeId ? { volumeId: s.volumeId } : {}) });
 export type SavedOwnership = { digest: string; file: SavedStat; directories: [string, SavedStat][] };
 type Ownership = { digest: string; file: SavedStat; directories: Map<string, SavedStat> };
 const digest = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -45,6 +46,7 @@ export class PiTemporaryDeployment {
   #io: ArtifactIO;
   #plans = new WeakMap<TemporaryDeploymentPreview, Plan>();
   #owned = new WeakMap<TemporaryDeploymentReceipt, Ownership>();
+  #restored = new WeakSet<TemporaryDeploymentReceipt>();
   constructor(targetDirectory: string, config: PiExtensionConfig, io: ArtifactIO = artifactIO) {
     try {
       new ReadBudget().validatePath(targetDirectory);
@@ -163,12 +165,13 @@ export class PiTemporaryDeployment {
   exportOwnership(receipt: TemporaryDeploymentReceipt): SavedOwnership {
     const owned = this.#owned.get(receipt);
     if (!owned) throw new Error('Missing deployment ownership');
-    return { digest: owned.digest, file: saveStat(owned.file),
-      directories: [...owned.directories].map(([path, stat]) => [path, saveStat(stat)]) };
+    return { digest: owned.digest, file: withVolumeIdentity(receipt.path, saveStat(owned.file)),
+      directories: [...owned.directories].map(([path, stat]) => [path, withVolumeIdentity(path, saveStat(stat))]) };
   }
   restoreOwnership(saved: SavedOwnership): TemporaryDeploymentReceipt {
     const receipt: TemporaryDeploymentReceipt = Object.freeze({ path: join(this.#target, 'extensions', 'agent-pet.ts'), status: 'deployed-awaiting-load' });
     this.#owned.set(receipt, { digest: saved.digest, file: saved.file, directories: new Map(saved.directories) });
+    this.#restored.add(receipt);
     return receipt;
   }
 
@@ -179,7 +182,25 @@ export class PiTemporaryDeployment {
   }
   async #matches(receipt: TemporaryDeploymentReceipt, owned: Ownership, budget: ReadBudget): Promise<boolean> {
       const before = await budget.regular(receipt.path);
-      if (!before || fingerprint(before) !== fingerprint(owned.file)) return false;
+      if (!before) return false;
+      if (this.#restored.has(receipt)) {
+        // Durable volume identity permits device renumbering across boots. All
+        // reads and mutations below bind to fresh, strict in-process identities.
+        if (!samePersistedIdentity(owned.file, before, receipt.path) ||
+            before.size !== owned.file.size || before.nlink !== owned.file.nlink ||
+            before.mtimeMs !== owned.file.mtimeMs || before.ctimeMs !== owned.file.ctimeMs) return false;
+        const directories = new Map<string, SavedStat>();
+        for (const [path, saved] of owned.directories) {
+          const now = await budget.stat(path);
+          if (!now || !samePersistedIdentity(saved, now, path)) return false;
+          // Keep persisted timestamps: only unchanged, empty owned directories
+          // may be removed after the extension is withdrawn.
+          directories.set(path, { ...saved, dev: now.dev });
+        }
+        owned.file = saveStat(before); owned.directories = directories;
+        this.#restored.delete(receipt);
+      }
+      if (fingerprint(before) !== fingerprint(owned.file)) return false;
       const file = await open(receipt.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
       let matches = false;
       try {

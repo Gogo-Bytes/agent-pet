@@ -1,3 +1,4 @@
+import './test-support/mock-volume-queries.js';
 import * as fs from 'node:fs/promises';
 import { createHash, randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';

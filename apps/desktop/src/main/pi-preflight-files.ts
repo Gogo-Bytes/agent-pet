@@ -158,17 +158,17 @@ export async function identifyInstallation(path: string, id: string, directory =
   } catch (error) { if (finding(error) === 'budget') throw error; return candidate; }
 }
 
-export function scanPaths(home: string, guiPath: string): string[] {
+export function scanPaths(home: string, guiPath: string, command: 'pi' | 'claude' = 'pi'): string[] {
   // Ignore empty/relative PATH entries (never inspect the process cwd); no shell expansion.
   const entries = guiPath.slice(0, 32768).split(':').slice(0, limits.pathEntries);
   return [...new Set([...entries, '/opt/homebrew/bin', '/usr/local/bin', join(home, '.local/bin')]
-    .filter(path => isAbsolute(path) && Buffer.byteLength(path) <= limits.pathBytes && !path.includes('\0')))].map(path => join(path, 'pi'));
+    .filter(path => isAbsolute(path) && Buffer.byteLength(path) <= limits.pathBytes && !/[\u0000-\u001f\u007f]/.test(path)))].map(path => join(path, command));
 }
 
 /** Finder does not inherit shell NVM setup. Inspect only one fixed version-manager directory,
  * never shell profiles, arbitrary sibling trees or executable output. */
-export async function discoverScanPaths(home: string, guiPath: string, budget = new ReadBudget()): Promise<{ paths: string[]; limited: boolean }> {
-  const base = scanPaths(home, guiPath);
+export async function discoverScanPaths(home: string, guiPath: string, budget = new ReadBudget(), command: 'pi' | 'claude' = 'pi'): Promise<{ paths: string[]; limited: boolean }> {
+  const base = scanPaths(home, guiPath, command);
   const root = join(home, '.nvm/versions/node');
   const versions: string[] = [];
   let limited = false;
@@ -192,7 +192,7 @@ export async function discoverScanPaths(home: string, guiPath: string, budget = 
     }
     if (versions.length > limits.nodeVersions) limited = true;
     versions.sort((a, b) => b.localeCompare(a, 'en', { numeric: true }));
-    const paths = [...new Set([...base, ...versions.slice(0, limits.nodeVersions).map(version => join(root, version, 'bin/pi'))])];
+    const paths = [...new Set([...base, ...versions.slice(0, limits.nodeVersions).map(version => join(root, version, 'bin', command))])];
     return { paths, limited };
   } catch { return { paths: base, limited: true }; }
 }

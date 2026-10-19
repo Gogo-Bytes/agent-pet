@@ -115,3 +115,13 @@ describe('session bubble projection', () => {
     expect(state.bubbles[0]?.name).toBe('pi session-1');
   });
 });
+it('unknown metadata feedback retains an unread known result only for the same work', () => {
+  const initial = { sessionId: 'claude', provider: 'claude' as const, status: 'error' as const,
+    observedAt: '2026-10-18T00:00:00Z', workId: 'work', revision: 1 };
+  const state = applyObservation(createSessionState(), initial);
+  const feedback = applyObservation(state, { ...initial, status: 'unknown', revision: 2 });
+  expect(feedback.sessions.claude?.status).toBe('error'); expect(feedback.bubbles[0]?.status).toBe('error-unread');
+  expect(applyObservation(state, { ...initial, status: 'unknown', workId: 'new', revision: 2 }).bubbles).toEqual([]);
+  const acknowledged = acknowledgeBubble(feedback, 'claude');
+  expect(applyObservation(acknowledged, { ...initial, status: 'unknown', revision: 3 }).bubbles).toEqual([]);
+});

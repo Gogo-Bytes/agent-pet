@@ -24,6 +24,54 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 - 此前仅授权 M1/M2 部署与桌面授权入口的代码实现、自有临时目标/隔离 socket 验证。2026-10-08 用户另授权以 Computer-Use 操作桌面端验收，范围为本轮自建的独立测试目录；开发版 App 已运行。仍不读写日常 HOME/pi 配置或安装目标、不安装依赖。M2 的目标读写/部署/连接须先给出**精确目标、读取和写入范围、变更预览、生效条件与撤回方式**并获得授权；本轮已按预览确认写入并在同一桌面进程撤回自有测试扩展。
 - 普通实现与小修复由 Main 按范围推进，不逐项询问用户；只有结果/范围变化、真实环境权限、不可逆动作、新增依赖/实质成本或风险接受需要另行确认。打包依赖安装与签名账号/证书成本分开处理，不默认获准。
 
+## 重启连接恢复（2026-10-19，本机迁移与 dev 重开验证完成）
+
+已修复新记录跨重启设备编号变化的持久身份，保留当前操作的严格文件检查；旧记录不自动绕过检查，提供显式私有记录迁移。pi 原临时目录缺失时可在显式恢复中核对原扩展并排他重建，token/地址/扩展保持；未知路径不接管。旧空 legacy 记录迁移后不再生成多余 pi，不删除配置。此项覆盖下方历史“缺失 runtime 一律拒绝”的恢复策略，不放宽未知目录/socket 或文件归属检查。全量 1157 passed / 1 skipped；首轮系统查询导致的测试超时及修复记录保留。用户已精确授权并完成三组迁移，保护文件前后摘要一致；dev实际列表恢复原两条，pi显式恢复后真实已连接。正常退出/重开后记录与hooks核对有效，最终由用户确认pi已连接、Claude等待启动。pi重开恢复通过；用户随后使用原入口新开Claude并确认已连接，接收恢复与新会话在线通过。旧会话不自动认领的限制保留，系统重启实测与Claude任务反馈未在本次完成。[实现与证据](CONNECTION-RESTART-RECOVERY.md)、[精确预览](CONNECTION-RESTART-REPAIR-PREVIEW.md)。
+
+## Codex CLI 输入边界（2026-10-19）
+
+按用户“继续下一项”进入既定的Codex CLI阶段，桌面端仍最后。已根据当前官方文档实现独立64KiB输入白名单与33项行为测试；保留会话/轮次/工具身份与明确中断事实，丢弃正文/路径/参数。工具返回不等于成功，Stop不等于任务完成，审批检查不等于持续等待；未知工具不猜动作。没有接入Main或发布在线状态。与Claude输入边界合计58项、typecheck及desktop源码build通过，无打包。
+
+旧本机版本0.163.0仅证明当时程序版本，当前文档不能代替该版本原生兼容验证。下一步为隔离原生hook形状/信任/宿主身份验证，再做认证传输、配置保留和正式UI接线；真实安装操作仍需精确预览授权。本阶段不读写日常Codex配置、不启动Agent，原dev保持运行。见 [模块与契约边界](../integrations/codex-hooks/README.md)。Claude查找/退出/并发等剩余矩阵保留，不因推进新Provider标为通过。
+
+Codex下一阶段的版本/帮助检查脚本已就绪：固定入口、独占隔离HOME、输出与时间限制，不继承凭据、不读日常配置。40项相关测试、typecheck、desktop源码build通过；用户已按 [精确预览](CODEX-CLI-COMPATIBILITY-CHECK-PREVIEW.md) 授权并完成：本机0.163.0、版本与帮助均退出0，帮助提及hooks；仅保存白名单摘要。没有加载hook或启动任务、改日常配置、重启dev。此检查不能代替hook加载及任务验收。
+
+### Codex 接收与共享状态链路（2026-10-19）
+
+已实现独立Codex codec、认证loopback接收、静默stdin脚本、可选动作映射和接收→SessionObservation组合接口；传输/输入清理与Claude共用，保持Claude原协议和守卫。自有进程实际运行编译后的hook脚本，验证工具结果→共享宠物executing、明确Interrupt→cancelled；原生ID转随机别名。多会话身份分开，旧轮次/子任务/重复事件不冒充当前工作，退出与停止清理计时器。Stop/审批/工具返回不制造任务完成、持续等待或错误。实际资产动画仍按可选目录回退。
+
+最终全量 `pnpm test --maxWorkers=1` 为1226 passed / 1 skipped / 102 files；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`通过，仅源码构建。检查Claude兼容边界后另补无效运行编号+未知事件的返回类别回归，保持旧行为。独立审查发现探针后代进程和消费者异常两项清理问题，均修复并补回归；独立17项复核通过。首次后代测试的立即PID消失断言有异步回收竞争，改用存活后代的心跳停止断言后复验通过；原问题与失败证据保留在加载预览中。
+
+外部Main必须先独立核对宿主身份和存活；此阶段未启用Codex正式连接页，也不从hook短命进程猜Agent在线。已准备 [原生加载精确预览](CODEX-NATIVE-START-CHECK-PREVIEW.md) 和可执行脚本：在独占隔离HOME创建空会话，网络限127.0.0.1，不发turn/start、不绕过信任；等待本次新增真实加载授权。现有dev、token、hooks、配置及历史native fixtures保留，无打包。
+
+Codex原生首轮已获授权并尝试，初始化前退出，未收到事件，不标为通过。系统true复现证明本产品沙箱地址语法非法；改为macOS支持的localhost IPv4规则后，真实自有Node测试证实回环可连、外网EPERM。13项相关测试/typecheck/源码build通过。原失败目录保留，不放开网络或自动重试；[同一预览](CODEX-NATIVE-START-CHECK-PREVIEW.md)已列出r1新目录，等待复验范围确认。
+
+Codex r1复验已获授权并执行：初始化成功，空会话RPC被拒绝（630字节输出、无stderr/无hook），尚不能归因，不标为通过。代码补上固定错误类别/有界错误码，并准备先导出本机版本schema再选择只读枚举的r2检查；不猜参数、不放开网络或启动任务。20项检查程序测试、typecheck及源码build通过；[r2精确范围](CODEX-SCHEMA-VERIFY-PREVIEW.md)待确认，原两次结果保留。
+
+Codex r2已获授权并执行：本机schema确认read-only，修正r1的readOnly参数后初始化/空会话均成功（3140字节输出、无stderr），未收到hook。没有发任务、登录或改信任；不能宣称已接通。已准备复用r2配置的 [hooks/list只读核对](CODEX-HOOK-STATUS-CHECK-PREVIEW.md)，仅投影自有条目启用/信任状态和数量，不自动批准。25项检查程序测试、typecheck、源码build通过；新增真实只读范围待确认，原dev及日常配置保留。
+
+Codex只读hooks/list已获授权并执行：精确匹配的本产品hook10条全部启用、全部未信任，其他来源/错误/警告均0；初始化成功，stdout7178字节、stderr0，未创建会话或改信任。原生通知未通过的当前阻塞已定位为审核尚未完成。已准备[用户隔离审核及条件复验](CODEX-HOOK-TRUST-REVIEW-PREVIEW.md)，通过Codex自己的UI审核，绝不直接改写信任；下一步需用户决定，尚未运行。日常配置及dev保持。
+
+Codex隔离审核首轮已获授权，由用户运行后在进入审核前失败：pid-managed后台服务调用ps返回EPERM。自有Node在同款系统沙箱中仅查询自身PID复现spawn EPERM；未检查其他应用。审核脚本按官方建议添加--no-daemon，保留沙箱/信任边界，并使用review-r1独占助手保留首轮文件。[同一预览](CODEX-HOOK-TRUST-REVIEW-PREVIEW.md)已更新唯一有界复验范围；真实复验尚未运行，未声明Codex接通。原dev与日常配置保持。
+
+Codex审核r1已获授权，用户运行后在Codex启动前被准备检查拒绝。固定隔离文件只读核对：observer内容一致、权限/归属有效；仅config多了首轮CLI正常写入的tui.screen_reader_detection_done=true，review-r1仅文档助手存在、checker和结果均未生成。已修正精确UI增量校验、r1同字节助手安全续接及固定失败类别；33项测试/typecheck/源码build通过，收窄复用后两项回归通过。未再次启动真实Codex；按有界失败规则在[审核记录](CODEX-HOOK-TRUST-REVIEW-PREVIEW.md)留停点，不自动重试或扩范围。--no-daemon真实启动、审核和回调仍未验收，dev/日常配置保留。
+
+Codex修复后恢复准备检查已实际通过，用户运行后确认进入登录界面。review-status.json真实查询仍为10条启用/未信任、其他来源/错误/警告0。用户明确要求使用本机已有登录，已实现[仅审核期间的本机凭据临时使用](CODEX-LOCAL-AUTH-REVIEW-PREVIEW.md)：只读有界原auth、隔离600排他副本、交互退出finally核对清理、命令行file模式不改config、保留外网限制，无任务；新助手/结果名保留旧证据。37项测试/typecheck/源码build通过；尚未用真实凭证运行审核，不宣称信任/回调通过，日常配置与dev保持。
+
+Codex本机凭据审核已由用户实际执行，TUI在account/read的workspace routing discovery失败（-32603）；临时副本已核对删除，原凭据metadata正常，两个新结果不存在，审核未完成。完全禁外网可能挡住账号初始化，尚未排除上游错误。已准备[仅chatgpt.com:443受限出口的对照](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)：原系统沙箱不放开，单次认证loopback网关、TLS透传、无任务/正文日志，临时凭据规则不变，新助手/结果保留旧证据。40项测试/typecheck/源码build及两项隧道复核通过；未实际外连/启动Codex复验，因新增外部账号请求需用户决定。dev及日常配置保持。
+
+Codex受限联网已获用户精确授权；用户报告EEXIST并要求Main自行终端测试。Main真实PTY复现EEXIST，修复仅复用内容/权限/归属/单链接全同的network助手，无删除覆盖。一次真实PTY复验已越过准备，但TUI loading仍在account/read工作区路由发现失败（-32603），没有任务/信任审批/后续查询或空会话。临时凭据已核对删除、原auth metadata正常、隔离config保持预期，网关finally关闭。7项聚焦与完整40项测试/typecheck/源码build通过。按有界失败规则停止真实重试，代理使用/上游/账号路由原因仍未区分，见[实际终端证据](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)。dev、日常配置保持，不打包/推送。
+
+## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
+
+用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。随后用户精确授权日常升级并完成：12组自有hooks已保存，其他设置及原备份核对一致；新版dev已启动，用户确认原路径新开的Claude已连接。真实读取、写入/修改、Bash执行及模型出错反馈已核对；Glob/Grep在当前会话不可用，查找未验收。
+
+已实现任务事实→Main私有关联/随机别名→Configurations/Application→共享宠物反馈，以及保留原hooks的显式升级。动作可选、缺动画静态回退；工具反馈不伪造整个任务完成、取消或持续等待。原正式Renderer隔离dev已检查升级/取消回焦/首页GLB反馈；普通Claude启动/Home已有真实确认，本轮匿名状态记录验证常用动作请求，不证明模型资产具有对应动画。独立代码复核无新确定缺陷；检索性审查发现的一处过时验证摘要已修正。真实升级已按精确预览授权完成；实测后正常退出记录版并切回普通dev，未改token/hooks/配置，不打包。[实现、历史失败与最新证据](CLAUDE-TASK-OBSERVATION.md)、[升级预览](CLAUDE-TASK-UPGRADE-PREVIEW.md)。既有设置实机停点及native fixtures保持。
+
+## Claude 自动发现（2026-10-17）
+
+已将 Claude 接入自动扫描：有界 PATH/固定入口/NVM 发现，Main 候选重新核对后带入默认配置与原精确 hook 预览；多入口按程序去重，多安装可选，已有配置直接查看。原配置/hooks/进程与 pi 边界保留。npm 2.1.301 可准备；官方/Homebrew 仅显示待验证，不扩大真实兼容，终端 PATH 未修改。相关 118 项、独立复查 63 项、最终全量 1032 passed / 1 skipped / 92 files、最终界面复验 48 项、typecheck/项目标准源码 build 通过；临时副本 pnpm 拒绝和首次原终端测试超时证据保留。正式 React 浏览器隔离交互/窄窗口已检查，Electron 原生自动化滞后的覆盖限制已记录；本机扫描已获授权并完成：真实发现 npm Claude 2.1.301 一处、pi 0.85.1 两处；已有配置查看复用通过，原两条 UUID/路径保留，未部署或操作 Agent。pi 扫描 complete、Claude 受限，不宣称整机完整覆盖。原日常 dev 已启动并保持运行，Claude waiting、pi 未自动恢复，不打包。见 [设计与证据](CLAUDE-DISCOVERY-DESIGN.md)、[本机检查预览](CLAUDE-DISCOVERY-CHECK-PREVIEW.md)。此前完成的十个提交已推送至 `210ad8b`，本阶段独立本地提交。
+
 ## Claude CLI 一次配置、普通启动（2026-10-16）
 
 **日常配置与实测（覆盖下方历史待授权记录）：** 用户已按[配置预览](CLAUDE-NORMAL-START-PREVIEW.md)及[临时阶段检查](CLAUDE-LIVE-STAGE-CHECK-PREVIEW.md)分别授权。默认settings原先不存在，仅新建自有SessionStart hook；原pi配置保留且未自动恢复。真实Claude由用户运行原入口完整路径，检查版连接/首页通过；临时记录完整撤回后，原observer/原Main摘要和自有hook复核通过，原版再次新开会话为observing/1/notice none，实际首页有对应GLB宠物。CUA旧绑定曾返回过时空态，不能据旧截图认定同步bug或宣称根因修复；初始等待原因仍未确定。偏好仅初次配置时摘要一致，最终发现仅petSize160→80变化，未归因/覆盖/恢复该值。原回调边界20项、阶段记录9种输入/guard及自有安装撤回闭环通过；前导空格修复`434ae5c`的45项/typecheck/build结果保留。当前原dev与用户会话继续运行，无依赖安装/模型请求/打包/推送。普通启动/恢复观察/首页链路通过，退出/并发/任务动作/终端PATH/桌面宿主与发布仍未验收，详见[验收记录](CLAUDE-CLI-ACCEPTANCE.md)。

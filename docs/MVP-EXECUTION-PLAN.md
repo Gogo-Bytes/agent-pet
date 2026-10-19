@@ -60,6 +60,8 @@ Codex修复后恢复准备检查已实际通过，用户运行后确认进入登
 
 Codex本机凭据审核已由用户实际执行，TUI在account/read的workspace routing discovery失败（-32603）；临时副本已核对删除，原凭据metadata正常，两个新结果不存在，审核未完成。完全禁外网可能挡住账号初始化，尚未排除上游错误。已准备[仅chatgpt.com:443受限出口的对照](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)：原系统沙箱不放开，单次认证loopback网关、TLS透传、无任务/正文日志，临时凭据规则不变，新助手/结果保留旧证据。40项测试/typecheck/源码build及两项隧道复核通过；未实际外连/启动Codex复验，因新增外部账号请求需用户决定。dev及日常配置保持。
 
+Codex受限联网已获用户精确授权；用户报告EEXIST并要求Main自行终端测试。Main真实PTY复现EEXIST，修复仅复用内容/权限/归属/单链接全同的network助手，无删除覆盖。一次真实PTY复验已越过准备，但TUI loading仍在account/read工作区路由发现失败（-32603），没有任务/信任审批/后续查询或空会话。临时凭据已核对删除、原auth metadata正常、隔离config保持预期，网关finally关闭。7项聚焦与完整40项测试/typecheck/源码build通过。按有界失败规则停止真实重试，代理使用/上游/账号路由原因仍未区分，见[实际终端证据](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)。dev、日常配置保持，不打包/推送。
+
 ## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 
 用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。随后用户精确授权日常升级并完成：12组自有hooks已保存，其他设置及原备份核对一致；新版dev已启动，用户确认原路径新开的Claude已连接。真实读取、写入/修改、Bash执行及模型出错反馈已核对；Glob/Grep在当前会话不可用，查找未验收。

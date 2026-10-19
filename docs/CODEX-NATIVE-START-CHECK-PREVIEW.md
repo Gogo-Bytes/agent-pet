@@ -1,6 +1,6 @@
 # Codex 原生事件加载：隔离检查预览
 
-2026-10-19。首轮已按精确授权执行，因沙箱规则语法错误在初始化前退出；本页的r1目录复验待授权，尚未启动本机Codex会话。
+2026-10-19。**历史授权与结果：首轮及r1均已执行，尚未收到hook；下方保留原授权范围，不作为下一次执行说明。** 脚本已准备改用r2，最新范围见 [本机接口格式与空会话复验](CODEX-SCHEMA-VERIFY-PREVIEW.md)。
 
 ## 目的
 
@@ -44,3 +44,7 @@ AGENTS.md要求“真实目标操作仍需精确范围、预览与授权”。�
 只用系统 `/usr/bin/true` 做一次有界最小复现，原规则被sandbox-exec拒绝：network address的host必须使用*或localhost，原127.0.0.1字面量非法。唯一假设修复为ip规则使用localhost（仍为IPv4本机回环）；相同true复验退出0。自有Node网络测试实际证明127.0.0.1连接成功、TEST-NET-1保留地址192.0.2.1:443被EPERM拒绝；已加入真实macOS回归。没有去掉沙箱、扩大网络或重试Codex。
 
 13项检查程序测试、pnpm typecheck、desktop源码build通过，未打包。原目录和失败结果不覆盖，脚本改用上文r1新目录，其他原生执行范围不变；新增目录及再次尝试在此请求精确确认。
+
+## r1实际结果
+
+用户明确授权复验后执行一次：initialized=true、threadStarted=false、rpcError=true、serverRequest=false、outcome=rpc-error、stdoutBytes=630、stderrBytes=0、events=[]。初始化通过，空会话请求被拒绝，不标为hook加载通过。此前没有保留RPC错误码或分类，不能据此归因为登录、信任或某个参数。没有移除沙箱、登录或继续尝试。r1结果保留在原隔离目录，日常配置与现有dev未操作。下一步已准备本机协议schema核对和固定错误分类，新增范围按r2预览确认。

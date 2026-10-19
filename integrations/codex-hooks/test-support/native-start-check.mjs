@@ -2,8 +2,9 @@ import { mkdir, writeFile, chmod } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { build } from 'vite';
-import { environment, resolveEntry } from './cli-check.mjs';
-const ROOT = '/tmp/agent-pet-codex-start-20261019-5f92c8-r1';
+import { readGeneratedMode } from './schema-compat.mjs';
+import { environment, resolveEntry, runBounded } from './cli-check.mjs';
+const ROOT = '/tmp/agent-pet-codex-start-20261019-5f92c8-r2';
 if (process.argv[2] !== '--run-authorized-check' || process.argv.length !== 3) {
   console.error('Explicit authorized-check argument required.'); process.exitCode = 1;
 } else {
@@ -26,8 +27,20 @@ if (process.argv[2] !== '--run-authorized-check' || process.argv.length !== 3) {
     const now = await resolveEntry();
     if (now.executable !== before.executable || now.identity !== before.identity) throw new Error('program-changed');
     const { probeCodexStart, launchIsolatedCodex } = require(join(ROOT, 'runtime/check.cjs'));
-    const result = await probeCodexStart({ root: ROOT,
-      launch: hookEnv => launchIsolatedCodex(now.executable, ROOT, environment(ROOT), hookEnv) });
-    console.log(JSON.stringify(result));
+    const { LOOPBACK_ONLY_PROFILE } = require(join(ROOT, 'runtime/check.cjs'));
+    const schema = await runBounded('/usr/bin/sandbox-exec', ['-p', LOOPBACK_ONLY_PROFILE, now.executable,
+      'app-server', 'generate-json-schema', '--out', join(ROOT, 'schema')], ROOT, 'schema', 10000);
+    const sandboxMode = schema.status === 'ok' ? await readGeneratedMode(join(ROOT, 'schema')) : undefined;
+    if (!sandboxMode) {
+      const result = { outcome: 'schema-unavailable', status: schema.status, bytes: schema.bytes };
+      await writeFile(join(ROOT, 'result.json'), JSON.stringify(result), { flag: 'wx', mode: 0o600 });
+      console.log(JSON.stringify(result)); process.exitCode = 1;
+    } else {
+      const final = await resolveEntry();
+      if (final.executable !== before.executable || final.identity !== before.identity) throw new Error('program-changed');
+      const result = await probeCodexStart({ root: ROOT, sandboxMode,
+        launch: hookEnv => launchIsolatedCodex(final.executable, ROOT, environment(ROOT), hookEnv) });
+      console.log(JSON.stringify(result));
+    }
   } catch { console.error('CHECK_STOPPED; daily configuration untouched'); process.exitCode = 1; }
 }

@@ -4,6 +4,19 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { startCodexHookReceiver } from '../transport.js';
 
+/** Fixed categories only. Arbitrary error messages never leave this function. */
+export function classifyRpcError(error: unknown): { kind: string; code: number | null } {
+  if (!error || typeof error !== 'object' || Array.isArray(error)) return { kind: 'unknown', code: null };
+  const value = error as Record<string, unknown>;
+  const code = typeof value.code === 'number' && Number.isSafeInteger(value.code) && Math.abs(value.code) <= 2147483647 ? value.code : null;
+  const text = typeof value.message === 'string' ? value.message.slice(0, 8192) : '';
+  const kind = code === -32602 ? 'invalid-params' : code === -32601 ? 'unsupported-method' :
+    /hook/i.test(text) && /trust/i.test(text) ? 'hook-trust-required' :
+    /(?:not authenticated|authentication required|missing.*api.?key|please.*(?:log|sign).?in)/i.test(text) ? 'authentication-required' :
+    /sandbox/i.test(text) ? 'sandbox-rejected' : 'unknown';
+  return { kind, code };
+}
+
 /** Test-only probe. The launched server creates one empty isolated thread; never starts a turn.
  * A new app-server is used only to test its own hooks, not to observe another running CLI.
  */
@@ -11,6 +24,7 @@ export async function probeCodexStart(options: {
   root: string;
   launch(env: Record<string, string>): ChildProcessWithoutNullStreams;
   timeoutMs?: number;
+  sandboxMode?: 'read-only' | 'readOnly';
 }) {
   const token = randomBytes(32).toString('hex'), runId = randomUUID();
   let child: ChildProcessWithoutNullStreams | undefined, live = false, stopping = false;
@@ -21,7 +35,7 @@ export async function probeCodexStart(options: {
         ...(fact.kind === 'session-started' ? { source: fact.source } : {}) });
     } });
   const result = { initialized: false, threadStarted: false, rpcError: false,
-    serverRequest: false, outcome: 'closed', stdoutBytes: 0, stderrBytes: 0, events };
+    serverRequest: false, readOnlyMode: options.sandboxMode ?? 'readOnly', rpcErrorKind: 'none', rpcErrorCode: null as number | null, outcome: 'closed', stdoutBytes: 0, stderrBytes: 0, events };
   try {
     child = options.launch({ AGENT_PET_CODEX_URL: receiver.url, AGENT_PET_CODEX_TOKEN: token, AGENT_PET_CODEX_RUN_ID: runId });
     live = true;
@@ -68,11 +82,16 @@ export async function probeCodexStart(options: {
           let value: Record<string, unknown>;
           try { value = JSON.parse(line); } catch { stop('invalid-protocol'); return; }
           if (!value || typeof value !== 'object' || Array.isArray(value)) { stop('invalid-protocol'); return; }
-          if (value.error && (value.id === 1 || value.id === 2)) { result.rpcError = true; stop('rpc-error'); return; }
+          if (value.error && (value.id === 1 || value.id === 2)) {
+            result.rpcError = true;
+            const diagnostic = classifyRpcError(value.error);
+            result.rpcErrorKind = diagnostic.kind; result.rpcErrorCode = diagnostic.code;
+            stop('rpc-error'); return;
+          }
           if (value.id === 1 && value.result && !result.initialized) {
             result.initialized = true;
             send({ method: 'initialized', params: {} });
-            send({ id: 2, method: 'thread/start', params: { cwd: join(options.root, 'work'), approvalPolicy: 'never', sandbox: 'readOnly' } });
+            send({ id: 2, method: 'thread/start', params: { cwd: join(options.root, 'work'), approvalPolicy: 'never', sandbox: options.sandboxMode ?? 'readOnly' } });
           } else if (value.id === 2 && value.result) {
             const thread = (value.result as { thread?: { id?: unknown } }).thread;
             if (!thread || typeof thread.id !== 'string' || !thread.id || thread.id.length > 256) { stop('invalid-protocol'); return; }

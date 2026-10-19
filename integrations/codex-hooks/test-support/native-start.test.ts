@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { probeCodexStart } from './native-start.js';
+import { probeCodexStart, classifyRpcError } from './native-start.js';
 const source = `
 const readline = require('node:readline');
 readline.createInterface({input:process.stdin}).on('line', line => {
@@ -62,4 +62,13 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
     if (pid) { try { process.kill(pid, 'SIGKILL'); } catch { /* already reaped */ } }
     await rm(root, { recursive: true, force: true });
   }
+});
+
+it('classifies only bounded error codes/categories without exposing error text', () => {
+  expect(classifyRpcError({code:-32602,message:'SECRET'})).toEqual({kind:'invalid-params',code:-32602});
+  expect(classifyRpcError({code:-32601,message:'SECRET'})).toEqual({kind:'unsupported-method',code:-32601});
+  expect(classifyRpcError({message:'Hook trust required SECRET'})).toEqual({kind:'hook-trust-required',code:null});
+  expect(classifyRpcError({message:'Authentication required SECRET'})).toEqual({kind:'authentication-required',code:null});
+  expect(classifyRpcError({message:'Sandbox failed SECRET'})).toEqual({kind:'sandbox-rejected',code:null});
+  expect(classifyRpcError({code:Infinity,message:'SECRET'})).toEqual({kind:'unknown',code:null});
 });

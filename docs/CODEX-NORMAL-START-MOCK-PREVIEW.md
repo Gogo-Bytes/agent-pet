@@ -1,6 +1,6 @@
 # 普通启动桥接的隔离实测预览
 
-本预览首轮已按用户授权执行，结果与复验范围见下文。前一步app-server本机模拟首轮已通过，新的私有文件发现与原生宿主核验代码已通过自有fixture。新hook命令与原来已审核的环境变量命令不同，需要Codex原生重新审核，不能沿用旧10条的信任同意。
+本预览首轮已按用户授权执行，结果与复验范围见下文。前一步app-server本机模拟首轮已通过，新的私有文件发现与原生宿主核验代码已通过自有fixture。新hook命令与原来已审核的环境变量命令不同，本轮已取得单独授权并完成新的10条原生审核，没有沿用旧命令的信任同意。
 
 固定程序仍为 `/Users/gan/.local/bin/codex`，只按既有安装链接/metadata规则核对，不读日常Codex配置或凭据，不登录、不联网账号、不调用真实模型，不改当前Claude/pi/dev或打包。
 
@@ -23,9 +23,9 @@
 
 检查修复只改测试边界：交互fixture有界解析内存中的请求格式，仅识别固定title schema，不保存正文/原生ID/请求字段；任务返回固定OK，标题返回固定合法JSON，分别计数。每轮只接受1次任务、最多1次标题；未知结构/预热、重复任务、额外标题、非回环或授权请求仍不能通过。连接由原生身份核验后的publish独立计数，失败结果也保存退出码与各项布尔/计数。旧app-server fixture模式和严格一次请求验收保持。
 
-## 待授权的一次有界复验
+## 已授权的一次有界复验（历史操作范围）
 
-此前预览约定失败不自动重试；以下新增复验**尚未执行**，需用户确认后才运行：
+此前预览约定失败不自动重试；用户随后明确授权以下新增范围，已执行通过，结果见下一节：
 
 `node integrations/codex-hooks/test-support/normal-start-review.mjs --run-authorized-normal-retry`
 
@@ -35,4 +35,25 @@
 - 仅独占新增normal-retry-result.json或normal-retry-failure.json（600），保存阶段、退出码、任务/标题/拒绝/连接计数、轮换/原文件保持布尔值。原normal-failure.json、审核记录及runtime资产不覆盖。若已有复验记录或材料不符则停止。
 - 复验失败不再自动重试；关闭自建接收器/模拟服务，保留证据与原始材料。即使通过也只验收此隔离--no-daemon模式；默认共享daemon、空启动即在线与日常接入仍未验收。
 
-检查程序修复验证：`pnpm test integrations/codex-hooks/test-support --maxWorkers=1` 63项通过，`pnpm typecheck`与`pnpm --filter @agent-pet/desktop build`通过（仅源码构建）；独立审查18项自有fixture通过，无新增确定缺陷。未执行上述真实复验。
+检查程序修复验证：`pnpm test integrations/codex-hooks/test-support --maxWorkers=1` 63项通过，`pnpm typecheck`与`pnpm --filter @agent-pet/desktop build`通过（仅源码构建）；独立审查18项自有fixture通过，无新增确定缺陷。此处记录准备代码检查；随后真实复验结果如下。
+
+## 修正后原生复验通过（2026-10-19）
+
+Main按用户授权运行`--run-authorized-normal-retry`，旧私有材料/当前源码与helper核对通过，未重写hooks、未重新授予信任。两次隔离TUI均进入主界面，分别只发送一次原固定任务，正常/quit退出0。第一轮唯一警告经F2核对为自定义fixture模型无metadata、采用fallback，不是hook报错；未更改此设置。
+
+结果文件：`/private/tmp/agent-pet-codex-normal-20261019-9fe182/normal-retry-result.json`（600）。原失败文件保留。
+
+| 检查 | 第一轮 | 接收器恢复后的第二轮 |
+| --- | --- | --- |
+| Codex退出码 | 0 | 0 |
+| 原生身份核验后发布连接 | true | true |
+| 固定任务请求 | 1 | 1 |
+| 原生标题schema请求 | 1 | 1 |
+| 异常/被拒请求 | 0 / 0 | 0 / 0 |
+| 本轮通过 | true | true |
+
+总计4次本机固定Responses响应（任务2、标题2），没有外部模型或凭据。`activationRotated=true`、`hooksUnchanged=true`、`specialConnectionEnvironment=false`、`passed=true`。累计connected=6/disconnected=2是状态发布次数，**不是6个宿主或连接配置**。脚本正常结束，关闭自建接收器及模拟服务，不重启现有dev/Agent、不打包、不推送。
+
+此复验实际识别了隐藏标题流量，修正后的两轮均没有重复任务；首试未记录分类，不能追溯证明首试的第二次请求也一定是标题。通过只覆盖固定安装0.163.0、无凭据/外网、隔离--no-daemon模式，以及无专用连接环境变量的私有发现、原生身份链路与接收器轮换；不是默认共享daemon、空CLI启动即在线、正式连接页/首页、日常安装或真实任务验收。
+
+独立审查已按脱敏白名单结果复核本轮文档，未发现结论矛盾；未让审查Agent访问真实目录、安装或凭据。

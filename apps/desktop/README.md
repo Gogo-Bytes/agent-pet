@@ -501,4 +501,4 @@ normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
 
 ## Codex 新桥接模块（2026-10-19）
 
-dev/源码build会编译`out/codex-runtime/native-hook.cjs`。首轮本机模拟已通过；私有文件发现、精确宿主核验和Main记录恢复模块已有隔离验证。它们尚未注册到正式连接页/首页，不代表日常Codex已接通，也不支持凭空把空CLI标为在线。[实现与验收边界](../../docs/CODEX-NORMAL-START-IMPLEMENTATION.md)、[新命令原生审核预览](../../docs/CODEX-NORMAL-START-MOCK-PREVIEW.md)。继续dev，不打包；现有pi/Claude配置不变。
+dev/源码build会编译`out/codex-runtime/native-hook.cjs`。首轮本机模拟已通过；私有文件发现、精确宿主核验和Main记录恢复已通过真实隔离Codex的两轮TUI复验（--no-daemon）：各1任务+1标题、收到连接、正常退出，接收地址轮换后无需改hooks或连接环境变量。原首试计数误判证据保留。它们尚未注册到正式连接页/首页，不代表日常Codex已接通，也不支持凭空把空CLI标为在线。[实现与验收边界](../../docs/CODEX-NORMAL-START-IMPLEMENTATION.md)、[新命令原生审核预览](../../docs/CODEX-NORMAL-START-MOCK-PREVIEW.md)。继续dev，不打包；现有pi/Claude配置不变。

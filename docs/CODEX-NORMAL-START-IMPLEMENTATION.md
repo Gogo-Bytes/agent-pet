@@ -18,14 +18,14 @@
 | 检查 | 本轮结果 | 证明范围 |
 | --- | --- | --- |
 | 本机Codex0.163.0首轮、本机固定Responses | 真实通过，1次本地请求，启动→提交→Stop→结束 | 原hook的首轮触发/认证链路；[精确范围与结果](CODEX-FIRST-TURN-MOCK-PREVIEW.md) |
-| 无环境变量hook读取私有文件，地址替换后下一次调用 | 自有Node subprocess通过 | 新native-entry及桥接组合，不冒充原生Codex已审核新命令 |
+| 无环境变量hook读取私有文件，地址替换后下一次调用 | 自有Node subprocess通过 | 新native-entry及桥接组合；真实原生审核另见下行 |
 | 实际macOS metadata检查 | 自建C宿主→Node hook通过，宿主退出后断开 | 原生helper和OS祖先链，非真实Agent生命周期验收 |
 | Main私有记录重启 | 自有fixture通过 | 地址/token轮换、hook/observer保留、编辑/pending/权限异常保留并失败关闭 |
-| 新命令的原生Codex审核与重开 | 尚未执行，已准备[隔离预览与脚本](CODEX-NORMAL-START-MOCK-PREVIEW.md) | 需新增10条命令的明确原生审核授权，不复用旧命令信任 |
+| 新命令的原生Codex审核与重开 | 已授权并通过，两轮原生TUI各收到真实连接、任务/标题各1次、退出0；[范围与证据](CODEX-NORMAL-START-MOCK-PREVIEW.md) | 固定安装0.163.0、隔离--no-daemon、无连接环境变量；接收地址轮换后同一hook命令仍可连接 |
 | 日常安装、默认共享daemon、空CLI即在线、正式连接页/首页 | 尚未完成/验收 | 新模块尚未注册到Configurations、IPC或Renderer，不显示虚假在线 |
 
 既有Claude与pi部署/撤回/保留测试未削弱。第二阶段全量`pnpm test --maxWorkers=1`为1288 passed /1 skipped /115 files；`pnpm typecheck`及`pnpm --filter @agent-pet/desktop build`通过，仅源码构建。随后新增审核脚本gate与回调拒绝回归，聚焦16项通过。独立审查复现了回调正常返回误停和pending启动退出过早两项，均修正并补回归；最终独立复核22项自有fixture通过，无新的确定缺陷。未推送、未打包。
 
 本模块无法凭空提供空CLI的在线存在性，也不宣称Stop就是任务成功、工具返回就是完成/出错、审批检查就是持续等待。共享daemon最小状态来源、已运行会话恢复与正式配置部署/撤回继续按研究依赖推进；任何日常目标写入仍需精确预览与授权。
 
-原生隔离普通启动首试已完成10条审核并返回固定OK，但测试程序对HTTP次数的假设有误，且失败证据缺连接计数，真实桥接结果仍未知；不能列为通过。测试边界已区分同版本隐藏标题schema，准备一次有界复验，原失败保留。见[范围与证据](CODEX-NORMAL-START-MOCK-PREVIEW.md)。
+原生隔离普通启动首试因测试程序的HTTP次数假设失败，原记录缺连接计数，不能倒推首试通过；证据保留。修正后经用户精确授权的一次有界复验已通过：两轮各1任务+1标题、真实连接、退出0；私有activation轮换且hook/observer保持。63项test-support、typecheck与源码build通过，独立18项fixture复核无确定缺陷；见[范围与证据](CODEX-NORMAL-START-MOCK-PREVIEW.md)。

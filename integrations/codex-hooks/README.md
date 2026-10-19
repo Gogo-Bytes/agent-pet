@@ -80,3 +80,8 @@ Validation for startup diagnostics:53 test-support fixtures pass; typecheck and 
 ## Native first turn with local mock: passed
 
 [Exact scope and evidence](../../docs/CODEX-FIRST-TURN-MOCK-PREVIEW.md): the installed Codex completed one isolated first turn against a fixed loopback Responses fixture. Authenticated event order was session-started → turn-submitted → stop-requested → session-ended; one local model request, no credentials/external access, unchanged reviewed hooks/config.56 harness fixtures/typecheck/source build pass. This replaces the empty-start probe as the successful trigger check, not ordinary-start or real-model acceptance.
+
+
+## Native private activation and receiver restart: passed in isolation
+
+[Authorized normal bridge verification](../../docs/CODEX-NORMAL-START-MOCK-PREVIEW.md): the new10 commands were reviewed/trusted through native UI. The first test stopped on an incorrect single-HTTP-request assumption and did not save connection counts, so its connection verdict remains unknown. After separating the same-version native title schema from the fixed task, one explicitly authorized retry passed both TUI launches: each made1 task +1 title request, published an independently verified connection and exited0. Restoring the private receiver rotated activation without editing reviewed hook commands or supplying connection environment variables. All responses stayed loopback-only, no credentials/real model/daily config/dev change.63 test-support checks/typecheck/source build pass; independent18 own fixtures found no confirmed defect. Default shared daemon, empty-CLI presence, daily installation and Configurations/IPC/Renderer remain unverified or unwired.

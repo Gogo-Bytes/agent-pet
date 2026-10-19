@@ -373,14 +373,14 @@ describe('ManagementApp formal four-page interface', () => {
     let dialog = screen.getByRole('dialog', { name: '手动添加' });
     await test.user.click(within(dialog).getByRole('button', { name: '选择位置' }));
     await test.user.click(within(dialog).getByRole('button', { name: '验证配置' }));
-    await test.user.selectOptions(within(dialog).getByRole('combobox', { name: 'Agent 类型' }), 'codex');
+    await test.user.selectOptions(within(dialog).getByRole('combobox', { name: 'Agent 类型' }), 'gemini');
     expect(within(dialog).getByRole('status').textContent).toContain('暂时还不能连接');
     await test.user.click(within(dialog).getByRole('button', { name: '下一步' }));
     await test.user.clear(within(dialog).getByRole('textbox', { name: '配置名称' }));
-    await test.user.type(within(dialog).getByRole('textbox', { name: '配置名称' }), '工作 Codex');
+    await test.user.type(within(dialog).getByRole('textbox', { name: '配置名称' }), '工作 Gemini');
     await test.user.click(within(dialog).getByRole('button', { name: '添加配置' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(test.bridge.configurations.create).toHaveBeenCalledExactlyOnceWith({ name: '工作 Codex', provider: 'codex', targetPath: '/isolated/new-project' });
+    expect(test.bridge.configurations.create).toHaveBeenCalledExactlyOnceWith({ name: '工作 Gemini', provider: 'gemini', targetPath: '/isolated/new-project' });
     expect(screen.getByRole('heading', { name: '暂不支持连接' })).toBeTruthy();
     expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
   });

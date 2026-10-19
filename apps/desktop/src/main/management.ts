@@ -4,6 +4,7 @@ import { realpathSync } from 'node:fs';
 import { PiBridgeAdapter as ConfigurationAdapter } from '@agent-pet/adapter-pi';
 import type { SessionState } from '@agent-pet/domain';
 import { Configurations } from './configurations.js';
+import { loadCodexRuntimeAssets } from './codex-runtime-assets.js';
 import { loadClaudeRuntimeAssets, claudeProcessProbePath } from './claude-runtime-assets.js';
 import { configurationOnline } from '../shared/configurations.js';
 import { registerConfigurationIpc } from './configuration-ipc.js';
@@ -52,6 +53,14 @@ export function createManagement(options: {
       async chooseExecutable() {
         if (!window || window.isDestroyed() || quitting) return null;
         const result = await dialog.showOpenDialog(window, { title: '选择 Claude Code 程序（当前支持 npm 2.1.301）',
+          properties: ['openFile', 'showHiddenFiles', 'dontAddToRecent'] });
+        return result.canceled ? null : result.filePaths[0] ?? null;
+      } },
+    codex: { nodeExecutable: process.execPath, observerExecutable: realpathSync(process.execPath), runAsNode: true,
+      probePath: claudeProcessProbePath(), runtimeAssets: loadCodexRuntimeAssets,
+      async chooseExecutable() {
+        if (!window || window.isDestroyed() || quitting) return null;
+        const result = await dialog.showOpenDialog(window, { title: '选择 Codex CLI 程序（已验证 standalone 0.163.0）',
           properties: ['openFile', 'showHiddenFiles', 'dontAddToRecent'] });
         return result.canceled ? null : result.filePaths[0] ?? null;
       } },

@@ -62,3 +62,9 @@ it('refuses both native normal-review entry points without explicit terminal exe
         stderr: expect.stringContaining('Explicit normal-start authorization and terminal required.') });
   }
 });
+
+it('refuses default daemon verification outside an explicitly authorized terminal', async () => {
+  await expect(promisify(execFile)(process.execPath, [fileURLToPath(new URL('./default-start-review.mjs', import.meta.url)),
+    '--run-authorized-default-start'], { cwd: '/tmp', timeout: 3000 })).rejects.toMatchObject({ code: 1, stdout: '',
+      stderr: expect.stringContaining('Explicit default-start authorization and terminal required.') });
+});

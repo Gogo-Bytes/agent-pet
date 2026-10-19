@@ -21,6 +21,7 @@ export class CodexNormalObserver {
   private sessions = 0;
   constructor(private readonly options: Omit<BridgeOptions, 'onChange'> & {
     directory: string; nodeExecutable: string; runAsNode: boolean;
+    onChange?(): void;
     /** Self-owned cancellation fixture only; production callers use the native bridge. */
     startBridge?: typeof startCodexNormalBridge;
   }) {
@@ -54,7 +55,7 @@ export class CodexNormalObserver {
     const pending = (this.options.startBridge ?? startCodexNormalBridge)({ ...this.options, onChange: state => {
       if (this.closed || generation !== this.generation) return;
       this.sessions = state.observedSessions;
-      this.status = this.sessions ? 'observing' : 'waiting-for-event';
+      this.status = this.sessions ? 'observing' : 'waiting-for-event'; this.options.onChange?.();
     } });
     this.pending = pending;
     try {

@@ -502,3 +502,8 @@ normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
 ## Codex 新桥接模块（2026-10-19）
 
 dev/源码build会编译`out/codex-runtime/native-hook.cjs`。首轮本机模拟已通过；私有文件发现、精确宿主核验和Main记录恢复已通过真实隔离Codex的两轮TUI复验（--no-daemon）：各1任务+1标题、收到连接、正常退出，接收地址轮换后无需改hooks或连接环境变量。原首试计数误判证据保留。它们尚未注册到正式连接页/首页，不代表日常Codex已接通，也不支持凭空把空CLI标为在线。[实现与验收边界](../../docs/CODEX-NORMAL-START-IMPLEMENTATION.md)、[新命令原生审核预览](../../docs/CODEX-NORMAL-START-MOCK-PREVIEW.md)。继续dev，不打包；现有pi/Claude配置不变。
+
+
+## Codex CLI 正式连接页/Home代码（2026-10-19）
+
+已接入Main/Configurations/既有类型化IPC与共享会话/Home：手动选择实际CODEX_HOME、程序、只追加10条通知的确认预览；暂停/恢复/选择性移除保留其他hooks、config.toml和登录。Codex的原生/hooks审核另由用户完成，首任务后才有在线宠物；默认后台不以终端关闭或PID活着推断会话状态。standalone0.163.0的前台隔离真实验证已通过；默认后台已准备独立宿主入口核对和真实隔离验证，尚未执行，不宣称日常已接通。Codex自动扫描/桌面端尚未支持。继续dev、不打包；[实现与测试/截图](../../docs/CODEX-CLI-CONNECTION.md)、[待授权默认实测](../../docs/CODEX-DEFAULT-START-PREVIEW.md)。

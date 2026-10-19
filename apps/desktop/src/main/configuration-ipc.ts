@@ -51,7 +51,7 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     assert(event); const valid = configurationPath(value); if (!valid) throw new TypeError('请输入完整绝对路径。');
     const current = window()!;
     const result = await dialog.showMessageBox(current, { type: 'question', title: '允许检查这个配置位置？',
-      message: valid, detail: '只读检查此目录及祖先的安全 metadata、settings.json、extensions/package.json 和固定入口/ignore 的存在。不会读取会话、凭据或对话，也不会写入、启动或控制 Agent。',
+      message: valid, detail: '只读检查此目录及祖先的安全 metadata、settings.json、hooks.json、extensions/package.json 和固定入口/ignore 的存在；连接预览还会核对所选 Agent 程序及本配置目录中的固定后台程序入口 metadata。不会读取会话、凭据或对话，也不会写入、启动或控制 Agent。',
       buttons: ['取消', '允许检查'], defaultId: 0, cancelId: 0 });
     if (quitting() || window() !== current || result.response !== 1) return null;
     const canonical = await canonicalLocation(valid); chosen.add(canonical); return canonical;

@@ -26,6 +26,8 @@ Claude CLI启动方式确认（2026-10-16）：采用一次配置、以后正常
 
 新增接入范围与顺序（2026-10-16）：用户确认Claude Code CLI、Codex CLI、Antigravity CLI优先依次实施，全部CLI先完成，Codex与Antigravity桌面端最后分别适配。CLI与桌面端属于同一Provider的不同宿主，兼容性、加载与实际事件分别验收；一端通过不代表另一端通过。保留现有配置，继续dev、不打包；当前Claude CLI已实现正式连接页与首页的连接/静态陪伴，隔离 dev 通过；真实日常前台接入和任务动作仍待验收。程序更新、manifest与隔离初始化另有证据。执行证据与剩余条件见 [MVP计划](MVP-EXECUTION-PLAN.md) 和 [Claude记录](CLAUDE-CLI-ACCEPTANCE.md)。
 
+2026-10-19接线进度：Codex CLI已加入正式连接页/Home代码，仍只观察，不启动/审批任务；第一次可信任务事件后才显示宠物。默认后台、日常安装与桌面端分开验收，当前尚未完成默认/日常原生实测。配置与其他hooks保留；详见[Codex接线与证据](CODEX-CLI-CONNECTION.md)。
+
 ## 1. 产品一句话
 
 Agent Pet 是一个陪伴用户使用各种 AI Agent 的桌面宠物。它用轻松、可爱的方式表达 Agent 的工作状态，让用户在不学习专业配置的情况下获得陪伴感和反馈。

@@ -1,4 +1,5 @@
 import type { PiConnectionState } from './pi-connection.js';
+import type { CodexConnectionState } from './codex-connection.js';
 import type { ClaudeConnectionState } from './claude-connection.js';
 import type { Inspection, InstallationCandidate } from './pi-preflight.js';
 import type { ClaudeDiscoveryState } from './claude-discovery.js';
@@ -20,9 +21,10 @@ export interface AgentConfiguration extends ConfigurationMetadata {
   inspection: Inspection | null;
   connection: PiConnectionState | null;
   claude?: ClaudeConnectionState;
+  codex?: CodexConnectionState;
 }
 export function configurationOnline(record: AgentConfiguration): boolean {
-  return record.connection?.status === 'connected' || record.claude?.status === 'observing';
+  return record.connection?.status === 'connected' || record.claude?.status === 'observing' || record.codex?.status === 'observing';
 }
 export type ConfigurationNotice = 'none' | 'invalid' | 'duplicate' | 'not-found' | 'busy' |
   'save-failed' | 'saved-invalid' | 'withdraw-first' | 'retained' | 'unsupported' | 'limit';

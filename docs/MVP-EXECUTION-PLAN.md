@@ -30,6 +30,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Codex CLI 输入边界（2026-10-19）
 
+**正式接线代码已完成，默认/日常实测待授权：** 已加Codex手动添加、10条hooks保留式预览/确认/暂停/恢复/撤回、私有记录备份与失败关闭、Main精确默认宿主入口解析，Configurations→共享Application→Home真实事件链路。首任务前等待，不把空CLI或daemon活着当在线；不读取对话文件，不启动Agent。默认daemon独立程序路径已由固定源码核对，尚需真实隔离实测。全量1310 passed/1 skipped/121 files，最后UI取消生命周期回归3项通过；原Claude93项通过。独立审查发现私有state并发编辑保护缺口，已用红绿回归修复；正式Renderer宽/窄窗口、弹窗回焦、GLB及Enter/Escape实看通过（示例数据，不是原生验收）。日常配置/dev不动，不打包。[接线与验证](CODEX-CLI-CONNECTION.md)、[默认模式精确预览](CODEX-DEFAULT-START-PREVIEW.md)。下方“尚未注册”记录是此前阶段快照，不覆盖本条代码状态。
+
 最新原生普通启动有界复验已通过：新版10条原生信任保留，两轮隔离--no-daemon TUI均发布经过身份核验的真实连接、各1任务+1标题请求、正常退出0；接收地址轮换后同一hook仍连接，无专用连接环境变量。异常/拒绝0，不使用凭据/外网/真实模型，不改日常配置或现有dev/Agent，不打包。首试计数误判与漏存连接计数证据保留，不能倒推首试通过。63项test-support/typecheck/源码build通过，独立18项自有fixture复核通过。默认共享daemon、空CLI在线、正式连接页/首页与日常部署仍未验收。[实测结果与边界](CODEX-NORMAL-START-MOCK-PREVIEW.md)。
 
 **普通启动基础模块已实现，日常接入未启用：** 新hook每次读取本应用私有activation，无需连接环境变量；原生helper核对UID/精确程序/完整祖先链/出生时间，独立区分宿主与多会话；首次可信非启动事件可建立unknown基线。Main私有记录轮换有完整性、编辑保留与pending失败关闭，停止等待尚在启动的receiver；dev编译新hook资产。自有Node与实际macOS自建宿主fixture通过，全量1288 passed/1 skipped、typecheck/源码build通过；新增聚焦16项通过。独立审查两处生命周期缺陷已修，最终22项自有fixture复核通过。Configurations/IPC/Renderer和日常hook尚未注册；新命令的原生信任已按[隔离预览](CODEX-NORMAL-START-MOCK-PREVIEW.md)取得单独授权并完成，不能据此自动授予日常信任。见[实现/边界](CODEX-NORMAL-START-IMPLEMENTATION.md)。

@@ -1,6 +1,6 @@
 # Codex 普通启动桥接实现与验收边界
 
-2026-10-19。依照[方案研究](CODEX-CONNECTION-RESEARCH.md)，本轮已完成原生首轮本机模拟与普通启动基础模块；没有安装日常Codex hook、修改现有配置或启用正式Renderer支持。
+2026-10-19。依照[方案研究](CODEX-CONNECTION-RESEARCH.md)，本节记录原生首轮本机模拟与普通启动基础模块。后续[正式接线代码](CODEX-CLI-CONNECTION.md)已加入Configurations/连接页/Home并通过隔离验证；默认后台和日常安装仍待原生实测，未修改现有日常配置。
 
 ## 模块
 
@@ -22,7 +22,8 @@
 | 实际macOS metadata检查 | 自建C宿主→Node hook通过，宿主退出后断开 | 原生helper和OS祖先链，非真实Agent生命周期验收 |
 | Main私有记录重启 | 自有fixture通过 | 地址/token轮换、hook/observer保留、编辑/pending/权限异常保留并失败关闭 |
 | 新命令的原生Codex审核与重开 | 已授权并通过，两轮原生TUI各收到真实连接、任务/标题各1次、退出0；[范围与证据](CODEX-NORMAL-START-MOCK-PREVIEW.md) | 固定安装0.163.0、隔离--no-daemon、无连接环境变量；接收地址轮换后同一hook命令仍可连接 |
-| 日常安装、默认共享daemon、空CLI即在线、正式连接页/首页 | 尚未完成/验收 | 新模块尚未注册到Configurations、IPC或Renderer，不显示虚假在线 |
+| 正式连接页/首页 | 后续已注册，Main/React隔离测试及正式Renderer示例实看通过 | [新接线证据](CODEX-CLI-CONNECTION.md)，不是默认或日常原生验收 |
+| 日常安装、默认共享daemon、空CLI即在线 | 尚未完成/验收 | 不从已配置或daemon活着制造在线 |
 
 既有Claude与pi部署/撤回/保留测试未削弱。第二阶段全量`pnpm test --maxWorkers=1`为1288 passed /1 skipped /115 files；`pnpm typecheck`及`pnpm --filter @agent-pet/desktop build`通过，仅源码构建。随后新增审核脚本gate与回调拒绝回归，聚焦16项通过。独立审查复现了回调正常返回误停和pending启动退出过早两项，均修正并补回归；最终独立复核22项自有fixture通过，无新的确定缺陷。未推送、未打包。
 

@@ -22,7 +22,7 @@ export async function writeOrVerifyHelper(file, content, resume = false) {
   }
 }
 export async function prepareIsolated(prefix) {
-  if (!['status', 'review', 'review-r1'].includes(prefix)) throw new Error('Invalid isolated operation');
+  if (!['status', 'review', 'review-r1', 'review-auth'].includes(prefix)) throw new Error('Invalid isolated operation');
   const before = await resolveEntry();
   for (const name of ['', 'runtime', 'config', 'work', 'home', 'cache', 'tmp']) {
     const stat = await lstat(join(ROOT, name));
@@ -44,14 +44,14 @@ export async function prepareIsolated(prefix) {
   const hash = text => createHash('sha256').update(text).digest('hex');
   if (hash(observer) !== hash(installed)) throw new Error('Observer changed');
   const documents = await compile('integrations/codex-hooks/hook-source.ts', `${prefix}-documents.cjs`);
-  await writeOrVerifyHelper(join(ROOT, `runtime/${prefix}-documents.cjs`), documents, prefix === 'review-r1');
+  await writeOrVerifyHelper(join(ROOT, `runtime/${prefix}-documents.cjs`), documents, prefix === 'review-r1' || prefix === 'review-auth');
   const require = createRequire(import.meta.url);
   const { createCodexHookDocument } = require(join(ROOT, `runtime/${prefix}-documents.cjs`));
   const expected = createCodexHookDocument(process.execPath, join(ROOT, 'runtime/observer.cjs'));
   if (await readOwn(join(ROOT, 'config/hooks.json'), 64 * 1024) !== expected ||
     !isExpectedIsolatedConfig(await readOwn(join(ROOT, 'config/config.toml'), 1024))) throw new Error('Isolated configuration changed');
   const checker = await compile('integrations/codex-hooks/test-support/native-start.ts', `${prefix}-check.cjs`);
-  await writeOrVerifyHelper(join(ROOT, `runtime/${prefix}-check.cjs`), checker, prefix === 'review-r1');
+  await writeOrVerifyHelper(join(ROOT, `runtime/${prefix}-check.cjs`), checker, prefix === 'review-r1' || prefix === 'review-auth');
   const now = await resolveEntry();
   if (now.executable !== before.executable || now.identity !== before.identity) throw new Error('Program changed');
   const { probeCodexStart, launchIsolatedCodex, LOOPBACK_ONLY_PROFILE, hasReviewedOwnHooks } = require(join(ROOT, `runtime/${prefix}-check.cjs`));

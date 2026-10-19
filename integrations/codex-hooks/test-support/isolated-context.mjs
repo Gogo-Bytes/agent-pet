@@ -6,7 +6,7 @@ import { build } from 'vite';
 import { environment, resolveEntry } from './cli-check.mjs';
 export const ROOT = '/tmp/agent-pet-codex-start-20261019-5f92c8-r2';
 export async function prepareIsolated(prefix) {
-  if (!['status', 'review'].includes(prefix)) throw new Error('Invalid isolated operation');
+  if (!['status', 'review', 'review-r1'].includes(prefix)) throw new Error('Invalid isolated operation');
   const before = await resolveEntry();
   for (const name of ['', 'runtime', 'config', 'work', 'home', 'cache', 'tmp']) {
     const stat = await lstat(join(ROOT, name));

@@ -21,3 +21,16 @@ socket.once('error',error=>{socket.destroy();done(error.code)});socket.setTimeou
     expect(code).toBe(0); expect(JSON.parse(output)).toEqual({ loopback: 'connected', external: 'EPERM' });
   } finally { clearTimeout(timer); child.kill('SIGKILL'); await new Promise<void>(resolve => server.close(() => resolve())); }
 });
+
+it.skipIf(process.platform !== 'darwin')('records the ps execution restriction without inspecting another process', async () => {
+  const source = `try { require('node:child_process').execFile('/bin/ps',['-p',String(process.pid),'-o','pid='],{timeout:1000},(error,stdout)=>console.log(JSON.stringify({errorCode:error?.code??null,ownPidMatched:stdout.trim()===String(process.pid)}))); } catch(error) { console.log(JSON.stringify({errorCode:error.code,ownPidMatched:false})); }`;
+  const child = spawn('/usr/bin/sandbox-exec',['-p',LOOPBACK_ONLY_PROFILE,process.execPath,'-e',source],{
+    env:{PATH:'/usr/bin:/bin'},stdio:['ignore','pipe','pipe']});
+  let output='';child.stdout.on('data',chunk=>{output+=chunk;});child.stderr.resume();
+  const timer=setTimeout(()=>child.kill('SIGKILL'),3000);
+  try {
+    const code=await new Promise<number|null>((resolve,reject)=>{child.once('close',resolve);child.once('error',reject);});
+    expect(code).toBe(0);
+    expect(JSON.parse(output)).toEqual({errorCode:'EPERM',ownPidMatched:false});
+  } finally {clearTimeout(timer);child.kill('SIGKILL');}
+});

@@ -1,13 +1,14 @@
 import { spawn } from 'node:child_process';
 import { prepareIsolated } from './isolated-context.mjs';
-if (process.argv[2] !== '--run-authorized-review' || process.argv.length !== 3 || !process.stdin.isTTY) {
+const retry = process.argv[2] === '--run-authorized-review-r1';
+if ((!retry && process.argv[2] !== '--run-authorized-review') || process.argv.length !== 3 || !process.stdin.isTTY) {
   console.error('Run this reviewed operation in an interactive terminal with --run-authorized-review.'); process.exitCode = 1;
 } else {
   try {
-    const ctx = await prepareIsolated('review');
+    const ctx = await prepareIsolated(retry ? 'review-r1' : 'review');
     console.log('这是隔离 Codex，只审核本产品的 10 条 hook。进入后输入 /hooks，核对并信任这些条目，然后正常退出。不要发送任务；若要求登录，请直接退出。');
     const code = await new Promise((resolve, reject) => {
-      const child = spawn('/usr/bin/sandbox-exec', ['-p', ctx.profile, ctx.executable, '--no-alt-screen'], {
+      const child = spawn('/usr/bin/sandbox-exec', ['-p', ctx.profile, ctx.executable, '--no-daemon', '--no-alt-screen'], {
         cwd: ctx.root + '/work', env: ctx.environment, stdio: 'inherit',
       });
       let force;

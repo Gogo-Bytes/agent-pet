@@ -45,18 +45,28 @@ export function createCodexObservations(options: {
   const disconnect = (runId: string, session: Session) => {
     clear(session); session.connected = false; session.ended = true; emit(runId, session);
   };
+  const admitVerifiedSession = (runId: string, providerSessionId: string, turnId?: string) => {
+    if (closed) return;
+    let run = runs.get(runId);
+    if (run?.retired || run?.sessions.has(providerSessionId) ||
+        (!run && runs.size >= 32) || (run && run.sessions.size >= 32)) return;
+    const session: Session = { id: randomUUID(), revision: 0, connected: true, ended: false,
+      saturated: false, interrupted: false, turns: new Set(), tools: new Set(), capabilities: {} };
+    if (turnId) { session.turn = turnId; session.turns.add(turnId); session.work = randomUUID(); }
+    if (!run) { run = { retired: false, sessions: new Map() }; runs.set(runId, run); }
+    run.sessions.set(providerSessionId, session); emit(runId, session);
+  };
   return {
+    /** Native ingress only: fresh OS ancestry verification can admit a missed startup.
+     * This is an unknown baseline, never a synthetic SessionStart or task success.
+     */
+    admitVerifiedSession,
     accept({ runId, fact }: { runId: string; fact: CodexHookFact }): void {
       if (closed || fact.childId) return;
       let run = runs.get(runId);
       if (run?.retired) return;
       if (fact.kind === 'session-started') {
-        if (run?.sessions.has(fact.providerSessionId)) return;
-        if ((!run && runs.size >= 32) || (run && run.sessions.size >= 32)) return;
-        const session: Session = { id: randomUUID(), revision: 0, connected: true, ended: false,
-          saturated: false, interrupted: false, turns: new Set(), tools: new Set(), capabilities: {} };
-        if (!run) { run = { retired: false, sessions: new Map() }; runs.set(runId, run); }
-        run.sessions.set(fact.providerSessionId, session); emit(runId, session); return;
+        admitVerifiedSession(runId, fact.providerSessionId); return;
       }
       const session = run?.sessions.get(fact.providerSessionId);
       if (!session || session.ended) return;

@@ -17,6 +17,10 @@ async function compileClaudeRuntime(): Promise<void> {
   if (process.platform === 'darwin') await promisify(execFile)('/usr/bin/clang', ['-O2', '-Wall', '-Wextra', '-Werror',
     resolve('../../integrations/claude-hooks/native-process-probe.c'), '-o', resolve('out/claude-runtime/process-probe')],
     { timeout: 15000, maxBuffer: 16384 });
+  await build({ configFile: false, logLevel: 'warn', build: {
+    ssr: resolve('../../integrations/codex-hooks/native-hook-entry.ts'), outDir: resolve('out/codex-runtime'), emptyOutDir: false,
+    rollupOptions: { output: { format: 'cjs', entryFileNames: 'native-hook.cjs', inlineDynamicImports: true } },
+  } });
 }
 
 export default defineConfig(async (): Promise<ElectronViteConfig> => {

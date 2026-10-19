@@ -15,3 +15,8 @@ it.each([[],['--run-authorized-interactive-start'],['--run-authorized-interactiv
     [fileURLToPath(new URL('./interactive-start-check.mjs', import.meta.url)), ...args], {cwd:'/tmp',timeout:3000}))
     .rejects.toMatchObject({code:1,stdout:'',stderr:expect.stringContaining('terminal required')});
 });
+it('refuses normal-start review without a terminal before touching its exclusive directory', async () => {
+  await expect(run(process.execPath,
+    [fileURLToPath(new URL('./normal-start-review.mjs', import.meta.url)), '--run-authorized-normal-start'], { cwd: '/tmp', timeout: 3000 }))
+    .rejects.toMatchObject({ code: 1, stdout: '', stderr: expect.stringContaining('terminal required') });
+});

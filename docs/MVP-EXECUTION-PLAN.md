@@ -30,6 +30,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Codex CLI 输入边界（2026-10-19）
 
+**普通启动基础模块已实现，日常接入未启用：** 新hook每次读取本应用私有activation，无需连接环境变量；原生helper核对UID/精确程序/完整祖先链/出生时间，独立区分宿主与多会话；首次可信非启动事件可建立unknown基线。Main私有记录轮换有完整性、编辑保留与pending失败关闭，停止等待尚在启动的receiver；dev编译新hook资产。自有Node与实际macOS自建宿主fixture通过，全量1288 passed/1 skipped、typecheck/源码build通过；新增聚焦16项通过。独立审查两处生命周期缺陷已修，最终22项自有fixture复核通过。Configurations/IPC/Renderer和日常hook尚未注册；新命令的原生信任需按[新隔离预览](CODEX-NORMAL-START-MOCK-PREVIEW.md)授权，不能复用旧10条。见[实现/边界](CODEX-NORMAL-START-IMPLEMENTATION.md)。
+
 **首轮本机模拟已通过：** 固定本机Codex复用已审核隔离hooks，不改config/信任、不读凭据、OS仅回环；空线程150ms负对照后提交首轮，真实认证事件依次SessionStart/UserPromptSubmit/Stop/SessionEnd，任务完成，本地模拟Responses仅1次、stderr0。56项test-support/typecheck/源码build及独立3项复核通过。未打包/推送。普通启动与身份模块继续实施，日常接入/真实模型/正式UI未验收。[范围与结果](CODEX-FIRST-TURN-MOCK-PREVIEW.md)。
 
 **后续方案复核纠正验收前提：** 用户要求独立research后，同版本0.163.0官方源码/测试确认SessionStart在首轮任务路径执行，空thread/start或空CLI等待不能判定此hook损坏。现有环境变量注入也仅覆盖自建探针，不是普通启动接入。停止沿用空启动验收，先准备不调用真实模型的首轮mock/停轮验证，再补持久激活与宿主/存在性；共享daemon须先证明状态范围、权限和正文边界，仍未采用。完整证据、方案比较及实施建议集中在[连接方案复核](CODEX-CONNECTION-RESEARCH.md)；下方历史实测保留，不表示首轮/正式UI已验收。本阶段仅调研，没有真实Agent/凭据操作、模型请求、dev重启或打包。

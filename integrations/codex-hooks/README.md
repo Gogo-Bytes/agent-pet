@@ -2,6 +2,8 @@
 
 `normalize.ts` accepts bounded JSON and emits metadata facts. Transport, standalone hook command and shared-state projection are now implemented and tested with isolated self-owned processes. Main/Renderer registration and daily configuration installation are not yet enabled; the current dev does not connect to Codex.
 
+Latest: [native first-turn mock passed](../../docs/CODEX-FIRST-TURN-MOCK-PREVIEW.md); [normal-start private discovery/OS-bound bridge modules](../../docs/CODEX-NORMAL-START-IMPLEMENTATION.md) are implemented with isolated verification. A Main private-runtime controller exists, but Configurations/IPC/Renderer registration and daily hook installation remain disabled. Native review of the new file-based command is a separate pending step, not inherited from the previously trusted environment-based command.
+
 The 2026-10-19 [official hook contract](https://learn.chatgpt.com/docs/hooks) supplies native session/turn/tool identities. These are Main-private, not UI IDs. Input projection drops prompts, paths, tool arguments/results, message text and model names. Unknown events are ignored; malformed known events are rejected. No input is logged.
 
 Design decisions:

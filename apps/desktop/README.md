@@ -498,3 +498,7 @@ normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
 ### 重启后的连接恢复
 
 新连接记录以磁盘 UUID 核对跨重启身份；操作期间仍严格核对文件身份和内容。旧格式因设备编号变化失效时需要显式迁移，不能重新添加同一配置或删除未知文件来绕过检查。pi 显式恢复可在原临时目录缺失时排他重建，保留原地址和凭据；Claude 按原规则恢复接收。详见[恢复行为与验证](../../docs/CONNECTION-RESTART-RECOVERY.md)。继续使用 `pnpm --filter @agent-pet/desktop dev`，源码 build 不等于安装包。
+
+## Codex 新桥接模块（2026-10-19）
+
+dev/源码build会编译`out/codex-runtime/native-hook.cjs`。首轮本机模拟已通过；私有文件发现、精确宿主核验和Main记录恢复模块已有隔离验证。它们尚未注册到正式连接页/首页，不代表日常Codex已接通，也不支持凭空把空CLI标为在线。[实现与验收边界](../../docs/CODEX-NORMAL-START-IMPLEMENTATION.md)、[新命令原生审核预览](../../docs/CODEX-NORMAL-START-MOCK-PREVIEW.md)。继续dev，不打包；现有pi/Claude配置不变。

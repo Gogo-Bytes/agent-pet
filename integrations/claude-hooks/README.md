@@ -1,9 +1,15 @@
-# Claude Code passive observation — isolated building blocks
+# Claude Code passive observation
 
-**Normalization, local delivery, a standalone hook command and explicit invocation binding are implemented for isolated verification. Not a connected
-Adapter, installed hook, Main registration, or native compatibility acceptance.** Nothing
-in this directory is registered in the running desktop or daily Claude configuration. Generated plugin documents
-are not an installation or an authorization to load them.
+**Current production path: normal-start hooks → OS-bound `native-presence.ts` →
+Main-private `observations.ts` → Configurations/Application → shared pet presentation.**
+Normal startup/Home presence has real-user acceptance. Task feedback and explicit
+schema1→2 owned-hook upgrade pass the latest isolated suite (1121 passed, 1 skipped),
+including the real own-process schema2 chain; independent code review found no
+new concrete defects. A prior cold
+helper startup exceeded its three-second readiness budget and remains a known
+availability risk. Daily task hooks have not been upgraded or accepted. Legacy launcher/plugin helpers below are retained
+compatibility/test building blocks, not the current onboarding flow. See
+[task semantics, limits and validation](../../docs/CLAUDE-TASK-OBSERVATION.md).
 
 `normalizeClaudeHook()` accepts one JSON payload capped at 64 KiB (UTF-8 bytes),
 then returns a new object containing only bounded IDs, fixed categories and booleans. Explicit native

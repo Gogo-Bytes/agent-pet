@@ -24,7 +24,7 @@ function id(value: unknown): value is string {
     value.trim() === value && !/[\u0000-\u001f\u007f-\u009f]/u.test(value);
 }
 function nullableBoolean(value: unknown): boolean { return value === null || typeof value === 'boolean'; }
-function validFact(value: unknown): value is ClaudeHookFact {
+export function validClaudeHookFact(value: unknown): value is ClaudeHookFact {
   if (!object(value) || typeof value.kind !== 'string' || !Object.hasOwn(fields, value.kind)) return false;
   const kind = value.kind as ClaudeHookFact['kind'];
   const allowed = new Set(['kind', 'providerSessionId', 'promptId', 'childId', ...fields[kind]]);
@@ -45,7 +45,7 @@ export function parseClaudeDelivery(input: string): ClaudeHookDelivery | undefin
   try { value = JSON.parse(input); } catch { return; }
   if (!object(value) || Object.keys(value).some(key => !['schemaVersion', 'runId', 'eventId', 'fact'].includes(key)) ||
       value.schemaVersion !== 1 || typeof value.runId !== 'string' || !uuid.test(value.runId) ||
-      typeof value.eventId !== 'string' || !uuid.test(value.eventId) || !validFact(value.fact)) return;
+      typeof value.eventId !== 'string' || !uuid.test(value.eventId) || !validClaudeHookFact(value.fact)) return;
   return value as ClaudeHookDelivery;
 }
 

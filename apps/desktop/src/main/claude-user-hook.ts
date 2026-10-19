@@ -3,13 +3,21 @@ import { basename, isAbsolute, join, normalize } from 'node:path';
 import { TextDecoder } from 'node:util';
 
 const MAX_BYTES = 64 * 1024, MATCHER = 'startup|resume|clear|compact';
+export const CLAUDE_USER_HOOK_EVENTS = Object.freeze(['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
+  'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact'] as const);
+export type ClaudeUserHookEvent = typeof CLAUDE_USER_HOOK_EVENTS[number];
 type Identity = { dev: number; ino: number; birthtimeMs: number; uid: number; gid: number; mode: number };
 type HookEntry = { matcher: typeof MATCHER; hooks: [{ type: 'command'; command: string; timeout: 2 }] };
-export type HookOwnership = {
-  schemaVersion: 1; directory: string; path: string; command: string; entry: HookEntry;
+type HookOwnershipBase = {
+  directory: string; path: string; command: string; entry: HookEntry;
   createdFields: { hooks: boolean; sessionStart: boolean };
   directories: [string, Identity][];
 };
+export type HookOwnership = HookOwnershipBase & ({ schemaVersion: 1 } | {
+  schemaVersion: 2; events: ClaudeUserHookEvent[];
+  /** Event array fields absent before registration; only these may be removed when empty. */
+  createdEvents: ClaudeUserHookEvent[];
+});
 /** Main only: original may contain credentials. Never serialize this plan to IPC or logs. */
 export type HookPlan = Readonly<{
   path: string; exists: boolean; canApply: boolean; notice: string;
@@ -133,9 +141,16 @@ function scan(text: string): Node {
 const member = (node: Node, key: string) => node.members.find(item => item.key === key);
 const property = (node: Node, key: string) => member(node, key)?.value;
 function entry(command: string): HookEntry { return { matcher: MATCHER, hooks: [{ type: 'command', command, timeout: 2 }] }; }
-function exactEntry(node: Node, command: string): boolean {
+function eventEntry(command: string, event: ClaudeUserHookEvent): { matcher?: string; hooks: HookEntry['hooks'] } {
+  const matcher = event === 'SessionStart' ? MATCHER : event === 'Notification' ? 'permission_prompt' :
+    ['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest'].includes(event) ? '.*' : undefined;
+  return { ...(matcher === undefined ? {} : { matcher }), hooks: [{ type: 'command', command, timeout: 2 }] };
+}
+function exactEntry(node: Node, command: string, event: ClaudeUserHookEvent = 'SessionStart'): boolean {
   const hooks = property(node, 'hooks'), child = hooks?.items[0];
-  return node.kind === 'object' && node.members.length === 2 && property(node, 'matcher')?.value === MATCHER &&
+  const matcher = eventEntry(command, event).matcher;
+  return node.kind === 'object' && node.members.length === (matcher === undefined ? 1 : 2) &&
+    (matcher === undefined ? !member(node, 'matcher') : property(node, 'matcher')?.value === matcher) &&
     hooks?.kind === 'array' && hooks.items.length === 1 && child?.kind === 'object' && child.members.length === 3 &&
     property(child, 'type')?.value === 'command' && property(child, 'command')?.value === command && property(child, 'timeout')?.value === 2;
 }
@@ -175,6 +190,29 @@ function referenceCount(hooks: Node | undefined, command: string): number {
     for (const hook of property(group, 'hooks')!.items) if (references(hook)) count++;
   }
   return count;
+}
+const ownedEvents = (ownership: HookOwnership): readonly ClaudeUserHookEvent[] =>
+  ownership.schemaVersion === 1 ? ['SessionStart'] : ownership.events;
+function matchesOwned(hooks: Node | undefined, ownership: HookOwnership): boolean {
+  const events = ownedEvents(ownership);
+  return hooks !== undefined && referenceCount(hooks, ownership.command) === events.length && events.every(event =>
+    property(hooks, event)?.items.filter(item => exactEntry(item, ownership.command, event)).length === 1);
+}
+function completeEvents(events: unknown): events is readonly ClaudeUserHookEvent[] {
+  return Array.isArray(events) && events.length === CLAUDE_USER_HOOK_EVENTS.length &&
+    CLAUDE_USER_HOOK_EVENTS.every(event => events.filter(item => item === event).length === 1);
+}
+function appendEvents(text: string, events: readonly ClaudeUserHookEvent[], command: string): { text: string; createdEvents: ClaudeUserHookEvent[] } {
+  const createdEvents: ClaudeUserHookEvent[] = [];
+  for (const event of events) {
+    const root = scan(text), hooks = structure(root).hooks, groups = hooks && property(hooks, event);
+    const raw = JSON.stringify(eventEntry(command, event));
+    if (!groups) createdEvents.push(event);
+    text = !hooks ? append(text, root, `"hooks":{${JSON.stringify(event)}:[${raw}]}`) :
+      !groups ? append(text, hooks, `${JSON.stringify(event)}:[${raw}]`) : append(text, groups, raw);
+  }
+  if (Buffer.byteLength(text) > MAX_BYTES) throw new Error();
+  return { text, createdEvents };
 }
 function append(text: string, container: Node, raw: string): string {
   const children = container.kind === 'object' ? container.members : container.items;
@@ -224,11 +262,22 @@ function write(context: Context, source: Source, text: string): boolean {
 
 export function isClaudeUserHookOwnership(value: unknown): value is HookOwnership {
   try {
-    if (!exact(value, ['schemaVersion', 'directory', 'path', 'command', 'entry', 'createdFields', 'directories']) || value.schemaVersion !== 1 ||
+    if (!value || typeof value !== 'object') return false;
+    const version = 'schemaVersion' in value ? value.schemaVersion : undefined;
+    const names = ['schemaVersion', 'directory', 'path', 'command', 'entry', 'createdFields', 'directories'];
+    if ((version !== 1 && version !== 2) || !exact(value, version === 1 ? names : [...names, 'events', 'createdEvents']) ||
         !validDirectory(value.directory) || value.path !== join(value.directory, 'settings.json') || !commandValid(value.command) ||
         !exact(value.createdFields, ['hooks', 'sessionStart']) || typeof value.createdFields.hooks !== 'boolean' ||
         typeof value.createdFields.sessionStart !== 'boolean' || (value.createdFields.hooks && !value.createdFields.sessionStart) ||
         !Array.isArray(value.directories)) return false;
+    if (version === 2) {
+      const events = value.events, created = value.createdEvents;
+      if (!completeEvents(events) || !events.every((event, index) => event === CLAUDE_USER_HOOK_EVENTS[index]) ||
+          !Array.isArray(created) || created.some(event => !events.includes(event)) ||
+          created.length !== new Set(created).size ||
+          created.some((event, index) => index > 0 && CLAUDE_USER_HOOK_EVENTS.indexOf(event) <= CLAUDE_USER_HOOK_EVENTS.indexOf(created[index - 1])) ||
+          created.includes('SessionStart') !== value.createdFields.sessionStart) return false;
+    }
     const paths = directoryPaths(value.directory);
     if (paths.length !== value.directories.length || value.directories.some((item: unknown, index: number) => !Array.isArray(item) ||
         item.length !== 2 || item[0] !== paths[index] || !exact(item[1], ['dev', 'ino', 'birthtimeMs', 'uid', 'gid', 'mode']) ||
@@ -247,27 +296,52 @@ function contextFromOwnership(ownership: HookOwnership): Context {
 
 /** Read-only preparation against a precisely authorized directory. The caller supplies a
  * fixed command containing only application paths, never a capability or Agent prompt.
+ * Omitted events retains schema1 SessionStart-only behavior. Task observation requires
+ * the explicit complete whitelist; partial or duplicate event sets fail closed.
  */
-export function prepareClaudeUserHook(options: { directory: string; command: string }): HookPlan {
+export function prepareClaudeUserHook(options: { directory: string; command: string; events?: readonly ClaudeUserHookEvent[] }): HookPlan {
   let path = '', exists = false;
   try {
-    if (!validDirectory(options.directory) || !commandValid(options.command)) throw new Error();
+    if (!validDirectory(options.directory) || !commandValid(options.command) ||
+        (options.events !== undefined && !completeEvents(options.events))) throw new Error();
     path = join(options.directory, 'settings.json');
     const context: Context = { directory: options.directory, path, pending: join(options.directory, 'settings.agent-pet.pending.json'),
       directories: directoryPaths(options.directory).map(directory => [directory, identity(safeDirectory(directory))]) };
     exists = !absent(path); const source = readSource(context), text = source.text ?? '{}', root = scan(text), shape = structure(root);
     if (shape.disabled || referenceCount(shape.hooks, options.command) !== 0) throw new Error();
-    const own = entry(options.command), raw = JSON.stringify(own);
-    const patched = !shape.hooks ? append(text, root, `"hooks":{"SessionStart":[${raw}]}`) :
-      !shape.session ? append(text, shape.hooks, `"SessionStart":[${raw}]`) : append(text, shape.session, raw);
-    if (Buffer.byteLength(patched) > MAX_BYTES) throw new Error();
-    const ownership: HookOwnership = { schemaVersion: 1, directory: options.directory, path, command: options.command, entry: own,
+    const patched = appendEvents(text, options.events === undefined ? ['SessionStart'] : CLAUDE_USER_HOOK_EVENTS, options.command);
+    const base: HookOwnershipBase = { directory: options.directory, path, command: options.command, entry: entry(options.command),
       createdFields: { hooks: !shape.hooks, sessionStart: !shape.session }, directories: structuredClone(context.directories) };
-    const plan = makePlan({ path, exists, canApply: true, notice: '仅追加一个 SessionStart hook，保留原设置与 hooks。' },
+    const ownership: HookOwnership = options.events === undefined ? { ...base, schemaVersion: 1 } :
+      { ...base, schemaVersion: 2, events: [...CLAUDE_USER_HOOK_EVENTS], createdEvents: patched.createdEvents };
+    const plan = makePlan({ path, exists, canApply: true, notice: options.events === undefined ?
+      '仅追加一个 SessionStart hook，保留原设置与 hooks。' : '仅追加所列观察 hooks，保留原设置与 hooks。' },
       source.text, structuredClone(ownership));
-    plans.set(plan, { context, source, text: patched, ownership }); return plan;
+    plans.set(plan, { context, source, text: patched.text, ownership }); return plan;
   } catch {
     return makePlan({ path, exists, canApply: false, notice: '设置不可安全追加；已保留原文件，请检查禁用、格式、权限或未完成写入。' }, null, null);
+  }
+}
+/** Explicit preview only: a legacy registration must still be exact and enabled.
+ * The original SessionStart group and every unrelated JSON token remain untouched.
+ */
+export function prepareClaudeUserHookUpgrade(ownership: HookOwnership): HookPlan {
+  let path = '', exists = false;
+  try {
+    const context = contextFromOwnership(ownership); path = context.path;
+    if (ownership.schemaVersion !== 1) throw new Error();
+    const source = readSource(context); exists = source.text !== null;
+    if (source.text === null) throw new Error();
+    const shape = structure(scan(source.text));
+    if (shape.disabled || !matchesOwned(shape.hooks, ownership)) throw new Error();
+    const patched = appendEvents(source.text, CLAUDE_USER_HOOK_EVENTS.slice(1), ownership.command);
+    const upgraded: HookOwnership = { ...structuredClone(ownership), schemaVersion: 2, events: [...CLAUDE_USER_HOOK_EVENTS],
+      createdEvents: [...(ownership.createdFields.sessionStart ? ['SessionStart' as const] : []), ...patched.createdEvents] };
+    const plan = makePlan({ path, exists, canApply: true, notice: '保留原 SessionStart，仅追加任务观察 hooks；确认后才生效。' },
+      source.text, structuredClone(upgraded));
+    plans.set(plan, { context, source, text: patched.text, ownership: upgraded }); return plan;
+  } catch {
+    return makePlan({ path, exists, canApply: false, notice: '原观察 hook 不可安全升级；已保留设置，请检查修改、禁用或未完成写入。' }, null, null);
   }
 }
 export function applyClaudeUserHook(plan: HookPlan): HookOwnership | null {
@@ -279,25 +353,31 @@ export function inspectClaudeUserHook(ownership: HookOwnership): boolean {
   try {
     const source = readSource(contextFromOwnership(ownership)); if (source.text === null) return false;
     const shape = structure(scan(source.text));
-    return !shape.disabled && referenceCount(shape.hooks, ownership.command) === 1 &&
-      shape.session?.items.filter(item => exactEntry(item, ownership.command)).length === 1;
+    return !shape.disabled && matchesOwned(shape.hooks, ownership);
   } catch { return false; }
 }
-/** Remove only the unambiguous, unchanged owned entry. User edits elsewhere and a global
+/** Remove only the unambiguous, unchanged owned registration. User edits elsewhere and a global
  * disabled flag are retained. Empty newly-created fields are removed; files are retained.
  */
 export function withdrawClaudeUserHook(ownership: HookOwnership): boolean {
   try {
     const context = contextFromOwnership(ownership), source = readSource(context);
     if (source.text === null) return true;
-    const text = source.text, root = scan(text), shape = structure(root), count = referenceCount(shape.hooks, ownership.command);
-    const matches = shape.session?.items.map((item, index) => exactEntry(item, ownership.command) ? index : -1).filter(index => index >= 0) ?? [];
-    if (matches.length === 0 && count === 0) return true;
-    if (matches.length !== 1 || count !== 1 || !shape.hooks || !shape.session) return false;
-    const patched = ownership.createdFields.hooks && shape.hooks.members.length === 1 && shape.session.items.length === 1 ?
-      remove(text, root, root.members.indexOf(member(root, 'hooks')!)) :
-      ownership.createdFields.sessionStart && shape.session.items.length === 1 ?
-        remove(text, shape.hooks, shape.hooks.members.indexOf(member(shape.hooks, 'SessionStart')!)) : remove(text, shape.session, matches[0]!);
+    const shape = structure(scan(source.text));
+    if (referenceCount(shape.hooks, ownership.command) === 0) return true;
+    if (!matchesOwned(shape.hooks, ownership)) return false;
+    let patched = source.text;
+    const created = ownership.schemaVersion === 1 ? (ownership.createdFields.sessionStart ? ['SessionStart'] : []) : ownership.createdEvents;
+    // Validate the whole registration before any edit; a missing/modified group
+    // must retain all remaining references and their private runtime ownership.
+    for (const event of [...ownedEvents(ownership)].reverse()) {
+      const hooks = structure(scan(patched)).hooks!, groups = property(hooks, event)!;
+      const index = groups.items.findIndex(item => exactEntry(item, ownership.command, event));
+      patched = created.includes(event) && groups.items.length === 1 ?
+        remove(patched, hooks, hooks.members.indexOf(member(hooks, event)!)) : remove(patched, groups, index);
+    }
+    const root = scan(patched), hooks = structure(root).hooks!;
+    if (ownership.createdFields.hooks && hooks.members.length === 0) patched = remove(patched, root, root.members.indexOf(member(root, 'hooks')!));
     return write(context, source, patched);
   } catch { return false; }
 }

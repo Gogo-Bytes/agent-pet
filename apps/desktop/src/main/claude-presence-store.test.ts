@@ -208,3 +208,54 @@ it('rejects a wrong configuration directory name without creating its parent', (
   const store = new ClaudePresenceStore(wrong, configurationId);
   expect(store.error).toBe(true); expect(fs.existsSync(dirname(wrong))).toBe(false);
 });
+
+function normalStore() {
+  directory = join(root, `claude-normal-${configurationId}`);
+  const input = { executable: '/fixture/bin/claude', files: { 'observer.cjs': '// original observer', 'activation.json': '{"token":"old-private"}',
+    'hook.json': '{"schemaVersion":1}', 'settings-before.json': 'original private settings with 9007199254740993123456' } };
+  const store = new ClaudePresenceStore(directory, configurationId, 'normal'); expect(store.initialize(input)).toBe(true);
+  return { store, input };
+}
+const replacement = () => ({ 'observer.cjs': '// replacement observer', 'activation.json': '{"token":"new-private"}', 'hook.json': '{"schemaVersion":2}' });
+
+it('explicitly replaces normal observer and ownership with a receipted recovery backup while preserving settings-before', () => {
+  const { store, input } = normalStore(), receipt = fs.readFileSync(file('receipt.json'), 'utf8');
+  expect(store.replaceNormalMaterials(replacement())).toBe(true); expect(store.verify()).toBe(true);
+  const backup = JSON.parse(fs.readFileSync(file('upgrade-before.json'), 'utf8'));
+  expect(backup).toEqual({ schemaVersion: 1, receipt, materials: { 'observer.cjs': input.files['observer.cjs'],
+    'activation.json': input.files['activation.json'], 'hook.json': input.files['hook.json'] } });
+  expect(fs.lstatSync(file('upgrade-before.json')).mode & 0o7777).toBe(0o600);
+  expect(fs.readFileSync(file('settings-before.json'), 'utf8')).toBe(input.files['settings-before.json']);
+  const restored = new ClaudePresenceStore(directory, configurationId, 'normal'); expect(restored.verify()).toBe(true);
+  expect(restored.readMaterial('hook.json')).toBe(replacement()['hook.json']);
+  expect(restored.replaceActivation('{"token":"rotated"}', false)).toBe(true); expect(restored.setDisabled(true)).toBe(true);
+  expect(JSON.stringify(restored.read())).not.toMatch(/token|private|original/);
+});
+
+it.each(['observer', 'receipt'])('preserves recovery materials and prospective ownership on partial %s replacement failure', failedFile => {
+  const { store, input } = normalStore(), beforeReceipt = fs.readFileSync(file('receipt.json')), rename = fs.renameSync;
+  vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+    if (to === file(failedFile === 'observer' ? 'observer.cjs' : 'receipt.json')) throw new Error('fixture'); rename(from, to);
+  });
+  expect(store.replaceNormalMaterials(replacement())).toBe(false); expect(store.error).toBe(true);
+  expect(fs.readFileSync(file('receipt.json'))).toEqual(beforeReceipt); expect(fs.existsSync(file('upgrade-before.json'))).toBe(true);
+  expect(fs.readFileSync(file('hook.json'), 'utf8')).toBe(replacement()['hook.json']);
+  expect(fs.readFileSync(file('settings-before.json'), 'utf8')).toBe(input.files['settings-before.json']);
+  const restored = new ClaudePresenceStore(directory, configurationId, 'normal'); expect(restored.error).toBe(true);
+  expect(restored.replaceActivation('{}', false)).toBe(false);
+});
+
+it.each(['edited', 'unknown', 'pending', 'missing-input', 'extra-input', 'oversized'])('does not mutate normal materials when upgrade is unsafe: %s', kind => {
+  const { store } = normalStore(), materials: Record<string, string> = replacement(), receipt = fs.readFileSync(file('receipt.json'));
+  if (kind === 'edited') fs.writeFileSync(file('observer.cjs'), '// user edit');
+  if (kind === 'unknown') fs.writeFileSync(file('upgrade-before.json'), 'unknown backup', { mode: 0o600 });
+  if (kind === 'pending') fs.writeFileSync(file('observer.cjs.pending'), 'unknown pending', { mode: 0o600 });
+  if (kind === 'missing-input') delete materials['hook.json'];
+  if (kind === 'extra-input') materials['settings-before.json'] = 'forbidden replacement';
+  if (kind === 'oversized') materials['observer.cjs'] = 'x'.repeat(512 * 1024 + 1);
+  const before = fs.readFileSync(file('observer.cjs'));
+  expect(store.replaceNormalMaterials(materials)).toBe(false);
+  expect(fs.readFileSync(file('observer.cjs'))).toEqual(before); expect(fs.readFileSync(file('receipt.json'))).toEqual(receipt);
+  if (kind === 'unknown') expect(fs.readFileSync(file('upgrade-before.json'), 'utf8')).toBe('unknown backup');
+  else expect(fs.existsSync(file('upgrade-before.json'))).toBe(false);
+});

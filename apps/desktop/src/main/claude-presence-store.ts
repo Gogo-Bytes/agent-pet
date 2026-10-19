@@ -64,8 +64,10 @@ export class ClaudePresenceStore {
   private readonly ancestors = new Map<string, fs.Stats>();
   private readonly directories = new Map<string, fs.Stats>();
   private readonly files = new Map<string, OwnedFile>();
+  private normalUpgradeBackup = false;
   get error(): boolean { return this.failed; }
-  private get paths(): readonly string[] { return this.layout === 'normal' ? ['observer.cjs', 'activation.json', 'hook.json', 'settings-before.json'] : LEGACY_PATHS; }
+  private get paths(): readonly string[] { return this.layout === 'normal' ? ['observer.cjs', 'activation.json', 'hook.json', 'settings-before.json',
+    ...(this.normalUpgradeBackup ? ['upgrade-before.json'] : [])] : LEGACY_PATHS; }
   private get directoryPaths(): readonly string[] { return this.layout === 'normal' ? [''] : LEGACY_DIRECTORIES; }
   constructor(private readonly directory: string, private readonly configurationId: string, private readonly layout: 'legacy' | 'normal' = 'legacy') {
     try {
@@ -78,6 +80,7 @@ export class ClaudePresenceStore {
         current = join(current, part); this.ancestors.set(current, this.ancestorStat(current));
       }
       if (absent(directory)) return;
+      if (layout === 'normal') this.normalUpgradeBackup = !absent(join(directory, 'upgrade-before.json'));
       for (const relative of this.directoryPaths) this.directories.set(relative, privateStat(join(directory, relative), 'directory'));
       // Fixed tree validation precedes reading any material, including activation secrets.
       this.checkTree(new Set([...this.paths, 'receipt.json']));
@@ -223,6 +226,33 @@ export class ClaudePresenceStore {
       const receipt = this.receiptText(next);
       this.ensureSize({ 'activation.json': text, 'receipt.json': receipt });
       this.replace('activation.json', text); this.replace('receipt.json', receipt); this.value = next; return true;
+    } catch { this.failed = true; this.value = null; return false; }
+  }
+  /** Explicit one-time registration upgrade only. Keep original settings evidence
+   * untouched and save old private materials before replacing any of them. A
+   * partial publication fails closed with recovery evidence retained on disk.
+   */
+  replaceNormalMaterials(materials: Record<string, string>, disabled = false): boolean {
+    if (this.failed) return false;
+    try {
+      const replacements = ['hook.json', 'observer.cjs', 'activation.json'];
+      if (this.layout !== 'normal' || this.normalUpgradeBackup || !this.value || !this.verify() ||
+          !keys(materials, replacements) || !Object.values(materials).every(text => typeof text === 'string') ||
+          typeof disabled !== 'boolean') throw new Error();
+      const before = Object.fromEntries(replacements.map(path => [path, this.readMaterial(path)]));
+      if (Object.values(before).some(text => text === null)) throw new Error();
+      const originalReceipt = readPrivate(join(this.directory, 'receipt.json')).bytes.toString('utf8');
+      const backup = JSON.stringify({ schemaVersion: 1, materials: before, receipt: originalReceipt }) + '\n';
+      this.normalUpgradeBackup = true;
+      const next: Receipt = { ...this.value, disabled, files: { ...this.value.files,
+        ...Object.fromEntries(replacements.map(path => [path, hash(materials[path]!)])), 'upgrade-before.json': hash(backup) } };
+      const receipt = this.receiptText(next);
+      this.ensureSize({ ...materials, 'upgrade-before.json': backup, 'receipt.json': receipt });
+      this.files.set('upgrade-before.json', this.writeExclusive('upgrade-before.json', backup));
+      this.syncRoot();
+      // Prospective registration ownership precedes the shared-settings apply.
+      for (const path of replacements) this.replace(path, materials[path]!);
+      this.replace('receipt.json', receipt); this.value = next; return true;
     } catch { this.failed = true; this.value = null; return false; }
   }
   setDisabled(disabled: boolean): boolean {

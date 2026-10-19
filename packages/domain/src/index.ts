@@ -8,6 +8,7 @@ export type SessionStatus =
   | 'error'
   | 'idle'
   | 'waiting_input'
+  | 'unknown'
   | 'offline';
 
 export type DisplayStatus = 'working' | 'completed-unread' | 'error-unread';
@@ -66,7 +67,8 @@ export function applyObservation(
   // A reconnect baseline cannot invent history or erase an unread result already
   // held by this Application. A fresh process with no result stays idle.
   const previous = state.sessions[observation.sessionId];
-  if (observation.baseline && observation.status === 'idle' && previous &&
+  if (((observation.baseline && observation.status === 'idle') ||
+      (observation.status === 'unknown' && observation.workId === previous?.workId)) && previous &&
     state.bubbles.some(bubble => bubble.sessionId === observation.sessionId && bubble.unread)) {
     observation = { ...observation, status: previous.status, ...(previous.workId ? { workId: previous.workId } : {}) };
   }

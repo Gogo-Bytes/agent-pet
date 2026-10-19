@@ -56,14 +56,32 @@ async function child(activation: string, text = payload(), open = false) {
 const silent = { code: 0, signal: null, stdout: '', stderr: '' };
 
 describe('ordinary CLI passive native hook (own input/receiver only)', () => {
-  it('only sends a root SessionStart fact and its live hook PID, without identities, text, environment or paths', async () => {
+  it('sends only normalized root metadata and its live hook PID into the Main-private channel', async () => {
     const own = await fixture(), result = await child(own.activation);
     expect(result.result).toEqual(silent);
     expect(own.requests).toEqual([{ authorization: `Bearer ${'d'.repeat(64)}`, body: {
-      schemaVersion: 1, hookPid: result.pid, fact: { kind: 'session-started', source: 'startup' },
+      schemaVersion: 2, hookPid: result.pid, eventId: expect.stringMatching(/^[a-f0-9-]{36}$/),
+      fact: { providerSessionId: 'PRIVATE SESSION', kind: 'session-started', source: 'startup' },
     } }]);
-    expect(JSON.stringify(own.requests[0]!.body)).not.toContain('PRIVATE');
+    expect(JSON.stringify(own.requests[0]!.body)).not.toMatch(/PRIVATE PROMPT|transcript|never-open/);
     const bundle = await readFile(entry, 'utf8'); expect(bundle).not.toMatch(/child_process|spawn\(|execFile|process\.env/);
+  });
+  it('sends normalized root task facts with fresh event IDs and drops all raw content', async () => {
+    const own = await fixture();
+    const inputs = [
+      { hook_event_name: 'UserPromptSubmit', prompt_id: 'prompt-id' },
+      { hook_event_name: 'PreToolUse', tool_use_id: 'tool-id', tool_name: 'Read', tool_input: { path: 'PRIVATE PATH' } },
+      { hook_event_name: 'Stop', stop_hook_active: false, background_tasks: [], session_crons: [] },
+      { hook_event_name: 'SessionEnd' },
+    ];
+    for (const fields of inputs) expect((await child(own.activation, payload(fields))).result).toEqual(silent);
+    const bodies = own.requests.map(request => request.body as { schemaVersion: number; eventId: string; fact: { kind: string } });
+    expect(bodies.map(body => body.schemaVersion)).toEqual([2, 2, 2, 2]);
+    expect(bodies.map(body => body.fact.kind)).toEqual(['turn-submitted', 'tool-requested', 'response-stopped', 'session-ended']);
+    expect(new Set(bodies.map(body => body.eventId)).size).toBe(4);
+    expect(JSON.stringify(bodies)).not.toMatch(/PRIVATE PROMPT|PRIVATE PATH|transcript_path|tool_input|hook_event_name/);
+    expect((await child(own.activation, payload({ hook_event_name: 'UserPromptSubmit', agent_id: 'child' }))).result).toEqual(silent);
+    expect(own.requests).toHaveLength(4);
   });
 
   it('ignores nonroot/unknown events, malformed and oversized input before any activation or network access', async () => {

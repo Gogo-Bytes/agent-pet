@@ -37,6 +37,38 @@ async function mount(record = claude()) {
   return { ...test, ...view, user, update };
 }
 describe('Claude formal connection controls', () => {
+  it('previews an explicit legacy task upgrade, lists changed files/events and leaves cancellation reversible', async () => {
+    const test = await mount(claude({ mode: 'normal-start', configured: true, status: 'observing', observedRuns: 1,
+      canConfigure: false, canUpgrade: true }));
+    const taskPreview = { ...preview, operation: 'upgrade' as const, events: ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'Stop'],
+      files: ['/synthetic/private/claude-one/observer.cjs', '/synthetic/private/claude-one/hook.json', '/synthetic/private/claude-one/upgrade-before.json'],
+      settings: { path: '/isolated/settings.json', exists: true, canApply: true, reason: '' } };
+    test.bridge.configurations.preview.mockImplementationOnce(async () => test.update({ preview: taskPreview }));
+    await test.user.click(screen.getByRole('button', { name: '启用任务反馈' }));
+    expect(test.bridge.configurations.preview).toHaveBeenCalledExactlyOnceWith('claude-one');
+    const dialog = screen.getByRole('dialog', { name: '确认 Claude Code 任务反馈设置' });
+    expect(dialog.textContent).toContain('保留你的原有配置'); expect(dialog.textContent).toContain('SessionEnd、UserPromptSubmit、PreToolUse、Stop');
+    expect(dialog.textContent).toContain('启用后请新开 Claude 会话'); expect(dialog.textContent).toContain('最初的原配置备份保持不变');
+    expect(dialog.textContent).toContain('/synthetic/private/claude-one/upgrade-before.json');
+    expect(dialog.textContent).toContain('短暂反馈'); expect(dialog.textContent).toContain('任务完成、取消和等待操作暂不判断');
+    await test.user.click(within(dialog).getByRole('button', { name: '取消' }));
+    expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '启用任务反馈' })).toBeTruthy();
+    expect(screen.getByText('Claude Code 已连接，宠物可以陪伴你。')).toBeTruthy();
+  });
+  it('confirms task upgrade through the existing consent API and requests a new Claude session', async () => {
+    const test = await mount(claude({ mode: 'normal-start', configured: true, status: 'waiting', canConfigure: false, canUpgrade: true }));
+    const taskPreview = { ...preview, operation: 'upgrade' as const, events: ['SessionStart', 'Stop'],
+      settings: { path: '/isolated/settings.json', exists: true, canApply: true, reason: '' } };
+    test.bridge.configurations.preview.mockImplementationOnce(async () => test.update({ preview: taskPreview }));
+    test.bridge.configurations.confirm.mockImplementationOnce(async () => test.update({ preview: null, canUpgrade: false, scope: 'task-events' }));
+    await test.user.click(screen.getByRole('button', { name: '启用任务反馈' }));
+    await test.user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '确认并启用任务反馈' }));
+    expect(test.bridge.configurations.confirm).toHaveBeenCalledExactlyOnceWith('claude-one', 'claude-plan');
+    expect(screen.getByText('设置已完成，请新开 Claude 会话。之后照常在终端运行 claude 即可。')).toBeTruthy();
+    expect(screen.getByText('支持读取、修改、查找、运行命令后的短暂反馈，以及出错提醒。任务完成、取消和等待操作暂不判断。')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '启用任务反馈' })).toBeNull();
+  });
   it('configures normal startup once with exact settings consent and never shows a special command', async () => {
     const test = await mount(claude({ mode: 'normal-start' }));
     const normalPreview = { ...preview, settings: { path: '/isolated/project-one/settings.json', exists: true, canApply: true, reason: '' } };

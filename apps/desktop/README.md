@@ -1,5 +1,7 @@
 # Desktop development
 
+Claude 任务反馈（2026-10-19）：近期工具动作、回答出错和旧连接显式升级已实现，恢复旧连接不会自动改 hooks。本轮全量1121通过/1跳过、类型检查和源码构建通过，待真实任务验收；此前冷启动超时仍作为已知风险保留。继续 dev、不打包。见 [实现与验证](../../docs/CLAUDE-TASK-OBSERVATION.md)。
+
 Claude 自动扫描（2026-10-17）：省去默认配置和隐藏程序路径选择；多安装可选、已有配置直接查看。当前可接入仍仅 npm 2.1.301，官方安装/Homebrew 显示待验证；未改 shell/PATH，未要求重装。源码/隔离验证及已授权的本机发现、已有配置查看通过：Claude 一处、pi 两处，原记录保留。Claude 扫描仍有受限提示，终端 PATH/其他安装方式真实加载和发布未因此通过。见 [设计与验证](../../docs/CLAUDE-DISCOVERY-DESIGN.md)。
 
 当前范围、进度与下一步见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。此页开发命令不是安装许可；完整真实端到端仍待验收，managed 入口仍关闭。

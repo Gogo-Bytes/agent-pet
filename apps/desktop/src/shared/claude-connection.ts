@@ -5,10 +5,12 @@ export interface ClaudeConnectionPreview {
   directory: string;
   files: readonly string[];
   settings?: { path: string; exists: boolean; canApply: boolean; reason: string };
+  operation?: 'configure' | 'upgrade';
+  events?: readonly string[];
 }
 export interface ClaudeConnectionState {
   revision: number;
-  scope: 'presence-only';
+  scope: 'presence-only' | 'task-events';
   mode?: 'normal-start' | 'legacy-launcher';
   status: 'not-configured' | 'waiting' | 'observing' | 'disconnected' | 'disabled' | 'failed';
   busy: boolean;
@@ -19,6 +21,7 @@ export interface ClaudeConnectionState {
   launchCommand: string | null;
   canConfigure: boolean;
   canResume: boolean;
+  canUpgrade?: boolean;
   notice: 'none' | 'choose-executable' | 'unsupported-installation' | 'preview-failed' | 'stale-preview' |
     'save-failed' | 'start-failed' | 'resume-required' | 'retained' | 'disabled' | 'disconnected' | 'saved-invalid';
 }

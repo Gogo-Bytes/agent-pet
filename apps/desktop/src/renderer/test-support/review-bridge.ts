@@ -14,7 +14,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   const configListeners = new Set<(value: ConfigurationsState) => void>();
   const sessionListeners = new Set<(value: SessionState) => void>();
   const paths = scenario === 'detail-long-path' ? [`/test/AgentPet/${'a-very-long-project-directory/'.repeat(12)}pi-config`] : ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
-  if (scenario !== 'empty' && scenario !== 'scan-new' && !scenario.startsWith('claude-scan')) paths.forEach((path, index) => {
+  if (scenario !== 'empty' && scenario !== 'scan-new' && !scenario.startsWith('claude-')) paths.forEach((path, index) => {
     const id = `review-${index}`;
     const record: ConfigurationMetadata = { id, name: ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? 'pi 默认配置' : index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };
     configs.records.push({ ...record, availability: 'available', inspection: { target: { path, source: 'chosen' }, findings: [] }, connection: { ...base, status: 'connected', receiving: 'active', saved: 'ready', canConfigure: false, canRemove: true, deployedPath: `${path}/extensions/agent-pet.ts` } });
@@ -31,6 +31,17 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   if (scenario === 'detail-error') configs.records = configs.records.map(record => ({ ...record, availability: 'attention',
     inspection: { target: { path: record.targetPath, source: 'chosen' }, findings: ['unreadable'] },
     connection: { ...base, status: 'failed', notice: 'preview-failed' } }));
+  if (scenario.startsWith('claude-task')) {
+    configs.records = [{ id: 'review-claude-task', name: 'Claude Code', provider: 'claude', targetPath: '/示例/.claude', installation: null,
+      pet: null, availability: 'available', inspection: null, connection: null,
+      claude: { revision: 0, mode: 'normal-start', scope: scenario === 'claude-task-upgrade' ? 'presence-only' : 'task-events',
+        status: 'observing', busy: false, configured: true, observedRuns: 1, launchers: 1, preview: null, launchCommand: null,
+        canConfigure: false, canUpgrade: scenario === 'claude-task-upgrade', canResume: false, notice: 'none' } }];
+    configs.sessionConfigurations = { 'review-feedback': 'review-claude-task' };
+    sessions = applyObservation(sessions, { sessionId: 'review-feedback', provider: 'claude', agentName: 'Claude Code', status: 'unknown',
+      observedAt: '2026-10-18T00:00:00Z', capabilities: { reading: 'supported' },
+      facts: { activities: [], waitingForInput: false, recentActivity: { id: 'review-recent', kind: 'reading' } } });
+  }
   const preflight: PreflightState = { revision: 0, installations: [], automaticTarget: { path: '/test/AgentPet/default', source: 'default' }, selectedInstallation: null, target: { path: '/test/AgentPet', source: 'chosen' }, inspection: null, scan: 'complete', notice: 'none' };
   function pushConfigs() { configs = { ...configs, revision: configs.revision + 1 }; configListeners.forEach(listener => listener(configs)); return Promise.resolve(configs); }
   function subscribe<T>(listeners: Set<(value: T) => void>, listener: (value: T) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
@@ -76,7 +87,15 @@ export function createReviewBridge(scenario: string): ManagementBridge {
       changeTarget: async (id, path) => { const current = record(id); configs.notice = current.connection?.deployedPath ? 'withdraw-first' : 'none'; if (configs.notice === 'none') current.targetPath = path; return pushConfigs(); },
       bindPet: async (id, pet) => { record(id).pet = pet; return pushConfigs(); },
       inspect: async id => { const current = record(id); current.inspection = { target: { path: current.targetPath, source: 'chosen' }, findings: [] }; current.availability = 'available'; return pushConfigs(); },
-      preview: async id => { const current = record(id); current.connection = { ...base, preview: { id: 'isolated-plan', path: `${current.targetPath}/extensions/agent-pet.ts`, target: { path: current.targetPath, source: 'chosen' }, action: 'create', findings: [], createDirectories: [] } }; return pushConfigs(); },
+      preview: async id => { const current = record(id);
+        if (current.claude) {
+          const directory = '/示例/AgentPet/private/claude';
+          current.claude.preview = { id: 'review-task-upgrade', operation: 'upgrade', directory, executable: '/示例/npm/bin/claude.exe',
+            events: ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact'],
+            files: ['observer.cjs', 'activation.json', 'hook.json', 'upgrade-before.json', 'receipt.json'].map(name => directory + '/' + name),
+            settings: { path: '/示例/.claude/settings.json', exists: true, canApply: true, reason: '' } };
+        } else current.connection = { ...base, preview: { id: 'isolated-plan', path: `${current.targetPath}/extensions/agent-pet.ts`, target: { path: current.targetPath, source: 'chosen' }, action: 'create', findings: [], createDirectories: [] } };
+        return pushConfigs(); },
       cancel: async id => { const value = record(id); if (value.claude) value.claude.preview = null; else value.connection!.preview = null; return pushConfigs(); },
       confirm: async () => { throw new Error('Browser fixture cannot deploy. Real Main deployment is verified in isolated filesystem tests.'); },
       resume: async () => { throw new Error('Browser fixture cannot start receivers.'); },

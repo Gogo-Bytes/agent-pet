@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { applyClaudeUserHook, inspectClaudeUserHook, isClaudeUserHookOwnership, prepareClaudeUserHook,
-  withdrawClaudeUserHook, type HookOwnership } from './claude-user-hook.js';
+  prepareClaudeUserHookUpgrade, CLAUDE_USER_HOOK_EVENTS, withdrawClaudeUserHook, type HookOwnership } from './claude-user-hook.js';
 
 vi.mock('node:fs', async original => ({ ...await original<typeof import('node:fs')>() }));
 let directory: string, path: string;
@@ -230,4 +230,134 @@ it('rejects substitution between lstat and no-follow open before reading setting
   });
   expect(prepare().canApply).toBe(false); expect(fs.readFileSync(path, 'utf8')).toBe('{"user":"substituted"}');
   expect(fs.existsSync(join(directory, 'settings.agent-pet.pending.json'))).toBe(false);
+});
+
+it('previews and applies the complete task event set only when explicitly requested', () => {
+  const original = '{ "large":9007199254740993123456, "minus":-0, "raw":1.2300e+42 }\r\n';
+  fs.writeFileSync(path, original, { mode: 0o644 });
+  const plan = prepareClaudeUserHook({ directory, command, events: [...CLAUDE_USER_HOOK_EVENTS].reverse() });
+  expect(plan.canApply).toBe(true); expect(plan.original).toBe(original);
+  expect(fs.readFileSync(path, 'utf8')).toBe(original);
+  expect(plan.ownership?.schemaVersion).toBe(2);
+  const ownership = applyClaudeUserHook(plan)!;
+  expect(isClaudeUserHookOwnership(ownership)).toBe(true); expect(inspectClaudeUserHook(ownership)).toBe(true);
+  if (ownership.schemaVersion !== 2) throw new Error('Expected task registration');
+  expect(ownership.events).toEqual(CLAUDE_USER_HOOK_EVENTS); expect(ownership.createdEvents).toEqual(CLAUDE_USER_HOOK_EVENTS);
+  const settings = JSON.parse(fs.readFileSync(path, 'utf8'));
+  expect(Object.keys(settings.hooks)).toEqual(CLAUDE_USER_HOOK_EVENTS);
+  for (const event of CLAUDE_USER_HOOK_EVENTS) {
+    expect(settings.hooks[event][0].hooks).toEqual(ownership.entry.hooks);
+  }
+  expect(settings.hooks.SessionStart[0].matcher).toBe('startup|resume|clear|compact');
+  for (const event of ['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest']) expect(settings.hooks[event][0].matcher).toBe('.*');
+  expect(settings.hooks.Notification[0].matcher).toBe('permission_prompt');
+  for (const event of ['UserPromptSubmit', 'Stop', 'StopFailure', 'SessionEnd', 'PreCompact', 'PostCompact']) expect(settings.hooks[event][0]).not.toHaveProperty('matcher');
+  expect(withdrawClaudeUserHook(JSON.parse(JSON.stringify(ownership)))).toBe(true);
+  expect(fs.readFileSync(path, 'utf8')).toBe(original); expect(fs.statSync(path).mode & 0o7777).toBe(0o644);
+});
+it.each([[], ['SessionStart'], [...CLAUDE_USER_HOOK_EVENTS, 'Stop'], [...CLAUDE_USER_HOOK_EVENTS.slice(0, -1), 'Unknown']].map(events => ({ events })))(
+  'rejects incomplete, duplicate, or unknown explicit event sets: $events', ({ events }) => {
+    fs.writeFileSync(path, '{}');
+    const plan = prepareClaudeUserHook({ directory, command, events: events as never });
+    expect(plan.canApply).toBe(false); expect(applyClaudeUserHook(plan)).toBeNull(); expect(fs.readFileSync(path, 'utf8')).toBe('{}');
+  });
+it.each([
+  '{ "large":9007199254740993123456, "minus":-0, "raw":1.2300e+42 }\r\n',
+  '{ "hooks": { "Stop": [ {"hooks":[{"type":"command","command":"user-stop"}]} ], "PreToolUse":[], "Notification":[] }, "escaped":"\\u0041" }',
+  '{ "ho\\u006fks": { "SessionStart": [ {"matcher":"startup","hooks":[{"type":"command","command":"user-start"}]} ] } }',
+])('upgrades exact legacy ownership without rewriting its SessionStart or user bytes: %s', original => {
+  const legacy = install(original), before = fs.readFileSync(path, 'utf8');
+  const legacyGroup = JSON.stringify(legacy.entry);
+  const plan = prepareClaudeUserHookUpgrade(legacy);
+  expect(plan.canApply).toBe(true); expect(plan.original).toBe(before); expect(fs.readFileSync(path, 'utf8')).toBe(before);
+  expect(JSON.stringify(plan)).not.toContain('original');
+  const ownership = applyClaudeUserHook(plan)!;
+  expect(ownership.schemaVersion).toBe(2); expect(inspectClaudeUserHook(ownership)).toBe(true); expect(inspectClaudeUserHook(legacy)).toBe(false);
+  expect(fs.readFileSync(path, 'utf8').split(legacyGroup)).toHaveLength(2);
+  expect(prepareClaudeUserHookUpgrade(ownership).canApply).toBe(false);
+  expect(withdrawClaudeUserHook(legacy)).toBe(false);
+  expect(withdrawClaudeUserHook(ownership)).toBe(true); expect(fs.readFileSync(path, 'utf8')).toBe(original);
+  expect(withdrawClaudeUserHook(ownership)).toBe(true);
+});
+it.each(['missing', 'modified', 'duplicate', 'other-event', 'disabled', 'pending', 'comment'])('blocks unsafe legacy upgrades with no writes: %s', mode => {
+  const ownership = install(), settings = JSON.parse(fs.readFileSync(path, 'utf8'));
+  if (mode === 'missing') settings.hooks.SessionStart = [];
+  if (mode === 'modified') settings.hooks.SessionStart[0].hooks[0].timeout = 3;
+  if (mode === 'duplicate') settings.hooks.SessionStart.push(structuredClone(settings.hooks.SessionStart[0]));
+  if (mode === 'other-event') settings.hooks.Stop = [structuredClone(settings.hooks.SessionStart[0])];
+  if (mode === 'disabled') settings.disableAllHooks = true;
+  if (mode === 'pending') fs.writeFileSync(join(directory, 'settings.agent-pet.pending.json'), 'preserve pending');
+  const text = JSON.stringify(settings) + (mode === 'comment' ? '/* unsupported */' : ''); fs.writeFileSync(path, text);
+  const plan = prepareClaudeUserHookUpgrade(ownership);
+  expect(plan.canApply).toBe(false); expect(applyClaudeUserHook(plan)).toBeNull(); expect(fs.readFileSync(path, 'utf8')).toBe(text);
+});
+it.each(['modified', 'extra-field', 'missing', 'duplicate', 'moved', 'unknown-reference', 'shared-command'])('retains all schema2 groups if registration becomes ambiguous: %s', mode => {
+  const ownership = applyClaudeUserHook(prepareClaudeUserHookUpgrade(install()))!;
+  const settings = JSON.parse(fs.readFileSync(path, 'utf8'));
+  if (mode === 'modified') settings.hooks.Notification[0].matcher = 'idle_prompt';
+  if (mode === 'extra-field') settings.hooks.Stop[0].hooks[0].async = true;
+  if (mode === 'missing') delete settings.hooks.Stop;
+  if (mode === 'duplicate') settings.hooks.Stop.push(structuredClone(settings.hooks.Stop[0]));
+  if (mode === 'moved') { settings.hooks.Unknown = settings.hooks.Stop; delete settings.hooks.Stop; }
+  if (mode === 'unknown-reference') settings.hooks.Unknown = [{ hooks: [{ type: 'command', command: command + ' --user-flag' }] }];
+  if (mode === 'shared-command') settings.hooks.Stop[0].hooks.push({ type: 'command', command: 'user-command' });
+  const text = JSON.stringify(settings); fs.writeFileSync(path, text);
+  expect(inspectClaudeUserHook(ownership)).toBe(false); expect(withdrawClaudeUserHook(ownership)).toBe(false);
+  expect(fs.readFileSync(path, 'utf8')).toBe(text); expect(fs.existsSync(join(directory, 'settings.agent-pet.pending.json'))).toBe(false);
+});
+it('retains user-added groups and disables without enabling hooks during schema2 withdrawal', () => {
+  const ownership = applyClaudeUserHook(prepareClaudeUserHookUpgrade(install('{"original":1e99}')))!;
+  const settings = JSON.parse(fs.readFileSync(path, 'utf8'));
+  settings.disableAllHooks = true;
+  settings.hooks.Stop.push({ hooks: [{ type: 'command', command: 'user-stop' }] });
+  settings.hooks.Unknown = [];
+  fs.writeFileSync(path, JSON.stringify(settings));
+  expect(inspectClaudeUserHook(ownership)).toBe(false); expect(withdrawClaudeUserHook(ownership)).toBe(true);
+  expect(JSON.parse(fs.readFileSync(path, 'utf8'))).toEqual({ original: 1e99, disableAllHooks: true,
+    hooks: { Stop: [{ hooks: [{ type: 'command', command: 'user-stop' }] }], Unknown: [] } });
+});
+it('does not replace settings edited after upgrade preview and retains uncertain pending writes', () => {
+  const ownership = install(), plan = prepareClaudeUserHookUpgrade(ownership);
+  const changed = fs.readFileSync(path, 'utf8').replace('{', '{"user":"new",'); fs.writeFileSync(path, changed);
+  expect(applyClaudeUserHook(plan)).toBeNull(); expect(fs.readFileSync(path, 'utf8')).toBe(changed);
+  const second = prepareClaudeUserHookUpgrade(ownership);
+  vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => { throw new Error('fixture'); });
+  expect(applyClaudeUserHook(second)).toBeNull(); expect(fs.readFileSync(path, 'utf8')).toBe(changed);
+  expect(fs.existsSync(join(directory, 'settings.agent-pet.pending.json'))).toBe(true);
+  expect(prepareClaudeUserHookUpgrade(ownership).canApply).toBe(false);
+});
+it('validates schema2 ownership fields and retains the entire registration after a partial withdrawal failure', () => {
+  const ownership = applyClaudeUserHook(prepareClaudeUserHookUpgrade(install()))!;
+  if (ownership.schemaVersion !== 2) throw new Error('Expected task registration');
+  for (const invalid of [{ ...ownership, events: ownership.events.slice(1) }, { ...ownership, events: [...ownership.events].reverse() },
+    { ...ownership, createdEvents: ['Unknown'] }, { ...ownership, createdEvents: ['Stop', 'Stop'] },
+    { ...ownership, createdEvents: [] }, { ...ownership, extra: true }]) expect(isClaudeUserHookOwnership(invalid)).toBe(false);
+  const original = fs.readFileSync(path, 'utf8');
+  vi.spyOn(fs, 'writeFileSync').mockImplementationOnce(() => { throw new Error('fixture'); });
+  expect(withdrawClaudeUserHook(ownership)).toBe(false); expect(fs.readFileSync(path, 'utf8')).toBe(original);
+  expect(fs.existsSync(join(directory, 'settings.agent-pet.pending.json'))).toBe(true);
+  expect(withdrawClaudeUserHook(ownership)).toBe(false); expect(fs.readFileSync(path, 'utf8')).toBe(original);
+});
+it.each(['non-array', 'null-group', 'non-array-hooks', 'duplicate-key'])('retains malformed schema2 settings without partial edits: %s', mode => {
+  const ownership = applyClaudeUserHook(prepareClaudeUserHookUpgrade(install()))!;
+  const settings = JSON.parse(fs.readFileSync(path, 'utf8'));
+  if (mode === 'non-array') settings.hooks.Stop = {};
+  if (mode === 'null-group') settings.hooks.Stop = [null];
+  if (mode === 'non-array-hooks') settings.hooks.Stop[0].hooks = {};
+  const text = JSON.stringify(settings).replace('"hooks":{', mode === 'duplicate-key' ? '"hooks":{"Stop":[],' : '"hooks":{');
+  fs.writeFileSync(path, text);
+  expect(inspectClaudeUserHook(ownership)).toBe(false); expect(withdrawClaudeUserHook(ownership)).toBe(false);
+  expect(fs.readFileSync(path, 'utf8')).toBe(text);
+});
+it('keeps prospective schema2 ownership available after an uncertain committed upgrade', () => {
+  const plan = prepareClaudeUserHookUpgrade(install()), original = fs.renameSync;
+  vi.spyOn(fs, 'renameSync').mockImplementationOnce((from, to) => { original(from, to); throw new Error('fixture'); });
+  expect(applyClaudeUserHook(plan)).toBeNull(); expect(inspectClaudeUserHook(plan.ownership!)).toBe(true);
+  expect(withdrawClaudeUserHook(plan.ownership!)).toBe(true); expect(fs.readFileSync(path, 'utf8')).toBe('{}');
+});
+it('rejects upgrade apply after the authorized directory identity changes', () => {
+  const plan = prepareClaudeUserHookUpgrade(install()), text = fs.readFileSync(path, 'utf8'), moved = `${directory}-retained`;
+  fs.renameSync(directory, moved); retained.push(moved); fs.mkdirSync(directory, { mode: 0o700 }); fs.writeFileSync(path, text, { mode: 0o600 });
+  expect(applyClaudeUserHook(plan)).toBeNull(); expect(fs.readFileSync(path, 'utf8')).toBe(text);
+  expect(inspectClaudeUserHook(plan.ownership!)).toBe(false); expect(withdrawClaudeUserHook(plan.ownership!)).toBe(false);
 });

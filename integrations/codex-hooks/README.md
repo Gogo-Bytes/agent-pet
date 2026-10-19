@@ -1,6 +1,6 @@
 # Codex CLI hook input boundary
 
-Stage 1 only: `normalize.ts` accepts bounded JSON and emits metadata facts. It has no filesystem, transport, hook output, installation or Main/Renderer registration. Nothing in the current dev connects to Codex yet.
+`normalize.ts` accepts bounded JSON and emits metadata facts. Transport, standalone hook command and shared-state projection are now implemented and tested with isolated self-owned processes. Main/Renderer registration and daily configuration installation are not yet enabled; the current dev does not connect to Codex.
 
 The 2026-10-19 [official hook contract](https://learn.chatgpt.com/docs/hooks) supplies native session/turn/tool identities. These are Main-private, not UI IDs. Input projection drops prompts, paths, tool arguments/results, message text and model names. Unknown events are ignored; malformed known events are rejected. No input is logged.
 
@@ -19,3 +19,18 @@ Validation: `pnpm test integrations/codex-hooks/normalize.test.ts integrations/c
 ## Bounded installed-CLI check harness
 
 `test-support/cli-check.mjs` prepares only fixed version/help commands in an exclusive temporary profile. It never executes on import; its explicit entry requires authorization under the [precise preview](../../docs/CODEX-CLI-COMPATIBILITY-CHECK-PREVIEW.md). Seven self-owned process/filesystem tests cover output limits, deadlines, secret-free summaries and bounded installation links. Together with input tests: 40 passed; typecheck and desktop source build passed. After precise authorization, the installed CLI returned version 0.163.0 and help successfully; help mentions hooks. No hook was loaded or interactive session started. See the preview for measured output sizes and remaining limits.
+
+## End-to-end isolated implementation (2026-10-19)
+
+- `transport.ts`: separate Codex route and strict provider codec over the shared authenticated loopback runtime. Unknown/retired runs are refused by the externally supplied host binding gate. Socket closure never invents Agent exit.
+- `command.ts` / `command-entry.ts`: bounded stdin, metadata projection before sending, silent exit0 on observer failure, no filesystem or Agent control. `hook-source.ts` produces additive inert documents; it never installs or trusts hooks.
+- `observations.ts`: native session/turn/tool IDs stay private; Application gets random aliases and the existing provider-neutral facts. Canonical tool results give two-second recent activity, explicit root interruption gives a cancellation occurrence; neither creates success/error bubbles. Pre-hooks/approval/Stop do not establish working/waiting/completed. Child/old/unseen events are ignored. Native compatibility and child attribution still require real evidence.
+- Up to32 host runs,32 native sessions/run,256 turns/session and1024 tool tombstones/session; saturation refuses new task facts rather than accepting evicted replay. Retired host/session identities stay retired. SessionEnd, run retirement and stop clear timers. Multiple distinct native sessions are not type-deduplicated.
+- `bridge.ts` composes receiver→mapper→existing SessionObservation; Main must supply independently verified host ownership/liveness. This interface cannot grant itself permission to observe arbitrary existing Codex processes.
+- `test-support/native-start-check.mjs`: prepared native empty-thread/hook loading check with network confined to loopback, no task, no trust bypass. Requires the separate [precise preview](../../docs/CODEX-NATIVE-START-CHECK-PREVIEW.md) authorization. It tests only the new isolated host, not CLI/desktop attachment.
+
+Self-owned subprocess tests prove command→authenticated callback→shared pet presentation, cancellation, path quoting and quiet failure. Synthetic mapper tests cover independent identities, deduplication, old/child facts, resource bounds and cleanup/reentrant stop. These are not real Codex acceptance or proof that a pet asset has every animation.
+
+Validation for this slice: final full `pnpm test --maxWorkers=1` 1226 passed /1 skipped /102 files; `pnpm typecheck` and `pnpm --filter @agent-pet/desktop build` passed. The retained skip and existing Three.js duplicate-import warnings are unchanged. A final Claude invalid-run compatibility assertion is also covered by the focused transport rerun. No application package or daily native activation was performed.
+
+Independent review reproduced two cleanup defects before commit: a closed group leader could cancel descendant escalation, and a throwing consumer could interrupt remaining session cleanup. The probe now retains its owned-group termination promise; the mapper isolates consumer failures. Added descendant heartbeat and multi-session failing-subscriber regressions. The initial immediate PID-removal assertion was invalid for asynchronous process reaping; the replacement asserts that the known-live descendant stops executing, without removing the failing scenario. Independent focused recheck:17 passed.

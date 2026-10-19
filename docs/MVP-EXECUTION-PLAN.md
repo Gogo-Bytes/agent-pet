@@ -36,6 +36,14 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 Codex下一阶段的版本/帮助检查脚本已就绪：固定入口、独占隔离HOME、输出与时间限制，不继承凭据、不读日常配置。40项相关测试、typecheck、desktop源码build通过；用户已按 [精确预览](CODEX-CLI-COMPATIBILITY-CHECK-PREVIEW.md) 授权并完成：本机0.163.0、版本与帮助均退出0，帮助提及hooks；仅保存白名单摘要。没有加载hook或启动任务、改日常配置、重启dev。此检查不能代替hook加载及任务验收。
 
+### Codex 接收与共享状态链路（2026-10-19）
+
+已实现独立Codex codec、认证loopback接收、静默stdin脚本、可选动作映射和接收→SessionObservation组合接口；传输/输入清理与Claude共用，保持Claude原协议和守卫。自有进程实际运行编译后的hook脚本，验证工具结果→共享宠物executing、明确Interrupt→cancelled；原生ID转随机别名。多会话身份分开，旧轮次/子任务/重复事件不冒充当前工作，退出与停止清理计时器。Stop/审批/工具返回不制造任务完成、持续等待或错误。实际资产动画仍按可选目录回退。
+
+最终全量 `pnpm test --maxWorkers=1` 为1226 passed / 1 skipped / 102 files；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`通过，仅源码构建。检查Claude兼容边界后另补无效运行编号+未知事件的返回类别回归，保持旧行为。独立审查发现探针后代进程和消费者异常两项清理问题，均修复并补回归；独立17项复核通过。首次后代测试的立即PID消失断言有异步回收竞争，改用存活后代的心跳停止断言后复验通过；原问题与失败证据保留在加载预览中。
+
+外部Main必须先独立核对宿主身份和存活；此阶段未启用Codex正式连接页，也不从hook短命进程猜Agent在线。已准备 [原生加载精确预览](CODEX-NATIVE-START-CHECK-PREVIEW.md) 和可执行脚本：在独占隔离HOME创建空会话，网络限127.0.0.1，不发turn/start、不绕过信任；等待本次新增真实加载授权。现有dev、token、hooks、配置及历史native fixtures保留，无打包。
+
 ## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 
 用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。随后用户精确授权日常升级并完成：12组自有hooks已保存，其他设置及原备份核对一致；新版dev已启动，用户确认原路径新开的Claude已连接。真实读取、写入/修改、Bash执行及模型出错反馈已核对；Glob/Grep在当前会话不可用，查找未验收。

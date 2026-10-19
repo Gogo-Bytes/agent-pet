@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { startCodexHookReceiver } from '../transport.js';
+import { summarizeHooks, type HookStatusSummary } from './hook-status.js';
 
 /** Fixed categories only. Arbitrary error messages never leave this function. */
 export function classifyRpcError(error: unknown): { kind: string; code: number | null } {
@@ -25,6 +26,8 @@ export async function probeCodexStart(options: {
   launch(env: Record<string, string>): ChildProcessWithoutNullStreams;
   timeoutMs?: number;
   sandboxMode?: 'read-only' | 'readOnly';
+  mode?: 'start' | 'hooks-only';
+  expectedHookCommand?: string;
 }) {
   const token = randomBytes(32).toString('hex'), runId = randomUUID();
   let child: ChildProcessWithoutNullStreams | undefined, live = false, stopping = false;
@@ -35,7 +38,7 @@ export async function probeCodexStart(options: {
         ...(fact.kind === 'session-started' ? { source: fact.source } : {}) });
     } });
   const result = { initialized: false, threadStarted: false, rpcError: false,
-    serverRequest: false, readOnlyMode: options.sandboxMode ?? 'readOnly', rpcErrorKind: 'none', rpcErrorCode: null as number | null, outcome: 'closed', stdoutBytes: 0, stderrBytes: 0, events };
+    serverRequest: false, hookStatus: null as HookStatusSummary | null, readOnlyMode: options.sandboxMode ?? 'readOnly', rpcErrorKind: 'none', rpcErrorCode: null as number | null, outcome: 'closed', stdoutBytes: 0, stderrBytes: 0, events };
   try {
     child = options.launch({ AGENT_PET_CODEX_URL: receiver.url, AGENT_PET_CODEX_TOKEN: token, AGENT_PET_CODEX_RUN_ID: runId });
     live = true;
@@ -82,7 +85,7 @@ export async function probeCodexStart(options: {
           let value: Record<string, unknown>;
           try { value = JSON.parse(line); } catch { stop('invalid-protocol'); return; }
           if (!value || typeof value !== 'object' || Array.isArray(value)) { stop('invalid-protocol'); return; }
-          if (value.error && (value.id === 1 || value.id === 2)) {
+          if (value.error && (value.id === 1 || value.id === 2 || value.id === 3)) {
             result.rpcError = true;
             const diagnostic = classifyRpcError(value.error);
             result.rpcErrorKind = diagnostic.kind; result.rpcErrorCode = diagnostic.code;
@@ -91,7 +94,15 @@ export async function probeCodexStart(options: {
           if (value.id === 1 && value.result && !result.initialized) {
             result.initialized = true;
             send({ method: 'initialized', params: {} });
-            send({ id: 2, method: 'thread/start', params: { cwd: join(options.root, 'work'), approvalPolicy: 'never', sandbox: options.sandboxMode ?? 'readOnly' } });
+            if (options.mode === 'hooks-only') {
+              send({ id: 3, method: 'hooks/list', params: { cwds: [join(options.root, 'work')] } });
+            } else {
+              send({ id: 2, method: 'thread/start', params: { cwd: join(options.root, 'work'), approvalPolicy: 'never', sandbox: options.sandboxMode ?? 'readOnly' } });
+            }
+          } else if (value.id === 3 && value.result && options.mode === 'hooks-only') {
+            const summary = options.expectedHookCommand && summarizeHooks(value.result, join(options.root, 'config/hooks.json'), options.expectedHookCommand);
+            if (!summary) { stop('invalid-protocol'); return; }
+            result.hookStatus = summary; stop('hooks-listed');
           } else if (value.id === 2 && value.result) {
             const thread = (value.result as { thread?: { id?: unknown } }).thread;
             if (!thread || typeof thread.id !== 'string' || !thread.id || thread.id.length > 256) { stop('invalid-protocol'); return; }
@@ -106,13 +117,14 @@ export async function probeCodexStart(options: {
       proc.once('error', () => { stopping = true; result.outcome = 'spawn-failed'; live = false; finish(); });
       proc.once('exit', () => { live = false; });
       proc.once('close', () => { live = false; buffer = ''; finish(); });
-      send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'agent_pet_isolated_check', version: '0.1.0' } } });
+      send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'agent_pet_isolated_check', version: '0.1.0' },
+        ...(options.mode === 'hooks-only' ? { capabilities: { experimentalApi: true } } : {}) } });
     });
   } finally {
     live = false; await receiver.stop();
   }
   // Never persist native IDs, arbitrary server text, stdout/stderr or credentials.
-  await writeFile(join(options.root, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
+  await writeFile(join(options.root, options.mode === 'hooks-only' ? 'hook-status.json' : 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx', mode: 0o600 });
   return result;
 }
 export const LOOPBACK_ONLY_PROFILE = '(version 1)(allow default)(deny network*)(allow network-outbound (remote ip "localhost:*"))(allow network-inbound (local ip "localhost:*"))';

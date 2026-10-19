@@ -1,6 +1,6 @@
 # Codex 本机接口格式与空会话复验
 
-2026-10-19，待本次精确授权。此前r1初始化成功，但空会话RPC被拒绝，未收到hook。错误全文未保留，暂不能判断是参数、登录或信任问题。现有代码已补固定错误分类及本机schema选择，避免猜参数。
+2026-10-19，用户已精确授权并完成r2。本机协议核对与只读空会话通过，但尚无hook，不能标为接入通过。下方保留本次授权范围。
 
 ## 唯一执行入口
 
@@ -30,3 +30,9 @@ result.json独占0600。除原有白名单字段外，只增加固定RPC错误�
 AGENTS.md要求真实目标操作有精确范围、预览与授权；之前r1只含一次空会话检查，本次新增协议导出、固定schema读取和r2目录，因此确认本次范围。无需你登录或发送任务。
 
 本次准备代码验证：20项检查程序测试、pnpm typecheck、desktop源码build通过；未执行r2、未打包。
+
+## r2真实结果
+
+用户确认后执行固定脚本，schema导出成功，本机只读枚举为read-only（原readOnly与本机协议不符，解释了r1参数拒绝）。随后initialized=true、threadStarted=true、rpcError=false、serverRequest=false、readOnlyMode=read-only、rpcErrorKind=none、rpcErrorCode=null、outcome=thread-started、stdoutBytes=3140、stderrBytes=0、events=[]。原程序仅创建空会话，未发送任务或修改信任；result.json0600、根目录0700。
+
+空会话通过不等于hook加载通过。已在授权的本次公开schema bundle内核对hooks/list、HookMetadata及HookTrustStatus的结构，不读取任何日常材料；尚未实际查询hook列表，不能把零回调归因为信任问题。下一步的 [只读状态核对](CODEX-HOOK-STATUS-CHECK-PREVIEW.md) 已准备，将复用本次隔离配置，避免重建与重复配置。

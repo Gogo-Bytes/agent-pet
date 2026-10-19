@@ -9,6 +9,9 @@ const readline = require('node:readline');
 readline.createInterface({input:process.stdin}).on('line', line => {
  const request=JSON.parse(line);
  if(request.method==='initialize') console.log(JSON.stringify({id:1,result:{private:'SECRET'}}));
+ else if(request.method==='hooks/list' && process.env.MODE==='hooks') {
+   console.log(JSON.stringify({id:3,result:{data:[{cwd:'SECRET',errors:[],warnings:[],hooks:[{enabled:true,trustStatus:'untrusted',eventName:'sessionStart',source:'user',sourcePath:process.env.ROOT+'/config/hooks.json',handlerType:'command',command:'known command',currentHash:'SECRET'}]}]}}));
+ }
  else if(request.method==='thread/start') {
    console.log(JSON.stringify(process.env.MODE==='error'?{id:2,error:{message:'SECRET'}}:
      process.env.MODE==='request'?{id:4,method:'private/request',params:{private:'SECRET'}}:{id:2,result:{thread:{id:'SECRET'}}}));
@@ -18,8 +21,8 @@ async function fixture(mode: string, fn: (root: string, result: Awaited<ReturnTy
   const root = await mkdtemp(join(tmpdir(), 'agent-pet-codex-start-fixture-'));
   try {
     await mkdir(join(root, 'work'));
-    const result = await probeCodexStart({ root, timeoutMs: 200, launch: () => spawn(process.execPath,
-      ['-e', mode === 'timeout' ? 'setInterval(()=>{},1000)' : source], { detached: true, env: { MODE: mode }, stdio: ['pipe', 'pipe', 'pipe'] }) });
+    const result = await probeCodexStart({ root, timeoutMs: 200, ...(mode === 'hooks' ? { mode: 'hooks-only', expectedHookCommand: 'known command' } as const : {}), launch: () => spawn(process.execPath,
+      ['-e', mode === 'timeout' ? 'setInterval(()=>{},1000)' : source], { detached: true, env: { MODE: mode, ROOT: root }, stdio: ['pipe', 'pipe', 'pipe'] }) });
     await fn(root, result);
   } finally { await rm(root, { recursive: true, force: true }); }
 }
@@ -72,3 +75,8 @@ it('classifies only bounded error codes/categories without exposing error text',
   expect(classifyRpcError({message:'Sandbox failed SECRET'})).toEqual({kind:'sandbox-rejected',code:null});
   expect(classifyRpcError({code:Infinity,message:'SECRET'})).toEqual({kind:'unknown',code:null});
 });
+
+it('queries only hook status without creating a thread or changing trust', async () => fixture('hooks', async (root, result) => {
+  expect(result).toMatchObject({initialized:true,threadStarted:false,outcome:'hooks-listed',hookStatus:{own:1,untrusted:1,trusted:0}});
+  expect(await readFile(join(root,'hook-status.json'),'utf8')).not.toContain('SECRET');
+}));

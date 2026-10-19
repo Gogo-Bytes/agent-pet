@@ -1,0 +1,49 @@
+import { lstat, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { join, resolve } from 'node:path';
+import { build } from 'vite';
+import { environment, resolveEntry } from './cli-check.mjs';
+const ROOT = '/tmp/agent-pet-codex-start-20261019-5f92c8-r2';
+if (process.argv[2] !== '--run-authorized-check' || process.argv.length !== 3) {
+  console.error('Explicit authorized-check argument required.'); process.exitCode = 1;
+} else {
+  try {
+    const before = await resolveEntry();
+    for (const name of ['', 'runtime', 'config', 'work', 'home', 'cache', 'tmp']) {
+      const stat = await lstat(join(ROOT, name));
+      if (!stat.isDirectory() || stat.uid !== process.getuid() || (stat.mode & 0o7777) !== 0o700) throw new Error('Unsafe isolated directory');
+    }
+    const compile = async (source, name) => {
+      const result = await build({ configFile: false, logLevel: 'silent', build: { write: false, ssr: resolve(source),
+        outDir: join(ROOT, 'runtime'), emptyOutDir: false, rollupOptions: { output: { format: 'cjs', entryFileNames: name } } } });
+      const item = (Array.isArray(result) ? result[0] : result).output.find(item => item.type === 'chunk' && item.isEntry);
+      if (!item) throw new Error('Missing standalone entry'); return item.code;
+    };
+    const readOwn = async (file, limit) => {
+      const stat = await lstat(file);
+      if (!stat.isFile() || stat.nlink !== 1 || stat.uid !== process.getuid() || stat.size > limit || (stat.mode & 0o7777) !== 0o600) throw new Error('Unsafe isolated file');
+      return readFile(file, 'utf8');
+    };
+    const observer = await compile('integrations/codex-hooks/command-entry.ts', 'observer.cjs');
+    const installed = await readOwn(join(ROOT, 'runtime/observer.cjs'), 256 * 1024);
+    const hash = text => createHash('sha256').update(text).digest('hex');
+    if (hash(observer) !== hash(installed)) throw new Error('Observer changed');
+    const documents = await compile('integrations/codex-hooks/hook-source.ts', 'status-documents.cjs');
+    await writeFile(join(ROOT, 'runtime/status-documents.cjs'), documents, { flag: 'wx', mode: 0o600 });
+    const require = createRequire(import.meta.url);
+    const { createCodexHookDocument } = require(join(ROOT, 'runtime/status-documents.cjs'));
+    const expected = createCodexHookDocument(process.execPath, join(ROOT, 'runtime/observer.cjs'));
+    if (await readOwn(join(ROOT, 'config/hooks.json'), 64 * 1024) !== expected ||
+      await readOwn(join(ROOT, 'config/config.toml'), 1024) !== 'cli_auth_credentials_store = "ephemeral"\ncheck_for_update_on_startup = false\n') throw new Error('Isolated configuration changed');
+    const checker = await compile('integrations/codex-hooks/test-support/native-start.ts', 'status-check.cjs');
+    await writeFile(join(ROOT, 'runtime/status-check.cjs'), checker, { flag: 'wx', mode: 0o600 });
+    const now = await resolveEntry();
+    if (now.executable !== before.executable || now.identity !== before.identity) throw new Error('Program changed');
+    const { probeCodexStart, launchIsolatedCodex } = require(join(ROOT, 'runtime/status-check.cjs'));
+    const result = await probeCodexStart({ root: ROOT, mode: 'hooks-only',
+      expectedHookCommand: JSON.parse(expected).hooks.SessionStart[0].hooks[0].command,
+      launch: hookEnv => launchIsolatedCodex(now.executable, ROOT, environment(ROOT), hookEnv) });
+    console.log(JSON.stringify(result));
+  } catch { console.error('CHECK_STOPPED; no existing configuration or trust changed'); process.exitCode = 1; }
+}

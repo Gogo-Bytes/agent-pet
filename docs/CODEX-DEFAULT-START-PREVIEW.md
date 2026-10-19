@@ -1,6 +1,6 @@
 # Codex 默认后台模式：隔离实测预览
 
-2026-10-19。正式连接页/Home代码与隔离测试已准备；本页所列真实默认模式**尚未执行**。日常 Codex 配置、hooks、登录和当前会话不在本次范围内。
+2026-10-19。正式连接页/Home代码与隔离测试已准备；本页所列真实默认模式**已按授权执行，两轮通过**。日常 Codex 配置、hooks、登录和当前会话不在本次范围内。
 
 ## 为什么这次需要不同的运行范围
 
@@ -27,3 +27,13 @@
 结束时只对这个隔离CODEX_HOME调用一次`app-server daemon stop`（5秒，另有1秒强制结束助手的期限）；不停止日常Codex。Main接收器和本机模拟服务关闭。默认后台停止未确认则结果不通过，保留目录、结果和安全停点，不自行强杀未知进程、不扩大访问范围或无限重试。
 
 本次不重启当前dev/Claude/pi，不更新程序或依赖、不打包、不推送。即使通过，日常安装仍须另给精确写入预览。空CLI没有首条任务时不算会话在线，关闭一个终端也不等于后台会话结束；这些产品语义在正式连接页已明确说明。
+
+## 本次执行结果（2026-10-19）
+
+用户已确认本页精确范围。Main运行隔离副本的默认TUI（没有`--no-daemon`），核对生成hooks全部为本产品同一命令、原生界面仅10条待审核后，按授权审核信任；未遇到登录、未知hook或程序安装要求。两轮各发送一次固定任务至本机模拟服务，退出码均0、可信连接均true；各1任务请求和1原生标题请求，拒绝/异常请求均0。中间通过正式Configurations重新创建接收器，恢复waiting成功，同一hooks字节不变，第二轮自动读新接收记录并连接。
+
+结果：`/private/tmp/agent-pet-codex-default-20261019-61d04a/default-result.json`。`phase=verified`、`passed=true`，`privateRestart=true`、`commandUnchanged=true`、`binaryMatched=true`、`receiverCleanup=true`、`daemonCleanup=true`。`connected=6/disconnected=2`是状态发布次数，不代表6个窗口或6个会话。总计4个本机模拟响应（2任务+2标题），未用登录凭据/真实模型/专用连接环境变量。原生界面出现的唯一warning为模拟模型缺少metadata，核对后继续；不是hook加载错误。没有观测外网流量，不能将未OS过滤的初始化表述为“已证明零外网”。
+
+此证据覆盖0.163.0固定隔离managed副本布局下的默认启动、原生信任、事件身份与接收器重建；未直接记录后台PID连续性，不能据此宣称两轮必为同一个后台进程。未部署日常Codex目标、未用真实模型任务，未做Codex桌面端或完整异常/并发矩阵验收。正式React/Home画面此前使用测试边界数据验证，本轮走真实Main/Configurations入口但未将隔离数据接到当前日常Electron窗口。日常配置、token/hooks、当前dev和Agent保持，不打包/推送。
+
+执行后检查：3个验证助手测试文件使用`pnpm test … --maxWorkers=1`运行；首条误用`node --test`导致Vitest上下文错误，更正测试运行器后11项全部通过。源码未变，沿用提交d88e9cd的typecheck、desktop源码build及全量1310 passed/1 skipped结果。没有重试任何真实Codex任务。

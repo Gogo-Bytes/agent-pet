@@ -30,6 +30,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Codex CLI 输入边界（2026-10-19）
 
+**默认后台隔离实测已通过，日常部署未执行：** 用户按精确预览授权后，两轮默认0.163.0 TUI均退出0、可信连接true、各1本机任务+1标题请求、异常/拒绝0；正式Configurations重建接收器后同一hooks继续连接。隔离程序摘要匹配，接收器/隔离daemon正常停止。未用登录凭据/真实模型，不改日常配置或当前dev、不打包。初始化未OS过滤，不宣称零外网；未记录daemon PID连续性，不宣称两轮必为同一进程。正式UI为前阶段示例数据验证，本轮真实Main链路通过不等于日常Electron/真实模型验收。证据与后续边界见[默认实测](CODEX-DEFAULT-START-PREVIEW.md#本次执行结果2026-10-19)。下方待授权是前阶段快照。
+
 **正式接线代码已完成，默认/日常实测待授权：** 已加Codex手动添加、10条hooks保留式预览/确认/暂停/恢复/撤回、私有记录备份与失败关闭、Main精确默认宿主入口解析，Configurations→共享Application→Home真实事件链路。首任务前等待，不把空CLI或daemon活着当在线；不读取对话文件，不启动Agent。默认daemon独立程序路径已由固定源码核对，尚需真实隔离实测。全量1310 passed/1 skipped/121 files，最后UI取消生命周期回归3项通过；原Claude93项通过。独立审查发现私有state并发编辑保护缺口，已用红绿回归修复；正式Renderer宽/窄窗口、弹窗回焦、GLB及Enter/Escape实看通过（示例数据，不是原生验收）。日常配置/dev不动，不打包。[接线与验证](CODEX-CLI-CONNECTION.md)、[默认模式精确预览](CODEX-DEFAULT-START-PREVIEW.md)。下方“尚未注册”记录是此前阶段快照，不覆盖本条代码状态。
 
 最新原生普通启动有界复验已通过：新版10条原生信任保留，两轮隔离--no-daemon TUI均发布经过身份核验的真实连接、各1任务+1标题请求、正常退出0；接收地址轮换后同一hook仍连接，无专用连接环境变量。异常/拒绝0，不使用凭据/外网/真实模型，不改日常配置或现有dev/Agent，不打包。首试计数误判与漏存连接计数证据保留，不能倒推首试通过。63项test-support/typecheck/源码build通过，独立18项自有fixture复核通过。默认共享daemon、空CLI在线、正式连接页/首页与日常部署仍未验收。[实测结果与边界](CODEX-NORMAL-START-MOCK-PREVIEW.md)。

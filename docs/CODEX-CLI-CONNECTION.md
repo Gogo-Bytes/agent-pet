@@ -1,12 +1,12 @@
 # Codex CLI 正式接线与验收
 
-2026-10-19。**正式连接页/Home已接代码，默认后台与日常目标仍待原生实测/授权。** 前一步两轮真实Codex已通过的是隔离--no-daemon模式，不在此扩大为默认模式通过。见[前台证据](CODEX-NORMAL-START-MOCK-PREVIEW.md)和[默认模式精确预览](CODEX-DEFAULT-START-PREVIEW.md)。
+2026-10-19。**正式连接页/Home已接代码；0.163.0隔离默认后台两轮实测通过，日常目标尚未部署。** 前台与默认模式分别保存证据，不将隔离结论扩大为日常安装或桌面端通过。见[前台证据](CODEX-NORMAL-START-MOCK-PREVIEW.md)和[默认模式精确预览](CODEX-DEFAULT-START-PREVIEW.md)。
 
 ## 接入方式与边界
 
 手动添加→Codex→实际CODEX_HOME目录（通常~/.codex，不是项目的.codex）→选择程序→查看追加预览→明确确认。只读所选目录hooks.json（64KiB）及祖先/程序metadata；只追加本产品10条通知，保留现有JSON值和无关字节，不重写config.toml、其他hooks、登录或shell。Codex原生/hooks审核是独立步骤，应用不写信任、不启动/控制/审批Agent。
 
-只接受已有原生证据版本0.163.0的standalone布局；其他安装方式/版本没有假成功入口。默认后台可能有独立程序：Main按该版本固定的packages/app-server-daemon入口和有限旧布局状态metadata解析并核对精确路径；不读取后台日志正文，不用进程名字猜在线。若后台程序升级/更换不匹配，事件不会冒充在线，需重新核对。真实默认后台的程序选择与生命周期尚待实测，不能只凭布局测试宣布兼容。
+只接受已有原生证据版本0.163.0的standalone布局；其他安装方式/版本没有假成功入口。默认后台可能有独立程序：Main按该版本固定的packages/app-server-daemon入口和有限旧布局状态metadata解析并核对精确路径；不读取后台日志正文，不用进程名字猜在线。若后台程序升级/更换不匹配，事件不会冒充在线，需重新核对。0.163.0固定managed隔离副本默认启动与接收器重建已通过真实测试；其他布局、后台进程连续性和完整生命周期矩阵仍未验收。
 
 ## 模块与状态
 
@@ -31,4 +31,4 @@
 - [首页](../.agent-work/codex-connection-ui-20261019/home.jpg)、[键盘聚焦](../.agent-work/codex-connection-ui-20261019/home-focus.jpg)
 - [连接详情](../.agent-work/codex-connection-ui-20261019/connected.jpg)
 
-日常dev/Agent仍保持，未读写日常Codex配置或凭据、未打包/推送。待授权默认后台隔离验证脚本已准备并验证拒绝隐式执行、独立编译/载入；新增副本/运行/联网范围见精确预览。默认通过后再对日常目标提供具体写入/撤回预览，不从当前任务推断已经允许部署。
+日常dev/Agent仍保持，未读写日常Codex配置或凭据、未打包/推送。默认后台隔离检查已按精确授权执行，两轮退出0、可信连接true、各1任务+1标题请求；正式Configurations重建接收器成功且hooks不变，隔离后台与接收器停止成功。没有登录凭据/真实模型；原生初始化未OS过滤，未断言零外网。结果与覆盖限制见[默认实测](CODEX-DEFAULT-START-PREVIEW.md#本次执行结果2026-10-19)。日常目标需另给具体写入/撤回预览，不从本次隔离测试推断已允许部署。

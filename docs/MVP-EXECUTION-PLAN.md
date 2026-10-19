@@ -62,6 +62,8 @@ Codex本机凭据审核已由用户实际执行，TUI在account/read的workspace
 
 Codex受限联网已获用户精确授权；用户报告EEXIST并要求Main自行终端测试。Main真实PTY复现EEXIST，修复仅复用内容/权限/归属/单链接全同的network助手，无删除覆盖。一次真实PTY复验已越过准备，但TUI loading仍在account/read工作区路由发现失败（-32603），没有任务/信任审批/后续查询或空会话。临时凭据已核对删除、原auth metadata正常、隔离config保持预期，网关finally关闭。7项聚焦与完整40项测试/typecheck/源码build通过。按有界失败规则停止真实重试，代理使用/上游/账号路由原因仍未区分，见[实际终端证据](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)。dev、日常配置保持，不打包/推送。
 
+Codex最新隔离实测已通过账号初始化和原生信任审核：网关原并发限制实际拒绝5条，修复有界排队（32客户端/8上游、全局2MiB）及同主机默认443格式后，真实TUI进入审核/主界面。用户明确授权Main代为信任10条，Native UI完成并正常退出；只读查询10启用/10trusted，其余与错误全0。只接受Native新增的10条自有hooks.state记录，原配置/凭据保留。离线空会话收到真实SessionEnd认证回调，但SessionStart仍未通过：探针ACK即退出缺陷已用红绿fixture修复，一次2500ms真实等待复验仍hook-not-observed（stdout3140/stderr241、仅SessionEnd），不归因或伪造在线。45项测试/typecheck/源码build通过，原结果分别保留；临时凭据清理确认、dev不变、无打包。启动事件按有界规则留停点，Main/UI尚未激活，详见[最新实测](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)。
+
 ## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 
 用户再次要求复验后，未修改源码或放宽超时，原真实自有进程 schema2 链路及全量 **1121 passed / 1 skipped / 94 files** 通过，`pnpm typecheck`、desktop 源码 build 通过，不打包。三个自编译助手仅查询自身 PID，首次315/338/391ms，随后2/8/3ms；上轮3秒启动超时未复现，仍保留为启动稳定性风险，不宣称根因已消除。自检失败时不监听、不发布在线；真实Agent检查250ms和peer1秒限制保持。随后用户精确授权日常升级并完成：12组自有hooks已保存，其他设置及原备份核对一致；新版dev已启动，用户确认原路径新开的Claude已连接。真实读取、写入/修改、Bash执行及模型出错反馈已核对；Glob/Grep在当前会话不可用，查找未验收。

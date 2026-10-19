@@ -8,7 +8,25 @@ export const ROOT = '/tmp/agent-pet-codex-start-20261019-5f92c8-r2';
 const BASE_CONFIG = 'cli_auth_credentials_store = "ephemeral"\ncheck_for_update_on_startup = false\n';
 /** Codex saves this harmless UI detection result before its interactive startup completes. */
 export function isExpectedIsolatedConfig(text) {
-  return text === BASE_CONFIG || text === BASE_CONFIG + '\n[tui]\nscreen_reader_detection_done = true\n';
+  const plain=value=>value===BASE_CONFIG || value===BASE_CONFIG+'\n[tui]\nscreen_reader_detection_done = true\n';
+  if(plain(text))return true;
+  if(typeof text!=='string' || text.length>4096)return false;
+  const parts=text.split('\n[hooks.state]\n');
+  if(parts.length!==2 || !plain(parts[0]))return false;
+  const events=new Set(['pre_tool_use','permission_request','post_tool_use','pre_compact','post_compact','session_start','session_end','user_prompt_submit','stop','interrupt']);
+  const blocks=parts[1].trim().split('\n\n');
+  if(blocks.length!==events.size)return false;
+  for(const block of blocks) {
+    const match=/^\[hooks\.state\.("(?:[^"\\]|\\.)+")\]\ntrusted_hash = "sha256:[a-f0-9]{64}"$/.exec(block);
+    if(!match)return false;
+    let key;try{key=JSON.parse(match[1]);}catch{return false;}
+    const sources=[ROOT+'/config/hooks.json','/private'+ROOT+'/config/hooks.json'];
+    const source=sources.find(source=>key.startsWith(source+':'));
+    if(!source)return false;
+    const suffix=key.slice(source.length+1),event=suffix.replace(/:0:0$/,'');
+    if(suffix!==event+':0:0' || !events.delete(event))return false;
+  }
+  return events.size===0;
 }
 /** Resume an interrupted preparation only when its existing own helper is byte-identical. */
 export async function writeOrVerifyHelper(file, content, resume = false) {
@@ -22,7 +40,7 @@ export async function writeOrVerifyHelper(file, content, resume = false) {
   }
 }
 export async function prepareIsolated(prefix) {
-  if (!['status', 'review', 'review-r1', 'review-auth', 'review-network'].includes(prefix)) throw new Error('Invalid isolated operation');
+  if (!['status', 'review', 'review-r1', 'review-auth', 'review-network', 'review-wait'].includes(prefix)) throw new Error('Invalid isolated operation');
   const before = await resolveEntry();
   for (const name of ['', 'runtime', 'config', 'work', 'home', 'cache', 'tmp']) {
     const stat = await lstat(join(ROOT, name));
@@ -49,7 +67,7 @@ export async function prepareIsolated(prefix) {
   const { createCodexHookDocument } = require(join(ROOT, `runtime/${prefix}-documents.cjs`));
   const expected = createCodexHookDocument(process.execPath, join(ROOT, 'runtime/observer.cjs'));
   if (await readOwn(join(ROOT, 'config/hooks.json'), 64 * 1024) !== expected ||
-    !isExpectedIsolatedConfig(await readOwn(join(ROOT, 'config/config.toml'), 1024))) throw new Error('Isolated configuration changed');
+    !isExpectedIsolatedConfig(await readOwn(join(ROOT, 'config/config.toml'), 4096))) throw new Error('Isolated configuration changed');
   const checker = await compile('integrations/codex-hooks/test-support/native-start.ts', `${prefix}-check.cjs`);
   await writeOrVerifyHelper(join(ROOT, `runtime/${prefix}-check.cjs`), checker, prefix === 'review-r1' || prefix === 'review-auth' || prefix === 'review-network');
   const now = await resolveEntry();
@@ -63,6 +81,6 @@ export async function prepareIsolated(prefix) {
       if (current.executable !== before.executable || current.identity !== before.identity ||
         await readOwn(join(ROOT, 'runtime/observer.cjs'), 256 * 1024) !== installed ||
         await readOwn(join(ROOT, 'config/hooks.json'), 64 * 1024) !== expected ||
-        !isExpectedIsolatedConfig(await readOwn(join(ROOT, 'config/config.toml'), 1024))) throw new Error('Isolated target changed');
+        !isExpectedIsolatedConfig(await readOwn(join(ROOT, 'config/config.toml'), 4096))) throw new Error('Isolated target changed');
     } };
 }

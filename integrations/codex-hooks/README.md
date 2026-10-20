@@ -1,3 +1,5 @@
+> Current status (2026-10-20): formal Main/connection UI/Home and daily CLI basic presence are enabled and verified. Native execution/apply_patch/cancellation were driven by Main in a dedicated daily test session and reached shared action requests. Independent error/read/search/waiting feedback remains unsupported or unverified; no animation-visual acceptance this round. [Current scope/evidence](../../docs/CODEX-TASK-LIVE-VERIFY-PREVIEW.md#最终实测结果2026-10-20) supersedes historical “not connected/unregistered” statements below. Daily hooks/configuration preserved; ordinary dev remains running, no package.
+
 # Codex CLI hook input boundary
 
 `normalize.ts` accepts bounded JSON and emits metadata facts. Transport, standalone hook command and shared-state projection are now implemented and tested with isolated self-owned processes. Main/Renderer registration and daily configuration installation are not yet enabled; the current dev does not connect to Codex.

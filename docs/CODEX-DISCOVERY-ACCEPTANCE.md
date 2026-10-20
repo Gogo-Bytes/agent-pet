@@ -43,4 +43,15 @@
 
 本范围 **VERIFIED：正式 Renderer 的示例数据布局、安装详情展开、Codex 检查对话框与取消交互**。不等于真实 Electron 原生窗口、真实 Main IPC、hooks.json 读取、部署、Codex 审核或在线连接通过。
 
-下一步若要继续真实“一键配置”，会读取 hooks.json 及固定后台入口 metadata，必须另列精确读取范围；现有已配置目标优先查看原记录，不能为验收重复部署或撤回原 hooks。
+## 真实目标只读配置预览
+
+用户随后同意进入只读预览，精确目标为 `/Users/gan/.codex`，只读取 `/Users/gan/.codex/hooks.json`、目标祖先目录 metadata，以及固定 standalone CLI/host metadata。未执行 `apply`、`confirm`、Codex 或任务。
+
+- `hooks.json` 已存在。
+- hooks 结构与安全检查通过，`canApply: true`。
+- 既有 hooks 保留；预览算法只准备追加式变更，不覆盖原文件。由于现有事件数组均已存在，内部 ownership 的 `createdEvents` 为 0；这不是“没有 10 个事件”，而是后续会向已有事件数组追加自有条目。
+- CLI 与 host metadata 核对通过，布局为 standalone 0.163.0。
+- 写入：false；启动 Codex：false；启动任务：false；确认部署：false。
+- 摘要脚本编译产物位于临时目录 `/tmp/agent-pet-codex-preview-ASzDdC`，只保留脱敏 `result.json`，不会提交。
+
+本范围 **VERIFIED：真实日常 Codex 目标的只读 hooks 预览与程序 metadata 核对**。仍不等于用户授权部署、原生 `/hooks` 审核、在线连接或任务验收。后续若执行追加，必须再次展示精确文件/条目预览，并单独确认写入与撤回范围。

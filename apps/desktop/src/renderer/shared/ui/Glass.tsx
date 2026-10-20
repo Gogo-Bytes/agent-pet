@@ -5,7 +5,7 @@ type Material = 'control' | 'panel';
 const classes = (material: Material, className?: string) =>
   `glass-surface glass-${material}${className ? ` ${className}` : ''}`;
 
-type LensMap = { width: number; height: number; image: string };
+type LensMap = { width: number; height: number; image: string; specular: string };
 
 /** A rounded bezel bends only background pixels; the middle remains neutral. */
 function makeLensMap(width: number, height: number, radius: number): LensMap | null {
@@ -14,6 +14,11 @@ function makeLensMap(width: number, height: number, radius: number): LensMap | n
   const context = canvas.getContext('2d');
   if (!context) return null;
   const pixels = context.createImageData(width, height);
+  const specularCanvas = document.createElement('canvas');
+  specularCanvas.width = width; specularCanvas.height = height;
+  const specularContext = specularCanvas.getContext('2d');
+  if (!specularContext) return null;
+  const specular = specularContext.createImageData(width, height);
   const halfX = width / 2, halfY = height / 2;
   const r = Math.min(radius, halfX, halfY);
   const bezel = Math.min(9, halfY * .35);
@@ -30,9 +35,13 @@ function makeLensMap(width: number, height: number, radius: number): LensMap | n
     pixels.data[index] = Math.round(128 - Math.sign(px) * nx * bend * 127);
     pixels.data[index + 1] = Math.round(128 - Math.sign(py) * ny * bend * 127);
     pixels.data[index + 2] = 128; pixels.data[index + 3] = 255;
+    const light = Math.max(0, (-Math.sign(px) * nx * .55) + (-Math.sign(py) * ny * .8));
+    const highlight = distance > 0 && distance < bezel ? Math.round(Math.sin(Math.PI * distance / bezel) * light * 78) : 0;
+    specular.data[index] = 255; specular.data[index + 1] = 255; specular.data[index + 2] = 255; specular.data[index + 3] = highlight;
   }
   context.putImageData(pixels, 0, 0);
-  return { width, height, image: canvas.toDataURL() };
+  specularContext.putImageData(specular, 0, 0);
+  return { width, height, image: canvas.toDataURL(), specular: specularCanvas.toDataURL() };
 }
 
 function useLens(material: Material, enabled = true) {
@@ -67,8 +76,10 @@ function useLens(material: Material, enabled = true) {
     {map && <svg className="glass-filter-defs" aria-hidden="true" focusable="false"><defs>
       <filter id={id} x="0" y="0" width={map.width} height={map.height} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
         <feImage href={map.image} width={map.width} height={map.height} preserveAspectRatio="none" result="bezel" />
-        <feDisplacementMap in="SourceGraphic" in2="bezel" scale="12" xChannelSelector="R" yChannelSelector="G" />
-        <feGaussianBlur stdDeviation=".45" />
+        <feDisplacementMap in="SourceGraphic" in2="bezel" scale="12" xChannelSelector="R" yChannelSelector="G" result="refracted" />
+        <feGaussianBlur in="refracted" stdDeviation=".45" result="soft" />
+        <feImage href={map.specular} width={map.width} height={map.height} preserveAspectRatio="none" result="specular" />
+        <feBlend in="soft" in2="specular" mode="screen" />
       </filter>
     </defs></svg>}
     <span className="glass-optics" aria-hidden="true" style={{ '--glass-filter': map ? `url(#${id})` : 'blur(.6px)' } as CSSProperties} />

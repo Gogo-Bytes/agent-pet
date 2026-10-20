@@ -45,7 +45,7 @@ it('uses an exact additive preview, cancels and confirms without inventing an on
   await test.user.click(screen.getByRole('button', { name: '设置连接' })); dialog = screen.getByRole('dialog');
   await test.user.click(within(dialog).getByRole('button', { name: '确认并设置连接' }));
   expect(test.bridge.configurations.confirm).toHaveBeenCalledExactlyOnceWith('codex-one', 'codex-plan');
-  expect(screen.getByRole('heading', { name: '等待首次任务' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: '等待活动' })).toBeTruthy();
   await test.user.click(screen.getByRole('tab', { name: '首页' }));
   expect(test.container.querySelector('[data-pet="codex-one"]')).toBeNull();
   await act(async () => { test.update({ status: 'observing', observedSessions: 1 }); });

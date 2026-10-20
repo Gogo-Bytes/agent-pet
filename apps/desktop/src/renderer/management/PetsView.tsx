@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentConfiguration, PetBinding } from '../../shared/configurations.js';
 import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from '../shared/ui/Glass.js';
-import { Icon } from './components/icons.js';
+import { Icon, type IconName } from './components/icons.js';
 import { Dialog } from './components/Dialog.js';
 import { GlassDrawer } from './components/GlassDrawer.js';
 import { petActions } from './ScenePet.js';
@@ -40,6 +40,8 @@ export function PetsView({ visible, records, name, clips, action, busy, onName, 
   }
   const motions = petActions.filter(value => clips.some(clip => normalizePetAction(clip) === value.id));
   const normalizedAction = normalizePetAction(action);
+  const boundRecords = records.filter(record => record.pet?.assetId === 'starter');
+  const providerIcon = (provider: AgentConfiguration['provider']): IconName => provider === 'codex' ? 'command' : provider === 'claude' ? 'flower' : provider === 'pi' ? 'pi' : 'code';
   useEffect(() => { if (!visible) { setPanel(null); setMotionsOpen(false); setEditing(false); } }, [visible]);
   useEffect(() => {
     if (!motionsOpen) return;
@@ -54,11 +56,11 @@ export function PetsView({ visible, records, name, clips, action, busy, onName, 
         <button disabled={busy || !draft.trim()}>保存</button><button type="button" onClick={endNameEdit}>取消</button>
       </form> : <h1 aria-label={name}><button ref={nameTrigger} className="pet-name-edit" aria-label="修改宠物名称" title={name + ' · 点击修改名称'} disabled={busy}
         onClick={() => { setDraft(name); setNotice(''); setEditing(true); }}>{name}</button></h1>}
-      <div className="pet-binding-tags" aria-label="使用这个宠物的 Agent">
-        {records.filter(record => record.pet?.assetId === 'starter').map(record => <GlassSurface as="span" className="pet-binding-tag" key={record.id}>
-          <i><Icon name="pi" size={16} /></i><span>{record.name}</span><button disabled={busy} aria-label={`解除 ${record.name} 的宠物绑定`} onClick={() => onBind(record.id, null)}><Icon name="close" /></button>
+      <div className={`pet-binding-tags${boundRecords.length > 5 ? ' is-collapsed' : ''}`} aria-label="使用这个宠物的 Agent">
+        {boundRecords.map(record => <GlassSurface as="span" className="pet-binding-tag" key={record.id} title={providerLabels[record.provider]}>
+          <i><Icon name={providerIcon(record.provider)} size={16} /></i><span>{providerLabels[record.provider]}</span><button disabled={busy} aria-label={`解除 ${providerLabels[record.provider]} 连接`} onClick={() => onBind(record.id, null)}><Icon name="close" /></button>
         </GlassSurface>)}
-        <GlassButton className="pet-tag-add" aria-label="配置使用此宠物的 Agent" onClick={() => openPanel('agents')}><Icon name="plus" /></GlassButton>
+        <button className="pet-tag-add flat-icon-button" aria-label="配置使用此宠物的 Agent" onClick={() => openPanel('agents')}><Icon name="plus" /></button>
       </div>
     </div>
     <GlassToolbar className="pet-cycle" aria-label="宠物切换"><GlassAction aria-label="上一个宠物" onClick={() => setNotice('当前收藏只有一只内置宠物。')}><Icon name="left" /></GlassAction>

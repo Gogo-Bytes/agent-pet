@@ -89,10 +89,10 @@ function assignRef<T>(ref: ForwardedRef<T>, node: T | null) {
   else if (ref) ref.current = node;
 }
 
-type ButtonProps = ComponentPropsWithoutRef<'button'> & { material?: Material };
-export const GlassButton = forwardRef<HTMLButtonElement, ButtonProps>(function GlassButton({ material = 'control', className, type = 'button', ...props }, forwardedRef) {
+type ButtonProps = ComponentPropsWithoutRef<'button'> & { material?: Material; flat?: boolean };
+export const GlassButton = forwardRef<HTMLButtonElement, ButtonProps>(function GlassButton({ material = 'control', flat = false, className, type = 'button', ...props }, forwardedRef) {
   const { ref, optics } = useLens(material);
-  return <button ref={node => { ref.current = node; assignRef(forwardedRef, node); }} type={type} className={`${classes(material, className)} glass-button`} {...props}>{optics}{props.children}</button>;
+  return <button ref={node => { ref.current = node; assignRef(forwardedRef, node); }} type={type} className={`${classes(material, `${flat ? 'glass-flat' : ''}${className ? ` ${className}` : ''}`)} glass-button`} {...props}>{flat ? null : optics}{props.children}</button>;
 });
 
 /** Children use transparent native buttons, so this group filters the backdrop once. */

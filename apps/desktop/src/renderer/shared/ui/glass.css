@@ -51,6 +51,10 @@
   box-shadow:var(--glass-rim);
 }
 .glass-button { transition:border-color .16s,box-shadow .16s; }
+.glass-button.glass-flat { background:#eee9fb; border:1px solid #d9d1f6; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+.glass-button.glass-flat::after,.glass-button.glass-flat > .glass-optics { display:none; }
+.glass-button.glass-flat:hover:not(:disabled) { background:#e2d9f8; border-color:#b7a6e4; }
+.glass-button.glass-flat:active:not(:disabled) { background:#d8ccef; }
 .glass-button.glass-surface:hover:not(:disabled) { --glass-fill:var(--glass-hover-fill); border-color:#ffffffa8; }
 .glass-button.glass-surface:is([aria-pressed="true"],[aria-expanded="true"]):not(:disabled) {
   --glass-fill:var(--glass-selected-fill); border-color:#8f77ba99; color:var(--glass-accent);

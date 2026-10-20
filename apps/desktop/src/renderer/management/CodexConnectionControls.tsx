@@ -5,8 +5,8 @@ import { Dialog } from './components/Dialog.js';
 import { Icon } from './components/icons.js';
 export function codexConnectionSummary(state: CodexConnectionState | undefined): { title: string; description: string; tone: 'online' | 'waiting' | 'quiet' | 'error' } {
   switch (state?.status) {
-    case 'observing': return { title: '已连接', description: '已收到 Codex 会话，宠物可以跟随支持的操作作出反应。', tone: 'online' };
-    case 'waiting': return { title: '等待首次任务', description: '照常打开 codex，在 /hooks 中审核 Agent Pet 通知，再发送任务。仅打开空会话暂不会显示宠物。', tone: 'waiting' };
+    case 'observing': return { title: '已连接', description: 'Codex 已连接。', tone: 'online' };
+    case 'waiting': return { title: '等待活动', description: '打开 Codex 并发送任务后，连接会自动出现。', tone: 'waiting' };
     case 'disabled': return { title: '已暂停', description: '不影响 Codex 运行，连接文件会保留。', tone: 'quiet' };
     case 'failed': return { title: '连接需要处理', description: '请查看提示，已有文件会保留。', tone: 'error' };
     default: return { title: '还未连接', description: '设置一次后，照常使用 Codex CLI。', tone: 'quiet' };
@@ -57,12 +57,12 @@ export function CodexConnectionControls({ record, api, run, busy, visible, error
       {state?.canResume && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{state.status === 'disabled' ? '继续连接' : '重新连接'}</button>}
     </div>
     {state && state.notice !== 'none' && <p role="alert">{notices[state.notice]}</p>}
-    <details className="cfg-operation-help"><summary>连接说明</summary><p>首次设置后，请在 Codex 的 /hooks 中审核这 10 条 Agent Pet 通知。通知只报告会话和支持的动作，不读取对话文件，也不会替你执行或审批任务。</p><p>需要首条任务才会收到连接。会话结束以 Codex 通知为准，关闭一个终端窗口可能不会立即结束后台会话。Codex 桌面端尚未支持。</p><p>不会改动 config.toml、登录信息或原有 hooks。暂停只停止接收，移除仅撤回本应用的条目。</p></details>
+    <details className="cfg-operation-help"><summary>连接说明</summary><p>首次设置后，在 Codex 的 <code>/hooks</code> 中审核 Agent Pet 通知，再发送任务。只报告会话和支持的动作，不读取对话或替你执行任务。</p><p>不会改动原有设置；暂停停止接收，移除只撤回本应用条目。</p></details>
     {visible && preview && <Dialog label="连接 Codex CLI" className="cfg-page cfg-dialog" initialFocusRef={cancelButton} onClose={() => { if (!disabled) void run(() => api.cancel(record.id)); }}>
       <div className="cfg-dialog-shell"><header className="cfg-dialog-header"><div className="cfg-dialog-title"><span className="cfg-dialog-emblem"><Icon name="command" /></span><h2>连接 Codex CLI</h2></div><button className="cfg-dialog-close" aria-label="关闭连接预览" disabled={disabled} onClick={() => void run(() => api.cancel(record.id))}><Icon name="close" /></button></header>
         <section className="cfg-dialog-body"><h3>{preview.canApply ? '添加 Agent Pet 通知' : '暂时无法添加'}</h3><code className="cfg-file-path" title={preview.path}>{preview.path}</code><p>{preview.canApply ? '只追加 10 条通知，保留原有内容。' : '请检查文件格式、权限、禁用设置或已有条目。原文件会保留。'}</p>
-          <p>之后在 Codex 的 /hooks 中审核通知，发送首条任务后连接。</p>
-          <details className="cfg-operation-help"><summary>文件与保存说明</summary><p>将检查所选程序和配置文件夹的安全信息，仅修改上方 hooks.json。在应用私有目录保存原文件备份、通知助手和连接记录。不会改 config.toml、登录信息或 shell 设置，不启动 Codex。应用下次启动会恢复接收；主动暂停的连接保持暂停。</p><code className="cfg-file-path" title={preview.executable}>{preview.executable}</code><p>被修改或来源不明的文件会保留。移除只撤回本产品条目，不恢复整份旧备份。</p></details>
+          <p>审核通知后发送任务，连接会自动出现。</p>
+          <details className="cfg-operation-help"><summary>文件与保存说明</summary><p>只追加上方 <code>hooks.json</code> 条目，原有内容保留。连接材料保存在应用私有目录，不读取登录信息、会话或对话。</p><code className="cfg-file-path" title={preview.executable}>{preview.executable}</code><p>移除只撤回本产品条目，不覆盖后续修改。</p></details>
           {error && <p role="alert">{error}</p>}
         </section><footer className="cfg-dialog-footer"><div><button ref={cancelButton} className="cfg-secondary" disabled={disabled} onClick={() => void run(() => api.cancel(record.id))}>取消</button><button className="cfg-primary" disabled={disabled || !preview.canApply} onClick={() => void run(() => api.confirm(record.id, preview.id))}>{disabled ? '正在保存…' : '确认并设置连接'}</button></div></footer>
       </div>

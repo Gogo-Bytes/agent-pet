@@ -30,6 +30,8 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Codex CLI 输入边界（2026-10-19）
 
+**错误反馈契约核对（2026-10-20）：** 官方文档及同版本固定源码确认，现有 hooks 的普通命令结果缺少统一可靠的失败事实，部分处理器失败还会省略 PostToolUse；不解析正文猜错、不照搬 Claude 错误事件。新增8项跨 normalize/Application/宠物投影回归，连同相关模块61项、typecheck/源码build通过。现有执行/写入/取消保持；独立错误仍未支持，不修改日常observer/hooks或重启dev、不打包。详见[版本证据、行为与后续接口条件](CODEX-ERROR-FEEDBACK-LIMIT.md)。
+
 **细分动作实测（2026-10-20，Main自行验证）：** 用户委托开发验证由Main操作。独立日常CLI测试会话实际命令/apply_patch/取消/exit7，App匿名记录证实executing、writing、cancelled及回idle，连接保持；exit7不制造成功/取消，但独立error反馈仍未实现，不能称已支持。原记录停止更新后仅一次恢复并补测，旧证据保留。53项相关回归、typecheck、源码build通过。测试TUI退出0、记录版dev退出0，已回普通dev，原配置/hooks/token/已有Agent保持，无打包/推送。缺少本轮原生CUA/实际动画截图，资产动画视觉未验收；模型错误/独立读取搜索/等待/并发/桌面端等保留。[范围、实测与限制](CODEX-TASK-LIVE-VERIFY-PREVIEW.md#最终实测结果2026-10-20)。
 
 **日常CLI基础接入通过（最新）：** 已按精确授权追加10组自有hooks，用户正常codex启动、原生审核和一次任务后确认已连接/首页有宠物；实际普通dev的AX和真实GLB截图也确认Codex宠物出现。pi/Claude记录、原配置/token保留，匿名临时记录已关闭，继续普通dev，不打包。12项相关回归、typecheck、源码build通过。本轮原生聚焦点击因CUA失败未覆盖；工具/错误/取消/等待/并发/系统重启矩阵、自动扫描/其他安装方式、Codex桌面端及发布未验收。终端killed具体原因未定，撤回仍失败/恢复后新终端成功的证据不扩大成因果结论。见[日常验收与授权记录](CODEX-DAILY-CONNECTION-PREVIEW.md#最终结果2026-10-19)。下方未部署/待授权条目均为此前阶段快照。

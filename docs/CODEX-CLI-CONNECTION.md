@@ -42,3 +42,6 @@
 ## 细分动作实测（2026-10-20）
 
 Main在独立日常CLI会话自行验证，真实共享状态记录executing/writing/cancelled与回idle，原生apply_patch/取消均实际执行；故意exit7仍只提供执行反馈，独立出错动作未实现，不因工具返回或Stop制造成功。53项回归、typecheck/源码build通过；已关闭记录并回普通dev，原配置/hooks/登录不变，无打包。原生界面工具本轮不可用，没有动画视觉截图验收。[完整证据与剩余缺口](CODEX-TASK-LIVE-VERIFY-PREVIEW.md#最终实测结果2026-10-20)。后续开发测试按用户委托由Main完成，用户只做最终交付验收；涉及新真实权限/范围/成本仍明确说明。
+
+
+2026-10-20 出错反馈契约已核对：当前0.163.0 hooks不能可靠区分普通命令失败/模型失败；不读取正文猜测。新增8项跨模块回归，相关61项/typecheck/源码build通过，运行代码与日常配置保持。[证据与后续条件](CODEX-ERROR-FEEDBACK-LIMIT.md)。

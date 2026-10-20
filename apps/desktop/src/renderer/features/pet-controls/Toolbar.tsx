@@ -57,13 +57,13 @@ export function Toolbar({ bridge, layout, engaged, hidden, onToggle, pageVisible
       if (element.current && !element.current.contains(document.activeElement)) setFocused(false);
     })}>
     <Tooltip label={label} rect={layout?.pet} disabled={!visible}>
-      <GlassAction className="bubble-toggle" aria-label={label} aria-pressed={hidden} onClick={onToggle}>
+      <GlassAction iconOnly className="bubble-toggle" aria-label={label} aria-pressed={hidden} onClick={onToggle}>
         {hidden ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
       </GlassAction>
     </Tooltip>
     <span className={styles.divider} aria-hidden="true" />
     <Tooltip label="调整大小（方向键）" rect={layout?.pet} disabled={!visible}>
-      <GlassAction className={`resize-handle ${styles.resize}`} aria-label="调整宠物窗口大小" {...resize.handlers}>
+      <GlassAction iconOnly className={`resize-handle ${styles.resize}`} aria-label="调整宠物窗口大小" {...resize.handlers}>
         <MoveDiagonal2 aria-hidden="true" />
       </GlassAction>
     </Tooltip>

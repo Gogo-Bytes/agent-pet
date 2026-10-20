@@ -63,10 +63,10 @@ export function PetsView({ visible, records, name, clips, action, busy, onName, 
         <button className="pet-tag-add flat-icon-button" aria-label="配置使用此宠物的 Agent" onClick={() => openPanel('agents')}><Icon name="plus" /></button>
       </div>
     </div>
-    <GlassToolbar className="pet-cycle" aria-label="宠物切换"><GlassAction aria-label="上一个宠物" onClick={() => setNotice('当前收藏只有一只内置宠物。')}><Icon name="left" /></GlassAction>
+    <GlassToolbar className="pet-cycle" aria-label="宠物切换"><GlassAction iconOnly aria-label="上一个宠物" onClick={() => setNotice('当前收藏只有一只内置宠物。')}><Icon name="left" /></GlassAction>
       <GlassAction className="pet-grid-open" aria-label="打开宠物收藏" onClick={() => openPanel('pets')}><Icon name="grid" /><small>1 / 1</small></GlassAction>
-      <GlassAction aria-label="下一个宠物" onClick={() => setNotice('当前收藏只有一只内置宠物。')}><Icon name="right" /></GlassAction></GlassToolbar>
-    <div className="pet-animation-picker"><GlassToolbar className="pet-animation-toolbar" aria-label="动画预览"><GlassAction disabled={!motions.length} aria-label="重新播放当前动画" onClick={() => onAction(action)}><Icon name="replay" /></GlassAction>
+      <GlassAction iconOnly aria-label="下一个宠物" onClick={() => setNotice('当前收藏只有一只内置宠物。')}><Icon name="right" /></GlassAction></GlassToolbar>
+    <div className="pet-animation-picker"><GlassToolbar className="pet-animation-toolbar" aria-label="动画预览"><GlassAction iconOnly disabled={!motions.length} aria-label="重新播放当前动画" onClick={() => onAction(action)}><Icon name="replay" /></GlassAction>
       <button ref={motionTrigger} className="glass-action" disabled={!motions.length} aria-label="选择动画" aria-expanded={motionsOpen} aria-controls="motion-palette" onClick={() => setMotionsOpen(value => !value)}><Icon name="play" />{motions.find(value => value.id === normalizePetAction(action))?.label ?? (motions.length ? '选择动作' : '静态展示')}<Icon name={motionsOpen ? 'up' : 'down'} /></button></GlassToolbar>
       {motionsOpen && <GlassSurface material="panel" as="section" className="motion-palette" id="motion-palette" aria-label="选择动画"><header><strong>动作</strong><small>{motions.length}</small></header>
         <label className="surface-search glass-inset"><Icon name="search" /><input aria-label="搜索动画" value={query} placeholder="搜索动作" onChange={event => setQuery(event.target.value)} /></label>

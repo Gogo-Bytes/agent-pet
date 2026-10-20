@@ -62,9 +62,9 @@
 .glass-button.glass-surface:active:not(:disabled) { --glass-fill:var(--glass-active-fill); }
 .glass-button:disabled { color:#8b8195; box-shadow:none; cursor:default; }
 .glass-button:focus-visible,.flat-control:focus-visible,.glass-toolbar>button:focus-visible { outline:3px solid #7460b0; outline-offset:3px; }
-.glass-toolbar>button { border:1px solid #ded6eb; background:#f4f0fa; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
-.glass-toolbar>button:hover { background:#fff; border-color:#c8b9df; }
-.glass-toolbar>button[aria-expanded="true"] { background:#8069d7; border-color:#8069d7; color:#fff; }
+.glass-toolbar>button { border:1px solid transparent; background:transparent; backdrop-filter:none; }
+.glass-toolbar>button:hover { background:#ffffff52; }
+.glass-toolbar>button[aria-expanded="true"] { background:#b69cde30; color:var(--glass-accent); }
 /* Floating desktop controls must stay readable over light and dark wallpaper. */
 .glass-surface[data-contrast="high"] { --glass-ink:#49395f; --glass-secondary-ink:#655370; }
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
@@ -106,8 +106,15 @@
   border-radius:var(--glass-action-radius); color:var(--glass-ink);
   transition:background .16s, color .16s;
 }
-.glass-toolbar > .glass-action:active { background:#e3daf3; border-color:#c8b9df; }
+.glass-toolbar > .glass-action:active { background:#a499bd32; }
 .glass-action .ui-icon, .glass-button .ui-icon { width:var(--glass-icon-size); height:var(--glass-icon-size); }
+/* Icon-only actions are the flat functional layer inside a glass group. */
+.glass-toolbar > .glass-action.icon-only {
+  background:#eee9fb; border:1px solid #d9d1f6; box-shadow:none;
+}
+.glass-toolbar > .glass-action.icon-only:hover { background:#e2d9f8; border-color:#b7a6e4; box-shadow:none; }
+.glass-toolbar > .glass-action.icon-only:active { background:#d8ccef; border-color:#b7a6e4; box-shadow:none; }
+.glass-toolbar > .glass-action.icon-only:is([aria-expanded="true"],[aria-pressed="true"]) { background:#8069d7; border-color:#8069d7; color:#fff; box-shadow:none; }
 @media(prefers-reduced-motion:reduce) { .glass-action { transition:none; } }
 @media(forced-colors:active) {
   .glass-toolbar > .glass-action { color:ButtonText; }
@@ -122,22 +129,22 @@
   --glass-inner-hover: linear-gradient(145deg,#ffffff73,#f2eafb33);
 }
 .glass-surface .glass-choice,.glass-toolbar > .glass-action {
-  border:1px solid #ded6eb; box-shadow:none; background:#f4f0fa;
-  color:var(--glass-ink); transition:background .18s,border-color .18s,color .18s;
+  border:1px solid transparent; box-shadow:none; background:transparent;
+  color:var(--glass-ink); transition:background .18s,box-shadow .18s,border-color .18s;
 }
 .glass-surface .glass-choice:hover,.glass-toolbar > .glass-action:hover {
-  background:#fff; border-color:#c8b9df; box-shadow:none;
+  background:var(--glass-inner-hover); box-shadow:var(--glass-inner-rim);
 }
 .glass-surface .glass-choice[aria-pressed="true"],.glass-toolbar > .glass-action:is([aria-expanded="true"],[aria-pressed="true"]) {
-  background:#8069d7; border-color:#8069d7;
-  color:#fff; box-shadow:none;
+  background:var(--glass-inner-selected); border-color:#ffffffa3;
+  color:var(--glass-accent); box-shadow:var(--glass-inner-rim),var(--glass-inner-lift);
 }
 .glass-surface .glass-choice:active,.glass-toolbar > .glass-action:active {
-  box-shadow:none; background:#e3daf3;
+  box-shadow:inset 0 1px 3px #7653901a; background:#c7b5dc26;
 }
 .glass-surface .glass-inset {
-  background:#fff; border:1px solid #ded6eb;
-  box-shadow:none;
+  background:linear-gradient(160deg,#a38aba0d,#ffffff33); border:1px solid #8a709815;
+  box-shadow:inset 0 1px 3px #7859910e,0 1px 0 #ffffff9c;
 }
 .glass-surface .glass-inset:focus-within { outline:none; border-color:#ffffff80; box-shadow:inset 0 1px 3px #7859910e,0 0 0 2px #8871be; }
 @media(prefers-reduced-transparency:reduce),(prefers-contrast:more) {
@@ -153,3 +160,13 @@
   .glass-surface .glass-inset { border-color:CanvasText; background:Canvas; box-shadow:none; }
   .glass-surface .glass-inset:focus-within { outline:2px solid Highlight; outline-offset:2px; border-color:CanvasText; box-shadow:none; }
 }
+
+/* Keep icon-only actions flat even when a pressed/hovered text-action rule also matches. */
+.glass-toolbar > button.glass-action.icon-only,
+.glass-toolbar > button.glass-action.icon-only:hover,
+.glass-toolbar > button.glass-action.icon-only:active {
+  background:#eee9fb; border:1px solid #d9d1f6; box-shadow:none; color:var(--glass-ink);
+}
+.glass-toolbar > button.glass-action.icon-only:hover { background:#e2d9f8; border-color:#b7a6e4; }
+.glass-toolbar > button.glass-action.icon-only:active { background:#d8ccef; }
+.glass-toolbar > button.glass-action.icon-only:is([aria-expanded="true"],[aria-pressed="true"]) { background:#8069d7; border-color:#8069d7; color:#fff; box-shadow:none; }

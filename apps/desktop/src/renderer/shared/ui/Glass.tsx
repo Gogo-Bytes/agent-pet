@@ -35,13 +35,13 @@ function makeLensMap(width: number, height: number, radius: number): LensMap | n
   return { width, height, image: canvas.toDataURL() };
 }
 
-function useLens(material: Material) {
+function useLens(material: Material, enabled = true) {
   const ref = useRef<HTMLElement>(null);
   const id = `glass-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [map, setMap] = useState<LensMap | null>(null);
   useLayoutEffect(() => {
     const element = ref.current;
-    if (!element || material !== 'control' || typeof ResizeObserver === 'undefined') { setMap(null); return; }
+    if (!enabled || !element || material !== 'control' || typeof ResizeObserver === 'undefined') { setMap(null); return; }
     let frame = 0;
     let previous = '';
     const observer = new ResizeObserver(() => {
@@ -62,7 +62,7 @@ function useLens(material: Material) {
     });
     observer.observe(element);
     return () => { observer.disconnect(); cancelAnimationFrame(frame); };
-  }, [material]);
+  }, [enabled, material]);
   const optics = <>
     {map && <svg className="glass-filter-defs" aria-hidden="true" focusable="false"><defs>
       <filter id={id} x="0" y="0" width={map.width} height={map.height} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
@@ -91,7 +91,7 @@ function assignRef<T>(ref: ForwardedRef<T>, node: T | null) {
 
 type ButtonProps = ComponentPropsWithoutRef<'button'> & { material?: Material; flat?: boolean };
 export const GlassButton = forwardRef<HTMLButtonElement, ButtonProps>(function GlassButton({ material = 'control', flat = false, className, type = 'button', ...props }, forwardedRef) {
-  const { ref, optics } = useLens(material);
+  const { ref, optics } = useLens(material, !flat);
   const buttonClass = flat ? `flat-control${className ? ` ${className}` : ''}` : `${classes(material, className)} glass-button`;
   return <button ref={node => { ref.current = node; assignRef(forwardedRef, node); }} type={type} className={`${buttonClass}${flat ? ' glass-button' : ''}`} {...props}>{flat ? null : optics}{props.children}</button>;
 });
@@ -103,6 +103,7 @@ export const GlassToolbar = forwardRef<HTMLDivElement, ComponentPropsWithoutRef<
 });
 
 /** Transparent native action inside one shared material; never another lens. */
-export const GlassAction = forwardRef<HTMLButtonElement, ComponentPropsWithoutRef<'button'>>(function GlassAction({ className = '', type = 'button', ...props }, ref) {
-  return <button ref={ref} type={type} className={`glass-action ${className}`} {...props} />;
+type ActionProps = ComponentPropsWithoutRef<'button'> & { iconOnly?: boolean };
+export const GlassAction = forwardRef<HTMLButtonElement, ActionProps>(function GlassAction({ className = '', iconOnly = false, type = 'button', ...props }, ref) {
+  return <button ref={ref} type={type} className={`glass-action${iconOnly ? ' icon-only' : ''}${className ? ` ${className}` : ''}`} {...props} />;
 });

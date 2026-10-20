@@ -1,6 +1,6 @@
 import net from 'node:net';
 import {expect,it,vi} from 'vitest';
-import {startAccountProxy} from './account-proxy.mjs';
+import {startAccountProxy,isOfficialAuthority} from './account-proxy.mjs';
 async function request(proxy,target,authorize=true,method='CONNECT',keepAlive=false) {
  const url=new URL(proxy.environment.HTTPS_PROXY);
  const auth=Buffer.from(decodeURIComponent(url.username)+':'+decodeURIComponent(url.password)).toString('base64');
@@ -20,6 +20,8 @@ it('refuses every other destination, unauthenticated tunnels and plain HTTP with
   expect(await request(proxy,'chatgpt.com:443',false)).toContain('403 Forbidden');
   expect(await request(proxy,'https://chatgpt.com/',true,'GET')).toContain('403 Forbidden');
   expect(connect).not.toHaveBeenCalled();
+  expect(proxy.summary()).toMatchObject({accepted:0,blockedDestination:5,blockedAuthentication:1,blockedHttp:1});
+  expect(JSON.stringify(proxy.summary())).not.toMatch(/agent-pet:|Proxy-Authorization|chatgpt/);
  } finally{await proxy.stop();}
 });
 it('accepts only the authenticated fixed TLS route and closes active fixture tunnels on stop',async()=>{
@@ -34,6 +36,23 @@ it('accepts only the authenticated fixed TLS route and closes active fixture tun
   tunnel.socket.write('opaque fixture');expect(await data).toBe('opaque fixture');
   const closed=new Promise(resolve=>tunnel.socket.once('close',resolve));
   await proxy.stop();await closed;expect(tunnel.socket.destroyed).toBe(true);
+  expect(proxy.summary()).toMatchObject({accepted:1,connected:1,upstreamFailed:0});
+  expect(proxy.summary().clientBytes).toBeGreaterThan(0);expect(proxy.summary().serverBytes).toBeGreaterThan(0);
  }
  finally{await proxy.stop();await proxy.stop();for(const socket of peers)socket.destroy();await new Promise(resolve=>upstream.close(resolve));}
+});
+
+it('accepts only the fixed official TLS authority and never URL paths, credentials or non-TLS ports',()=>{
+ for(const value of ['chatgpt.com:443','chatgpt.com','CHATGPT.COM:443'])expect(isOfficialAuthority(value)).toBe(true);
+ for(const value of ['chatgpt.com:80','chatgpt.com.evil:443','chatgpt.com:443/','user@chatgpt.com:443','https://chatgpt.com','chatgpt.com:0443',null])expect(isOfficialAuthority(value)).toBe(false);
+});
+it('queues a normal burst of twelve startup tunnels without dropping the account connection',async()=>{
+ const peers=new Set();const upstream=net.createServer(socket=>{peers.add(socket);socket.once('close',()=>peers.delete(socket));});
+ await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve));
+ const proxy=await startAccountProxy({connect:()=>net.connect({host:'127.0.0.1',port:upstream.address().port})});
+ try {
+  const results=await Promise.all(Array.from({length:12},()=>request(proxy,'chatgpt.com:443')));
+  expect(results.every(value=>value.includes('200 Connection Established'))).toBe(true);
+  expect(proxy.summary()).toMatchObject({accepted:12,connected:12,capacityRejected:0,blockedDestination:0});
+ } finally{await proxy.stop();for(const peer of peers)peer.destroy();await new Promise(resolve=>upstream.close(resolve));}
 });

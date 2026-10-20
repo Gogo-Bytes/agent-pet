@@ -28,17 +28,20 @@ export async function probeCodexStart(options: {
   timeoutMs?: number;
   sandboxMode?: 'read-only' | 'readOnly';
   mode?: 'start' | 'hooks-only';
-  resultFileName?: 'review-status.json' | 'review-start.json' | 'auth-review-status.json' | 'auth-review-start.json' | 'network-review-status.json' | 'network-review-start.json';
+  waitForSessionStart?: boolean;
+  resultFileName?: 'review-status.json' | 'review-start.json' | 'auth-review-status.json' | 'auth-review-start.json' | 'network-review-status.json' | 'network-review-start.json' | 'wait-review-start.json' | 'shape-review-start.json';
   expectedHookCommand?: string;
 }) {
-  if (options.resultFileName && !['review-status.json', 'review-start.json', 'auth-review-status.json', 'auth-review-start.json', 'network-review-status.json', 'network-review-start.json'].includes(options.resultFileName)) throw new Error('Invalid isolated result path');
+  if (options.resultFileName && !['review-status.json', 'review-start.json', 'auth-review-status.json', 'auth-review-start.json', 'network-review-status.json', 'network-review-start.json', 'wait-review-start.json', 'shape-review-start.json'].includes(options.resultFileName)) throw new Error('Invalid isolated result path');
   const token = randomBytes(32).toString('hex'), runId = randomUUID();
   let child: ChildProcessWithoutNullStreams | undefined, live = false, stopping = false;
   const events: { kind: string; hasTurnId: boolean; hasChildId: boolean; source?: string }[] = [];
+  let observedStart = () => {};
   const receiver = await startCodexHookReceiver({ token, acceptRun: id => live && id === runId,
     onFact: ({ fact }) => {
       if (events.length < 32) events.push({ kind: fact.kind, hasTurnId: Boolean(fact.turnId), hasChildId: Boolean(fact.childId),
         ...(fact.kind === 'session-started' ? { source: fact.source } : {}) });
+      if(fact.kind==='session-started')observedStart();
     } });
   const result = { initialized: false, threadStarted: false, rpcError: false,
     serverRequest: false, hookStatus: null as HookStatusSummary | null, readOnlyMode: options.sandboxMode ?? 'readOnly', rpcErrorKind: 'none', rpcErrorCode: null as number | null, outcome: 'closed', stdoutBytes: 0, stderrBytes: 0, events };
@@ -49,6 +52,7 @@ export async function probeCodexStart(options: {
     await new Promise<void>(resolve => {
       let buffer = '', settled = false;
       let force: ReturnType<typeof setTimeout> | undefined;
+      let hookDeadline: ReturnType<typeof setTimeout> | undefined;
       let termination: Promise<void> = Promise.resolve(), terminated: (() => void) | undefined;
       const finish = () => {
         if (settled) return; settled = true; clearTimeout(deadline);
@@ -62,7 +66,7 @@ export async function probeCodexStart(options: {
         void termination.then(resolve);
       };
       const stop = (outcome: string) => {
-        if (stopping) return; stopping = true; result.outcome = outcome;
+        if (stopping) return; stopping = true; clearTimeout(hookDeadline); result.outcome = outcome;
         termination = new Promise<void>(done => { terminated = done; });
         // Only this explicitly created child process group can be stopped.
         if (proc.pid) { try { process.kill(-proc.pid, 'SIGTERM'); } catch { /* exited */ } }
@@ -72,6 +76,7 @@ export async function probeCodexStart(options: {
           terminated?.(); finish();
         }, 1000);
       };
+      observedStart = () => {if(result.threadStarted && !stopping)stop('thread-started');};
       const send = (value: unknown) => { if (!stopping) proc.stdin.write(JSON.stringify(value) + '\n'); };
       proc.stdin.on('error', () => stop('input-closed'));
       const deadline = setTimeout(() => stop('timeout'), options.timeoutMs ?? 10000);
@@ -110,8 +115,10 @@ export async function probeCodexStart(options: {
             const thread = (value.result as { thread?: { id?: unknown } }).thread;
             if (!thread || typeof thread.id !== 'string' || !thread.id || thread.id.length > 256) { stop('invalid-protocol'); return; }
             result.threadStarted = true;
-            // SessionStart is synchronous in our document; no arbitrary wait or turn request.
-            stop('thread-started');
+            // Thread acknowledgement and an actual hook callback are independent facts.
+            if(options.waitForSessionStart && !events.some(event=>event.kind==='session-started'))
+              hookDeadline=setTimeout(()=>stop('hook-not-observed'),2500);
+            else stop('thread-started');
           } else if (value.method && value.id !== undefined) {
             result.serverRequest = true; stop('server-request');
           }

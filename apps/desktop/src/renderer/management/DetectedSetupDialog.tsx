@@ -7,7 +7,7 @@ import { Icon } from './components/icons.js';
 /** Read consent for a Main-resolved default only. Closing also revokes in-flight work. */
 export function DetectedSetupDialog({ installationId, targetPath, provider = 'pi', state, bridge, run, onClose, onPrepared, onCancelError }: {
   installationId: string; targetPath: string; state: ConfigurationsState; bridge: ManagementBridge;
-  provider?: 'pi' | 'claude';
+  provider?: 'pi' | 'claude' | 'codex';
   run(work: () => Promise<ConfigurationsState>): Promise<boolean>;
   onClose(): void; onPrepared(id: string): void;
   onCancelError(message: string): void;
@@ -35,7 +35,7 @@ export function DetectedSetupDialog({ installationId, targetPath, provider = 'pi
     } };
     pending.current = job;
     const saved = await run(async () => {
-      const result = await Promise.race([provider === 'claude' ? bridge.configurations.prepareDetectedClaude(installationId, requestId) : bridge.configurations.prepareDetected(installationId, requestId), cancellation]);
+      const result = await Promise.race([provider === 'codex' ? bridge.configurations.prepareDetectedCodex(installationId, requestId) : provider === 'claude' ? bridge.configurations.prepareDetectedClaude(installationId, requestId) : bridge.configurations.prepareDetected(installationId, requestId), cancellation]);
       if (!cancelled) { configurationId = result.configurationId; timedOut = result.reason === 'timeout'; }
       return result.state;
     });
@@ -46,11 +46,11 @@ export function DetectedSetupDialog({ installationId, targetPath, provider = 'pi
     else if (saved && configurationId) onPrepared(configurationId);
     else if (!saved) setError('检查未完成，尚未确认结果。请重试或取消后重新扫描。');
   }
-  const label = provider === 'claude' ? 'Claude Code' : 'pi';
+  const label = provider === 'codex' ? 'Codex CLI' : provider === 'claude' ? 'Claude Code' : 'pi';
   return <Dialog label={`连接 ${label}`} className="cfg-page cfg-dialog cfg-compact-dialog" onClose={close}>
-    <div className="cfg-dialog-shell"><header className="cfg-dialog-header"><div className="cfg-dialog-title"><span className="cfg-dialog-emblem"><Icon name={provider === 'claude' ? 'flower' : 'pi'} /></span><h2>连接 {label}</h2></div><button className="cfg-dialog-close" aria-label="取消配置检查" onClick={close}><Icon name="close" /></button></header>
+    <div className="cfg-dialog-shell"><header className="cfg-dialog-header"><div className="cfg-dialog-title"><span className="cfg-dialog-emblem"><Icon name={provider === 'codex' ? 'command' : provider === 'claude' ? 'flower' : 'pi'} /></span><h2>连接 {label}</h2></div><button className="cfg-dialog-close" aria-label="取消配置检查" onClick={close}><Icon name="close" /></button></header>
       <section className="cfg-dialog-body"><p className="cfg-consent-intro">先检查配置文件夹，不会改动 {label} 文件。</p><code className="cfg-file-path" title={targetPath}>{targetPath}</code>
-        <details><summary>检查范围</summary><p>{provider === 'claude' ? '仅重新核对选中的程序链接和安装包 metadata，检查这个文件夹及上级文件夹的安全性，并读取 settings.json（最多 64 KiB）。不会读取登录信息、会话或对话，不更改原有设置，也不会启动 Claude。下一步仍需你确认后才添加连接。' : '只检查这个文件夹及上级文件夹的安全性，读取 settings.json、extensions/package.json，并查看扩展入口和忽略规则。不读取对话、会话或登录信息，不更改原有设置，也不会启动或重新加载 pi。'}</p></details>
+        <details><summary>检查范围</summary><p>{provider === 'codex' ? '重新核对选中的程序和固定后台程序入口，检查配置文件夹及上级文件夹，并读取 hooks.json（最多 64 KiB）。不读取登录信息、配置正文、会话或对话，不启动 Codex。下一步仍需你确认后才添加通知，原有 hooks 会保留。' : provider === 'claude' ? '仅重新核对选中的程序链接和安装包 metadata，检查这个文件夹及上级文件夹的安全性，并读取 settings.json（最多 64 KiB）。不会读取登录信息、会话或对话，不更改原有设置，也不会启动 Claude。下一步仍需你确认后才添加连接。' : '只检查这个文件夹及上级文件夹的安全性，读取 settings.json、extensions/package.json，并查看扩展入口和忽略规则。不读取对话、会话或登录信息，不更改原有设置，也不会启动或重新加载 pi。'}</p></details>
         {checking && <p role="status">正在检查，可随时取消。</p>}{error && <p role="alert">{error}</p>}
       </section><footer className="cfg-dialog-footer"><div><button className="co-secondary" onClick={close}>{checking ? '取消检查' : '取消'}</button><button className="co-primary" disabled={checking} onClick={() => void prepare()}>检查并预览<Icon name="right" /></button></div></footer>
     </div>

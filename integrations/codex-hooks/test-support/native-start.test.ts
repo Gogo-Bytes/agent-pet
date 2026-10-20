@@ -99,3 +99,34 @@ it('rejects arbitrary result paths before launching and preserves exclusive revi
     expect(await readFile(join(root,'review-status.json'),'utf8')).toBe(first);
   } finally { await rm(root,{recursive:true,force:true}); }
 });
+
+it('keeps the authenticated receiver alive for a SessionStart arriving after the thread acknowledgement', async () => {
+  const root=await mkdtemp(join(tmpdir(),'agent-pet-codex-hook-order-'));
+  const code=`const readline=require('node:readline'),http=require('node:http'),crypto=require('node:crypto');
+readline.createInterface({input:process.stdin}).on('line',line=>{
+ const request=JSON.parse(line);
+ if(request.id===1)console.log(JSON.stringify({id:1,result:{}}));
+ if(request.id===2){console.log(JSON.stringify({id:2,result:{thread:{id:'fixture'}}}));setTimeout(()=>{
+ const body=JSON.stringify({schemaVersion:1,runId:process.env.AGENT_PET_CODEX_RUN_ID,eventId:crypto.randomUUID(),fact:{kind:'session-started',providerSessionId:'fixture',source:'startup'}});
+ const req=http.request(process.env.AGENT_PET_CODEX_URL,{method:'POST',headers:{Authorization:'Bearer '+process.env.AGENT_PET_CODEX_TOKEN,'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}},res=>res.resume());req.on('error',()=>{});req.end(body);
+ },50);}
+});`;
+  try {
+    await mkdir(join(root,'work'));
+    const result=await probeCodexStart({root,timeoutMs:1000,
+      waitForSessionStart:true,
+      launch:env=>spawn(process.execPath,['-e',code],{detached:true,env,stdio:['pipe','pipe','pipe']})});
+    expect(result.threadStarted).toBe(true);
+    expect(result.events).toContainEqual({kind:'session-started',hasTurnId:false,hasChildId:false,source:'startup'});
+  } finally {await rm(root,{recursive:true,force:true});}
+});
+
+it('never treats thread acknowledgement alone as the expected hook callback',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'agent-pet-codex-no-hook-'));
+ try {
+  await mkdir(join(root,'work'));
+  const result=await probeCodexStart({root,timeoutMs:100,waitForSessionStart:true,
+   launch:()=>spawn(process.execPath,['-e',source],{detached:true,env:{MODE:'ok',ROOT:root},stdio:['pipe','pipe','pipe']})});
+  expect(result.threadStarted).toBe(true);expect(result.events).toEqual([]);expect(result.outcome).toBe('timeout');
+ } finally{await rm(root,{recursive:true,force:true});}
+});

@@ -158,7 +158,7 @@ export async function identifyInstallation(path: string, id: string, directory =
   } catch (error) { if (finding(error) === 'budget') throw error; return candidate; }
 }
 
-export function scanPaths(home: string, guiPath: string, command: 'pi' | 'claude' = 'pi'): string[] {
+export function scanPaths(home: string, guiPath: string, command: 'pi' | 'claude' | 'codex' = 'pi'): string[] {
   // Ignore empty/relative PATH entries (never inspect the process cwd); no shell expansion.
   const entries = guiPath.slice(0, 32768).split(':').slice(0, limits.pathEntries);
   return [...new Set([...entries, '/opt/homebrew/bin', '/usr/local/bin', join(home, '.local/bin')]
@@ -167,7 +167,7 @@ export function scanPaths(home: string, guiPath: string, command: 'pi' | 'claude
 
 /** Finder does not inherit shell NVM setup. Inspect only one fixed version-manager directory,
  * never shell profiles, arbitrary sibling trees or executable output. */
-export async function discoverScanPaths(home: string, guiPath: string, budget = new ReadBudget(), command: 'pi' | 'claude' = 'pi'): Promise<{ paths: string[]; limited: boolean }> {
+export async function discoverScanPaths(home: string, guiPath: string, budget = new ReadBudget(), command: 'pi' | 'claude' | 'codex' = 'pi'): Promise<{ paths: string[]; limited: boolean }> {
   const base = scanPaths(home, guiPath, command);
   const root = join(home, '.nvm/versions/node');
   const versions: string[] = [];

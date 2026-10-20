@@ -14,7 +14,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   const configListeners = new Set<(value: ConfigurationsState) => void>();
   const sessionListeners = new Set<(value: SessionState) => void>();
   const paths = scenario === 'detail-long-path' ? [`/test/AgentPet/${'a-very-long-project-directory/'.repeat(12)}pi-config`] : ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
-  if (scenario !== 'empty' && scenario !== 'scan-new' && !scenario.startsWith('claude-')) paths.forEach((path, index) => {
+  if (scenario !== 'empty' && scenario !== 'scan-new' && scenario !== 'codex-scan-new' && !scenario.startsWith('claude-') && !scenario.startsWith('codex-')) paths.forEach((path, index) => {
     const id = `review-${index}`;
     const record: ConfigurationMetadata = { id, name: ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? 'pi 默认配置' : index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };
     configs.records.push({ ...record, availability: 'available', inspection: { target: { path, source: 'chosen' }, findings: [] }, connection: { ...base, status: 'connected', receiving: 'active', saved: 'ready', canConfigure: false, canRemove: true, deployedPath: `${path}/extensions/agent-pet.ts` } });
@@ -42,6 +42,19 @@ export function createReviewBridge(scenario: string): ManagementBridge {
       observedAt: '2026-10-18T00:00:00Z', capabilities: { reading: 'supported' },
       facts: { activities: [], waitingForInput: false, recentActivity: { id: 'review-recent', kind: 'reading' } } });
   }
+  if (scenario.startsWith('codex-') && scenario !== 'codex-scan-new') {
+    configs.records = [{ id: 'review-codex', name: '我的 Codex', provider: 'codex', targetPath: '/示例/.codex', installation: null,
+      pet: null, availability: scenario === 'codex-error' ? 'attention' : 'available', inspection: null, connection: null,
+      codex: { revision: 0, status: scenario === 'codex-online' ? 'observing' : scenario === 'codex-waiting' ? 'waiting' :
+        scenario === 'codex-error' ? 'failed' : 'not-configured', configured: scenario !== 'codex-preview', busy: false,
+        observedSessions: scenario === 'codex-online' ? 1 : 0, canConfigure: scenario === 'codex-preview', canResume: scenario === 'codex-error',
+        preview: null, notice: scenario === 'codex-error' ? 'saved-invalid' : 'none' } }];
+    if (scenario === 'codex-online') {
+      configs.sessionConfigurations = { 'review-codex-session': 'review-codex' };
+      sessions = applyObservation(sessions, { provider: 'codex', sessionId: 'review-codex-session', agentName: 'Codex', status: 'unknown',
+        connected: true, observedAt: '2026-10-19T00:00:00Z', capabilities: {}, facts: { activities: [], waitingForInput: false } });
+    }
+  }
   const preflight: PreflightState = { revision: 0, installations: [], automaticTarget: { path: '/test/AgentPet/default', source: 'default' }, selectedInstallation: null, target: { path: '/test/AgentPet', source: 'chosen' }, inspection: null, scan: 'complete', notice: 'none' };
   function pushConfigs() { configs = { ...configs, revision: configs.revision + 1 }; configListeners.forEach(listener => listener(configs)); return Promise.resolve(configs); }
   function subscribe<T>(listeners: Set<(value: T) => void>, listener: (value: T) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
@@ -61,6 +74,12 @@ export function createReviewBridge(scenario: string): ManagementBridge {
     piConnection: { getState: async () => base, preview: async () => base, cancel: async () => base, confirm: async () => base, resume: async () => base, disable: async () => base, remove: async () => base, subscribe: () => () => {} },
     configurations: {
       getState: async () => configs, subscribe: listener => subscribe(configListeners, listener),
+      detectCodex: async () => ({ installations: scenario === 'codex-scan-new' ? [
+        { id: 'review-codex-standalone', entryPath: '/示例/.codex/packages/standalone/current/bin/codex', executable: '/示例/.codex/packages/standalone/releases/0.163.0-aarch64-apple-darwin/bin/codex', kind: 'standalone' as const, version: null, compatibility: 'verified' as const },
+        { id: 'review-codex-npm', entryPath: '/示例/.nvm/versions/node/v22.18.0/bin/codex', executable: '/示例/npm/bin/codex.js', kind: 'npm' as const, version: '0.163.0', compatibility: 'unverified' as const },
+      ] : [], targetPath: '/示例/.codex', scan: 'complete', notice: 'none' }),
+      cancelCodexScan: async () => {},
+      prepareDetectedCodex: async () => ({ state: configs, configurationId: null }),
       detectClaude: async () => ({ installations: scenario.startsWith('claude-scan') ? [
         { id: 'review-claude-npm', entryPath: '/示例/.nvm/versions/node/v22.18.0/bin/claude', executable: '/示例/npm/bin/claude.exe', kind: 'npm', version: '2.1.301', compatibility: 'verified' },
         ...(scenario === 'claude-scan-multiple' ? [{ id: 'review-claude-other', entryPath: '/示例/.nvm/versions/node/v24.20.0/bin/claude', executable: '/示例/npm-other/bin/claude.exe', kind: 'npm' as const, version: '2.1.301', compatibility: 'verified' as const }] : []),
@@ -88,7 +107,9 @@ export function createReviewBridge(scenario: string): ManagementBridge {
       bindPet: async (id, pet) => { record(id).pet = pet; return pushConfigs(); },
       inspect: async id => { const current = record(id); current.inspection = { target: { path: current.targetPath, source: 'chosen' }, findings: [] }; current.availability = 'available'; return pushConfigs(); },
       preview: async id => { const current = record(id);
-        if (current.claude) {
+        if (current.codex) {
+          current.codex.preview = { id: 'codex-fixture-plan', executable: '/示例/Codex/bin/codex', path: current.targetPath + '/hooks.json', canApply: true, exists: true, events: ['SessionStart','SessionEnd','UserPromptSubmit','PreToolUse','PostToolUse','PermissionRequest','Stop','Interrupt','PreCompact','PostCompact'] };
+        } else if (current.claude) {
           const directory = '/示例/AgentPet/private/claude';
           current.claude.preview = { id: 'review-task-upgrade', operation: 'upgrade', directory, executable: '/示例/npm/bin/claude.exe',
             events: ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact'],
@@ -96,7 +117,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
             settings: { path: '/示例/.claude/settings.json', exists: true, canApply: true, reason: '' } };
         } else current.connection = { ...base, preview: { id: 'isolated-plan', path: `${current.targetPath}/extensions/agent-pet.ts`, target: { path: current.targetPath, source: 'chosen' }, action: 'create', findings: [], createDirectories: [] } };
         return pushConfigs(); },
-      cancel: async id => { const value = record(id); if (value.claude) value.claude.preview = null; else value.connection!.preview = null; return pushConfigs(); },
+      cancel: async id => { const value = record(id); if (value.codex) value.codex.preview = null; else if (value.claude) value.claude.preview = null; else if (value.connection) value.connection.preview = null; return pushConfigs(); },
       confirm: async () => { throw new Error('Browser fixture cannot deploy. Real Main deployment is verified in isolated filesystem tests.'); },
       resume: async () => { throw new Error('Browser fixture cannot start receivers.'); },
       disable: async id => { record(id).connection = { ...base, status: 'disconnected', saved: 'disabled', canResume: true }; return pushConfigs(); },

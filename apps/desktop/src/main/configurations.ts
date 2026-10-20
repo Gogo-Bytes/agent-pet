@@ -11,11 +11,12 @@ import { PiConnection } from './pi-connection.js';
 import { PiConnectionStore } from './pi-connection-store.js';
 import { inspectTarget, limits, ReadBudget } from './pi-preflight-files.js';
 import { ClaudePresence, type ClaudePresenceOptions } from './claude-presence.js';
+import { CodexConnection, type CodexConnectionOptions } from './codex-connection.js';
 import { ClaudeNormalPresence } from './claude-normal-presence.js';
 import { createClaudeObservations } from '../../../../integrations/claude-hooks/observations.js';
 
 type Entry = { metadata: ConfigurationMetadata; inspection: Inspection | null; revision: number;
-  connection: PiConnection | null; claude?: ClaudePresence | ClaudeNormalPresence;
+  connection: PiConnection | null; codex?: CodexConnection; claude?: ClaudePresence | ClaudeNormalPresence;
   claudeObservations?: ReturnType<typeof createClaudeObservations>; unsubscribe?: () => void; controller?: AbortController };
 
 /** Main owns persistence, inspection and PiConnection capabilities. Renderer selection is observational.
@@ -35,6 +36,7 @@ export class Configurations {
     adapter(): Pick<PiBridgeAdapter, 'start'>;
     publish: ObservationSink['publish'];
     developmentEnvironment?: boolean;
+    codex?: Omit<CodexConnectionOptions, 'directory' | 'configurationId' | 'targetDirectory' | 'name' | 'publish'>;
     legacy?: { connection: PiConnection; targetPath: string };
     claude?: Omit<ClaudePresenceOptions, 'directory' | 'configurationId'> & {
       normal?: { probePath: string; observerExecutable: string };
@@ -82,6 +84,7 @@ export class Configurations {
     if (metadata.provider === 'claude' && this.options.claude) {
       this.attachClaude(entry);
     }
+    if (metadata.provider === 'codex' && this.options.codex) this.attachCodex(entry);
     if (entry.connection) entry.unsubscribe = entry.connection.subscribe(() => this.emit());
   }
   private attachClaude(entry: Entry): void {
@@ -99,12 +102,24 @@ export class Configurations {
     entry.unsubscribe = entry.claude.subscribe(() => this.emit());
     if (entry.claude instanceof ClaudeNormalPresence) void entry.claude.restore();
   }
+  private attachCodex(entry: Entry): void {
+    entry.codex = new CodexConnection({ ...this.options.codex!, directory: this.options.directory,
+      configurationId: entry.metadata.id, targetDirectory: entry.metadata.targetPath, name: () => entry.metadata.name,
+      publish: observation => {
+        const sessionId = `${entry.metadata.id}:${observation.sessionId}`;
+        this.sessionConfigurations[sessionId] = entry.metadata.id;
+        this.options.publish({ ...observation, sessionId }); this.emit();
+      } });
+    entry.unsubscribe = entry.codex.subscribe(() => this.emit());
+    void entry.codex.restore();
+  }
   private receiverDirectory(id: string): string { return join(this.options.directory, `configuration-${id}`); }
   snapshot(): ConfigurationsState {
     const records: AgentConfiguration[] = [...this.entries.values()].map(entry => ({ ...structuredClone(entry.metadata),
       inspection: structuredClone(entry.inspection), connection: entry.connection?.snapshot() ?? null,
       ...(entry.claude ? { claude: entry.claude.snapshot() } : {}),
-      availability: entry.claude ? entry.claude.snapshot().status === 'failed' ? 'attention' : 'available' : entry.metadata.provider !== 'pi' ? 'unsupported' : entry.connection?.snapshot().saved === 'invalid' ? 'attention' : !entry.inspection ? 'unchecked' :
+      ...(entry.codex ? { codex: entry.codex.snapshot() } : {}),
+      availability: entry.codex ? entry.codex.snapshot().status === 'failed' || entry.codex.snapshot().preview?.canApply === false ? 'attention' : entry.codex.snapshot().configured || entry.codex.snapshot().preview?.canApply ? 'available' : 'unchecked' : entry.claude ? entry.claude.snapshot().status === 'failed' ? 'attention' : 'available' : entry.metadata.provider !== 'pi' ? 'unsupported' : entry.connection?.snapshot().saved === 'invalid' ? 'attention' : !entry.inspection ? 'unchecked' :
         entry.inspection.findings.length ? 'attention' : 'available' }));
     return { revision: this.revision, records, notice: this.notice, busy: this.busy,
       sessionConfigurations: { ...this.sessionConfigurations } };
@@ -119,7 +134,7 @@ export class Configurations {
   }
   /** Window/navigation teardown revokes transient deployment consent; it does not stop active agents. */
   invalidateAll(): void {
-    for (const entry of this.entries.values()) { entry.controller?.abort(); entry.connection?.invalidate(); entry.claude?.invalidate(); }
+    for (const entry of this.entries.values()) { entry.controller?.abort(); entry.connection?.invalidate(); entry.claude?.invalidate(); entry.codex?.invalidate(); }
   }
   private emit(): ConfigurationsState {
     this.revision++; const state = this.snapshot();
@@ -158,7 +173,7 @@ export class Configurations {
   private update(id: string, change: (record: ConfigurationMetadata) => ConfigurationMetadata | ConfigurationNotice): ConfigurationsState {
     if (!this.available()) return this.result(this.blockedNotice());
     const entry = this.entry(id); if (!entry) return this.result('not-found');
-    if (entry.connection?.snapshot().busy || entry.claude?.snapshot().busy) return this.result('busy');
+    if (entry.connection?.snapshot().busy || entry.claude?.snapshot().busy || entry.codex?.snapshot().busy) return this.result('busy');
     const next = change(entry.metadata); if (typeof next === 'string') return this.result(next);
     if (!validMetadata(next)) return this.result('invalid');
     if (!this.persist(this.metadata().map(record => record.id === id ? next : record))) return this.emit();
@@ -177,7 +192,8 @@ export class Configurations {
   async changeTarget(id: string, value: string): Promise<ConfigurationsState> {
     const result = this.update(id, record => {
       const connection = this.entry(id)?.connection?.snapshot();
-      if (this.entry(id)?.claude?.snapshot().configured) return 'withdraw-first';
+      const codex = this.entry(id)?.codex?.snapshot();
+      if (this.entry(id)?.claude?.snapshot().configured || (codex && (codex.configured || !codex.canConfigure))) return 'withdraw-first';
       // The injected legacy controller owns its original preflight closure. Remove and add a new record after withdrawal.
       if (record.id === 'legacy-pi' || connection?.deployedPath || connection?.saved === 'uncertain' || connection?.saved === 'invalid' ||
           connection?.receiving === 'unknown' || connection?.canConfigure === false) return 'withdraw-first';
@@ -187,10 +203,14 @@ export class Configurations {
     });
     if (result.notice === 'none') {
       const entry = this.entry(id)!; entry.controller?.abort(); entry.inspection = null;
-      entry.connection?.invalidate(); entry.claude?.invalidate();
+      entry.connection?.invalidate(); entry.claude?.invalidate(); entry.codex?.invalidate();
       if (entry.claude instanceof ClaudeNormalPresence) {
         entry.unsubscribe?.(); await entry.claude.stop(); entry.claudeObservations?.stop();
         if (!this.closed) this.attachClaude(entry);
+      }
+      if (entry.codex) {
+        entry.unsubscribe?.(); await entry.codex.stop();
+        if (!this.closed) this.attachCodex(entry);
       }
       return this.emit();
     }
@@ -224,10 +244,10 @@ export class Configurations {
     } finally { if (timer) clearTimeout(timer); }
     return this.emit();
   }
-  private async operation(id: string, work: (connection: PiConnection | ClaudePresence | ClaudeNormalPresence) => Promise<unknown> | unknown): Promise<ConfigurationsState> {
+  private async operation(id: string, work: (connection: PiConnection | ClaudePresence | ClaudeNormalPresence | CodexConnection) => Promise<unknown> | unknown): Promise<ConfigurationsState> {
     if (!this.available()) return this.result(this.blockedNotice());
     const entry = this.entry(id); if (!entry) return this.result('not-found');
-    const connection = entry.claude ?? entry.connection;
+    const connection = entry.codex ?? entry.claude ?? entry.connection;
     if (!connection) return this.result('unsupported');
     this.notice = 'none'; await work(connection); return this.emit();
   }
@@ -236,6 +256,9 @@ export class Configurations {
   previewDetectedClaude(id: string, executable: string): Promise<ConfigurationsState> {
     return this.operation(id, connection => connection instanceof ClaudeNormalPresence ? connection.preview(executable) : undefined);
   }
+  previewDetectedCodex(id: string, executable: string): Promise<ConfigurationsState> {
+    return this.operation(id, connection => connection instanceof CodexConnection ? connection.preview(executable) : undefined);
+  }
   cancel(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.invalidate()); }
   confirm(id: string, planId: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.confirm(planId)); }
   resume(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.resume()); }
@@ -243,9 +266,10 @@ export class Configurations {
   async remove(id: string): Promise<ConfigurationsState> {
     if (!this.available()) return this.result(this.blockedNotice());
     const entry = this.entry(id); if (!entry) return this.result('not-found');
-    if (entry.connection?.snapshot().busy || entry.claude?.snapshot().busy) return this.result('busy');
+    if (entry.connection?.snapshot().busy || entry.claude?.snapshot().busy || entry.codex?.snapshot().busy) return this.result('busy');
     this.busy = true; this.notice = 'none'; this.emit();
     try {
+      if (entry.codex && !await entry.codex.remove()) { this.notice = 'retained'; return this.snapshotAfterRemoval(); }
       if (entry.claude && !await entry.claude.remove()) { this.notice = 'retained'; return this.snapshotAfterRemoval(); }
       const before = entry.connection?.snapshot();
       if (before?.deployedPath || before?.canRemove) {
@@ -258,7 +282,7 @@ export class Configurations {
         this.notice = 'retained'; return this.snapshotAfterRemoval();
       }
       if (!this.persist(this.metadata().filter(record => record.id !== id))) return this.snapshotAfterRemoval();
-      entry.controller?.abort(); entry.unsubscribe?.(); await entry.connection?.stop(); await entry.claude?.stop(); entry.claudeObservations?.stop(); this.entries.delete(id);
+      entry.controller?.abort(); entry.unsubscribe?.(); await entry.connection?.stop(); await entry.claude?.stop(); await entry.codex?.stop(); entry.claudeObservations?.stop(); this.entries.delete(id);
       for (const session of Object.keys(this.sessionConfigurations)) if (this.sessionConfigurations[session] === id) delete this.sessionConfigurations[session];
       this.notice = 'none'; return this.snapshotAfterRemoval();
     } finally { if (this.busy) { this.busy = false; this.emit(); } }
@@ -267,7 +291,7 @@ export class Configurations {
   async stop(): Promise<void> {
     this.closed = true;
     for (const entry of this.entries.values()) { entry.controller?.abort(); entry.unsubscribe?.(); }
-    const results = await Promise.allSettled([...this.entries.values()].flatMap(entry => [entry.connection?.stop(), entry.claude?.stop()]));
+    const results = await Promise.allSettled([...this.entries.values()].flatMap(entry => [entry.connection?.stop(), entry.claude?.stop(), entry.codex?.stop()]));
     for (const entry of this.entries.values()) entry.claudeObservations?.stop();
     this.listeners.clear();
     if (results.some(result => result.status === 'rejected')) throw new Error('Configuration receiver shutdown not confirmed');

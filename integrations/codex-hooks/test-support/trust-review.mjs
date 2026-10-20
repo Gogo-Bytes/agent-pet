@@ -29,7 +29,7 @@ if ((!retry && !localAuth && process.argv[2] !== '--run-authorized-review') || p
     try {
       if(network)proxy=await startAccountProxy();
       code = localAuth ? await withTemporaryAuth('/Users/gan/.codex/auth.json', ctx.root + '/config/auth.json', interactive) : await interactive();
-    } finally {await proxy?.stop();}
+    } finally {if(proxy){await proxy.stop();console.log(JSON.stringify({accountGateway:proxy.summary()}));}}
     if (code !== 0) throw new Error('Review interrupted');
     await ctx.verify();
     const status = await ctx.probe({ root: ctx.root, mode: 'hooks-only', resultFileName: network ? 'network-review-status.json' : localAuth ? 'auth-review-status.json' : 'review-status.json', expectedHookCommand: ctx.command,

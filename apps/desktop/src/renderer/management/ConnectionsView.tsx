@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { AgentConfiguration, ConfigurationsState } from '../../shared/configurations.js';
+import type { CodexDiscoveryState } from '../../shared/codex-discovery.js';
 import type { ClaudeDiscoveryState } from '../../shared/claude-discovery.js';
-import { DetectedClaudeResult } from './DetectedClaudeResult.js';
+import { DetectedCliResult } from './DetectedCliResult.js';
 import type { PreflightState } from '../../shared/pi-preflight.js';
 import { findingText } from '../../shared/pi-preflight.js';
 import { connectionSummary, findingSummary } from './connection-copy.js';
@@ -10,6 +11,7 @@ import { Icon, type IconName } from './components/icons.js';
 import { GlassButton } from '../shared/ui/Glass.js';
 import { ManualConnectionDialog } from './ManualConnectionDialog.js';
 import { DeploymentControls } from './DeploymentControls.js';
+import { CodexConnectionControls, codexConnectionSummary } from './CodexConnectionControls.js';
 import { ClaudeConnectionControls, claudeConnectionSummary } from './ClaudeConnectionControls.js';
 import { DetectedSetupDialog } from './DetectedSetupDialog.js';
 import { RemoveConnectionDialog } from './RemoveConnectionDialog.js';
@@ -39,7 +41,7 @@ function DetectedPiResult({ path, installations, existing, busy, onSelect }: {
 
 function Identity({ record, onRename, busy, statusRef }: { record: AgentConfiguration; onRename: (name: string) => Promise<boolean>; busy: boolean; statusRef: RefObject<HTMLHeadingElement | null> }) {
   const [editing, setEditing] = useState(false);
-  const summary = record.provider === 'claude' ? claudeConnectionSummary(record.claude) : connectionSummary(record.connection);
+  const summary = record.provider === 'codex' ? codexConnectionSummary(record.codex) : record.provider === 'claude' ? claudeConnectionSummary(record.claude) : connectionSummary(record.connection);
   const [name, setName] = useState(record.name);
   const trigger = useRef<HTMLButtonElement>(null);
   function cancel() { setEditing(false); requestAnimationFrame(() => trigger.current?.focus()); }
@@ -63,12 +65,13 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
   const [selected, setSelected] = useState<string | null>(null);
   const [manual, setManual] = useState<AgentConfiguration | null | undefined>(undefined);
   const [scan, setScan] = useState<PreflightState | null>(null);
+  const [codexScan, setCodexScan] = useState<CodexDiscoveryState | null>(null);
   const [claudeScan, setClaudeScan] = useState<ClaudeDiscoveryState | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState('');
-  const [setupConsent, setSetupConsent] = useState<{ installationId: string; targetPath: string; provider?: 'pi' | 'claude' } | null>(null);
+  const [setupConsent, setSetupConsent] = useState<{ installationId: string; targetPath: string; provider?: 'pi' | 'claude' | 'codex' } | null>(null);
   const generation = useRef(0);
-  const claudeScanRequest = useRef<string | null>(null);
+  const scanRequest = useRef<string | null>(null);
   const main = useRef<HTMLElement>(null);
   const statusHeadingRef = useRef<HTMLHeadingElement>(null);
   const removedFocus = useRef(false);
@@ -77,9 +80,10 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
   const automatic = detected.length ? scan?.automaticTarget : undefined;
   const existingDetected = automatic ? records.find(record => record.provider === 'pi' && record.targetPath === automatic.path) : undefined;
   const existingClaude = claudeScan ? records.find(record => record.provider === 'claude' && record.targetPath === claudeScan.targetPath) : undefined;
+  const existingCodex = codexScan ? records.find(record => record.provider === 'codex' && record.targetPath === codexScan.targetPath) : undefined;
   const removing = records.find(record => record.id === removalId);
   const current = records.find(record => record.id === selected) ?? (page === 'library' ? records[0] : undefined);
-  useEffect(() => () => { generation.current++; cancelClaudeScan(); }, []);
+  useEffect(() => () => { generation.current++; cancelCliScan(); }, []);
   useEffect(() => { if (!visible) { setManual(undefined); setSetupConsent(null); setRemovalId(null); } }, [visible]);
   useEffect(() => { if (visible) main.current?.querySelector<HTMLElement>('h1,h2')?.focus({ preventScroll: true }); }, [page, visible]);
   useEffect(() => {
@@ -88,24 +92,25 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
     return () => cancelAnimationFrame(frame);
   }, [removalId, visible]);
   async function detect() {
-    cancelClaudeScan(); const scanId = crypto.randomUUID(); claudeScanRequest.current = scanId;
+    cancelCliScan(); const scanId = crypto.randomUUID(); scanRequest.current = scanId;
     const request = ++generation.current; setScanning(true); setScanError(''); setPage('discover');
     try {
-      const results = await Promise.allSettled([bridge.piPreflight.detect(), bridge.configurations.detectClaude(scanId)]);
+      const results = await Promise.allSettled([bridge.piPreflight.detect(), bridge.configurations.detectClaude(scanId), bridge.configurations.detectCodex(scanId)]);
       if (request !== generation.current) return;
-      const [pi, claude] = results;
+      const [pi, claude, codex] = results;
       setScan(pi.status === 'fulfilled' ? pi.value : null);
       setClaudeScan(claude.status === 'fulfilled' ? claude.value : null);
+      setCodexScan(codex.status === 'fulfilled' ? codex.value : null);
       if (results.some(value => value.status === 'rejected' || ['failed', 'busy'].includes(value.value.notice))) setScanError('部分扫描未完成，可以重试或手动添加。');
     }
     catch { if (request === generation.current) setScanError('扫描失败，请重试或手动选择配置位置。'); }
-    finally { if (request === generation.current) setScanning(false); if (claudeScanRequest.current === scanId) claudeScanRequest.current = null; }
+    finally { if (request === generation.current) setScanning(false); if (scanRequest.current === scanId) scanRequest.current = null; }
   }
-  function cancelClaudeScan() {
-    const id = claudeScanRequest.current; claudeScanRequest.current = null;
-    if (id) void bridge.configurations.cancelClaudeScan(id).catch(() => setScanError('取消扫描未确认，可以重新扫描。'));
+  function cancelCliScan() {
+    const id = scanRequest.current; scanRequest.current = null;
+    if (id) void Promise.allSettled([bridge.configurations.cancelClaudeScan(id), bridge.configurations.cancelCodexScan(id)]).then(results => { if (results.some(value => value.status === 'rejected')) setScanError('取消扫描未确认，可以重新扫描。'); });
   }
-  function cancelScan() { cancelClaudeScan(); generation.current++; setScanning(false); setPage('library'); }
+  function cancelScan() { cancelCliScan(); generation.current++; setScanning(false); setPage('library'); }
   async function prepareDetected() {
     if (!detected[0] || busy || !state) return;
     if (automatic) setSetupConsent({ installationId: detected[0].id, targetPath: automatic.path });
@@ -118,17 +123,18 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
         <div className="cfg-library-body"><nav className="cfg-index" aria-label="已添加连接"><span className="cfg-index-label">已添加</span>{records.map(record => <button key={record.id} data-config={record.id} aria-label={`${record.name} ${providerLabels[record.provider]}，${labels[record.availability]}`} aria-pressed={current?.id === record.id} onClick={() => { setSelected(record.id); setPage('agent'); }}><AgentMark record={record} /><span><strong>{record.name}</strong><small>{providerLabels[record.provider]}</small></span>{['attention', 'unsupported'].includes(record.availability) && <span className={`cfg-index-state ${record.availability === 'unchecked' ? 'cfg-unchecked' : ''}`}>{record.availability === 'unsupported' ? '未支持' : '需处理'}</span>}</button>)}</nav>
           <div className="cfg-content-scroll">{current ? <section className="cfg-detail" key={current.id}><button className="cfg-text-button cfg-mobile-back" onClick={() => setPage('library')}><Icon name="left" />我的连接</button>
             <Identity record={current} statusRef={statusHeadingRef} busy={busy} onRename={name => run(() => bridge.configurations.rename(current.id, name))} />
-            <section className="cfg-receiving" aria-label="连接状态">{current.provider === 'claude' ? <ClaudeConnectionControls statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} error={error} /> : <DeploymentControls statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} />}</section>
+            <section className="cfg-receiving" aria-label="连接状态">{current.provider === 'codex' ? <CodexConnectionControls statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} error={error} /> : current.provider === 'claude' ? <ClaudeConnectionControls statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} error={error} /> : <DeploymentControls statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} />}</section>
             <section className="cfg-location" aria-label="配置位置"><span className="cfg-section-label">配置文件夹</span><div className="cfg-location-path"><span className="cfg-folder-emblem"><Icon name="folder" size={20} /></span><code id="config-target-path" title={current.targetPath}>{current.targetPath}</code></div></section>
-            <details className="cfg-more-options" open={current.availability === 'attention' || current.connection?.status === 'failed' || current.claude?.status === 'failed'}>
+            <details className="cfg-more-options" open={current.availability === 'attention' || current.connection?.status === 'failed' || current.claude?.status === 'failed' || current.codex?.status === 'failed'}>
               <summary>更多操作<Icon name="down" /></summary>
               <div className="cfg-options-body">
+                {current.codex?.configured && !current.codex.canResume && current.codex.status !== 'disabled' && <div className="cfg-option-row"><div><strong>暂停连接</strong><p>保留连接文件，不影响 Codex 运行。</p></div><button className="cfg-secondary" disabled={busy || current.codex.busy} onClick={() => void run(() => bridge.configurations.disable(current.id))}>暂停连接</button></div>}
                 {current.provider === 'claude' && current.claude?.configured && !current.claude.canResume && current.claude.status !== 'disabled' && <div className="cfg-option-row"><div><strong>暂停连接</strong><p>连接文件会保留，不影响 Claude Code 运行。</p></div><button className="cfg-secondary" disabled={busy || current.claude.busy} onClick={() => { void run(() => bridge.configurations.disable(current.id)).then(saved => { if (saved) requestAnimationFrame(() => statusHeadingRef.current?.focus({ preventScroll: true })); }); }}>暂停连接</button></div>}
                 {current.connection?.canRemove && current.connection.receiving !== 'stopped' && <div className="cfg-option-row"><div><strong>暂停连接</strong><p>不影响 pi 运行，连接文件会保留。</p></div><button className="cfg-secondary" disabled={busy || current.connection.busy} onClick={() => void run(() => bridge.configurations.disable(current.id))}>{current.connection.receiving === 'unknown' ? '尝试暂停连接' : '暂停连接'}</button></div>}
-                {current.provider !== 'claude' && <section className="cfg-position-check" aria-label="配置检查"><div className="cfg-option-row"><div><strong>位置检查<span className={`cfg-position-result cfg-result-${current.availability}`}>{labels[current.availability]}</span></strong><p>{current.availability === 'unsupported' ? '这类 Agent 暂时还不能连接，你可以先保留这条记录。' : '检查这个文件夹是否可以使用，不会建立连接。'}</p></div><button className="cfg-secondary" disabled={busy || current.provider !== 'pi'} onClick={() => void run(() => bridge.configurations.inspect(current.id))}>检查位置</button></div>
+                {current.provider !== 'claude' && current.provider !== 'codex' && <section className="cfg-position-check" aria-label="配置检查"><div className="cfg-option-row"><div><strong>位置检查<span className={`cfg-position-result cfg-result-${current.availability}`}>{labels[current.availability]}</span></strong><p>{current.availability === 'unsupported' ? '这类 Agent 暂时还不能连接，你可以先保留这条记录。' : '检查这个文件夹是否可以使用，不会建立连接。'}</p></div><button className="cfg-secondary" disabled={busy || current.provider !== 'pi'} onClick={() => void run(() => bridge.configurations.inspect(current.id))}>检查位置</button></div>
                   {current.inspection?.findings.length ? <div className="cfg-position-findings">{current.inspection.findings.map(finding => <p key={finding}>{findingSummary[finding]}</p>)}<details className="cfg-operation-help"><summary>查看检查结果</summary>{current.inspection.findings.map(finding => <p key={finding}>{findingText[finding]}</p>)}</details></div> : null}
                 </section>}
-                <div className="cfg-option-row"><div><strong>更换位置</strong><p>{current.connection?.deployedPath || current.claude?.configured || current.id === 'legacy-pi' ? '请先移除此连接，再重新添加新的文件夹。' : '选择这个 Agent 使用的其他配置文件夹。'}</p></div><button className="cfg-secondary" aria-label="更换位置" aria-describedby="config-target-path" disabled={busy || !!current.connection?.deployedPath || current.claude?.configured || current.id === 'legacy-pi'} onClick={() => setManual(current)}>更换位置</button></div>
+                <div className="cfg-option-row"><div><strong>更换位置</strong><p>{current.connection?.deployedPath || current.claude?.configured || current.codex?.configured || current.id === 'legacy-pi' ? '请先移除此连接，再重新添加新的文件夹。' : '选择这个 Agent 使用的其他配置文件夹。'}</p></div><button className="cfg-secondary" aria-label="更换位置" aria-describedby="config-target-path" disabled={busy || !!current.connection?.deployedPath || current.claude?.configured || current.codex?.configured || current.id === 'legacy-pi'} onClick={() => setManual(current)}>更换位置</button></div>
                 <div className="cfg-detail-end"><div><strong>移除此连接</strong><span>不会删除 Agent 程序或你的文件</span></div><button className="cfg-delete" disabled={busy} aria-label="移除连接" onClick={() => setRemovalId(current.id)}><Icon name="trash" />移除</button></div>
               </div>
             </details></section> : <div className="cfg-empty"><Icon name="folder" /><h2 tabIndex={-1}>从第一个连接开始</h2><p>{state ? '自动扫描，或手动添加你的 Agent。' : '正在读取已保存的连接…'}</p></div>}
@@ -136,13 +142,14 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
           </div></div>
       </> : <>
         <header className="cfg-subpage-head"><button className="cfg-text-button" onClick={cancelScan}><Icon name="left" />我的连接</button><span>自动扫描</span></header>
-        <div className="cfg-content-scroll"><section className="cfg-discovery">{!scanning && <div className="cfg-discovery-heading"><div><h1 tabIndex={-1}>自动扫描</h1><p>查找本机的 pi 和 Claude Code。</p></div><button className="cfg-secondary" disabled={scanning || busy} onClick={() => void detect()}><Icon name="replay" />重新扫描</button></div>}
-          {scanning ? <div className="cfg-scan-stage" role="status"><div className="cfg-radar" aria-hidden="true"><span className="cfg-radar-sweep" /><span className="cfg-radar-dot dot-one" /><span className="cfg-radar-dot dot-two" /><span className="cfg-radar-core"><Icon name="scan" /></span></div><h1 tabIndex={-1}>正在查找安装</h1><p>查找 pi 和 Claude Code，不读取会话或对话。</p><button className="cfg-secondary" onClick={cancelScan}>取消扫描</button></div> : <>
-            <div className="cfg-results">{claudeScan && claudeScan.installations.length > 0 && <DetectedClaudeResult state={claudeScan} existing={!!existingClaude} busy={busy} onSelect={installationId => existingClaude ? (setSelected(existingClaude.id), setPage('agent')) : setSetupConsent({ provider: 'claude', installationId, targetPath: claudeScan.targetPath })} />}{automatic && <DetectedPiResult path={automatic.path} installations={detected} existing={!!existingDetected} busy={busy} onSelect={() => existingDetected ? (setSelected(existingDetected.id), setPage('agent')) : void prepareDetected()} />}
+        <div className="cfg-content-scroll"><section className="cfg-discovery">{!scanning && <div className="cfg-discovery-heading"><div><h1 tabIndex={-1}>自动扫描</h1><p>查找本机的 pi、Claude Code 和 Codex。</p></div><button className="cfg-secondary" disabled={scanning || busy} onClick={() => void detect()}><Icon name="replay" />重新扫描</button></div>}
+          {scanning ? <div className="cfg-scan-stage" role="status"><div className="cfg-radar" aria-hidden="true"><span className="cfg-radar-sweep" /><span className="cfg-radar-dot dot-one" /><span className="cfg-radar-dot dot-two" /><span className="cfg-radar-core"><Icon name="scan" /></span></div><h1 tabIndex={-1}>正在查找安装</h1><p>查找 pi、Claude Code 和 Codex，不读取会话或对话。</p><button className="cfg-secondary" onClick={cancelScan}>取消扫描</button></div> : <>
+            <div className="cfg-results">{codexScan && codexScan.installations.length > 0 && <DetectedCliResult provider="codex" state={codexScan} existing={!!existingCodex} busy={busy} onSelect={installationId => existingCodex ? (setSelected(existingCodex.id), setPage('agent')) : setSetupConsent({ provider: 'codex', installationId, targetPath: codexScan.targetPath })} />}{claudeScan && claudeScan.installations.length > 0 && <DetectedCliResult provider="claude" state={claudeScan} existing={!!existingClaude} busy={busy} onSelect={installationId => existingClaude ? (setSelected(existingClaude.id), setPage('agent')) : setSetupConsent({ provider: 'claude', installationId, targetPath: claudeScan.targetPath })} />}{automatic && <DetectedPiResult path={automatic.path} installations={detected} existing={!!existingDetected} busy={busy} onSelect={() => existingDetected ? (setSelected(existingDetected.id), setPage('agent')) : void prepareDetected()} />}
               {scan?.installations.filter(installation => installation.compatibility === 'unverified').map(installation => <div className="cfg-result" key={installation.id}><AgentMark record={{ provider: 'pi' }} /><div><strong>pi <span>{installation.version ?? '版本未确认'}</span></strong><code>{installation.path}</code><small>此版本暂不支持一键配置，兼容性尚未验证。</small></div></div>)}</div>
-            {!scan?.installations.length && !claudeScan?.installations.length && <div className="cfg-empty"><Icon name="scan" /><h2>未找到安装</h2><p>可以手动选择已有配置位置。</p></div>}
+            {!scan?.installations.length && !claudeScan?.installations.length && !codexScan?.installations.length && <div className="cfg-empty"><Icon name="scan" /><h2>未找到安装</h2><p>可以手动选择已有配置位置。</p></div>}
+            {codexScan?.notice === 'cancelled' && <p className="cfg-notice" role="status">Codex 扫描已取消，可以重新扫描。</p>}
             {claudeScan?.notice === 'cancelled' && <p className="cfg-notice" role="status">Claude 扫描已取消，可以重新扫描。</p>}
-            {(scan?.scan === 'limited' || claudeScan?.scan === 'limited') && <p className="cfg-notice" role="status">扫描范围受限，结果可能不完整。可以重新扫描或手动选择配置位置。</p>}
+            {(scan?.scan === 'limited' || claudeScan?.scan === 'limited' || codexScan?.scan === 'limited') && <p className="cfg-notice" role="status">扫描范围受限，结果可能不完整。可以重新扫描或手动选择配置位置。</p>}
             {automatic && <p className="cfg-discovery-note">{existingDetected ? '可以查看或管理已有连接。' : '先查看需要添加的文件，由你确认后再添加。'}<span>完成设置后，还需要让 pi 加载连接组件。</span></p>}
             <div className="cfg-discovery-manual"><div><strong>使用项目或自定义配置？</strong><p>选择已有配置文件夹，单独添加。</p></div><button className="cfg-text-button" disabled={busy} onClick={() => setManual(null)}>手动添加<Icon name="right" /></button></div>{(scanError || error) && <p role="alert">{scanError || error}</p>}
           </>}

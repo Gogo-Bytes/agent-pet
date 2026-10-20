@@ -2,7 +2,7 @@
 
 Claude 任务反馈（2026-10-19）：近期工具动作、回答出错和旧连接显式升级已实现，恢复旧连接不会自动改 hooks。本轮全量1121通过/1跳过、类型检查和源码构建通过，待真实任务验收；此前冷启动超时仍作为已知风险保留。继续 dev、不打包。见 [实现与验证](../../docs/CLAUDE-TASK-OBSERVATION.md)。
 
-Claude 自动扫描（2026-10-17）：省去默认配置和隐藏程序路径选择；多安装可选、已有配置直接查看。当前可接入仍仅 npm 2.1.301，官方安装/Homebrew 显示待验证；未改 shell/PATH，未要求重装。源码/隔离验证及已授权的本机发现、已有配置查看通过：Claude 一处、pi 两处，原记录保留。Claude 扫描仍有受限提示，终端 PATH/其他安装方式真实加载和发布未因此通过。见 [设计与验证](../../docs/CLAUDE-DISCOVERY-DESIGN.md)。
+CLI 自动扫描（2026-10-20）：Codex 与 Claude 共用有界 metadata-only 扫描入口；Codex 仅将已核对的 standalone 0.163.0 布局标为可接入，其他版本/安装方式只显示待验证。多安装可选、已有配置直接查看；不改 shell/PATH，不读取配置、凭据、会话或对话。源码与隔离回归通过，真实日常扫描与桌面端仍分开验收。见 [Codex 接线与证据](../../docs/CODEX-CLI-CONNECTION.md)。
 
 当前范围、进度与下一步见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。此页开发命令不是安装许可；完整真实端到端仍待验收，managed 入口仍关闭。
 
@@ -498,3 +498,18 @@ normal mode. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md) and
 ### 重启后的连接恢复
 
 新连接记录以磁盘 UUID 核对跨重启身份；操作期间仍严格核对文件身份和内容。旧格式因设备编号变化失效时需要显式迁移，不能重新添加同一配置或删除未知文件来绕过检查。pi 显式恢复可在原临时目录缺失时排他重建，保留原地址和凭据；Claude 按原规则恢复接收。详见[恢复行为与验证](../../docs/CONNECTION-RESTART-RECOVERY.md)。继续使用 `pnpm --filter @agent-pet/desktop dev`，源码 build 不等于安装包。
+
+## Codex 新桥接模块（2026-10-19）
+
+dev/源码build会编译`out/codex-runtime/native-hook.cjs`。首轮本机模拟已通过；私有文件发现、精确宿主核验和Main记录恢复已通过真实隔离Codex的两轮TUI复验（--no-daemon）：各1任务+1标题、收到连接、正常退出，接收地址轮换后无需改hooks或连接环境变量。原首试计数误判证据保留。它们尚未注册到正式连接页/首页，不代表日常Codex已接通，也不支持凭空把空CLI标为在线。[实现与验收边界](../../docs/CODEX-NORMAL-START-IMPLEMENTATION.md)、[新命令原生审核预览](../../docs/CODEX-NORMAL-START-MOCK-PREVIEW.md)。继续dev，不打包；现有pi/Claude配置不变。
+
+
+## Codex CLI 正式连接页/Home代码（2026-10-19）
+
+最新结果：日常CLI基础接入已通过。用户正常运行codex、审核本产品10条通知并发送一次任务后确认连接页已连接/首页有宠物；实际普通dev首页AX和真实GLB截图确认。原配置/token及pi/Claude记录保留，临时记录已关闭，不打包。完整动作矩阵、桌面端与发布未验收。[日常验收](../../docs/CODEX-DAILY-CONNECTION-PREVIEW.md#最终结果2026-10-19)。下文为分阶段记录，旧“未部署/未注册”不覆盖本条。
+
+已接入Main/Configurations/既有类型化IPC与共享会话/Home：手动选择实际CODEX_HOME、程序、只追加10条通知的确认预览；暂停/恢复/选择性移除保留其他hooks、config.toml和登录。Codex的原生/hooks审核另由用户完成，首任务后才有在线宠物；默认后台不以终端关闭或PID活着推断会话状态。standalone0.163.0的前台隔离真实验证已通过；默认后台已准备独立宿主入口核对和真实隔离验证，尚未执行，不宣称日常已接通。Codex自动扫描/桌面端尚未支持。继续dev、不打包；[实现与测试/截图](../../docs/CODEX-CLI-CONNECTION.md)、[待授权默认实测](../../docs/CODEX-DEFAULT-START-PREVIEW.md)。
+
+Codex默认模式补充（2026-10-19）：0.163.0隔离副本两轮默认TUI、原生通知审核、正式Configurations接收器重建和清理已实测通过；日常配置未部署，当前dev未重启，真实模型/桌面端未验收。详见[默认实测与覆盖边界](../../docs/CODEX-DEFAULT-START-PREVIEW.md#本次执行结果2026-10-19)。
+
+Codex动作实测（2026-10-20）：Main独立终端测试证实命令执行、apply_patch写入、明确取消能产生真实共享动作请求并回待机；错误返回不冒充成功。独立error、读取/查找/等待等仍未支持或未验收，动画视觉未在本轮验证。已关闭匿名记录、回普通dev，保留原配置，不打包。[实测](../../docs/CODEX-TASK-LIVE-VERIFY-PREVIEW.md#最终实测结果2026-10-20)。

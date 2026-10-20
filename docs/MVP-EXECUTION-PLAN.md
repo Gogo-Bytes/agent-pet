@@ -30,6 +30,24 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## Codex CLI 输入边界（2026-10-19）
 
+**错误反馈契约核对（2026-10-20）：** 官方文档及同版本固定源码确认，现有 hooks 的普通命令结果缺少统一可靠的失败事实，部分处理器失败还会省略 PostToolUse；不解析正文猜错、不照搬 Claude 错误事件。新增8项跨 normalize/Application/宠物投影回归，连同相关模块61项、typecheck/源码build通过。现有执行/写入/取消保持；独立错误仍未支持，不修改日常observer/hooks或重启dev、不打包。详见[版本证据、行为与后续接口条件](CODEX-ERROR-FEEDBACK-LIMIT.md)。
+
+**细分动作实测（2026-10-20，Main自行验证）：** 用户委托开发验证由Main操作。独立日常CLI测试会话实际命令/apply_patch/取消/exit7，App匿名记录证实executing、writing、cancelled及回idle，连接保持；exit7不制造成功/取消，但独立error反馈仍未实现，不能称已支持。原记录停止更新后仅一次恢复并补测，旧证据保留。53项相关回归、typecheck、源码build通过。测试TUI退出0、记录版dev退出0，已回普通dev，原配置/hooks/token/已有Agent保持，无打包/推送。缺少本轮原生CUA/实际动画截图，资产动画视觉未验收；模型错误/独立读取搜索/等待/并发/桌面端等保留。[范围、实测与限制](CODEX-TASK-LIVE-VERIFY-PREVIEW.md#最终实测结果2026-10-20)。
+
+**日常CLI基础接入通过（最新）：** 已按精确授权追加10组自有hooks，用户正常codex启动、原生审核和一次任务后确认已连接/首页有宠物；实际普通dev的AX和真实GLB截图也确认Codex宠物出现。pi/Claude记录、原配置/token保留，匿名临时记录已关闭，继续普通dev，不打包。12项相关回归、typecheck、源码build通过。本轮原生聚焦点击因CUA失败未覆盖；工具/错误/取消/等待/并发/系统重启矩阵、自动扫描/其他安装方式、Codex桌面端及发布未验收。终端killed具体原因未定，撤回仍失败/恢复后新终端成功的证据不扩大成因果结论。见[日常验收与授权记录](CODEX-DAILY-CONNECTION-PREVIEW.md#最终结果2026-10-19)。下方未部署/待授权条目均为此前阶段快照。
+
+**默认后台隔离实测已通过，日常部署未执行：** 用户按精确预览授权后，两轮默认0.163.0 TUI均退出0、可信连接true、各1本机任务+1标题请求、异常/拒绝0；正式Configurations重建接收器后同一hooks继续连接。隔离程序摘要匹配，接收器/隔离daemon正常停止。未用登录凭据/真实模型，不改日常配置或当前dev、不打包。初始化未OS过滤，不宣称零外网；未记录daemon PID连续性，不宣称两轮必为同一进程。正式UI为前阶段示例数据验证，本轮真实Main链路通过不等于日常Electron/真实模型验收。证据与后续边界见[默认实测](CODEX-DEFAULT-START-PREVIEW.md#本次执行结果2026-10-19)。下方待授权是前阶段快照。
+
+**正式接线代码已完成，默认/日常实测待授权：** 已加Codex手动添加、10条hooks保留式预览/确认/暂停/恢复/撤回、私有记录备份与失败关闭、Main精确默认宿主入口解析，Configurations→共享Application→Home真实事件链路。首任务前等待，不把空CLI或daemon活着当在线；不读取对话文件，不启动Agent。默认daemon独立程序路径已由固定源码核对，尚需真实隔离实测。全量1310 passed/1 skipped/121 files，最后UI取消生命周期回归3项通过；原Claude93项通过。独立审查发现私有state并发编辑保护缺口，已用红绿回归修复；正式Renderer宽/窄窗口、弹窗回焦、GLB及Enter/Escape实看通过（示例数据，不是原生验收）。日常配置/dev不动，不打包。[接线与验证](CODEX-CLI-CONNECTION.md)、[默认模式精确预览](CODEX-DEFAULT-START-PREVIEW.md)。下方“尚未注册”记录是此前阶段快照，不覆盖本条代码状态。
+
+最新原生普通启动有界复验已通过：新版10条原生信任保留，两轮隔离--no-daemon TUI均发布经过身份核验的真实连接、各1任务+1标题请求、正常退出0；接收地址轮换后同一hook仍连接，无专用连接环境变量。异常/拒绝0，不使用凭据/外网/真实模型，不改日常配置或现有dev/Agent，不打包。首试计数误判与漏存连接计数证据保留，不能倒推首试通过。63项test-support/typecheck/源码build通过，独立18项自有fixture复核通过。默认共享daemon、空CLI在线、正式连接页/首页与日常部署仍未验收。[实测结果与边界](CODEX-NORMAL-START-MOCK-PREVIEW.md)。
+
+**普通启动基础模块已实现，日常接入未启用：** 新hook每次读取本应用私有activation，无需连接环境变量；原生helper核对UID/精确程序/完整祖先链/出生时间，独立区分宿主与多会话；首次可信非启动事件可建立unknown基线。Main私有记录轮换有完整性、编辑保留与pending失败关闭，停止等待尚在启动的receiver；dev编译新hook资产。自有Node与实际macOS自建宿主fixture通过，全量1288 passed/1 skipped、typecheck/源码build通过；新增聚焦16项通过。独立审查两处生命周期缺陷已修，最终22项自有fixture复核通过。Configurations/IPC/Renderer和日常hook尚未注册；新命令的原生信任已按[隔离预览](CODEX-NORMAL-START-MOCK-PREVIEW.md)取得单独授权并完成，不能据此自动授予日常信任。见[实现/边界](CODEX-NORMAL-START-IMPLEMENTATION.md)。
+
+**首轮本机模拟已通过：** 固定本机Codex复用已审核隔离hooks，不改config/信任、不读凭据、OS仅回环；空线程150ms负对照后提交首轮，真实认证事件依次SessionStart/UserPromptSubmit/Stop/SessionEnd，任务完成，本地模拟Responses仅1次、stderr0。56项test-support/typecheck/源码build及独立3项复核通过。未打包/推送。普通启动与身份模块继续实施，日常接入/真实模型/正式UI未验收。[范围与结果](CODEX-FIRST-TURN-MOCK-PREVIEW.md)。
+
+**后续方案复核纠正验收前提：** 用户要求独立research后，同版本0.163.0官方源码/测试确认SessionStart在首轮任务路径执行，空thread/start或空CLI等待不能判定此hook损坏。现有环境变量注入也仅覆盖自建探针，不是普通启动接入。停止沿用空启动验收，先准备不调用真实模型的首轮mock/停轮验证，再补持久激活与宿主/存在性；共享daemon须先证明状态范围、权限和正文边界，仍未采用。完整证据、方案比较及实施建议集中在[连接方案复核](CODEX-CONNECTION-RESEARCH.md)；下方历史实测保留，不表示首轮/正式UI已验收。本阶段仅调研，没有真实Agent/凭据操作、模型请求、dev重启或打包。
+
 按用户“继续下一项”进入既定的Codex CLI阶段，桌面端仍最后。已根据当前官方文档实现独立64KiB输入白名单与33项行为测试；保留会话/轮次/工具身份与明确中断事实，丢弃正文/路径/参数。工具返回不等于成功，Stop不等于任务完成，审批检查不等于持续等待；未知工具不猜动作。没有接入Main或发布在线状态。与Claude输入边界合计58项、typecheck及desktop源码build通过，无打包。
 
 旧本机版本0.163.0仅证明当时程序版本，当前文档不能代替该版本原生兼容验证。下一步为隔离原生hook形状/信任/宿主身份验证，再做认证传输、配置保留和正式UI接线；真实安装操作仍需精确预览授权。本阶段不读写日常Codex配置、不启动Agent，原dev保持运行。见 [模块与契约边界](../integrations/codex-hooks/README.md)。Claude查找/退出/并发等剩余矩阵保留，不因推进新Provider标为通过。
@@ -61,6 +79,10 @@ Codex修复后恢复准备检查已实际通过，用户运行后确认进入登
 Codex本机凭据审核已由用户实际执行，TUI在account/read的workspace routing discovery失败（-32603）；临时副本已核对删除，原凭据metadata正常，两个新结果不存在，审核未完成。完全禁外网可能挡住账号初始化，尚未排除上游错误。已准备[仅chatgpt.com:443受限出口的对照](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)：原系统沙箱不放开，单次认证loopback网关、TLS透传、无任务/正文日志，临时凭据规则不变，新助手/结果保留旧证据。40项测试/typecheck/源码build及两项隧道复核通过；未实际外连/启动Codex复验，因新增外部账号请求需用户决定。dev及日常配置保持。
 
 Codex受限联网已获用户精确授权；用户报告EEXIST并要求Main自行终端测试。Main真实PTY复现EEXIST，修复仅复用内容/权限/归属/单链接全同的network助手，无删除覆盖。一次真实PTY复验已越过准备，但TUI loading仍在account/read工作区路由发现失败（-32603），没有任务/信任审批/后续查询或空会话。临时凭据已核对删除、原auth metadata正常、隔离config保持预期，网关finally关闭。7项聚焦与完整40项测试/typecheck/源码build通过。按有界失败规则停止真实重试，代理使用/上游/账号路由原因仍未区分，见[实际终端证据](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)。dev、日常配置保持，不打包/推送。
+
+Codex最新隔离实测已通过账号初始化和原生信任审核：网关原并发限制实际拒绝5条，修复有界排队（32客户端/8上游、全局2MiB）及同主机默认443格式后，真实TUI进入审核/主界面。用户明确授权Main代为信任10条，Native UI完成并正常退出；只读查询10启用/10trusted，其余与错误全0。只接受Native新增的10条自有hooks.state记录，原配置/凭据保留。离线空会话收到真实SessionEnd认证回调，但SessionStart仍未通过：探针ACK即退出缺陷已用红绿fixture修复，一次2500ms真实等待复验仍hook-not-observed（stdout3140/stderr241、仅SessionEnd），不归因或伪造在线。45项测试/typecheck/源码build通过，原结果分别保留；临时凭据清理确认、dev不变、无打包。启动事件按有界规则留停点，Main/UI尚未激活，详见[最新实测](CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md)。
+
+最新启动诊断：真实离线空会话与一次修正后的原生CLI对照均只观察到SessionEnd脚本（accepted），正常CLI进入主界面并/quit退出0，真实认证退出回调通过、临时凭据清理true；SessionStart脚本未观察到执行。首轮CLI超时证据单独保留。尚不能确认首任务延迟触发或排除受限初始化影响，网关2MiB耗尽/其他域名拒绝仍有记录；不猜解析修复、不伪造在线、不放宽网络或自动发模型任务。本轮有界复验到停点，正式接线仍未激活。新增脱敏形状诊断、stdin保持/监听清理测试、非TTY入口拒绝与超时强制清理；53项测试/typecheck/源码build通过，独立审查发现并复核FIFO诊断阻塞修复；详见[本轮证据与后续边界](CODEX-STARTUP-SHAPE-CHECK.md)。
 
 ## Claude 任务反馈（2026-10-19，常用反馈真实验证完成）
 
@@ -160,7 +182,7 @@ Electron dev隔离profile已启动，原生管理首页启动实看，AX确认�
 
 用户随后要求消除双层窗口，并采用其他 macOS 应用的样式：正式管理界面铺满窗口，macOS 使用原生 `hiddenInset` 标题栏及左上角系统按钮，共享顶部栏预留按钮空间；其他平台保留 HTML 操作回退。关闭仍遵循后台偏好。最新相关 **47 项测试**、类型检查、构建及打包通过；实际新包的原生 AX 确认关闭/最小化/全屏按钮，截图工具的紫色捕获提示遮挡按钮区域，颜色的截图检查有此限制。实际截图及检查边界见正式迁移验收记录。
 
-准确缺口：仅一只真实内置 starter 宠物，包导入尚未实现；其他 Provider 仅可保存非秘密元数据，不能连接；自动扫描仍是支持的 pi 安装候选，不能自动找遍项目配置或证明其活跃；手动类型识别不确定时必须用户选择。旧已部署位置更换须先选择性撤回/移除再添加。系统登录项/GPU性能及新界面真实模型任务矩阵仍需实际验收；多 pi TUI 的空闲连接与生命周期范围已通过。映射、截图、运行方式和后续清单见 [正式迁移验收](MANAGEMENT-MIGRATION-ACCEPTANCE.md)。
+准确缺口：仅一只真实内置 starter 宠物，包导入尚未实现；其他未接入 Provider 仅可保存非秘密元数据，不能连接；CLI 自动扫描目前只做固定入口和安装 metadata 的有界检查，不能自动找遍项目配置或证明其活跃，Codex 仅已核对的 standalone 0.163.0 布局可进入配置预览；手动类型识别不确定时必须用户选择。旧已部署位置更换须先选择性撤回/移除再添加。系统登录项/GPU性能及新界面真实模型任务矩阵仍需实际验收；多 pi TUI 的空闲连接与生命周期范围已通过。映射、截图、运行方式和后续清单见 [正式迁移验收](MANAGEMENT-MIGRATION-ACCEPTANCE.md)。
 
 ## 功能接入第 1 阶段：配置在线状态（2026-10-14）
 
@@ -237,6 +259,10 @@ Electron dev隔离profile已启动，原生管理首页启动实看，AX确认�
 按用户标注，连接名称下方的 Agent 类型与在线状态已合为一行，状态只渲染一次；预览结束回焦仍指向同一个真实状态节点。宽/窄同排居中差为 0，浏览器实际确认后焦点落在“等待 pi”；管理页 33 tests、typecheck、desktop build（package 内）通过。详见 [连接页记录](CONNECTION-DETAIL-FLAT-ACCEPTANCE.md) 最新修订，当前应用与真实 pi 未操作。
 
 桌宠气泡截图反馈已修正：重复 CSS 定位导致收起状态露出下一条半截，展开态又沿用大面板阴影。现在只在展开时进入列表流，统一紧凑玻璃边缘/阴影并预留空间；Main 的 88/204px 边界、确认先于显示和状态语义不变。相关 **41 tests / 3 files**、typecheck、原型 build、desktop build（package 内）及 package 通过；正式 Renderer 实看白/深/线条背景、上下位置、悬停/键盘及系统媒体回退。最新包与原生覆盖限制见 [桌宠记录](DESKTOP-OVERLAY-REFINEMENT-ACCEPTANCE.md) 最新修订；当前应用未替换、真实 pi 未操作。
+
+### 第 3 阶段设置实机停点（尚未完成，不作为完成阶段提交）
+
+同一隔离 profile 的正式包已通过原生页面将省电档位保存为 30 FPS / 75%，自身 preferences.json 核对一致。软件分类实际画面显示完整开关，但 CUA 的原生 AX 缺少开关节点；一次重新绑定恢复后仍缺失，单次坐标操作返回 noWindowsAvailable。按 AGENTS 的有界基础设施恢复规则停止该自动化路径，应用经原生菜单正常退出（exit 0）。软件开关实际效果、重启后 UI、登录项和 GPU 不标为通过；需要用户辅助操作或原生工具恢复后继续。没有修改系统登录项。隔离偏好保留本次 30/75 结果，日常 profile 未更改。本条为准确恢复上下文的未提交进度记录。
 
 ## 当前事实与证据
 

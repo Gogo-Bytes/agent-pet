@@ -74,6 +74,9 @@ export function createReviewBridge(scenario: string): ManagementBridge {
     piConnection: { getState: async () => base, preview: async () => base, cancel: async () => base, confirm: async () => base, resume: async () => base, disable: async () => base, remove: async () => base, subscribe: () => () => {} },
     configurations: {
       getState: async () => configs, subscribe: listener => subscribe(configListeners, listener),
+      detectCodex: async () => ({ installations: [], targetPath: '/示例/.codex', scan: 'complete', notice: 'none' }),
+      cancelCodexScan: async () => {},
+      prepareDetectedCodex: async () => ({ state: configs, configurationId: null }),
       detectClaude: async () => ({ installations: scenario.startsWith('claude-scan') ? [
         { id: 'review-claude-npm', entryPath: '/示例/.nvm/versions/node/v22.18.0/bin/claude', executable: '/示例/npm/bin/claude.exe', kind: 'npm', version: '2.1.301', compatibility: 'verified' },
         ...(scenario === 'claude-scan-multiple' ? [{ id: 'review-claude-other', entryPath: '/示例/.nvm/versions/node/v24.20.0/bin/claude', executable: '/示例/npm-other/bin/claude.exe', kind: 'npm' as const, version: '2.1.301', compatibility: 'verified' as const }] : []),

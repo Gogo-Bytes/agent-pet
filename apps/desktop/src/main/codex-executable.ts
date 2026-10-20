@@ -1,6 +1,11 @@
 import * as fs from 'node:fs';
 import { dirname, isAbsolute, join, normalize, resolve } from 'node:path';
 
+/** Layout compatibility only, not a binary signature or runtime version attestation. */
+export function codexExecutableLayout(path: string): 'standalone' | 'app-server-daemon' | null {
+  return /\/packages\/(standalone|app-server-daemon)\/releases\/(?:v)?0\.163\.0(?:-(?:aarch64|x86_64)-apple-darwin)?\/(?:bin\/)?codex$/.exec(path)?.[1] as 'standalone' | 'app-server-daemon' | undefined ?? null;
+}
+
 /** Explicit native selection only. No PATH scan, execution, settings or credential reads.
  * This slice accepts the standalone layout verified by the isolated native hook check.
  */
@@ -32,7 +37,7 @@ export function inspectCodexExecutable(selected: string): string | null {
     if (!executable.isFile() || !(executable.mode & 0o111) || !path.endsWith('/codex')) return null;
     // Standalone distribution actually verified in isolation. Other layouts await compatibility checks.
     const release = dirname(path);
-    if (!/\/packages\/(?:standalone|app-server-daemon)\/releases\/(?:v)?0\.163\.0(?:-(?:aarch64|x86_64)-apple-darwin)?\/(?:bin\/)?codex$/.test(path)) return null;
+    if (!codexExecutableLayout(path)) return null;
     const metadata = fs.lstatSync(release);
     if (!metadata.isDirectory() || (metadata.mode & 0o022)) return null;
     return path;

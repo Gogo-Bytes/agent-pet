@@ -8,6 +8,7 @@ import { Configurations } from './configurations.js';
 import { registerConfigurationIpc } from './configuration-ipc.js';
 import { loadTrustedEntry } from './window-trust.js';
 import { PiPreflight } from './pi-preflight.js';
+import { CodexDiscovery } from './codex-discovery.js';
 import { ClaudeDiscovery } from './claude-discovery.js';
 import { PiConnectionStore } from './pi-connection-store.js';
 import { ConfigurationsStore } from './configurations-store.js';
@@ -22,6 +23,7 @@ let event: { sender: BrowserWindow['webContents']; senderFrame: BrowserWindow['w
 let closed: boolean;
 let preflight: PiPreflight;
 let claudeDiscovery: ClaudeDiscovery;
+let codexDiscovery: CodexDiscovery;
 let capabilities: ReturnType<typeof registerConfigurationIpc>;
 let visible: boolean;
 const start = vi.fn(async () => ({ stop: vi.fn(async () => {}) }));
@@ -33,21 +35,23 @@ beforeEach(() => {
   start.mockClear();
   chooseClaude.mockClear();
   registry = new Configurations({ directory: profile, adapter: () => ({ start }), publish: vi.fn(),
+    codex: { nodeExecutable: process.execPath, observerExecutable: process.execPath, probePath: '/isolated/probe', runAsNode: false, chooseExecutable: chooseClaude, runtimeAssets: async () => ({ nativeHook: '// isolated codex fixture' }) },
     claude: { nodeExecutable: process.execPath, runAsNode: false, chooseExecutable: chooseClaude,
       runtimeAssets: async () => ({ hook: '// legacy fixture', launcher: '// legacy fixture', nativeHook: '// isolated observer fixture' }),
       normal: { probePath: '/isolated/probe', observerExecutable: process.execPath } } });
   preflight = new PiPreflight({ home: directory, guiPath: join(directory, 'bin'), pick: async () => null });
+  codexDiscovery = new CodexDiscovery({ home: directory, guiPath: join(directory, 'bin') });
   claudeDiscovery = new ClaudeDiscovery({ home: directory, guiPath: join(directory, 'bin') });
   const contents = { mainFrame: { url: 'file:///review.html' }, setWindowOpenHandler: vi.fn(), on: vi.fn() };
   visible = true;
   window = { webContents: contents, isDestroyed: () => false, isVisible: () => visible, loadFile: vi.fn(), loadURL: vi.fn() } as unknown as BrowserWindow;
   loadTrustedEntry(window, '/review.html'); closed = false;
   event = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
-  capabilities = registerConfigurationIpc({ window: () => window, configurations: registry, preflight, claudeDiscovery, sessions: () => ({ sessions: {}, bubbles: [] }), quitting: () => closed });
+  capabilities = registerConfigurationIpc({ window: () => window, configurations: registry, preflight, claudeDiscovery, codexDiscovery, sessions: () => ({ sessions: {}, bubbles: [] }), quitting: () => closed });
 });
 afterEach(async () => {
   vi.useRealTimers();
-  preflight.close(); claudeDiscovery.invalidate(); await registry.stop();
+  preflight.close(); claudeDiscovery.invalidate(); codexDiscovery.invalidate(); await registry.stop();
   for (const record of registry.snapshot().records) {
     const saved = new PiConnectionStore(join(directory, 'profile', `configuration-${record.id}`)).snapshot();
     if (saved) rmSync(dirname(saved.config.endpoint), { recursive: true, force: true });
@@ -338,4 +342,76 @@ it('cancels a Claude scan in Main before further reads and rejects old cancellat
   const next = await invoke('configurations-detect-claude', 'new-scan') as Awaited<ReturnType<ClaudeDiscovery['detect']>>;
   await invoke('configurations-cancel-claude-scan', 'pending-scan');
   expect(claudeDiscovery.candidate(next.installations[0]!.id)).not.toBeNull();
+});
+
+async function codexFixture() {
+  const stat = ReadBudget.prototype.stat;
+  vi.spyOn(ReadBudget.prototype, 'stat').mockImplementation(function(this: ReadBudget, path) {
+    if (path.startsWith('/opt') || path.startsWith('/usr/local')) return Promise.resolve(null);
+    return stat.call(this, path);
+  });
+  const target = join(directory, '.codex');
+  const executable = join(target, 'packages/standalone/releases/0.163.0-aarch64-apple-darwin/bin/codex');
+  mkdirSync(dirname(executable), { recursive: true, mode: 0o700 });
+  writeFileSync(executable, 'DO NOT EXECUTE', { mode: 0o700 });
+  mkdirSync(join(directory, 'bin')); const entry = join(directory, 'bin/codex'); symlinkSync(executable, entry);
+  const hooks = join(target, 'hooks.json'), original = '{"hooks":{},"keep":"original"}\n';
+  writeFileSync(hooks, original, { mode: 0o600 });
+  writeFileSync(join(target, 'config.toml'), '# PRIVATE fixture only\n', { mode: 0o600 });
+  native.approve.mockResolvedValue({ response: 1 });
+  const detected = await invoke('configurations-detect-codex', 'scan-codex') as Awaited<ReturnType<CodexDiscovery['detect']>>;
+  return { id: detected.installations[0]!.id, executable, entry, target, hooks, original };
+}
+it('requires approval before Codex scanning and discards consent after window invalidation', async () => {
+  const detect = vi.spyOn(codexDiscovery, 'detect');
+  native.approve.mockResolvedValueOnce({ response: 0 });
+  expect(await invoke('configurations-detect-codex', 'scan')).toMatchObject({ notice: 'cancelled' });
+  native.approve.mockImplementationOnce(async () => { capabilities.invalidate(); return { response: 1 }; });
+  expect(await invoke('configurations-detect-codex', 'scan')).toMatchObject({ notice: 'cancelled' });
+  expect(detect).not.toHaveBeenCalled();
+});
+it('prepares Codex without a program picker, preserves existing hooks/config, reuses the record and cancels only its own preview', async () => {
+  const f = await codexFixture();
+  const prepare = (request: string) => invoke('configurations-prepare-detected-codex', f.id, request) as Promise<{ state: ReturnType<Configurations['snapshot']>; configurationId: string }>;
+  const first = await prepare('first');
+  expect(first.state.records[0]).toMatchObject({ provider: 'codex', targetPath: f.target,
+    codex: { configured: false, status: 'not-configured', preview: { executable: f.executable, path: f.hooks, canApply: true } } });
+  expect(chooseClaude).not.toHaveBeenCalled(); expect(native.pick).not.toHaveBeenCalled();
+  expect(existsSync(join(directory, 'profile', 'codex-normal-' + first.configurationId))).toBe(false);
+  const second = await prepare('second');
+  expect(second.configurationId).toBe(first.configurationId); expect(second.state.records).toHaveLength(1);
+  const plan = second.state.records[0]!.codex!.preview!.id;
+  await invoke('configurations-cancel-detected', 'first');
+  expect(registry.snapshot().records[0]!.codex!.preview?.id).toBe(plan);
+  await invoke('configurations-cancel-detected', 'second');
+  expect(registry.snapshot().records[0]!.codex!.preview).toBeNull();
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+  expect(readFileSync(join(f.target, 'config.toml'), 'utf8')).toBe('# PRIVATE fixture only\n');
+});
+it('rejects renderer executable paths, stale Codex candidates and a changed installation', async () => {
+  const f = await codexFixture();
+  await expect(invoke('configurations-prepare-detected-codex', '/arbitrary/codex', 'request')).rejects.toThrow('重新扫描');
+  rmSync(f.entry); symlinkSync('/unapproved/codex', f.entry);
+  await expect(invoke('configurations-prepare-detected-codex', f.id, 'request')).rejects.toThrow('已变化');
+  codexDiscovery.invalidate();
+  await expect(invoke('configurations-prepare-detected-codex', f.id, 'request')).rejects.toThrow('重新扫描');
+  expect(registry.snapshot().records).toEqual([]);
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+});
+it('releases a canceled Codex preparation while preventing late record creation', async () => {
+  const f = await codexFixture(), finish = delayInstallation(f.entry);
+  const pending = invoke('configurations-prepare-detected-codex', f.id, 'cancel-codex');
+  await invoke('configurations-cancel-detected', 'cancel-codex');
+  expect(await pending).toMatchObject({ configurationId: null, reason: 'cancelled' });
+  finish(); await new Promise(resolve => setImmediate(resolve)); await flushSetup();
+  expect(registry.snapshot().records).toEqual([]);
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+});
+it('invalidates completed Codex scan capabilities without affecting a later scan', async () => {
+  const f = await codexFixture();
+  await invoke('configurations-cancel-codex-scan', 'scan-codex');
+  expect(codexDiscovery.candidate(f.id)).toBeNull();
+  const next = await invoke('configurations-detect-codex', 'new-scan') as Awaited<ReturnType<CodexDiscovery['detect']>>;
+  await invoke('configurations-cancel-codex-scan', 'scan-codex');
+  expect(codexDiscovery.candidate(next.installations[0]!.id)).not.toBeNull();
 });

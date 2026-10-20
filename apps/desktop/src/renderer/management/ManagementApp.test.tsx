@@ -402,6 +402,21 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getByRole('heading', { name: '选择你的配置位置' })).toBeTruthy();
     expect((screen.getByRole('textbox', { name: '配置文件夹' }) as HTMLInputElement).value).toBe('');
   });
+  it('discovers a verified Codex CLI and routes one-click setup through the Codex preview', async () => {
+    const test = await mount([]); await page(test.user, '连接');
+    test.bridge.configurations.detectCodex.mockResolvedValueOnce({
+      installations: [{ id: 'codex-standalone', entryPath: '/isolated/.codex/packages/standalone/current/bin/codex', executable: '/isolated/.codex/packages/standalone/releases/0.163.0-aarch64-apple-darwin/bin/codex', kind: 'standalone', version: null, compatibility: 'verified' }],
+      targetPath: '/isolated/.codex', scan: 'complete', notice: 'none',
+    });
+    await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+    expect(screen.getByRole('heading', { name: 'Codex CLI' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '一键配置' })).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '一键配置' }));
+    expect(screen.getByRole('dialog', { name: '连接 Codex CLI' })).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '检查并预览' }));
+    expect(test.bridge.configurations.prepareDetectedCodex).toHaveBeenCalledExactlyOnceWith('codex-standalone', expect.any(String));
+    expect(test.bridge.configurations.prepareDetectedClaude).not.toHaveBeenCalled();
+  });
   it('reports limited discovery without implying the entire machine has been scanned', async () => {
     const test = await mount([]); await page(test.user, '连接');
     test.bridge.piPreflight.detect.mockResolvedValueOnce({ ...initialPreflight, scan: 'limited', installations: [] });
@@ -423,7 +438,7 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getAllByRole('button', { name: '一键配置' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /选择配置位置/ })).toBeNull();
     expect(screen.getByText('2 处安装 · 共用此配置')).toBeTruthy();
-    expect(screen.getByText('查找本机的 pi 和 Claude Code。')).toBeTruthy();
+    expect(screen.getByText('查找本机的 pi、Claude Code 和 Codex。')).toBeTruthy();
     const disclosure = screen.getByText('程序安装详情').closest('summary')!;
     expect(disclosure.parentElement?.hasAttribute('open')).toBe(false);
     await test.user.click(disclosure);
@@ -473,7 +488,7 @@ describe('ManagementApp formal four-page interface', () => {
     expect(screen.getAllByRole('alert').some(value => value.textContent?.includes('检查未完成'))).toBe(true);
     await test.user.click(screen.getByRole('button', { name: '取消' }));
     act(() => test.pushConfigs({ ...test.configs(), records: [existing] }));
-    expect(screen.getByText('查找本机的 pi 和 Claude Code。')).toBeTruthy();
+    expect(screen.getByText('查找本机的 pi、Claude Code 和 Codex。')).toBeTruthy();
     expect(screen.queryByText(/一键配置会先检查/)).toBeNull();
     await test.user.click(screen.getByRole('button', { name: '查看配置' }));
     expect(screen.getByRole('heading', { name: existing.name })).toBeTruthy();

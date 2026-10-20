@@ -256,6 +256,9 @@ export class Configurations {
   previewDetectedClaude(id: string, executable: string): Promise<ConfigurationsState> {
     return this.operation(id, connection => connection instanceof ClaudeNormalPresence ? connection.preview(executable) : undefined);
   }
+  previewDetectedCodex(id: string, executable: string): Promise<ConfigurationsState> {
+    return this.operation(id, connection => connection instanceof CodexConnection ? connection.preview(executable) : undefined);
+  }
   cancel(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.invalidate()); }
   confirm(id: string, planId: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.confirm(planId)); }
   resume(id: string): Promise<ConfigurationsState> { return this.operation(id, connection => connection.resume()); }

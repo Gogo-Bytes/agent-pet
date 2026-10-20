@@ -56,11 +56,11 @@ export class CodexConnection {
     return new CodexNormalObserver({ ...this.options, directory: this.runtimeDirectory, executable,
       onChange: () => { if (!this.closed) this.emit(); } });
   }
-  async preview(): Promise<CodexConnectionState> {
+  async preview(discoveredExecutable?: string): Promise<CodexConnectionState> {
     if (!this.snapshot().canConfigure) return this.snapshot();
     const generation = ++this.generation; this.plan = undefined; this.busy = true; this.notice = 'none'; this.emit();
     try {
-      const chosen = await this.options.chooseExecutable(); if (this.closed || generation !== this.generation || !chosen) return this.snapshot();
+      const chosen = discoveredExecutable ?? await this.options.chooseExecutable(); if (this.closed || generation !== this.generation || !chosen) return this.snapshot();
       const inspect = this.options.inspectExecutable ?? inspectCodexExecutable;
       const cli = inspect(chosen);
       const executable = cli && resolveCodexHostExecutable(cli, this.options.targetDirectory, inspect);

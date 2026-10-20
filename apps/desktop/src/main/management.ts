@@ -10,6 +10,7 @@ import { configurationOnline } from '../shared/configurations.js';
 import { registerConfigurationIpc } from './configuration-ipc.js';
 import { PreferenceStore } from './preferences.js';
 import { PiPreflight } from './pi-preflight.js';
+import { CodexDiscovery } from './codex-discovery.js';
 import { ClaudeDiscovery } from './claude-discovery.js';
 import { PiConnectionStore } from './pi-connection-store.js';
 import { PiConnection } from './pi-connection.js';
@@ -72,8 +73,9 @@ export function createManagement(options: {
     options.onlineChanged?.(snapshot.records.some(configurationOnline));
     if (window && !window.isDestroyed()) window.webContents.send('management:configurations-state', snapshot);
   });
+  const codexDiscovery = new CodexDiscovery({ home: app.getPath('home'), guiPath: process.env.PATH ?? '', ...(process.env.CODEX_HOME ? { codexHome: process.env.CODEX_HOME } : {}) });
   const claudeDiscovery = new ClaudeDiscovery({ home: app.getPath('home'), guiPath: process.env.PATH ?? '' });
-  const configurationIpc = registerConfigurationIpc({ window: () => window, configurations, preflight, claudeDiscovery,
+  const configurationIpc = registerConfigurationIpc({ window: () => window, configurations, preflight, claudeDiscovery, codexDiscovery,
     sessions: () => options.sessions?.() ?? { sessions: {}, bubbles: [] }, quitting: () => quitting });
   let tray: Tray | undefined;
   let runtimeError: string | null = null;

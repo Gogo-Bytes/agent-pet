@@ -55,3 +55,14 @@
 - 摘要脚本编译产物位于临时目录 `/tmp/agent-pet-codex-preview-ASzDdC`，只保留脱敏 `result.json`，不会提交。
 
 本范围 **VERIFIED：真实日常 Codex 目标的只读 hooks 预览与程序 metadata 核对**。仍不等于用户授权部署、原生 `/hooks` 审核、在线连接或任务验收。后续若执行追加，必须再次展示精确文件/条目预览，并单独确认写入与撤回范围。
+
+## 部署前备份与现状核对
+
+用户要求“原来先备份一下再开始”。因此在任何追加前，对当前 `/Users/gan/.codex/hooks.json` 创建了独立备份：
+
+- 备份目录：`/Users/gan/Library/Application Support/@agent-pet/desktop/codex-backup-20261020085640-85ac21a5-8212-4dca-b385-5c9321548f4e`。
+- 目录 0700，备份文件 0600，大小 5001 bytes，复制后 SHA-256 校验一致。
+- 目标 hooks 未写入，未启动 Codex 或任务。
+- 随后核对现有 Agent Pet 私有注册记录：目标 `/Users/gan/.codex`、active、未 removed，10 个事件已注册；`inspectCodexUserHook` 返回 true。
+
+因此当前目标已经完成此前的追加部署，重复执行会产生重复 hooks；本轮没有再次 apply。备份保留用于人工核对，应用自身的选择性撤回仍以私有 registration receipt 和当前文件内容检查为准，不用整份备份覆盖用户后来编辑。

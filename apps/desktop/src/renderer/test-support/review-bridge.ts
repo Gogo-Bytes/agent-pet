@@ -14,7 +14,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   const configListeners = new Set<(value: ConfigurationsState) => void>();
   const sessionListeners = new Set<(value: SessionState) => void>();
   const paths = scenario === 'detail-long-path' ? [`/test/AgentPet/${'a-very-long-project-directory/'.repeat(12)}pi-config`] : ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? ['/test/AgentPet/default'] : ['/test/AgentPet/personal', '/test/AgentPet/project'];
-  if (scenario !== 'empty' && scenario !== 'scan-new' && !scenario.startsWith('claude-') && !scenario.startsWith('codex-')) paths.forEach((path, index) => {
+  if (scenario !== 'empty' && scenario !== 'scan-new' && scenario !== 'codex-scan-new' && !scenario.startsWith('claude-') && !scenario.startsWith('codex-')) paths.forEach((path, index) => {
     const id = `review-${index}`;
     const record: ConfigurationMetadata = { id, name: ['scan-saved', 'detail-resume', 'detail-paused', 'detail-waiting'].includes(scenario) ? 'pi 默认配置' : index === 0 ? '个人配置' : '一个用于验证窄窗口的很长很长的项目配置名称', provider: 'pi', targetPath: path, installation: null, pet: { assetId: 'starter', name: index ? '项目小伙伴' : '小伙伴' } };
     configs.records.push({ ...record, availability: 'available', inspection: { target: { path, source: 'chosen' }, findings: [] }, connection: { ...base, status: 'connected', receiving: 'active', saved: 'ready', canConfigure: false, canRemove: true, deployedPath: `${path}/extensions/agent-pet.ts` } });
@@ -42,7 +42,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
       observedAt: '2026-10-18T00:00:00Z', capabilities: { reading: 'supported' },
       facts: { activities: [], waitingForInput: false, recentActivity: { id: 'review-recent', kind: 'reading' } } });
   }
-  if (scenario.startsWith('codex-')) {
+  if (scenario.startsWith('codex-') && scenario !== 'codex-scan-new') {
     configs.records = [{ id: 'review-codex', name: '我的 Codex', provider: 'codex', targetPath: '/示例/.codex', installation: null,
       pet: null, availability: scenario === 'codex-error' ? 'attention' : 'available', inspection: null, connection: null,
       codex: { revision: 0, status: scenario === 'codex-online' ? 'observing' : scenario === 'codex-waiting' ? 'waiting' :
@@ -74,7 +74,10 @@ export function createReviewBridge(scenario: string): ManagementBridge {
     piConnection: { getState: async () => base, preview: async () => base, cancel: async () => base, confirm: async () => base, resume: async () => base, disable: async () => base, remove: async () => base, subscribe: () => () => {} },
     configurations: {
       getState: async () => configs, subscribe: listener => subscribe(configListeners, listener),
-      detectCodex: async () => ({ installations: [], targetPath: '/示例/.codex', scan: 'complete', notice: 'none' }),
+      detectCodex: async () => ({ installations: scenario === 'codex-scan-new' ? [
+        { id: 'review-codex-standalone', entryPath: '/示例/.codex/packages/standalone/current/bin/codex', executable: '/示例/.codex/packages/standalone/releases/0.163.0-aarch64-apple-darwin/bin/codex', kind: 'standalone' as const, version: null, compatibility: 'verified' as const },
+        { id: 'review-codex-npm', entryPath: '/示例/.nvm/versions/node/v22.18.0/bin/codex', executable: '/示例/npm/bin/codex.js', kind: 'npm' as const, version: '0.163.0', compatibility: 'unverified' as const },
+      ] : [], targetPath: '/示例/.codex', scan: 'complete', notice: 'none' }),
       cancelCodexScan: async () => {},
       prepareDetectedCodex: async () => ({ state: configs, configurationId: null }),
       detectClaude: async () => ({ installations: scenario.startsWith('claude-scan') ? [

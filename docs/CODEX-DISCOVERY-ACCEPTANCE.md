@@ -31,4 +31,16 @@
 
 **VERIFIED：本机正式扫描模块的有界只读发现与候选撤销。** 不等于原生 Electron 扫描界面、一键配置、hooks 部署、在线连接或任务/动画验收。此前日常连接证据保持原范围。
 
-下一步先补正式 Renderer 的 Codex 扫描结果、多安装/未验证安装与已有配置查看的视觉/交互验证，使用自有示例数据、不改日常配置。真实“一键配置”会读取 hooks.json 及固定后台入口 metadata，超出本轮授权；执行前必须另列精确读取范围。现有已配置目标优先查看原记录，不能为验收重复部署或撤回原 hooks。
+## 正式 Renderer 隔离验收
+
+使用正式 React Renderer 的 management review 页面和自有 `codex-scan-new` 示例数据，未启动 Electron Main、Codex 或真实配置操作。检查 1280×720 页面：
+
+- 连接页→自动扫描显示 Codex CLI 卡片。
+- 两处安装详情默认折叠，展开后正确区分“独立安装/可接入”和“npm 0.163.0/待验证”。
+- 一键配置打开 Codex 专用检查对话框，路径显示为示例 `.codex`，未混入真实路径或秘密。
+- 检查范围默认折叠，取消按钮和右上角取消均可关闭；没有调用部署、确认或真实文件操作。
+- 截图证据：`/tmp/agent-pet-codex-scan.png`、`/tmp/agent-pet-codex-setup-dialog.png`（临时产物，不提交）。
+
+本范围 **VERIFIED：正式 Renderer 的示例数据布局、安装详情展开、Codex 检查对话框与取消交互**。不等于真实 Electron 原生窗口、真实 Main IPC、hooks.json 读取、部署、Codex 审核或在线连接通过。
+
+下一步若要继续真实“一键配置”，会读取 hooks.json 及固定后台入口 metadata，必须另列精确读取范围；现有已配置目标优先查看原记录，不能为验收重复部署或撤回原 hooks。

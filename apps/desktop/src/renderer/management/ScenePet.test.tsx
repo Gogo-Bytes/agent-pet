@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { act, create, type ReactThreeTest } from '@react-three/test-renderer';
 import { useGLTF } from '@react-three/drei';
 import { useThree, type RootState } from '@react-three/fiber';
-import { Box3, Mesh, Vector3, type AnimationClip, type Group } from 'three';
+import { Box3, Group, Mesh, Vector3, type AnimationClip } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ScenePet } from './ScenePet.js';
 import { HomeScene, PetPreviewScene } from './ManagementScenes.js';
@@ -103,6 +103,19 @@ describe('ScenePet actual bundled asset and multi-instance lifecycle', () => {
     expect(root.position.x).toBeCloseTo(.06, 4); expect(root.position.y).toBeCloseTo(.08, 4);
     expect(test.state.internal.subscribers).toHaveLength(1);
   });
+  it('falls back to a finite neutral transform for a zero-size imported model', async () => {
+    const malformed = { scene: new Group(), animations: [] };
+    vi.mocked(useGLTF).mockReturnValue(malformed as ReturnType<typeof useGLTF>);
+    let state!: RootState;
+    function Probe() { state = useThree(); return null; }
+    const view = await create(<><Probe /><ScenePet action="Idle" reduced={false} onReady={vi.fn()} modelUrl="blob:malformed" /></>);
+    mounted.push(view);
+    const pet = state.scene.children.find(child => child.type === 'Group');
+    expect(pet).toBeTruthy();
+    expect(Number.isFinite(pet!.scale.x)).toBe(true);
+    expect(Number.isFinite(pet!.position.y)).toBe(true);
+  });
+
   it('exposes only available clip capabilities and uses actual Idle when an optional action is absent', async () => {
     const test = await mount([{ id: 'a', action: 'Work' }], asset.animations.filter(clip => clip.name === 'Idle'));
     expect(test.ready).toHaveBeenCalledWith(['idle']);

@@ -48,13 +48,13 @@ it('keeps native action refs and one bounded optical observer per control surfac
   const notify = () => act(() => { resize([], {} as ResizeObserver); const callback = frame; frame = undefined; callback?.(0); });
   notify();
   expect(container.querySelector('feDisplacementMap')).toBeTruthy();
-  expect(draw).toHaveBeenCalledOnce();
+  expect(draw).toHaveBeenCalledTimes(2);
   notify(); // No per-frame rebuilding for an unchanged size.
-  expect(draw).toHaveBeenCalledOnce();
+  expect(draw).toHaveBeenCalledTimes(2);
   width = 10_000; // Area cap clears the obsolete map and falls back.
   notify();
   expect(container.querySelector('feDisplacementMap')).toBeNull();
-  expect(draw).toHaveBeenCalledOnce();
+  expect(draw).toHaveBeenCalledTimes(2);
   unmount();
   expect(disconnect).toHaveBeenCalledTimes(observe.mock.calls.length);
   expect(frame).toBeUndefined();

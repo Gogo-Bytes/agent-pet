@@ -28,7 +28,13 @@ describe('pet runtime contracts', () => {
     expect(validatePetManifest(validManifest)).toEqual({ valid: true, manifest: validManifest });
   });
 
-  it('rejects remote models but accepts assets without Idle', () => {
+  it('accepts a declared local avatar without fixing its filename or format', () => {
+    expect(validatePetManifest({ ...validManifest, avatar: 'portrait.webp' })).toMatchObject({ valid: true });
+    expect(validatePetManifest({ ...validManifest, avatar: '头像.jpg' })).toMatchObject({ valid: true });
+  });
+
+  it('rejects unsafe avatar paths but accepts assets without Idle', () => {
+    expect(validatePetManifest({ ...validManifest, avatar: '../portrait.png' })).toEqual({ valid: false, reason: 'required-field-missing' });
     expect(validatePetManifest({ ...validManifest, model: 'https://example.com/pet.glb' })).toEqual({
       valid: false,
       reason: 'model-must-be-local-glb',

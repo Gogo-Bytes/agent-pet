@@ -44,6 +44,14 @@
     backdrop-filter: blur(8px) saturate(120%);
   }
 }
+/* A soft specular sweep gives the surface a visible interactive relationship without adding another glass layer. */
+.glass-surface::before {
+  content:''; position:absolute; inset:1px; z-index:-1; pointer-events:none; border-radius:inherit;
+  background:linear-gradient(112deg,transparent 22%,#ffffff42 42%,#ffffff12 52%,transparent 72%);
+  opacity:.32; transform:translateX(-7%); transition:opacity .24s ease,transform .34s ease;
+}
+.glass-surface:hover::before,.glass-surface:focus-within::before { opacity:.62; transform:translateX(4%); }
+.glass-surface:active::before,.glass-surface:is([aria-pressed="true"],[aria-expanded="true"])::before { opacity:.78; transform:translateX(8%); }
 /* Rim lighting is separate from the refracted backdrop and readable content. */
 .glass-surface::after {
   content:''; position:absolute; inset:0; z-index:-1; pointer-events:none; border-radius:inherit;
@@ -51,6 +59,9 @@
   box-shadow:var(--glass-rim);
 }
 .glass-button { transition:border-color .16s,box-shadow .16s; }
+.flat-control { border:1px solid #d9d1f6; background:#eee9fb; color:var(--glass-ink); box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+.flat-control:hover:not(:disabled) { background:#e2d9f8; border-color:#b7a6e4; }
+.flat-control:active:not(:disabled) { background:#d8ccef; }
 .glass-button.glass-surface:hover:not(:disabled) { --glass-fill:var(--glass-hover-fill); border-color:#ffffffa8; }
 .glass-button.glass-surface:is([aria-pressed="true"],[aria-expanded="true"]):not(:disabled) {
   --glass-fill:var(--glass-selected-fill); border-color:#8f77ba99; color:var(--glass-accent);
@@ -58,7 +69,7 @@
 }
 .glass-button.glass-surface:active:not(:disabled) { --glass-fill:var(--glass-active-fill); }
 .glass-button:disabled { color:#8b8195; box-shadow:none; cursor:default; }
-.glass-button:focus-visible,.glass-toolbar>button:focus-visible { outline:3px solid #7460b0; outline-offset:3px; }
+.glass-button:focus-visible,.flat-control:focus-visible,.glass-toolbar>button:focus-visible { outline:3px solid #7460b0; outline-offset:3px; }
 .glass-toolbar>button { border:1px solid transparent; background:transparent; backdrop-filter:none; }
 .glass-toolbar>button:hover { background:#ffffff52; }
 .glass-toolbar>button[aria-expanded="true"] { background:#b69cde30; color:var(--glass-accent); }
@@ -74,7 +85,10 @@
   .glass-surface > .glass-optics { backdrop-filter:none; -webkit-backdrop-filter:none; }
   .glass-button.glass-surface:active:not(:disabled) { --glass-fill:#e8def6; }
 }
-@media(prefers-reduced-motion:reduce) { .glass-button { transition:none; } }
+@media(prefers-reduced-motion:reduce) {
+  .glass-button,.glass-surface::before { transition:none; }
+  .glass-surface:hover::before,.glass-surface:focus-within::before,.glass-surface:active::before { transform:none; }
+}
 @media(forced-colors:active) {
   .glass-surface.glass-control,.glass-surface.glass-panel { border-color:ButtonText; color:CanvasText; box-shadow:none; }
   .glass-surface > .glass-optics { background:Canvas; backdrop-filter:none; -webkit-backdrop-filter:none; }
@@ -105,6 +119,13 @@
 }
 .glass-toolbar > .glass-action:active { background:#a499bd32; }
 .glass-action .ui-icon, .glass-button .ui-icon { width:var(--glass-icon-size); height:var(--glass-icon-size); }
+/* Icon-only actions are the flat functional layer inside a glass group. */
+.glass-toolbar > .glass-action.icon-only {
+  background:#eee9fb; border:1px solid #d9d1f6; box-shadow:none;
+}
+.glass-toolbar > .glass-action.icon-only:hover { background:#e2d9f8; border-color:#b7a6e4; box-shadow:none; }
+.glass-toolbar > .glass-action.icon-only:active { background:#d8ccef; border-color:#b7a6e4; box-shadow:none; }
+.glass-toolbar > .glass-action.icon-only:is([aria-expanded="true"],[aria-pressed="true"]) { background:#8069d7; border-color:#8069d7; color:#fff; box-shadow:none; }
 @media(prefers-reduced-motion:reduce) { .glass-action { transition:none; } }
 @media(forced-colors:active) {
   .glass-toolbar > .glass-action { color:ButtonText; }
@@ -150,3 +171,13 @@
   .glass-surface .glass-inset { border-color:CanvasText; background:Canvas; box-shadow:none; }
   .glass-surface .glass-inset:focus-within { outline:2px solid Highlight; outline-offset:2px; border-color:CanvasText; box-shadow:none; }
 }
+
+/* Keep icon-only actions flat even when a pressed/hovered text-action rule also matches. */
+.glass-toolbar > button.glass-action.icon-only,
+.glass-toolbar > button.glass-action.icon-only:hover,
+.glass-toolbar > button.glass-action.icon-only:active {
+  background:#eee9fb; border:1px solid #d9d1f6; box-shadow:none; color:var(--glass-ink);
+}
+.glass-toolbar > button.glass-action.icon-only:hover { background:#e2d9f8; border-color:#b7a6e4; }
+.glass-toolbar > button.glass-action.icon-only:active { background:#d8ccef; }
+.glass-toolbar > button.glass-action.icon-only:is([aria-expanded="true"],[aria-pressed="true"]) { background:#8069d7; border-color:#8069d7; color:#fff; box-shadow:none; }

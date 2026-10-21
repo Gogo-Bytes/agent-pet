@@ -1,8 +1,8 @@
 # 宠物模型与动作
 
-艺术家交付一个本地 GLB 和 `pet.json`。动作全部可选：只做模型、完全没有动画也可以；模型会保持默认姿势。当前应用仍只有内置宠物，本说明与模板不代表用户导入功能已开放。
+艺术家交付一个普通宠物文件夹，根目录固定包含 `pet.json` 和 `pet.glb`，头像文件可自定义名称和图片格式，并在 `pet.json.avatar` 中声明。不需要制作新的文件格式，也不需要压缩。用户导入时直接选择这个文件夹。动作全部可选：只做模型、完全没有动画也可以；模型会保持默认姿势。头像用于宠物收藏和绑定标签显示；缺失或不匹配时应用使用默认头像。当前应用仍只有内置宠物，本说明与模板不代表用户导入功能已开放。
 
-复制 [完整模板](../packages/pet-runtime/templates/pet.json)，填写 `id`、`version`、`model` 和 `license`。`model` 是包内相对 GLB 路径。需要某个动作时，将对应的 `null` 改成 GLB 内动画的准确名称，例如：
+复制 [完整模板](../packages/pet-runtime/templates/pet.json)，填写 `id`、`version`、`model`、`avatar` 和 `license`。`model` 与 `avatar` 都是文件夹根目录下的相对文件名；头像可以使用 PNG、JPEG 或 WebP。头像声明缺失或文件对应不上时会回退默认头像。需要某个动作时，将对应的 `null` 改成 GLB 内动画的准确名称，例如：
 
 ```json
 "animations": { "idle": "Breathing", "thinking": "LookUp" }

@@ -39,6 +39,7 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
   const preferences = snapshot.state?.preferences ?? defaultPreferences;
   const assets = snapshot.petAssets ?? { version: 1 as const, records: [] };
   const selectedAsset = assets.records.find(asset => asset.id === selectedAssetId) ?? assets.records[0];
+  const assetAnimations = useMemo(() => Object.fromEntries(assets.records.filter(asset => asset.manifest.animations).map(asset => [asset.id, asset.manifest.animations!])), [assets.records]);
   const pets = useMemo(() => snapshot.configurations ? projectHomePets(snapshot.configurations, snapshot.sessions, preferences.petName) : [], [snapshot.configurations, snapshot.sessions, preferences.petName]);
   const importedAssetIds = assets.records.filter(asset => asset.source === 'imported').map(asset => asset.id).join('|');
   useEffect(() => {
@@ -81,7 +82,7 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
     </header>
     {(windowError || snapshot.error || snapshot.state?.preferenceError) && <p className="app-alert" role="alert">{windowError || snapshot.error || snapshot.state?.preferenceError}<button onClick={() => void store.retry()}>重新读取</button></p>}
     <div className="game-content">
-      <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} modelUrl={selectedAsset?.source === 'imported' ? assetModels[selectedAsset.id] : undefined} animations={selectedAsset?.manifest.animations} onClips={onClips}>
+      <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} modelUrl={selectedAsset?.source === 'imported' ? assetModels[selectedAsset.id] : undefined} animations={selectedAsset?.manifest.animations} modelUrls={assetModels} assetAnimations={assetAnimations} onClips={onClips}>
         <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} assets={assets} avatarUrls={assetAvatars} selectedAssetId={selectedAsset?.id ?? 'starter'} onSelectAsset={setSelectedAssetId} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
           onName={petName => change(() => bridge.updatePreferences({ petName }))} onBind={(id, pet) => void change(() => bridge.configurations.bindPet(id, pet))}
           onChooseImport={() => petAssets.choose()} onConfirmImport={token => petAssets.confirm(token)} onCancelImport={token => petAssets.cancel(token)}

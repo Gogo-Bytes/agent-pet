@@ -43,7 +43,7 @@ export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId
   }
   const motions = petActions.filter(value => clips.some(clip => normalizePetAction(clip) === value.id));
   const normalizedAction = normalizePetAction(action);
-  const boundRecords = records.filter(record => record.pet?.assetId === 'starter');
+  const boundRecords = records.filter(record => record.pet?.assetId === selectedAssetId);
   const providerIcon = (provider: AgentConfiguration['provider']): IconName => provider === 'codex' ? 'command' : provider === 'claude' ? 'flower' : provider === 'pi' ? 'pi' : 'code';
   useEffect(() => { if (!visible) { setPanel(null); setMotionsOpen(false); setEditing(false); setImportPreview(null); } }, [visible]);
   useEffect(() => {
@@ -100,7 +100,7 @@ export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId
     </GlassDrawer>}
     {panel === 'agents' && <Dialog label="配置 Agent" className="pet-dialog" onClose={() => setPanel(null)}>
       <header><h2>配置给 Agent</h2><button type="button" aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>
-      <div className="pet-agent-options">{records.map(record => <button key={record.id} disabled={busy} aria-pressed={record.pet?.assetId === 'starter'} onClick={() => onBind(record.id, record.pet ? null : { assetId: 'starter', name })}><Icon name="link" /><span>{record.name}<br /><small>{providerLabels[record.provider]}</small></span><small>{record.pet ? '已配置 ✓' : '默认宠物'}</small></button>)}</div>
+      <div className="pet-agent-options">{records.map(record => <button key={record.id} disabled={busy} aria-pressed={record.pet?.assetId === selectedAssetId} onClick={() => onBind(record.id, record.pet?.assetId === selectedAssetId ? null : { assetId: selectedAssetId, name })}><Icon name="link" /><span>{record.name}<br /><small>{providerLabels[record.provider]}</small></span><small>{record.pet?.assetId === selectedAssetId ? '已配置 ✓' : record.pet ? '已配置其他宠物' : '未配置'}</small></button>)}</div>
       {!records.length && <p className="collection-empty">还没有配置。可以从底部「连接」添加。</p>}
       <button className="dialog-done" onClick={() => setPanel(null)}>完成</button>{error && <p role="alert">{error}</p>}
     </Dialog>}

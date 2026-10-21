@@ -1,13 +1,15 @@
 import type { PiConnectionState } from './pi-connection.js';
 import type { CodexConnectionState } from './codex-connection.js';
 import type { ClaudeConnectionState } from './claude-connection.js';
+import { PET_ASSET_ID } from './pet-assets.js';
 import type { Inspection, InstallationCandidate } from './pi-preflight.js';
 import type { CodexDiscoveryState } from './codex-discovery.js';
 import type { ClaudeDiscoveryState } from './claude-discovery.js';
 
 export const configurationProviders = ['pi', 'codex', 'claude', 'opencode', 'gemini', 'cursor'] as const;
 export type ConfigurationProvider = typeof configurationProviders[number];
-export interface PetBinding { assetId: 'starter'; name: string }
+export interface PetBinding { assetId: string; name: string }
+export { PET_ASSET_ID };
 /** Non-secret metadata. Availability, peer connection, and task observations have separate owners. */
 export interface ConfigurationMetadata {
   id: string;

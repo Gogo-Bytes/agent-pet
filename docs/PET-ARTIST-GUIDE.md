@@ -1,8 +1,8 @@
 # 宠物模型与动作
 
-艺术家交付一个 `.pet` 文件包，内部固定包含根目录下的 `pet.json`、`pet.glb` 和 `avatar.png`。`.pet` 是固定结构的 ZIP 容器，不需要学习新的二进制格式。动作全部可选：只做模型、完全没有动画也可以；模型会保持默认姿势。`avatar.png` 用于宠物收藏和绑定标签显示，建议使用正方形 PNG。当前应用仍只有内置宠物，本说明与模板不代表用户导入功能已开放。
+艺术家交付一个普通宠物文件夹，根目录固定包含 `pet.json`、`pet.glb` 和 `avatar.png`。不需要制作新的文件格式，也不需要压缩。用户导入时直接选择这个文件夹。动作全部可选：只做模型、完全没有动画也可以；模型会保持默认姿势。`avatar.png` 用于宠物收藏和绑定标签显示，建议使用正方形 PNG。当前应用仍只有内置宠物，本说明与模板不代表用户导入功能已开放。
 
-复制 [完整模板](../packages/pet-runtime/templates/pet.json)，填写 `id`、`version`、`model` 和 `license`。`.pet` 包中 `model` 固定填写 `pet.glb`；头像固定命名为 `avatar.png`，不需要在 JSON 中再写一层路径。需要某个动作时，将对应的 `null` 改成 GLB 内动画的准确名称，例如：
+复制 [完整模板](../packages/pet-runtime/templates/pet.json)，填写 `id`、`version`、`model` 和 `license`。文件夹中的 `model` 固定填写 `pet.glb`；头像固定命名为 `avatar.png`，不需要在 JSON 中再写一层路径。需要某个动作时，将对应的 `null` 改成 GLB 内动画的准确名称，例如：
 
 ```json
 "animations": { "idle": "Breathing", "thinking": "LookUp" }

@@ -16,6 +16,22 @@ export interface PetAssetsState {
   records: PetAsset[];
 }
 
+export type PetImportPreview = {
+  token: string;
+  manifest: PetManifest;
+  modelBytes: number;
+  avatar: 'custom' | 'fallback';
+  avatarFile: string | null;
+};
+export type PetImportInspection = { ok: true; preview: PetImportPreview } | { ok: false; reason: string };
+export interface PetAssetsApi {
+  getState(): Promise<PetAssetsState>;
+  choose(): Promise<PetImportInspection>;
+  confirm(token: string): Promise<PetAssetsState>;
+  cancel(token: string): Promise<void>;
+  subscribe(listener: (state: PetAssetsState) => void): () => void;
+}
+
 export const starterPetAsset: PetAsset = {
   id: 'starter',
   source: 'bundled',

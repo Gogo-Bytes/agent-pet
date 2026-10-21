@@ -224,7 +224,7 @@ describe('ManagementApp formal four-page interface', () => {
     await page(test.user, '宠物');
     await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
     expect(screen.getByRole('dialog', { name: '宠物收藏' })).toBeTruthy();
-    expect(screen.getByText(/宠物包导入尚未支持/)).toBeTruthy();
+    expect(screen.getByText(/导入文件夹需包含 pet.json 和 pet.glb/)).toBeTruthy();
     await test.user.click(screen.getByRole('button', { name: '关闭弹窗' }));
     await page(test.user, '设置');
     expect(screen.getByRole('heading', { name: '场景渲染' })).toBeTruthy();

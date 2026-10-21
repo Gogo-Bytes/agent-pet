@@ -4,6 +4,7 @@ import { defaultPreferences, type ManagementState } from '../../shared/preferenc
 import type { ConfigurationsState, ConfigurationMetadata } from '../../shared/configurations.js';
 import type { PreflightState } from '../../shared/pi-preflight.js';
 import type { PiConnectionState } from '../../shared/pi-connection.js';
+import type { PetAssetsState } from '../../shared/pet-assets.js';
 
 const base: PiConnectionState = { revision: 0, status: 'not-configured', mode: 'desktop', busy: false, canConfigure: true, preview: null, deployedPath: null, canRemove: false, canResume: false, receiving: 'stopped', saved: 'none', notice: 'none' };
 export function createReviewBridge(scenario: string): ManagementBridge {
@@ -55,12 +56,14 @@ export function createReviewBridge(scenario: string): ManagementBridge {
         connected: true, observedAt: '2026-10-19T00:00:00Z', capabilities: {}, facts: { activities: [], waitingForInput: false } });
     }
   }
+  const petAssets: PetAssetsState = { version: 1, records: [{ id: 'starter', source: 'bundled', importedAt: null, manifest: { schemaVersion: 2, actionCatalogVersion: 1, id: 'starter', version: '1.0.0', model: 'starter.glb', license: 'CC0-1.0' } }] };
   const preflight: PreflightState = { revision: 0, installations: [], automaticTarget: { path: '/test/AgentPet/default', source: 'default' }, selectedInstallation: null, target: { path: '/test/AgentPet', source: 'chosen' }, inspection: null, scan: 'complete', notice: 'none' };
   function pushConfigs() { configs = { ...configs, revision: configs.revision + 1 }; configListeners.forEach(listener => listener(configs)); return Promise.resolve(configs); }
   function subscribe<T>(listeners: Set<(value: T) => void>, listener: (value: T) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
   function record(id: string) { const value = configs.records.find(value => value.id === id); if (!value) throw new Error('Record missing'); return value; }
   return {
     nativeWindowControls: false,
+    petAssets: { getState: async () => petAssets, choose: async () => ({ ok: false, reason: 'not-supported' }), confirm: async () => petAssets, cancel: async () => {}, subscribe: () => () => {} },
     windowAction: async () => {},
     getState: async () => state,
     subscribe: listener => subscribe(stateListeners, listener),

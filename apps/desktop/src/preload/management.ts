@@ -4,6 +4,7 @@ import type { SessionState } from '@agent-pet/domain';
 import type { ConfigurationsApi, ConfigurationsState } from '../shared/configurations.js';
 import type { ConfigurationLocationsApi } from '../shared/configuration-locations.js';
 import type { ManagementState, PreferencePatch } from '../shared/preferences.js';
+import type { PetAssetsApi, PetAssetsState } from '../shared/pet-assets.js';
 import type { PiPreflightApi } from '../shared/pi-preflight.js';
 import type { PiConnectionApi, PiConnectionState } from '../shared/pi-connection.js';
 const piConnection: PiConnectionApi = {
@@ -61,9 +62,20 @@ const locations: ConfigurationLocationsApi = {
   authorize: path => ipcRenderer.invoke('management:location-authorize', path),
   inspect: (path, provider) => ipcRenderer.invoke('management:location-inspect', path, provider),
 };
+const petAssets: PetAssetsApi = {
+  getState: () => ipcRenderer.invoke('management:pet-assets-state'),
+  choose: () => ipcRenderer.invoke('management:pet-assets-choose'),
+  confirm: token => ipcRenderer.invoke('management:pet-assets-confirm', token),
+  cancel: token => ipcRenderer.invoke('management:pet-assets-cancel', token),
+  subscribe(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, state: PetAssetsState) => listener(state);
+    ipcRenderer.on('management:pet-assets-state', handler);
+    return () => ipcRenderer.removeListener('management:pet-assets-state', handler);
+  },
+};
 const managementApi = {
   nativeWindowControls: process.platform === 'darwin',
-  piPreflight, piConnection, configurations, locations,
+  piPreflight, piConnection, configurations, locations, petAssets,
   windowAction(action: ManagementWindowAction): Promise<void> { return ipcRenderer.invoke('management:window-action', action); },
   getSessions(): Promise<SessionState> { return ipcRenderer.invoke('management:sessions'); },
   openProject(): Promise<void> { return ipcRenderer.invoke('management:project'); },

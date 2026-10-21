@@ -1,10 +1,11 @@
 /** Non-secret application preferences. Agent configurations and assets live separately. */
 export type Preferences = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   petVisible: boolean;
   /** Desktop pet anchor in CSS pixels; 140 is the 100% default. */
   petSize: number;
   petName: string;
+  petAssetId: string;
   fps: 30 | 60 | 120;
   resolution: 75 | 100 | 150;
   pauseHidden: boolean;
@@ -22,7 +23,7 @@ export type Preferences = {
   error: boolean;
 };
 export const defaultPreferences: Preferences = {
-  schemaVersion: 2, petVisible: true, petSize: 140, petName: '小伙伴',
+  schemaVersion: 3, petVisible: true, petSize: 140, petName: '小伙伴', petAssetId: 'starter',
   fps: 60, resolution: 100, pauseHidden: true,
   tray: true, dock: true, startConsole: false, background: true,
   offline: true, names: true, topmost: true, bubbles: true, reduced: false,
@@ -36,7 +37,7 @@ export type ManagementState = {
 };
 const booleanKeys = ['petVisible', 'pauseHidden', 'tray', 'dock', 'startConsole', 'background',
   'offline', 'names', 'topmost', 'bubbles', 'reduced', 'completed', 'error'] as const;
-const allowedKeys = new Set<string>([...booleanKeys, 'petSize', 'petName', 'fps', 'resolution']);
+const allowedKeys = new Set<string>([...booleanKeys, 'petSize', 'petName', 'petAssetId', 'fps', 'resolution']);
 export function parsePreferencePatch(value: unknown): PreferencePatch {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Invalid preferences');
   const patch = value as Record<string, unknown>;
@@ -44,6 +45,7 @@ export function parsePreferencePatch(value: unknown): PreferencePatch {
       booleanKeys.some(key => key in patch && typeof patch[key] !== 'boolean') ||
       ('petSize' in patch && (typeof patch.petSize !== 'number' || !Number.isInteger(patch.petSize) || patch.petSize < 80 || patch.petSize > 600)) ||
       ('petName' in patch && (typeof patch.petName !== 'string' || !patch.petName.trim() || patch.petName.trim().length > 40)) ||
+      ('petAssetId' in patch && (typeof patch.petAssetId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(patch.petAssetId))) ||
       ('fps' in patch && ![30, 60, 120].includes(patch.fps as number)) ||
       ('resolution' in patch && ![75, 100, 150].includes(patch.resolution as number))) {
     throw new TypeError('Invalid preferences');
@@ -62,6 +64,9 @@ export function parseStoredPreferences(value: unknown): Preferences {
   if (schemaVersion === 1) {
     if (Object.keys(patch).length !== 2 || !('petVisible' in patch) || !('petSize' in patch)) throw new TypeError('Invalid preference schema');
   } else if (schemaVersion === 2) {
+    const legacyKeys = new Set([...allowedKeys].filter(key => key !== 'petAssetId'));
+    if (Object.keys(patch).length !== legacyKeys.size || [...legacyKeys].some(key => !(key in patch))) throw new TypeError('Invalid preference schema');
+  } else if (schemaVersion === 3) {
     if (Object.keys(patch).length !== allowedKeys.size || [...allowedKeys].some(key => !(key in patch))) throw new TypeError('Invalid preference schema');
   } else throw new TypeError('Invalid preference schema');
   return validatePreferences({ ...defaultPreferences, ...parsePreferencePatch(patch) });

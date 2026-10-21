@@ -9,6 +9,8 @@ export type PetManifest = {
   id: string;
   version: string;
   model: string;
+  /** Optional local avatar path; invalid or missing files use the application fallback. */
+  avatar?: string;
   schemaVersion?: 2;
   actionCatalogVersion?: number;
   animations?: PetAnimations;
@@ -48,8 +50,12 @@ export function validatePetManifest(
   if (!model.toLowerCase().endsWith('.glb') || /[:\\\\?#\u0000-\u001f]/u.test(model) || model.startsWith('/') || model.split('/').includes('..')) {
     return { valid: false, reason: 'model-must-be-local-glb' };
   }
+  const avatar = source.avatar;
+  if (avatar !== undefined && (typeof avatar !== 'string' || !avatar.trim() || /[:\\\\?#\u0000-\u001f]/u.test(avatar) || avatar.startsWith('/') || avatar.split('/').includes('..'))) {
+    return { valid: false, reason: 'required-field-missing' };
+  }
 
-  // Optional animation mistakes disable that slot; they cannot reject the Pet.
+  // Optional animation and avatar mistakes use runtime fallback; they cannot reject the Pet.
   const mappings = source.animations;
   const animations: PetAnimations = {};
   if (mappings && typeof mappings === 'object' && !Array.isArray(mappings)) {
@@ -60,7 +66,7 @@ export function validatePetManifest(
     }
   }
   const manifest: PetManifest = { id: source.id as string, version: source.version as string, model,
-    license: source.license as string, ...(source.animations !== undefined ? { animations } : {}),
+    license: source.license as string, ...(typeof avatar === 'string' ? { avatar } : {}), ...(source.animations !== undefined ? { animations } : {}),
     ...(source.schemaVersion === 2 ? { schemaVersion: 2 } : {}),
     ...(typeof source.actionCatalogVersion === 'number' ? { actionCatalogVersion: source.actionCatalogVersion } : {}),
     ...(typeof source.author === 'string' ? { author: source.author } : {}),

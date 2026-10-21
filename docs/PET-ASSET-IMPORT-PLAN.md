@@ -138,13 +138,17 @@ interface PetBinding {
 
 验证：正常包、缺 manifest、坏 JSON、路径穿越、超大包、重复版本、非法动作映射、坏 GLB、取消和写入失败。
 
-### P3：动态加载与切换
+### P3：动态加载与切换（管理页第一版进行中）
 
-- [ ] `PetModel` / `ScenePet` 改为接受已解析的资产描述。
+- [x] `ScenePet` / 宠物预览场景已可接受导入资产的模型 URL 与动作映射。
+- [x] Main 通过受控 IPC 返回已注册模型/头像字节，Renderer 使用短生命周期 Blob URL。
+- [x] 收藏卡片已显示 manifest 声明的头像；头像读取失败回退图标。
+- [ ] `PetModel` / 首页多 Agent 场景改为接受各自绑定的资产描述。
 - [ ] 增加资产 URL / 本地路径到 Electron Renderer 的受控映射。
 - [ ] 每个资产独立加载、缓存和释放；切换时不复用错误的 GLB。
-- [ ] 使用 manifest 动画映射，不再默认使用 starter 的 `bundledAnimations`。
-- [ ] 对模型尺寸、零尺寸、非法 bounding box 和无动画保持静态回退。
+- [x] 管理页预览使用 manifest 动画映射，不再默认使用 starter 的 `bundledAnimations`。
+- [x] 导入模型使用通用包围盒；无动画继续静态展示。
+- [ ] 对模型尺寸、零尺寸、非法 bounding box 做独立导入资产回退测试。
 - [ ] 加载失败只影响该资产，不让首页/管理页整体崩溃。
 - [ ] 验证多个不同资产同时渲染和切换后的资源清理。
 
@@ -223,5 +227,6 @@ pet-assets:subscribe
 | 2026-10-20 | P1 | 开始实现共享资产类型与 Main 私有 registry；暂不接入导入 UI |
 | 2026-10-20 | P0 修订 | 改为普通宠物文件夹；`pet.json` + `pet.glb` 固定，头像由 `pet.json.avatar` 声明，缺失时默认回退 |
 | 2026-10-20 | P2 | 已接入 Main IPC、目录选择、导入预览、确认安装和宠物收藏 UI；动态模型切换仍待完成 |
+| 2026-10-20 | P3 | 管理页预览已接入导入 GLB Blob URL、manifest 动作映射和头像 Blob URL；首页多 Agent 资产绑定仍待接入 |
 
 每完成一个可以独立验证、独立回滚的阶段，更新本表、运行该阶段验证，并创建单一目的 Git commit。未完成阶段不提前标记为通过。

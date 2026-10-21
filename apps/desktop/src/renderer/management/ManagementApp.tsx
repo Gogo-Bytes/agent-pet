@@ -20,7 +20,7 @@ const notices: Record<ConfigurationsState['notice'], string> = {
 };
 export function ManagementApp({ bridge = window.management }: { bridge?: ManagementBridge }) {
   const store = useMemo(() => createManagementStore(bridge), [bridge]);
-  const petAssets = bridge.petAssets ?? { getState: async () => ({ version: 1 as const, records: [] }), choose: async () => ({ ok: false as const, reason: 'not-supported' }), confirm: async () => ({ version: 1 as const, records: [] }), cancel: async () => {}, subscribe: () => () => {} };
+  const petAssets = useMemo(() => bridge.petAssets ?? { getState: async () => ({ version: 1 as const, records: [] }), getModel: async () => null, getAvatar: async () => null, choose: async () => ({ ok: false as const, reason: 'not-supported' }), confirm: async () => ({ version: 1 as const, records: [] }), cancel: async () => {}, subscribe: () => () => {} }, [bridge]);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [page, setPage] = useState('home');
   const [error, setError] = useState('');
@@ -31,10 +31,30 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
   const [clips, setClips] = useState<string[]>([]);
   const [action, setAction] = useState('Idle');
   const [replay, setReplay] = useState(0);
+  const [selectedAssetId, setSelectedAssetId] = useState('starter');
+  const [assetModels, setAssetModels] = useState<Record<string, string>>({});
+  const [assetAvatars, setAssetAvatars] = useState<Record<string, string>>({});
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const onClips = useCallback((values: string[]) => setClips(previous => previous.join() === values.join() ? previous : values), []);
   const preferences = snapshot.state?.preferences ?? defaultPreferences;
+  const assets = snapshot.petAssets ?? { version: 1 as const, records: [] };
+  const selectedAsset = assets.records.find(asset => asset.id === selectedAssetId) ?? assets.records[0];
   const pets = useMemo(() => snapshot.configurations ? projectHomePets(snapshot.configurations, snapshot.sessions, preferences.petName) : [], [snapshot.configurations, snapshot.sessions, preferences.petName]);
+  const importedAssetIds = assets.records.filter(asset => asset.source === 'imported').map(asset => asset.id).join('|');
+  useEffect(() => {
+    if (!bridge.petAssets) return;
+    let active = true; const urls: string[] = [];
+    const ids = importedAssetIds ? importedAssetIds.split('|') : [];
+    void Promise.all(ids.map(async id => { const bytes = await petAssets.getModel(id); if (!bytes) return null; const copy = new Uint8Array(bytes.byteLength); copy.set(bytes); const url = URL.createObjectURL(new Blob([copy.buffer], { type: 'model/gltf-binary' })); urls.push(url); return [id, url] as const; })).then(entries => { if (active) setAssetModels(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => !!entry))); });
+    return () => { active = false; urls.forEach(url => URL.revokeObjectURL(url)); };
+  }, [importedAssetIds, petAssets]);
+  useEffect(() => {
+    if (!bridge.petAssets) return;
+    let active = true; const urls: string[] = [];
+    const imported = assets.records.filter(asset => asset.source === 'imported');
+    void Promise.all(imported.map(async asset => { const bytes = await petAssets.getAvatar(asset.id); if (!bytes) return null; const copy = new Uint8Array(bytes.byteLength); copy.set(bytes); const extension = asset.manifest.avatar?.toLowerCase().split('.').pop(); const type = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg'; const url = URL.createObjectURL(new Blob([copy.buffer], { type })); urls.push(url); return [asset.id, url] as const; })).then(entries => { if (active) setAssetAvatars(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => !!entry))); });
+    return () => { active = false; urls.forEach(url => URL.revokeObjectURL(url)); };
+  }, [importedAssetIds, assets.records, petAssets]);
   async function change<T extends ManagementState | ConfigurationsState>(work: () => Promise<T>, login = false): Promise<boolean> {
     if (pending.current) return false;
     pending.current = true; setBusy(true); setError('');
@@ -61,8 +81,8 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
     </header>
     {(windowError || snapshot.error || snapshot.state?.preferenceError) && <p className="app-alert" role="alert">{windowError || snapshot.error || snapshot.state?.preferenceError}<button onClick={() => void store.retry()}>重新读取</button></p>}
     <div className="game-content">
-      <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} onClips={onClips}>
-        <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} assets={snapshot.petAssets ?? { version: 1, records: [] }} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
+      <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} modelUrl={selectedAsset?.source === 'imported' ? assetModels[selectedAsset.id] : undefined} animations={selectedAsset?.manifest.animations} onClips={onClips}>
+        <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} assets={assets} avatarUrls={assetAvatars} selectedAssetId={selectedAsset?.id ?? 'starter'} onSelectAsset={setSelectedAssetId} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
           onName={petName => change(() => bridge.updatePreferences({ petName }))} onBind={(id, pet) => void change(() => bridge.configurations.bindPet(id, pet))}
           onChooseImport={() => petAssets.choose()} onConfirmImport={token => petAssets.confirm(token)} onCancelImport={token => petAssets.cancel(token)}
           onAction={value => { setAction(value); setReplay(previous => previous + 1); }} />

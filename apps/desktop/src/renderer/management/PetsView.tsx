@@ -9,8 +9,8 @@ import { petActions } from './ScenePet.js';
 import { normalizePetAction } from '@agent-pet/pet-runtime';
 import { providerLabels } from './home-projection.js';
 
-export function PetsView({ visible, records, assets, name, clips, action, busy, onName, onBind, onAction, onChooseImport, onConfirmImport, onCancelImport, error, reduced }: {
-  visible: boolean; records: AgentConfiguration[]; assets: PetAssetsState; name: string; clips: string[]; action: string; busy: boolean;
+export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId, onSelectAsset, name, clips, action, busy, onName, onBind, onAction, onChooseImport, onConfirmImport, onCancelImport, error, reduced }: {
+  visible: boolean; records: AgentConfiguration[]; assets: PetAssetsState; avatarUrls: Record<string, string>; selectedAssetId: string; onSelectAsset: (id: string) => void; name: string; clips: string[]; action: string; busy: boolean;
   onName: (value: string) => Promise<boolean>; onBind: (id: string, pet: PetBinding | null) => void;
   onAction: (value: string) => void; onChooseImport: () => Promise<PetImportInspection>; onConfirmImport: (token: string) => Promise<PetAssetsState>; onCancelImport: (token: string) => Promise<void>;
   error: string; reduced: boolean;
@@ -92,7 +92,7 @@ export function PetsView({ visible, records, assets, name, clips, action, busy, 
     {panel === 'pets' && <GlassDrawer label="宠物收藏" reduced={reduced} onClose={() => setPanel(null)}>
       <label className="collection-search glass-inset"><Icon name="search" /><input autoFocus aria-label="搜索宠物" placeholder="搜索宠物" value={query} onChange={event => setQuery(event.target.value)} /></label>
       <div className="pet-avatar-grid">{assets.records.filter(asset => asset.manifest.id === 'starter' ? name.includes(query) : asset.manifest.id.includes(query)).map(asset =>
-        <button key={asset.id} aria-pressed={asset.id === 'starter'} onClick={() => setNotice(asset.id === 'starter' ? '正在使用内置 starter.glb。' : '已导入该宠物；动态模型切换将在下一阶段启用。')}><span className="pet-card-icon"><Icon name="pet" size={28} /></span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span></button>)}
+        <button key={asset.id} aria-pressed={asset.id === selectedAssetId} onClick={() => { onSelectAsset(asset.id); setNotice(asset.id === 'starter' ? '正在使用内置 starter.glb。' : '已切换到导入宠物。'); }}><span className="pet-card-icon">{avatarUrls[asset.id] ? <img src={avatarUrls[asset.id]} alt="" /> : <Icon name="pet" size={28} />}</span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span></button>)}
         <button className="avatar-add" aria-label="添加宠物" onClick={() => void chooseImport()}><span className="pet-card-icon"><Icon name="plus" /></span><span className="avatar-name">添加</span></button></div>
       {!assets.records.some(asset => (asset.id === 'starter' ? name : asset.manifest.id).includes(query)) && <p className="collection-empty">没有找到宠物</p>}
       {importPreview && <section className="pet-import-preview" aria-label="宠物导入预览"><strong>{importPreview.manifest.id}</strong><span>版本 {importPreview.manifest.version} · 模型 {Math.ceil(importPreview.modelBytes / 1024)} KB</span><span>头像：{importPreview.avatar === 'custom' ? importPreview.avatarFile : '使用默认头像'}</span><div><button className="dialog-done" disabled={busy} onClick={() => void confirmImport()}>确认添加</button><button className="cfg-secondary" onClick={() => { void onCancelImport(importPreview.token); setImportPreview(null); }}>取消</button></div></section>}

@@ -7,7 +7,7 @@ export type ManagementBridge = Omit<Window['management'], 'petAssets'> & { petAs
 export type ManagementSnapshot = { state: ManagementState | null; configurations: ConfigurationsState | null; petAssets: PetAssetsState | null; sessions: SessionState; error: string };
 /** One listener per IPC channel across all pages and Three.js. Initial replies never replace a newer push. */
 export function createManagementStore(bridge: ManagementBridge) {
-  const petAssets: PetAssetsApi = bridge.petAssets ?? { getState: async () => ({ version: 1, records: [] }), choose: async () => ({ ok: false, reason: 'not-supported' }), confirm: async () => ({ version: 1, records: [] }), cancel: async () => {}, subscribe: () => () => {} };
+  const petAssets: PetAssetsApi = bridge.petAssets ?? { getState: async () => ({ version: 1, records: [] }), getModel: async () => null, getAvatar: async () => null, choose: async () => ({ ok: false, reason: 'not-supported' }), confirm: async () => ({ version: 1, records: [] }), cancel: async () => {}, subscribe: () => () => {} };
   let snapshot: ManagementSnapshot = { state: null, configurations: null, petAssets: null, sessions: createSessionState(), error: '' };
   const listeners = new Set<() => void>();
   let generation = 0;
@@ -16,10 +16,11 @@ export function createManagementStore(bridge: ManagementBridge) {
   function publish(patch: Partial<ManagementSnapshot>) { snapshot = { ...snapshot, ...patch }; listeners.forEach(listener => listener()); }
   async function request(current: number) {
     const before = { ...revisions };
-    const responses = await Promise.allSettled([bridge.getState(), bridge.configurations.getState(), petAssets.getState(), bridge.getSessions()]);
+    const requests = bridge.petAssets ? [bridge.getState(), bridge.configurations.getState(), petAssets.getState(), bridge.getSessions()] : [bridge.getState(), bridge.configurations.getState(), bridge.getSessions()];
+    const responses = await Promise.allSettled(requests);
     if (current !== generation) return;
     const patch: Partial<ManagementSnapshot> = { error: '' };
-    const keys = ['state', 'configurations', 'petAssets', 'sessions'] as const;
+    const keys = bridge.petAssets ? ['state', 'configurations', 'petAssets', 'sessions'] as const : ['state', 'configurations', 'sessions'] as const;
     responses.forEach((response, index) => {
       const key = keys[index]!;
       if (response.status === 'fulfilled') {

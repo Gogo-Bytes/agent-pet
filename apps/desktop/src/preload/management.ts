@@ -64,6 +64,8 @@ const locations: ConfigurationLocationsApi = {
 };
 const petAssets: PetAssetsApi = {
   getState: () => ipcRenderer.invoke('management:pet-assets-state'),
+  getModel: id => ipcRenderer.invoke('management:pet-assets-model', id),
+  getAvatar: id => ipcRenderer.invoke('management:pet-assets-avatar', id),
   choose: () => ipcRenderer.invoke('management:pet-assets-choose'),
   confirm: token => ipcRenderer.invoke('management:pet-assets-confirm', token),
   cancel: token => ipcRenderer.invoke('management:pet-assets-cancel', token),

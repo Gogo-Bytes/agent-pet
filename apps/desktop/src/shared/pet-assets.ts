@@ -26,6 +26,8 @@ export type PetImportPreview = {
 export type PetImportInspection = { ok: true; preview: PetImportPreview } | { ok: false; reason: string };
 export interface PetAssetsApi {
   getState(): Promise<PetAssetsState>;
+  getModel(id: string): Promise<Uint8Array | null>;
+  getAvatar(id: string): Promise<Uint8Array | null>;
   choose(): Promise<PetImportInspection>;
   confirm(token: string): Promise<PetAssetsState>;
   cancel(token: string): Promise<void>;

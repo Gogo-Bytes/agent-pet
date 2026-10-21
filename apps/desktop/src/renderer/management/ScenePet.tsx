@@ -8,12 +8,12 @@ import { bundledAnimationBounds } from '../features/pet/bundled-animation-bounds
 
 export const petActions = petActionIds.map(id => ({ id, label: petActionCatalog[id].label }));
 
-export function ScenePet({ action, replay = 0, reduced, onReady, animations = bundledAnimations, restAction = 'idle' }: {
-  action: string; replay?: number | string; restAction?: string; reduced: boolean; onReady: (clips: string[]) => void; animations?: PetAnimations;
+export function ScenePet({ action, replay = 0, reduced, onReady, animations = bundledAnimations, restAction = 'idle', modelUrl }: {
+  action: string; replay?: number | string; restAction?: string; reduced: boolean; onReady: (clips: string[]) => void; animations?: PetAnimations | undefined; modelUrl?: string | undefined;
 }) {
-  const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(starterUrl, false, false);
+  const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(modelUrl ?? starterUrl, false, false);
   const root = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
-  const envelope = useMemo(() => bundledAnimationBounds(gltf.scene, gltf.animations), [gltf]);
+  const envelope = useMemo(() => modelUrl ? new Box3().setFromObject(gltf.scene) : bundledAnimationBounds(gltf.scene, gltf.animations), [gltf, modelUrl]);
   const transform = useMemo(() => {
     const bounds = new Box3().copy(envelope);
     const size = bounds.getSize(new Vector3());

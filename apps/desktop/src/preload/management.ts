@@ -68,6 +68,7 @@ const petAssets: PetAssetsApi = {
   getAvatar: id => ipcRenderer.invoke('management:pet-assets-avatar', id),
   choose: () => ipcRenderer.invoke('management:pet-assets-choose'),
   confirm: token => ipcRenderer.invoke('management:pet-assets-confirm', token),
+  remove: id => ipcRenderer.invoke('management:pet-assets-remove', id),
   cancel: token => ipcRenderer.invoke('management:pet-assets-cancel', token),
   subscribe(listener) {
     const handler = (_event: Electron.IpcRendererEvent, state: PetAssetsState) => listener(state);

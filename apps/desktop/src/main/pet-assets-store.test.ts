@@ -35,6 +35,18 @@ describe('PetAssetsStore', () => {
     expect(fs.statSync(join(directory, 'pet-assets', 'registry.json')).mode & 0o777).toBe(0o600);
   });
 
+  it('removes imported assets atomically', () => {
+    const directory = root();
+    const store = new PetAssetsStore(directory);
+    expect(store.saveImported(imported())).toBe(true);
+    const assetDirectory = join(directory, 'pet-assets', 'fox');
+    fs.mkdirSync(assetDirectory, { mode: 0o700 });
+    fs.writeFileSync(join(assetDirectory, 'pet.glb'), 'glb', { mode: 0o600 });
+    expect(store.removeImported('fox')).toBe(true);
+    expect(store.snapshot().records.map(record => record.id)).toEqual(['starter']);
+    expect(fs.existsSync(assetDirectory)).toBe(false);
+  });
+
   it('rejects duplicate and starter imports', () => {
     const directory = root();
     const store = new PetAssetsStore(directory);

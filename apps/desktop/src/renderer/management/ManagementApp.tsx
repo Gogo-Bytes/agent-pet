@@ -20,7 +20,7 @@ const notices: Record<ConfigurationsState['notice'], string> = {
 };
 export function ManagementApp({ bridge = window.management }: { bridge?: ManagementBridge }) {
   const store = useMemo(() => createManagementStore(bridge), [bridge]);
-  const petAssets = useMemo(() => bridge.petAssets ?? { getState: async () => ({ version: 1 as const, records: [] }), getModel: async () => null, getAvatar: async () => null, choose: async () => ({ ok: false as const, reason: 'not-supported' }), confirm: async () => ({ version: 1 as const, records: [] }), cancel: async () => {}, subscribe: () => () => {} }, [bridge]);
+  const petAssets = useMemo(() => bridge.petAssets ?? { getState: async () => ({ version: 1 as const, records: [] }), getModel: async () => null, getAvatar: async () => null, choose: async () => ({ ok: false as const, reason: 'not-supported' }), confirm: async () => ({ version: 1 as const, records: [] }), remove: async () => ({ version: 1 as const, records: [] }), cancel: async () => {}, subscribe: () => () => {} }, [bridge]);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [page, setPage] = useState('home');
   const [error, setError] = useState('');
@@ -85,7 +85,7 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
       <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} modelUrl={selectedAsset?.source === 'imported' ? assetModels[selectedAsset.id] : undefined} animations={selectedAsset?.manifest.animations} modelUrls={assetModels} assetAnimations={assetAnimations} onClips={onClips}>
         <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} assets={assets} avatarUrls={assetAvatars} selectedAssetId={selectedAsset?.id ?? 'starter'} onSelectAsset={setSelectedAssetId} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
           onName={petName => change(() => bridge.updatePreferences({ petName }))} onBind={(id, pet) => void change(() => bridge.configurations.bindPet(id, pet))}
-          onChooseImport={() => petAssets.choose()} onConfirmImport={token => petAssets.confirm(token)} onCancelImport={token => petAssets.cancel(token)}
+          onChooseImport={() => petAssets.choose()} onConfirmImport={token => petAssets.confirm(token)} onCancelImport={token => petAssets.cancel(token)} onRemoveAsset={async id => { try { await petAssets.remove(id); if (selectedAssetId === id) setSelectedAssetId('starter'); setWindowError(''); return true; } catch (cause) { setWindowError(cause instanceof Error ? cause.message : '宠物删除失败，请先解除绑定。'); return false; } }}
           onAction={value => { setAction(value); setReplay(previous => previous + 1); }} />
       </CompanionScene>
       <ConnectionsView visible={page === 'connections'} state={snapshot.configurations} bridge={bridge} run={change} busy={busy || !!snapshot.configurations?.busy} error={configError} />

@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join, normalize } from 'node:path';
 import { starterPetAsset, validPetAssetsState, type PetAsset, type PetAssetsState } from '../shared/pet-assets.js';
 
@@ -60,6 +61,18 @@ export class PetAssetsStore {
     const records = [...this.records, structuredClone(asset)];
     if (!validPetAssetsState({ version: 1, records })) return false;
     return this.save(records);
+  }
+
+  removeImported(id: string): boolean {
+    if (this.error || id === 'starter' || !this.records.some(record => record.id === id)) return false;
+    const source = join(this.directory, id); const tombstone = join(this.directory, `.deleting-${id}-${randomUUID()}`);
+    try {
+      fs.renameSync(source, tombstone);
+      const saved = this.save(this.records.filter(record => record.id !== id));
+      if (!saved) { fs.renameSync(tombstone, source); return false; }
+      fs.rmSync(tombstone, { recursive: true, force: true });
+      return true;
+    } catch { this.error = true; try { if (absent(source) && !absent(tombstone)) fs.renameSync(tombstone, source); } catch { /* fail closed */ } return false; }
   }
 
   private save(records: PetAsset[]): boolean {

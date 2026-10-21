@@ -30,6 +30,7 @@ export interface PetAssetsApi {
   getAvatar(id: string): Promise<Uint8Array | null>;
   choose(): Promise<PetImportInspection>;
   confirm(token: string): Promise<PetAssetsState>;
+  remove(id: string): Promise<PetAssetsState>;
   cancel(token: string): Promise<void>;
   subscribe(listener: (state: PetAssetsState) => void): () => void;
 }

@@ -7,7 +7,7 @@ export type ManagementBridge = Omit<Window['management'], 'petAssets'> & { petAs
 export type ManagementSnapshot = { state: ManagementState | null; configurations: ConfigurationsState | null; petAssets: PetAssetsState | null; sessions: SessionState; error: string };
 /** One listener per IPC channel across all pages and Three.js. Initial replies never replace a newer push. */
 export function createManagementStore(bridge: ManagementBridge) {
-  const petAssets: PetAssetsApi = bridge.petAssets ?? { getState: async () => ({ version: 1, records: [] }), getModel: async () => null, getAvatar: async () => null, choose: async () => ({ ok: false, reason: 'not-supported' }), confirm: async () => ({ version: 1, records: [] }), cancel: async () => {}, subscribe: () => () => {} };
+  const petAssets: PetAssetsApi = bridge.petAssets ?? { getState: async () => ({ version: 1, records: [] }), getModel: async () => null, getAvatar: async () => null, choose: async () => ({ ok: false, reason: 'not-supported' }), confirm: async () => ({ version: 1, records: [] }), remove: async () => ({ version: 1, records: [] }), cancel: async () => {}, subscribe: () => () => {} };
   let snapshot: ManagementSnapshot = { state: null, configurations: null, petAssets: null, sessions: createSessionState(), error: '' };
   const listeners = new Set<() => void>();
   let generation = 0;

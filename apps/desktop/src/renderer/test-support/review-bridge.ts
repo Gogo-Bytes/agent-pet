@@ -63,7 +63,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
   function record(id: string) { const value = configs.records.find(value => value.id === id); if (!value) throw new Error('Record missing'); return value; }
   return {
     nativeWindowControls: false,
-    petAssets: { getState: async () => petAssets, getModel: async () => null, getAvatar: async () => null, choose: async () => ({ ok: false, reason: 'not-supported' }), confirm: async () => petAssets, cancel: async () => {}, subscribe: () => () => {} },
+    petAssets: { getState: async () => petAssets, getModel: async () => null, getAvatar: async () => null, choose: async () => ({ ok: false, reason: 'not-supported' }), confirm: async () => petAssets, remove: async () => petAssets, cancel: async () => {}, subscribe: () => () => {} },
     windowAction: async () => {},
     getState: async () => state,
     subscribe: listener => subscribe(stateListeners, listener),

@@ -231,6 +231,12 @@ export function createManagement(options: {
   }
   ipcMain.handle('management:pet-assets-model', (event, id: unknown) => { assertWindowSender(window, event); return readPetAssetFile(id, 'pet.glb'); });
   ipcMain.handle('management:pet-assets-avatar', (event, id: unknown) => { assertWindowSender(window, event); return readPetAssetFile(id, 'avatar'); });
+  ipcMain.handle('management:pet-assets-remove', (event, id: unknown) => {
+    assertWindowSender(window, event);
+    if (typeof id !== 'string' || configurations.snapshot().records.some(record => record.pet?.assetId === id)) throw new Error('请先解除所有 Agent 的宠物绑定。');
+    if (!petAssets.removeImported(id)) throw new Error('宠物资产不存在或删除失败。');
+    const next = petAssets.snapshot(); if (window && !window.isDestroyed()) window.webContents.send('management:pet-assets-state', next); return next;
+  });
   ipcMain.handle('management:pet-assets-choose', async event => {
     assertWindowSender(window, event);
     if (quitting) throw new Error('Application is quitting');

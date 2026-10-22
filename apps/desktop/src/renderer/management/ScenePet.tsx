@@ -9,7 +9,7 @@ import { bundledAnimationBounds } from '../features/pet/bundled-animation-bounds
 
 export const petActions = petActionIds.map(id => ({ id, label: petActionCatalog[id].label }));
 
-export function ScenePet({ action, replay = 0, reduced, onReady, animations = bundledAnimations, restAction = 'idle', modelUrl }: {
+export function ScenePet({ action, replay = 0, reduced, onReady, animations, restAction = 'idle', modelUrl }:  {
   action: string; replay?: number | string; restAction?: string; reduced: boolean; onReady: (clips: string[]) => void; animations?: PetAnimations | undefined; modelUrl?: string | undefined;
 }) {
   const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(modelUrl ?? starterUrl, false, false);
@@ -26,8 +26,8 @@ export function ScenePet({ action, replay = 0, reduced, onReady, animations = bu
     const scale = 2.1 / extent;
     return { scale, position: [-center.x * scale, -bounds.min.y * scale, -center.z * scale] as [number, number, number] };
   }, [envelope]);
-  usePetAnimation(root, gltf.animations, animations, normalizePetAction(action) ?? action, reduced, replay, restAction);
-  useEffect(() => { onReady(availablePetActions(animations, gltf.animations.map(clip => clip.name))); }, [gltf.animations, animations, onReady]);
+  usePetAnimation(root, gltf.animations, animations ?? (modelUrl ? {} : bundledAnimations), normalizePetAction(action) ?? action, reduced, replay, restAction);
+  useEffect(() => { onReady(availablePetActions(animations ?? (modelUrl ? {} : bundledAnimations), gltf.animations.map(clip => clip.name))); }, [gltf.animations, animations, modelUrl, onReady]);
   // Cached geometry/materials belong to useGLTF; instances own transforms/mixers only.
   return <group scale={transform.scale} position={transform.position}><primitive object={root} dispose={null} /></group>;
 }

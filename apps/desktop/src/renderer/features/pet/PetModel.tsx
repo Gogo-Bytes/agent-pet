@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Box3, type AnimationClip, type Group } from 'three';
 import { useThree } from '@react-three/fiber';
 import { useBounds, useGLTF } from '@react-three/drei';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { bundledAnimations, type PetMotion, type PetAnimations } from '@agent-pet/pet-runtime';
 import { usePetAnimation } from '../../shared/usePetAnimation.js';
 import starterUrl from '@agent-pet/pet-runtime/assets/starter.glb?url';
@@ -11,7 +12,7 @@ export function PetModel({ motion, reduced = false, onReady, onHover, animations
   const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(modelUrl ?? starterUrl, false, false);
   // Object transforms belong to this instance. The non-skinned bundled robot's
   // geometry/materials/textures still belong to useGLTF's shared URL cache.
-  const root = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
+  const root = useMemo(() => cloneSkinned(gltf.scene) as Group, [gltf.scene]);
   const envelope = useMemo(() => modelUrl ? new Box3().setFromObject(gltf.scene) : bundledAnimationBounds(gltf.scene, gltf.animations), [gltf.scene, gltf.animations, modelUrl]);
   usePetAnimation(root, gltf.animations, animations, motion, reduced, replay, restAction);
   const bounds = useBounds();

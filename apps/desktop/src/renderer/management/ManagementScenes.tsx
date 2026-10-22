@@ -53,7 +53,7 @@ export function HomeScene({ pets, focused, reduced, onFocus, onReady, modelUrls,
     </mesh>
     <Suspense fallback={null}>{pets.map((pet, index) =>
       <group key={pet.id} name={pet.id} position={petPosition(index, pets.length)} onClick={event => { event.stopPropagation(); onFocus(pet.id); }}>
-        <ScenePet action={pet.action} replay={pet.replay ?? 0} restAction={pet.restAction ?? 'idle'} reduced={reduced} onReady={onReady} modelUrl={modelUrls?.[pet.assetId ?? 'starter']} animations={animations?.[pet.assetId ?? 'starter']} />
+        <ScenePet key={pet.assetId ?? 'starter'} action={pet.action} replay={pet.replay ?? 0} restAction={pet.restAction ?? 'idle'} reduced={reduced} onReady={onReady} modelUrl={modelUrls?.[pet.assetId ?? 'starter']} animations={animations?.[pet.assetId ?? 'starter']} />
       </group>)}</Suspense>
   </group>;
 }
@@ -64,6 +64,6 @@ export function PetPreviewScene({ action, replay, reduced, onReady, modelUrl, an
 }) {
   return <group name="pet-preview-scene">
     <SceneCamera mode="pet" count={1} target={null} reduced={reduced} />
-    <Suspense fallback={null}><ScenePet action={action} replay={replay} reduced={reduced} onReady={onReady} modelUrl={modelUrl} animations={animations} /></Suspense>
+    <Suspense fallback={null}><ScenePet key={modelUrl ?? 'starter'} action={action} replay={replay} reduced={reduced} onReady={onReady} modelUrl={modelUrl} animations={animations} /></Suspense>
   </group>;
 }

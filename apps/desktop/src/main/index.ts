@@ -227,6 +227,10 @@ function startPrimaryInstance(): void {
         await piHandle?.stop();
       },
     });
+    ipcMain.handle('pet:asset', (event, id: unknown) => {
+      assertTrustedRenderer(event);
+      return typeof id === 'string' ? management?.petAsset(id) ?? null : null;
+    });
     adapterStart = startConfiguredAdapters();
   });
 }

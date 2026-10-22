@@ -55,6 +55,7 @@ export function createPetBridgeDouble(options: Options = {}) {
     interaction: vi.fn(async (_active: boolean) => {}),
     moveWindowBy: vi.fn(async (_delta: { x: number; y: number }) => {}),
     resizeWindowBy: vi.fn(async (_delta: { x: number; y: number }) => {}),
+    getAsset: vi.fn(async () => null),
   } satisfies Window['pet'];
   return {
     api,

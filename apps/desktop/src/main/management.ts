@@ -345,6 +345,11 @@ export function createManagement(options: {
   open();
   if (!preferences.snapshot().startConsole) { windowRequested = false; window?.hide(); }
   return { update, open, connection, configurations,
+    petAsset(id: string) {
+      const record = petAssets.snapshot().records.find(value => value.id === id && value.source === 'imported');
+      const bytes = readPetAssetFile(id, 'pet.glb');
+      return bytes ? { bytes, ...(record?.manifest.animations ? { animations: record.manifest.animations } : {}) } : null;
+    },
     publishSessions(snapshot: SessionState) { if (window && !window.isDestroyed()) window.webContents.send('management:sessions', snapshot); },
     preferences: () => preferences.snapshot(), isQuitting: () => quitting };
 }

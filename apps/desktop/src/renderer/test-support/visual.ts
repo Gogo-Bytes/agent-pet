@@ -44,7 +44,7 @@ window.pet = {
   },
   controlsVisible: async () => {},
   bubblesExpanded: async () => {}, bubblesVisible: async () => {},
-  interaction: async () => {}, moveWindowBy: async () => {}, resizeWindowBy: async () => {},
+  interaction: async () => {}, moveWindowBy: async () => {}, resizeWindowBy: async () => {}, getAsset: async () => null,
 };
 window.addEventListener('beforeunload', unsubscribe, { once: true });
 await import('../main.js');

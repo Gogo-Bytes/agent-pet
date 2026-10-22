@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { realpathSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { PiBridgeAdapter as ConfigurationAdapter } from '@agent-pet/adapter-pi';
 import type { SessionState } from '@agent-pet/domain';
 import { Configurations } from './configurations.js';
@@ -216,6 +216,27 @@ export function createManagement(options: {
   });
   ipcMain.handle('management:get-state', event => { assertWindowSender(window, event); return state(); });
   ipcMain.handle('management:pet-assets-state', event => { assertWindowSender(window, event); return petAssets.snapshot(); });
+  function readPetAssetFile(id: unknown, file: 'pet.glb' | 'avatar'): Uint8Array | null {
+    if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(id) || id === 'starter') return null;
+    const record = petAssets.snapshot().records.find(value => value.id === id && value.source === 'imported');
+    if (!record) return null;
+    const name = file === 'pet.glb' ? 'pet.glb' : record.manifest.avatar;
+    if (!name || name.includes('/') || name.includes('\\')) return null;
+    try {
+      const path = join(petAssets.directory, id, name);
+      const stat = lstatSync(path);
+      if (!stat.isFile() || stat.nlink !== 1 || stat.size > (file === 'pet.glb' ? 64 * 1024 * 1024 : 4 * 1024 * 1024)) return null;
+      return new Uint8Array(readFileSync(path));
+    } catch { return null; }
+  }
+  ipcMain.handle('management:pet-assets-model', (event, id: unknown) => { assertWindowSender(window, event); return readPetAssetFile(id, 'pet.glb'); });
+  ipcMain.handle('management:pet-assets-avatar', (event, id: unknown) => { assertWindowSender(window, event); return readPetAssetFile(id, 'avatar'); });
+  ipcMain.handle('management:pet-assets-remove', (event, id: unknown) => {
+    assertWindowSender(window, event);
+    if (typeof id !== 'string' || configurations.snapshot().records.some(record => record.pet?.assetId === id)) throw new Error('请先解除所有 Agent 的宠物绑定。');
+    if (!petAssets.removeImported(id)) throw new Error('宠物资产不存在或删除失败。');
+    const next = petAssets.snapshot(); if (window && !window.isDestroyed()) window.webContents.send('management:pet-assets-state', next); return next;
+  });
   ipcMain.handle('management:pet-assets-choose', async event => {
     assertWindowSender(window, event);
     if (quitting) throw new Error('Application is quitting');

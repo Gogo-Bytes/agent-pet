@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, normalize } from 'node:path';
 import { configurationProviders, type ConfigurationMetadata } from '../shared/configurations.js';
 import { sameIdentity } from './pi-connection-store.js';
 import { saveStat, type SavedStat } from './pi-temp-deployment.js';
+import { PET_ASSET_ID } from '../shared/pet-assets.js';
 
 export const MAX_CONFIGURATIONS = 64;
 const MAX_BYTES = 128 * 1024;
@@ -22,7 +23,7 @@ export function validMetadata(value: unknown): value is ConfigurationMetadata {
       configurationName(value.name) !== value.name || !configurationProviders.includes(value.provider as never) ||
       (value.id === 'legacy-pi' && value.provider !== 'pi') ||
       configurationPath(value.targetPath) !== value.targetPath || (value.pet !== null && (!object(value.pet) ||
-      Object.keys(value.pet).sort().join(',') !== 'assetId,name' || value.pet.assetId !== 'starter' ||
+      Object.keys(value.pet).sort().join(',') !== 'assetId,name' || typeof value.pet.assetId !== 'string' || !PET_ASSET_ID.test(value.pet.assetId) ||
       configurationName(value.pet.name) !== value.pet.name))) return false;
   if (value.installation === null) return true;
   const installation = value.installation;

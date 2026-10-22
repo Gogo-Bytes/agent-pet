@@ -6,6 +6,7 @@ import { HomeScene, PetPreviewScene, type HomePet } from './ManagementScenes.js'
 export type { HomePet } from './ManagementScenes.js';
 import { PreferenceRenderLoop } from '../shared/PreferenceRenderLoop.js';
 import type { Preferences } from '../../shared/preferences.js';
+import type { PetAnimations } from '@agent-pet/pet-runtime';
 import './scene.css';
 
 class SceneBoundary extends Component<{ children: ReactNode; onError: () => void }, { failed: boolean }> {
@@ -16,8 +17,8 @@ class SceneBoundary extends Component<{ children: ReactNode; onError: () => void
 }
 
 /** Home and pet audition share one persistent Canvas and the same configuration projection. */
-export function CompanionScene({ pets, page, preferences, action, replay, onClips, children }: {
-  pets: HomePet[]; page: string; preferences: Preferences; action: string; replay: number;
+export function CompanionScene({ pets, page, preferences, action, replay, modelUrl, animations, modelUrls, assetAnimations, onClips, children }: {
+  pets: HomePet[]; page: string; preferences: Preferences; action: string; replay: number; modelUrl?: string | undefined; animations?: Record<string, string | null> | undefined; modelUrls?: Record<string, string> | undefined; assetAnimations?: Record<string, PetAnimations> | undefined;
   onClips: (clips: string[]) => void; children: ReactNode;
 }) {
   const [focused, setFocused] = useState<string | null>(null);
@@ -57,8 +58,8 @@ export function CompanionScene({ pets, page, preferences, action, replay, onClip
         <PreferenceRenderLoop active={visible && (!preferences.pauseHidden || documentVisible)} fps={preferences.fps} />
         <ambientLight intensity={2} /><directionalLight intensity={3} position={[-3, 7, 5]} color="#fff5ed" />
         <directionalLight intensity={1} position={[4, 3, -4]} color="#d6ceff" />
-        {editing ? <PetPreviewScene action={action} replay={replay} reduced={reduced} onReady={ready} />
-          : <HomeScene pets={pets} focused={focused} reduced={reduced} onFocus={setFocused} onReady={ready} />}
+        {editing ? <PetPreviewScene action={action} replay={replay} reduced={reduced} onReady={ready} modelUrl={modelUrl} animations={animations} />
+          : <HomeScene pets={pets} focused={focused} reduced={reduced} onFocus={setFocused} onReady={ready} modelUrls={modelUrls} animations={assetAnimations} />}
       </Canvas>
     </SceneBoundary>
     {failed && <div className="scene-message" role="alert"><p>内置宠物加载失败。</p><button className="cfg-secondary" onClick={() => location.reload()}>重新加载</button></div>}

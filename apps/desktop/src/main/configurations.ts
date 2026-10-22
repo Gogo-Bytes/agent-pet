@@ -6,6 +6,7 @@ import type { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import { configurationProviders, type AgentConfiguration, type ConfigurationMetadata, type ConfigurationNotice,
   type ConfigurationsState, type CreateConfiguration, type PetBinding } from '../shared/configurations.js';
 import type { Inspection, PreflightState } from '../shared/pi-preflight.js';
+import { PET_ASSET_ID } from '../shared/pet-assets.js';
 import { ConfigurationsStore, configurationName, configurationPath, MAX_CONFIGURATIONS, validMetadata } from './configurations-store.js';
 import { PiConnection } from './pi-connection.js';
 import { PiConnectionStore } from './pi-connection-store.js';
@@ -186,7 +187,7 @@ export class Configurations {
     return this.update(id, record => {
       if (pet === null) return { ...record, pet: null };
       const name = configurationName(pet?.name);
-      return name && pet.assetId === 'starter' ? { ...record, pet: { assetId: 'starter', name } } : 'invalid';
+      return name && typeof pet.assetId === 'string' && PET_ASSET_ID.test(pet.assetId) ? { ...record, pet: { assetId: pet.assetId, name } } : 'invalid';
     });
   }
   async changeTarget(id: string, value: string): Promise<ConfigurationsState> {

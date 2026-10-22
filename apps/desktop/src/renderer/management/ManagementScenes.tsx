@@ -2,8 +2,9 @@ import { Suspense, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { MathUtils, Vector3 } from 'three';
 import { ScenePet } from './ScenePet.js';
+import type { PetAnimations } from '@agent-pet/pet-runtime';
 
-export type HomePet = { id: string; agent: string; name: string; configuration: string; status: string; action: string; replay?: number | string; restAction?: string };
+export type HomePet = { id: string; assetId?: string; agent: string; name: string; configuration: string; status: string; action: string; replay?: number | string; restAction?: string };
 export type Point = [number, number, number];
 export function petPosition(index: number, count: number): Point {
   const columns = Math.min(count, 3) || 1;
@@ -41,8 +42,8 @@ function SceneCamera({ target, count, reduced, mode }: {
 }
 
 /** Home has configuration instances, a floor and selection. The Canvas owns their lifetime. */
-export function HomeScene({ pets, focused, reduced, onFocus, onReady }: {
-  pets: HomePet[]; focused: string | null; reduced: boolean; onFocus: (id: string) => void; onReady: (clips: string[]) => void;
+export function HomeScene({ pets, focused, reduced, onFocus, onReady, modelUrls, animations }: {
+  pets: HomePet[]; focused: string | null; reduced: boolean; onFocus: (id: string) => void; onReady: (clips: string[]) => void; modelUrls?: Record<string, string> | undefined; animations?: Record<string, PetAnimations> | undefined;
 }) {
   const index = pets.findIndex(pet => pet.id === focused);
   return <group name="home-scene">
@@ -52,17 +53,17 @@ export function HomeScene({ pets, focused, reduced, onFocus, onReady }: {
     </mesh>
     <Suspense fallback={null}>{pets.map((pet, index) =>
       <group key={pet.id} name={pet.id} position={petPosition(index, pets.length)} onClick={event => { event.stopPropagation(); onFocus(pet.id); }}>
-        <ScenePet action={pet.action} replay={pet.replay ?? 0} restAction={pet.restAction ?? 'idle'} reduced={reduced} onReady={onReady} />
+        <ScenePet action={pet.action} replay={pet.replay ?? 0} restAction={pet.restAction ?? 'idle'} reduced={reduced} onReady={onReady} modelUrl={modelUrls?.[pet.assetId ?? 'starter']} animations={animations?.[pet.assetId ?? 'starter']} />
       </group>)}</Suspense>
   </group>;
 }
 
 /** A separate audition scene: only the selected asset, centered, with no home scenery. */
-export function PetPreviewScene({ action, replay, reduced, onReady }: {
-  action: string; replay: number; reduced: boolean; onReady: (clips: string[]) => void;
+export function PetPreviewScene({ action, replay, reduced, onReady, modelUrl, animations }: {
+  action: string; replay: number; reduced: boolean; onReady: (clips: string[]) => void; modelUrl?: string | undefined; animations?: Record<string, string | null> | undefined;
 }) {
   return <group name="pet-preview-scene">
     <SceneCamera mode="pet" count={1} target={null} reduced={reduced} />
-    <Suspense fallback={null}><ScenePet action={action} replay={replay} reduced={reduced} onReady={onReady} /></Suspense>
+    <Suspense fallback={null}><ScenePet action={action} replay={replay} reduced={reduced} onReady={onReady} modelUrl={modelUrl} animations={animations} /></Suspense>
   </group>;
 }

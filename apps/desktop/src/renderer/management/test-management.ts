@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 import { createSessionState, type SessionState } from '@agent-pet/domain';
 import type { AgentConfiguration, ConfigurationsState, CreateConfiguration, PetBinding } from '../../shared/configurations.js';
-import type { PetAssetsState } from '../../shared/pet-assets.js';
 import { defaultPreferences, type ManagementState, type PreferencePatch } from '../../shared/preferences.js';
 import { initialPreflight, preflightBridge } from './test-preflight.js';
 import { connectionBridge } from './test-connection.js';
@@ -16,7 +15,6 @@ export function managementBridge(records: AgentConfiguration[] = [configuration(
     login: { supported, enabled: false, error: null } };
   let configs: ConfigurationsState = { revision: 0, records, notice: 'none', busy: false, sessionConfigurations: {} };
   let sessions = createSessionState();
-  const petAssets: PetAssetsState = { version: 1, records: [{ id: 'starter', source: 'bundled', importedAt: null, manifest: { schemaVersion: 2, actionCatalogVersion: 1, id: 'starter', version: '1.0.0', model: 'starter.glb', license: 'CC0-1.0' } }] };
   const preferences = new Set<(state: ManagementState) => void>();
   const configurations = new Set<(state: ConfigurationsState) => void>();
   const observations = new Set<(state: SessionState) => void>();
@@ -26,7 +24,6 @@ export function managementBridge(records: AgentConfiguration[] = [configuration(
   function changed(nextRecords = configs.records) { pushConfigs({ ...configs, records: nextRecords, revision: configs.revision + 1 }); return configs; }
   const bridge = {
     nativeWindowControls,
-    petAssets: { getState: vi.fn(async () => petAssets), choose: vi.fn(async () => ({ ok: false as const, reason: 'not-supported' })), confirm: vi.fn(async () => petAssets), cancel: vi.fn(async () => {}), subscribe: vi.fn(() => () => {}) },
     windowAction: vi.fn(async (_action: string) => {}),
     piPreflight: preflightBridge(), piConnection: connectionBridge(),
     locations: {
@@ -60,7 +57,7 @@ export function managementBridge(records: AgentConfiguration[] = [configuration(
     setLogin: vi.fn(async (enabled: boolean) => { pushState({ ...state, login: { ...state.login, enabled } }); return state; }),
     subscribe: vi.fn((listener: (value: ManagementState) => void) => { preferences.add(listener); return () => { preferences.delete(listener); offState(); }; }),
     subscribeSessions: vi.fn((listener: (value: SessionState) => void) => { observations.add(listener); return () => { observations.delete(listener); offSessions(); }; }),
-  } satisfies Window['management'];
+  } satisfies import('./management-store.js').ManagementBridge;
   return { bridge, offState, offConfigs, offSessions, pushState, pushConfigs,
     state: () => state, configs: () => configs,
     pushSessions(next: SessionState) { sessions = next; observations.forEach(listener => listener(next)); },

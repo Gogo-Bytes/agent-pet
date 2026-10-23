@@ -69,6 +69,7 @@ export default function agentPetPiExtension(pi: PiApi): void {
   let active = false;
   let currentStatus: BridgeStatus = 'idle';
   let retry: ReturnType<typeof setTimeout> | undefined;
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   let retryDelay = 250;
   let seq = 0;
   let workCounter = 0;
@@ -109,6 +110,12 @@ export default function agentPetPiExtension(pi: PiApi): void {
       processInstanceId, providerSessionId, sentAt: new Date().toISOString(),
       ...fields,
     }) + '\n';
+  }
+
+  function sendHeartbeat(): void {
+    if (!active || !socket || connecting || socket.destroyed || !socket.writable) return;
+    if (socket.writableLength > 64 * 1024) { socket.destroy(); return; }
+    socket.write(wire('heartbeat'));
   }
 
   function connect(): void {
@@ -161,6 +168,9 @@ export default function agentPetPiExtension(pi: PiApi): void {
   pi.on('session_start', (_event, ctx) => {
     if (ctx.mode !== 'tui') return;
     active = true;
+    clearInterval(heartbeat);
+    heartbeat = setInterval(sendHeartbeat, 15000);
+    heartbeat.unref();
     providerSessionId = ctx.sessionManager.getSessionId() ?? 'ephemeral';
     sessionNameValue = sessionName(ctx);
     projectName = basename(ctx.cwd);
@@ -270,7 +280,7 @@ export default function agentPetPiExtension(pi: PiApi): void {
     clearActivities(); inWork = false; workSignal = undefined;
     send('lifecycle', ctx, { status: 'offline', facts: facts() });
     active = false;
-    clearTimeout(retry);
+    clearTimeout(retry); clearInterval(heartbeat); heartbeat = undefined;
     socket?.destroy();
     socket = undefined;
     connecting = false;

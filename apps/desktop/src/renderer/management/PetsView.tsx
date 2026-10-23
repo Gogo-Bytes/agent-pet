@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentConfiguration, PetBinding } from '../../shared/configurations.js';
-import type { PetAssetsState, PetImportInspection, PetImportPreview } from '../../shared/pet-assets.js';
+import type { PetAssetsState } from '../../shared/pet-assets.js';
 import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from '../shared/ui/Glass.js';
 import { Icon, type IconName } from './components/icons.js';
 import { Dialog } from './components/Dialog.js';
@@ -9,17 +9,16 @@ import { petActions } from './ScenePet.js';
 import { normalizePetAction } from '@agent-pet/pet-runtime';
 import { providerLabels } from './home-projection.js';
 
-export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId, onSelectAsset, name, clips, action, busy, onName, onBind, onAction, onChooseImport, onConfirmImport, onCancelImport, onRemoveAsset, error, reduced }: {
+export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId, onSelectAsset, name, clips, action, busy, onName, onBind, onAction, onRemoveAsset, error, reduced }: {
   visible: boolean; records: AgentConfiguration[]; assets: PetAssetsState; avatarUrls: Record<string, string>; selectedAssetId: string; onSelectAsset: (id: string) => void; name: string; clips: string[]; action: string; busy: boolean;
   onName: (value: string) => Promise<boolean>; onBind: (id: string, pet: PetBinding | null) => void;
-  onAction: (value: string) => void; onChooseImport: () => Promise<PetImportInspection>; onConfirmImport: (token: string) => Promise<PetAssetsState>; onCancelImport: (token: string) => Promise<void>; onRemoveAsset: (id: string) => Promise<boolean>;
+  onAction: (value: string) => void; onRemoveAsset: (id: string) => Promise<boolean>;
   error: string; reduced: boolean;
 }) {
   const [panel, setPanel] = useState<'pets' | 'agents' | null>(null);
   const [motionsOpen, setMotionsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState('');
-  const [importPreview, setImportPreview] = useState<PetImportPreview | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const motionTrigger = useRef<HTMLButtonElement>(null);
@@ -50,29 +49,13 @@ export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId
     onSelectAsset(assets.records[(selectedIndex + delta + assets.records.length) % assets.records.length]!.id);
   }
   const providerIcon = (provider: AgentConfiguration['provider']): IconName => provider === 'codex' ? 'command' : provider === 'claude' ? 'flower' : provider === 'pi' ? 'pi' : 'code';
-  useEffect(() => { if (!visible) { setPanel(null); setMotionsOpen(false); setEditing(false); setImportPreview(null); } }, [visible]);
+  useEffect(() => { if (!visible) { setPanel(null); setMotionsOpen(false); setEditing(false); } }, [visible]);
   useEffect(() => {
     if (!motionsOpen) return;
     const close = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setMotionsOpen(false); motionTrigger.current?.focus(); } };
     window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close);
   }, [motionsOpen]);
-  function openPanel(value: 'pets' | 'agents') { setPanel(value); setMotionsOpen(false); setQuery(''); setImportPreview(null); }
-  async function chooseImport() {
-    setNotice('');
-    try {
-      const result = await onChooseImport();
-      if (result.ok) setImportPreview(result.preview); else if (result.reason !== 'cancelled') setNotice('宠物文件夹无法导入，请检查 pet.json 和模型文件。');
-    } catch { setNotice('宠物导入检查失败，请重试。'); }
-  }
-  async function confirmImport() {
-    if (!importPreview) return;
-    try {
-      const next = await onConfirmImport(importPreview.token);
-      const imported = next.records.find(record => record.id === importPreview.manifest.id);
-      if (imported) onSelectAsset(imported.id);
-      setImportPreview(null); setNotice('宠物已添加到收藏。');
-    } catch { setNotice('宠物导入失败，未确认更改。'); }
-  }
+  function openPanel(value: 'pets' | 'agents') { setPanel(value); setMotionsOpen(false); setQuery(''); }
   return <>
     <div className="pet-identity"><span className="identity-agent">我的宠物</span>
       {editing ? <form className="pet-rename" onSubmit={event => { event.preventDefault(); if (!busy) void saveName(); }}>
@@ -102,10 +85,9 @@ export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId
       <label className="collection-search glass-inset"><Icon name="search" /><input autoFocus aria-label="搜索宠物" placeholder="搜索宠物" value={query} onChange={event => setQuery(event.target.value)} /></label>
       <div className="pet-avatar-grid">{assets.records.filter(asset => asset.manifest.id === 'starter' ? name.includes(query) : asset.manifest.id.includes(query)).map(asset =>
         <button key={asset.id} aria-pressed={asset.id === selectedAssetId} onClick={() => { onSelectAsset(asset.id); setNotice(asset.id === 'starter' ? '正在使用内置 starter.glb。' : '已切换到导入宠物。'); }}><span className="pet-card-icon">{avatarUrls[asset.id] ? <img src={avatarUrls[asset.id]} alt="" /> : <Icon name="pet" size={28} />}</span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span>{asset.source === 'imported' && <span role="button" tabIndex={busy ? -1 : 0} aria-label={`删除 ${asset.manifest.id}`} onClick={event => { event.stopPropagation(); if (!busy && window.confirm(`删除宠物「${asset.manifest.id}」？`)) void onRemoveAsset(asset.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!busy && window.confirm(`删除宠物「${asset.manifest.id}」？`)) void onRemoveAsset(asset.id); } }}><Icon name="close" size={16} /></span>}</button>)}
-        <button className="avatar-add" aria-label="添加宠物" onClick={() => void chooseImport()}><span className="pet-card-icon"><Icon name="plus" /></span><span className="avatar-name">添加</span></button></div>
+        </div>
       {!assets.records.some(asset => (asset.id === 'starter' ? name : asset.manifest.id).includes(query)) && <p className="collection-empty">没有找到宠物</p>}
-      {importPreview && <section className="pet-import-preview" aria-label="宠物导入预览"><strong>{importPreview.manifest.id}</strong><span>版本 {importPreview.manifest.version} · 模型 {Math.ceil(importPreview.modelBytes / 1024)} KB</span><span>头像：{importPreview.avatar === 'custom' ? importPreview.avatarFile : '使用默认头像'}</span><div><button className="dialog-done" disabled={busy} onClick={() => void confirmImport()}>确认添加</button><button className="cfg-secondary" onClick={() => { void onCancelImport(importPreview.token); setImportPreview(null); }}>取消</button></div></section>}
-      <p className="collection-empty">内置 starter.glb · 已接入实际模型与动作<br />导入文件夹需包含 pet.json 和 pet.glb，头像由 pet.json.avatar 指定。</p><p role="status">{notice}</p>
+      <p className="collection-empty">内置 starter.glb · 已接入实际模型与动作<br />自定义宠物导入将在后续版本提供。</p><p role="status">{notice}</p>
     </GlassDrawer>}
     {panel === 'agents' && <Dialog label="配置 Agent" className="pet-dialog" onClose={() => setPanel(null)}>
       <header><h2>配置给 Agent</h2><button type="button" aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>

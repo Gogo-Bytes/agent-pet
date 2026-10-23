@@ -1,6 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
 import { dirname, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { PiBridgeAdapter as ConfigurationAdapter } from '@agent-pet/adapter-pi';
 import type { SessionState } from '@agent-pet/domain';
@@ -20,7 +19,6 @@ import type { ObservationSink } from '@agent-pet/adapter-core';
 import { assertWindowSender, loadTrustedEntry } from './window-trust.js';
 import type { ManagementState, PreferencePatch, Preferences } from '../shared/preferences.js';
 import { PetAssetsStore } from './pet-assets-store.js';
-import { inspectPetFolder, installPetFolder, type PetImportPreview as SourcePetImportPreview } from './pet-assets-import.js';
 
 export function createManagement(options: {
   applyPreferences(preferences: Preferences): void;
@@ -31,7 +29,6 @@ export function createManagement(options: {
 }) {
   const preferences = new PreferenceStore(join(app.getPath('userData'), 'preferences.json'));
   const petAssets = new PetAssetsStore(app.getPath('userData'));
-  let pendingPetImport: { token: string; preview: SourcePetImportPreview } | undefined;
   let window: BrowserWindow | undefined;
   let windowRequested = false;
   const preflight = new PiPreflight({ home: app.getPath('home'), guiPath: process.env.PATH ?? '',
@@ -244,27 +241,16 @@ export function createManagement(options: {
     if (!petAssets.removeImported(id)) throw new Error('宠物资产不存在或删除失败。');
     const next = petAssets.snapshot(); if (window && !window.isDestroyed()) window.webContents.send('management:pet-assets-state', next); return next;
   });
-  ipcMain.handle('management:pet-assets-choose', async event => {
+  ipcMain.handle('management:pet-assets-choose', event => {
     assertWindowSender(window, event);
-    if (quitting) throw new Error('Application is quitting');
-    const result = await dialog.showOpenDialog(window!, { title: '选择宠物文件夹', properties: ['openDirectory', 'dontAddToRecent'] });
-    if (result.canceled || !result.filePaths[0]) return { ok: false, reason: 'cancelled' };
-    const inspected = inspectPetFolder(result.filePaths[0]);
-    if (!inspected.ok) return inspected;
-    const token = randomUUID(); pendingPetImport = { token, preview: inspected.preview };
-    return { ok: true, preview: { token, manifest: inspected.preview.manifest, modelBytes: inspected.preview.modelBytes, avatar: inspected.preview.avatar, avatarFile: inspected.preview.avatarFile } };
+    return { ok: false, reason: 'not-supported' } as const;
   });
-  ipcMain.handle('management:pet-assets-confirm', (event, token: unknown) => {
+  ipcMain.handle('management:pet-assets-confirm', (event, _token: unknown) => {
     assertWindowSender(window, event);
-    if (quitting || typeof token !== 'string' || !pendingPetImport || token !== pendingPetImport.token) throw new Error('Invalid pet import confirmation');
-    const pending = pendingPetImport; pendingPetImport = undefined;
-    if (!installPetFolder(pending.preview, petAssets)) throw new Error('宠物导入失败，未确认更改。');
-    const next = petAssets.snapshot(); if (window && !window.isDestroyed()) window.webContents.send('management:pet-assets-state', next); return next;
+    throw new Error('自定义宠物导入将在后续版本提供。');
   });
-  ipcMain.handle('management:pet-assets-cancel', (event, token: unknown) => {
+  ipcMain.handle('management:pet-assets-cancel', (event, _token: unknown) => {
     assertWindowSender(window, event);
-    if (typeof token !== 'string' || pendingPetImport?.token !== token) return;
-    pendingPetImport = undefined;
   });
   ipcMain.handle('management:update-preferences', (event, patch: unknown) => {
     assertWindowSender(window, event);

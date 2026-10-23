@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
 import { dirname, join } from 'node:path';
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { constants, closeSync, fstatSync, openSync, readFileSync, realpathSync } from 'node:fs';
 import { PiBridgeAdapter as ConfigurationAdapter } from '@agent-pet/adapter-pi';
 import type { SessionState } from '@agent-pet/domain';
 import { Configurations } from './configurations.js';
@@ -226,12 +226,15 @@ export function createManagement(options: {
     if (!record) return null;
     const name = file === 'pet.glb' ? 'pet.glb' : record.manifest.avatar;
     if (!name || name.includes('/') || name.includes('\\')) return null;
+    let fd: number | undefined;
     try {
       const path = join(petAssets.directory, id, name);
-      const stat = lstatSync(path);
+      fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const stat = fstatSync(fd);
       if (!stat.isFile() || stat.nlink !== 1 || stat.size > (file === 'pet.glb' ? 64 * 1024 * 1024 : 4 * 1024 * 1024)) return null;
-      return new Uint8Array(readFileSync(path));
+      return new Uint8Array(readFileSync(fd));
     } catch { return null; }
+    finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve read failure */ } } }
   }
   ipcMain.handle('management:pet-assets-model', (event, id: unknown) => { assertWindowSender(window, event); return readPetAssetFile(id, 'pet.glb'); });
   ipcMain.handle('management:pet-assets-avatar', (event, id: unknown) => { assertWindowSender(window, event); return readPetAssetFile(id, 'avatar'); });

@@ -84,8 +84,11 @@ export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId
     {panel === 'pets' && <GlassDrawer label="宠物收藏" reduced={reduced} onClose={() => setPanel(null)}>
       <label className="collection-search glass-inset"><Icon name="search" /><input autoFocus aria-label="搜索宠物" placeholder="搜索宠物" value={query} onChange={event => setQuery(event.target.value)} /></label>
       <div className="pet-avatar-grid">{assets.records.filter(asset => asset.manifest.id === 'starter' ? name.includes(query) : asset.manifest.id.includes(query)).map(asset =>
-        <button key={asset.id} aria-pressed={asset.id === selectedAssetId} onClick={() => { onSelectAsset(asset.id); setNotice(asset.id === 'starter' ? '正在使用内置 starter.glb。' : '已切换到导入宠物。'); }}><span className="pet-card-icon">{avatarUrls[asset.id] ? <img src={avatarUrls[asset.id]} alt="" /> : <Icon name="pet" size={28} />}</span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span>{asset.source === 'imported' && <span role="button" tabIndex={busy ? -1 : 0} aria-label={`删除 ${asset.manifest.id}`} onClick={event => { event.stopPropagation(); if (!busy && window.confirm(`删除宠物「${asset.manifest.id}」？`)) void onRemoveAsset(asset.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!busy && window.confirm(`删除宠物「${asset.manifest.id}」？`)) void onRemoveAsset(asset.id); } }}><Icon name="close" size={16} /></span>}</button>)}
-        </div>
+        <div className="pet-card" key={asset.id}>
+          <button type="button" className="pet-card-select" aria-pressed={asset.id === selectedAssetId} onClick={() => { onSelectAsset(asset.id); setNotice(asset.id === 'starter' ? '正在使用内置 starter.glb。' : '已切换到导入宠物。'); }}><span className="pet-card-icon">{avatarUrls[asset.id] ? <img src={avatarUrls[asset.id]} alt="" /> : <Icon name="pet" size={28} />}</span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span></button>
+          {asset.source === 'imported' && <button type="button" className="pet-card-delete" disabled={busy} aria-label={`删除 ${asset.manifest.id}`} onClick={() => { if (!busy && window.confirm(`删除宠物「${asset.manifest.id}」？`)) void onRemoveAsset(asset.id); }}><Icon name="close" size={16} /></button>}
+        </div>)}
+      </div>
       {!assets.records.some(asset => (asset.id === 'starter' ? name : asset.manifest.id).includes(query)) && <p className="collection-empty">没有找到宠物</p>}
       <p className="collection-empty">内置 starter.glb · 已接入实际模型与动作<br />自定义宠物导入将在后续版本提供。</p><p role="status">{notice}</p>
     </GlassDrawer>}

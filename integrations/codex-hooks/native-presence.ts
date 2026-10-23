@@ -33,7 +33,8 @@ export async function startCodexNativePresence(options: {
     const warm = await createNativeHostProbe(options.probePath, 3000)(process.pid);
     if (!warm || warm.uid !== process.getuid?.()) throw new Error('Native helper unavailable');
   }
-  const hosts = new Map<number, Host>(), retired = new Set<string>();
+  const hosts = new Map<number, Host>(), retired = new Set<string>(), retiredOrder: string[] = [];
+  const MAX_ACTIVE_HOSTS = 32, MAX_RETIRED_IDENTITIES = 64;
   let closed = false, polling = false, receiver: Awaited<ReturnType<typeof startNativeReceiver<Delivery>>>;
   const identityKey = (item: NativeHostIdentity) => `${item.pid}:${item.uid}:${item.startSeconds}:${item.startMicroseconds}:${item.executable}`;
   const call = (fn: () => unknown) => {
@@ -45,7 +46,12 @@ export async function startCodexNativePresence(options: {
     observedSessions: [...hosts.values()].reduce((count, host) => count + [...host.sessions.values()].filter(Boolean).length, 0) }));
   const retire = (host: Host) => {
     if (hosts.get(host.identity.pid) !== host) return;
-    hosts.delete(host.identity.pid); retired.add(identityKey(host.identity));
+    hosts.delete(host.identity.pid);
+    const key = identityKey(host.identity);
+    if (!retired.has(key)) {
+      retired.add(key); retiredOrder.push(key);
+      while (retiredOrder.length > MAX_RETIRED_IDENTITIES) retired.delete(retiredOrder.shift()!);
+    }
     call(() => options.onRetire(host.runId));
   };
   receiver = await startNativeReceiver<Delivery>({ token: options.token, route: '/codex-native-presence', parse,
@@ -57,7 +63,7 @@ export async function startCodexNativePresence(options: {
       let host = hosts.get(identity.pid);
       if (host && !sameHost(identity, host.identity)) { retire(host); publish(); return false; }
       if (!host) {
-        if (delivery.fact.kind === 'session-ended' || hosts.size + retired.size >= 32) return false;
+        if (delivery.fact.kind === 'session-ended' || hosts.size >= MAX_ACTIVE_HOSTS) return false;
         host = { identity, runId: randomUUID(), sessions: new Map(), seen: new Set() }; hosts.set(identity.pid, host);
       }
       const id = delivery.fact.providerSessionId;

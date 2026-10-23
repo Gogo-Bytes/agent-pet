@@ -6,10 +6,12 @@ export function codexExecutableLayout(path: string): 'standalone' | 'app-server-
   return /\/packages\/(standalone|app-server-daemon)\/releases\/(?:v)?0\.163\.0(?:-(?:aarch64|x86_64)-apple-darwin)?\/(?:bin\/)?codex$/.exec(path)?.[1] as 'standalone' | 'app-server-daemon' | undefined ?? null;
 }
 
-/** Explicit native selection only. No PATH scan, execution, settings or credential reads.
- * This slice accepts the standalone layout verified by the isolated native hook check.
- */
+/** Explicit native selection only. No PATH scan, execution, settings or credential reads. */
 export function inspectCodexExecutable(selected: string): string | null {
+  return inspectCodexPath(selected, false);
+}
+
+function inspectCodexPath(selected: string, allowDaemon: boolean): string | null {
   try {
     if (!isAbsolute(selected) || Buffer.byteLength(selected) > 4096 || /[\u0000-\u001f\u007f]/.test(selected)) return null;
     let path = normalize(selected), links = 0, steps = 0;
@@ -37,7 +39,8 @@ export function inspectCodexExecutable(selected: string): string | null {
     if (!executable.isFile() || !(executable.mode & 0o111) || !path.endsWith('/codex')) return null;
     // Standalone distribution actually verified in isolation. Other layouts await compatibility checks.
     const release = dirname(path);
-    if (!codexExecutableLayout(path)) return null;
+    const layout = codexExecutableLayout(path);
+    if (!layout || (layout === 'app-server-daemon' && !allowDaemon)) return null;
     const metadata = fs.lstatSync(release);
     if (!metadata.isDirectory() || (metadata.mode & 0o022)) return null;
     return path;
@@ -51,7 +54,10 @@ export function resolveCodexHostExecutable(cli: string, configurationDirectory: 
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; } };
   try {
     const dedicated = join(configurationDirectory, 'packages/app-server-daemon/current');
-    if (exists(dedicated)) return inspect(join(dedicated, exists(join(dedicated, 'codex')) && !exists(join(dedicated, 'bin/codex')) ? 'codex' : 'bin/codex'));
+    if (exists(dedicated)) {
+      const daemonPath = join(dedicated, exists(join(dedicated, 'codex')) && !exists(join(dedicated, 'bin/codex')) ? 'codex' : 'bin/codex');
+      return codexExecutableLayout(daemonPath) === 'app-server-daemon' ? inspectCodexPath(daemonPath, true) : inspect(daemonPath);
+    }
     const state = join(configurationDirectory, 'app-server-daemon');
     if (['app-server.pid', 'app-server.stderr.log', 'app-server-updater.pid', 'app-server-updater.stderr.log'].some(name => exists(join(state, name)))) {
       const root = join(configurationDirectory, 'packages/standalone/current');

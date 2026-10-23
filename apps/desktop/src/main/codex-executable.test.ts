@@ -13,6 +13,13 @@ it('resolves only owned supported release layouts, rejects writable programs and
   fs.chmodSync(path, 0o700); const other = path.replace('0.163.0-', '0.164.0-'); fs.mkdirSync(join(other, '..'), { recursive: true, mode: 0o700 }); fs.writeFileSync(other, 'fixture', { mode: 0o700 });
   expect(inspectCodexExecutable(other)).toBeNull();
 });
+it('rejects a daemon binary as an explicit CLI selection', () => {
+  const root = fs.realpathSync(fs.mkdtempSync(join(tmpdir(), 'codex-daemon-selection-'))); fs.chmodSync(root, 0o700); roots.push(root);
+  const path = join(root, 'packages/app-server-daemon/releases/0.163.0/bin/codex'); fs.mkdirSync(join(path, '..'), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path, 'daemon fixture', { mode: 0o700 });
+  expect(inspectCodexExecutable(path)).toBeNull();
+});
+
 it('uses the fixed dedicated daemon entry when present, never the CLI path as a substitute for invalid daemon', () => {
   const root = fs.realpathSync(fs.mkdtempSync(join(tmpdir(), 'codex-host-fixture-'))); fs.chmodSync(root, 0o700); roots.push(root);
   expect(resolveCodexHostExecutable('/known/cli', root, value => value)).toBe('/known/cli');

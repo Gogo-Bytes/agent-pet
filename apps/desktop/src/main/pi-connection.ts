@@ -29,6 +29,14 @@ export class PiConnection {
   private saved: SavedConnection | undefined;
   private callbackEpoch = 0;
   private acceptedObservations = new Map<string, SessionObservation>();
+  private rememberObservation(value: SessionObservation): void {
+    this.acceptedObservations.set(value.sessionId, value);
+    while (this.acceptedObservations.size > 256) {
+      const oldest = this.acceptedObservations.keys().next();
+      if (oldest.done) break;
+      this.acceptedObservations.delete(oldest.value);
+    }
+  }
   private listeners = new Set<(state: PiConnectionState) => void>();
   constructor(private readonly options: {
     target(): PreflightState;
@@ -199,7 +207,7 @@ export class PiConnection {
           const freshBaseline = value.connected !== false && value.baseline === true;
           if (previous && !freshBaseline && (previous.revision !== undefined && value.revision !== undefined
             ? value.revision <= previous.revision : value.observedAt < previous.observedAt)) return;
-          this.acceptedObservations.set(value.sessionId, value);
+          this.rememberObservation(value);
           this.options.publish(value);
         },
         connectionChanged: state => { if (epoch === this.callbackEpoch) this.connectionChanged(state); },
@@ -290,7 +298,7 @@ export class PiConnection {
           ...(value.revision !== undefined ? { revision: value.revision + 1 } : {}) };
       try {
         this.options.publish(disconnected);
-        this.acceptedObservations.set(value.sessionId, disconnected);
+        this.rememberObservation(disconnected);
       } catch { observerFailed = true; }
     }
     if (this.handle) { await this.handle.stop(); this.handle = undefined; }

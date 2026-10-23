@@ -93,6 +93,7 @@ it('keeps an overlapping reconnect online without duplicate hello transitions or
   replacement.send('hello');
   await vi.waitFor(() => expect(r.observations).toHaveLength(3));
   await disconnect(old.socket);
+  expect(r.observations.filter(value => value.connected === false)).toHaveLength(0);
   replacement.send('lifecycle', 'working');
   await vi.waitFor(() => expect(r.observations.at(-1)?.status).toBe('working'));
   expect(r.states).toEqual(['connected']);

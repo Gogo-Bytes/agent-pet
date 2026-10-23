@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, readFile, realpath, readdir, rm, stat, writeFile } from
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, it, vi } from 'vitest';
+import type { SessionObservation } from '@agent-pet/domain';
 import { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import { createApplication } from '@agent-pet/application';
 import type { PiBridgeConfig } from './pi-config.js';
@@ -39,6 +40,15 @@ it('reports environment reception independently of peer connection state', async
   expect(connection.snapshot()).toMatchObject({ status: 'connected', receiving: 'active' });
   connection.connectionChanged('disconnected');
   expect(connection.snapshot()).toMatchObject({ status: 'disconnected', receiving: 'active' });
+});
+
+it('accepts a fresh baseline after a previous connection used a higher revision', async () => {
+  const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
+  const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
+  const base: SessionObservation = { sessionId: 'reconnect', provider: 'pi', status: 'working', observedAt: '2026-10-22T00:00:00Z', connected: true };
+  sink.publish({ ...base, revision: 100 });
+  sink.publish({ ...base, status: 'idle', baseline: true, revision: 1 });
+  expect(f.app.snapshot().sessions.reconnect?.status).toBe('idle');
 });
 
 it('is inert until native target selection and explicit preview; cancelled/forged/stale plans never write or listen', async () => {

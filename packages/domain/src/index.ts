@@ -170,7 +170,7 @@ function isStale(
   previousMeta: SessionMeta | undefined,
   observation: SessionObservation,
 ): boolean {
-  if (!previousMeta) return false;
+  if (!previousMeta || (observation.baseline && observation.connected !== false)) return false;
   if (
     observation.revision !== undefined &&
     previousMeta.lastRevision !== undefined

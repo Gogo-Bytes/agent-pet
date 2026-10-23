@@ -44,6 +44,17 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
 
     const sockets = new Set<net.Socket>();
     const bridges = new Set<PiBridgeSession>();
+    const sessionOwners = new Map<string, net.Socket>();
+    const publish = (socket: net.Socket, observation: SessionObservation, disconnected = false): void => {
+      const owner = sessionOwners.get(observation.sessionId);
+      if (disconnected) {
+        if (owner !== socket) return;
+        sessionOwners.delete(observation.sessionId);
+      } else if (observation.baseline) {
+        sessionOwners.set(observation.sessionId, socket);
+      } else if (owner !== socket) return;
+      sink.publish(observation);
+    };
     // TCP/socket acceptance is not online evidence. Only a validated hello counts,
     // and each start() owns its peers independently even when the adapter is shared.
     const connectedSockets = new Set<net.Socket>();
@@ -55,8 +66,8 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
       let buffer = '';
       const bridge = new PiBridgeSession({
         token,
-        publishDisconnected: observation => sink.publish(observation),
-        publish: observation => { if (!stopping && !socket.destroyed) sink.publish(observation); },
+        publishDisconnected: observation => publish(socket, observation, true),
+        publish: observation => { if (!stopping && !socket.destroyed) publish(socket, observation); },
         connectionChanged: state => {
           if (stopping) return;
           if (state === 'connected' && !socket.destroyed) {
@@ -122,6 +133,7 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
         for (const bridge of bridges) {
           try { bridge.disconnected(); } catch { cleanupFailed = true; }
         }
+        sessionOwners.clear();
         for (const socket of sockets) socket.destroy();
         return stopPromise;
       },

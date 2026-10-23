@@ -78,6 +78,13 @@ describe('session bubble projection', () => {
     expect(state.bubbles[0]?.status).toBe('completed-unread');
   });
 
+  it('accepts a fresh baseline after a previous connection used a higher revision', () => {
+    const state = applyObservation(createSessionState(), working({ revision: 100 }));
+    const baseline = applyObservation(state, working({ status: 'idle', baseline: true, revision: 1 }));
+
+    expect(baseline.sessions['session-1']?.status).toBe('idle');
+  });
+
   it('does not resurrect an acknowledged terminal event', () => {
     const completed = applyObservation(
       createSessionState(),

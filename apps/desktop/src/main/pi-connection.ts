@@ -196,7 +196,8 @@ export class PiConnection {
         publish: value => {
           if (this.closed || epoch !== this.callbackEpoch) return;
           const previous = this.acceptedObservations.get(value.sessionId);
-          if (previous && (previous.revision !== undefined && value.revision !== undefined
+          const freshBaseline = value.connected !== false && value.baseline === true;
+          if (previous && !freshBaseline && (previous.revision !== undefined && value.revision !== undefined
             ? value.revision <= previous.revision : value.observedAt < previous.observedAt)) return;
           this.acceptedObservations.set(value.sessionId, value);
           this.options.publish(value);

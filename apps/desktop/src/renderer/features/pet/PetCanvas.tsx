@@ -54,11 +54,11 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
         <PreferenceRenderLoop active={visible || !preferences.pauseHidden} fps={preferences.fps} />
         <ambientLight intensity={2} />
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
-        {Object.keys(sessions.sessions).length > 0 && <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
+        <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
             <PetModel key={asset?.url ?? 'starter'} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} {...(onHover ? { onHover } : {})} />
           </Bounds>
-        </Suspense>}
+        </Suspense>
       </Canvas>
     </PetErrorBoundary>
   </div>;

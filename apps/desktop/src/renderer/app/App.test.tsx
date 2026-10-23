@@ -81,6 +81,11 @@ describe('App session interactions', () => {
     expect(screen.queryByText(defaultPreferences.petName)).toBeNull();
   });
 
+  it('renders the bundled starter pet without any connected sessions', async () => {
+    await mount();
+    expect(vi.mocked(PetModel).mock.calls.some(([props]) => props?.modelUrl === undefined)).toBe(true);
+  });
+
   it('confirms only the clicked completed/error bubble, retains working and shows explicit unsupported outcome', async () => {
     const user = userEvent.setup();
     const { bridge } = await mount({ observations: [

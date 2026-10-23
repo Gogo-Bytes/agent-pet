@@ -10,7 +10,7 @@ import { piObservation } from '../renderer/test-support/pi-fixtures.js';
 
 const native = vi.hoisted(() => {
   const frame = { url: '' };
-  const webContents = { mainFrame: frame, send: vi.fn(), setWindowOpenHandler: vi.fn(), on: vi.fn() };
+  const webContents = { mainFrame: frame, send: vi.fn(), setWindowOpenHandler: vi.fn(), on: vi.fn(), reload: vi.fn() };
   const window = {
     webContents, setBounds: vi.fn(), isDestroyed: () => false,
     isVisible: vi.fn(() => true), moveTop: vi.fn(), showInactive: vi.fn(), setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
@@ -348,6 +348,13 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     expectHit(false); // expansion was reset too
   });
 
+  it('reloads the pet renderer once after a crash and avoids a reload loop', () => {
+    const listener = native.webContents.on.mock.calls.find(([name]) => name === 'render-process-gone')?.[1];
+    expect(listener).toBeTypeOf('function');
+    listener(); listener();
+    expect(native.webContents.reload).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects foreign senders/subframes and malformed control payloads without changing layout', () => {
     const layout = latestLayout();
     for (const event of [{ sender: {}, senderFrame: native.webContents.mainFrame },
@@ -378,6 +385,14 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
       visibleOnFullScreen: true, skipTransformProcessType: true,
     });
   });
+  it('reloads the management renderer once after a crash and avoids a reload loop', () => {
+    const listener = native.management!.webContents.on.mock.calls.find(([name]) => name === 'render-process-gone')?.[1];
+    expect(listener).toBeTypeOf('function');
+    native.management!.webContents.reload.mockClear();
+    listener(); listener();
+    expect(native.management!.webContents.reload).toHaveBeenCalledTimes(1);
+  });
+
   it('creates distinct sandboxed entries and denies cross-window, subframe and navigated-frame capabilities', () => {
     expect(native.management).toBeDefined();
     expect(native.management!.webContents).not.toBe(native.webContents);

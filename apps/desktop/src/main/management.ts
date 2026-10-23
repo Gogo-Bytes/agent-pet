@@ -135,8 +135,15 @@ export function createManagement(options: {
           if (preferences.snapshot().background) current.hide(); else app.quit();
         }
       });
+      let rendererRecoveryAttempts = 0;
       current.webContents.on('did-start-loading', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
-      current.webContents.on('render-process-gone', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
+      current.webContents.on('did-finish-load', () => { rendererRecoveryAttempts = 0; });
+      current.webContents.on('render-process-gone', () => {
+        connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate();
+        if (quitting || current.isDestroyed() || rendererRecoveryAttempts >= 1) return;
+        rendererRecoveryAttempts++;
+        current.webContents.reload();
+      });
       current.once('ready-to-show', () => {
         if (!quitting && windowRequested && window === current && !current.isDestroyed()) current.show();
       });

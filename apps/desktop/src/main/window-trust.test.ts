@@ -24,6 +24,13 @@ describe('trusted app entry scale', () => {
     contents.emit('did-finish-load');
     expect(zoom.factor).toBe(1);
   });
+  it('rejects non-loopback development entries before granting renderer trust', () => {
+    const zoom = { factor: 1 };
+    const { window } = fixture(zoom);
+    expect(() => loadTrustedEntry(window, '/tmp/agent-pet/index.html', 'https://attacker.example/')).toThrow('Untrusted development entry');
+    expect(window.loadURL).not.toHaveBeenCalled();
+  });
+
   it('keeps desktop and management at the same size and ignores wheel zoom requests', () => {
     const zoom = { factor: 0.5 };
     const pet = fixture(zoom), management = fixture(zoom);

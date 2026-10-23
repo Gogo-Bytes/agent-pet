@@ -84,6 +84,13 @@ it('does not count raw, wrong-token, pre-hello or malformed peers as online', as
   await vi.waitFor(() => expect(r.states).toEqual(['connected', 'disconnected']));
 });
 
+it('bounds unauthenticated peers before they can retain socket buffers', async () => {
+  const r = await receiver();
+  const peers = await Promise.all(Array.from({ length: 33 }, (_, index) => r.peer(`raw-${index}`, false)));
+  await vi.waitFor(() => expect(peers.some(peer => peer.socket.destroyed)).toBe(true));
+  expect(r.observations).toEqual([]);
+});
+
 it('keeps an overlapping reconnect online without duplicate hello transitions or stale close effects', async () => {
   const r = await receiver();
   const old = await r.peer('process');

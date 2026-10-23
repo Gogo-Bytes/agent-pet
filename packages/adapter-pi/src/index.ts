@@ -11,6 +11,8 @@ import { parsePiBridgeMessage } from './protocol.js';
 import { PiSessionMapper } from './session-mapper.js';
 
 const MAX_LINE_BYTES = 64 * 1024;
+const MAX_PEERS = 32;
+const MAX_UNAUTHENTICATED_IDLE_MS = 1000;
 
 type BridgeSessionOptions = {
   token: string;
@@ -61,8 +63,10 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
     let stopping = false;
     let stopPromise: Promise<void> | undefined;
     const server = net.createServer(socket => {
-      if (stopping) { socket.destroy(); return; }
+      if (stopping || sockets.size >= MAX_PEERS) { socket.destroy(); return; }
       sockets.add(socket);
+      let authenticated = false;
+      socket.setTimeout(MAX_UNAUTHENTICATED_IDLE_MS, () => { if (!authenticated) socket.destroy(); });
       let buffer = '';
       const bridge = new PiBridgeSession({
         token,
@@ -71,6 +75,8 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
         connectionChanged: state => {
           if (stopping) return;
           if (state === 'connected' && !socket.destroyed) {
+            authenticated = true;
+            socket.setTimeout(0);
             const wasOnline = connectedSockets.size > 0;
             connectedSockets.add(socket);
             if (!wasOnline) sink.connectionChanged('connected');

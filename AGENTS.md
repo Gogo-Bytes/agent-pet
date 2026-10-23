@@ -17,3 +17,5 @@
 5. 向用户报告阶段完成内容、验证命令、commit 和推送结果。
 
 “一次对话”不等于“一个阶段”。只有完成了具备独立交付价值的阶段才提交；未完成的半成品、跨阶段耦合改动或仅文档草稿不强行提交。推送前不得执行破坏性 Git 操作，也不得覆盖用户已有改动。
+
+Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.

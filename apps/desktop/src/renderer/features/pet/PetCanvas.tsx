@@ -1,11 +1,11 @@
-import { Component, Suspense, useEffect, useSyncExternalStore, type ReactNode } from 'react';
+import { Component, Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds } from '@react-three/drei';
 import type { Rect } from '../../../shared/overlay-layout.js';
 import type { PetStore } from '../../app/bridge/pet-store.js';
 import { rectStyle } from '../../shared/rect-style.js';
 import { useWindowGesture } from '../../shared/use-window-gesture.js';
-import { projectPetPresentation } from '@agent-pet/pet-runtime';
+import { projectPetPresentation, type PetAnimations } from '@agent-pet/pet-runtime';
 import styles from './PetCanvas.module.css';
 import { PreferenceRenderLoop } from '../../shared/PreferenceRenderLoop.js';
 import { PetModel } from './PetModel.js';
@@ -27,6 +27,21 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
 }) {
   const { sessions, preferences } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const presentation = projectPetPresentation(sessions);
+  const [asset, setAsset] = useState<{ url: string; animations?: PetAnimations } | null>(null);
+  const assetId = preferences.petAssetId;
+  useEffect(() => {
+    let active = true;
+    if (!assetId || assetId === 'starter') { setAsset(null); return () => { active = false; }; }
+    if (!store.bridge.getAsset) { setAsset(null); return () => { active = false; }; }
+    void store.bridge.getAsset(assetId).then(value => {
+      if (!active) return;
+      if (!value) { setAsset(null); return; }
+      const bytes = new Uint8Array(value.bytes);
+      const url = URL.createObjectURL(new Blob([bytes.buffer], { type: 'model/gltf-binary' }));
+      setAsset({ url, ...(value.animations ? { animations: value.animations } : {}) });
+    }).catch(() => { if (active) setAsset(null); });
+    return () => { active = false; setAsset(current => { if (current) URL.revokeObjectURL(current.url); return null; }); };
+  }, [assetId, store.bridge]);
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
   // Canvas adds its own sizing divs. Keep Main's absolute pixel region and the
   // native pointer handlers on this outer surface, never on a Three mesh.
@@ -41,7 +56,7 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} {...(onHover ? { onHover } : {})} />
+            <PetModel key={asset?.url ?? 'starter'} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} {...(onHover ? { onHover } : {})} />
           </Bounds>
         </Suspense>
       </Canvas>

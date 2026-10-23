@@ -11,6 +11,7 @@ const channels = {
 
 import type { Preferences } from '../shared/preferences.js';
 import type { OverlayLayout } from '../shared/overlay-layout.js';
+import type { PetAnimations } from '@agent-pet/pet-runtime';
 const petApi = {
   subscribePreferences(listener: (preferences: Preferences) => void): () => void {
     const handler = (_event: Electron.IpcRendererEvent, preferences: Preferences) => listener(preferences);
@@ -31,6 +32,7 @@ const petApi = {
   acknowledgeAndOpen(session: SessionRef): Promise<OpenSessionResult> {
     return ipcRenderer.invoke(channels.acknowledgeAndOpen, session);
   },
+  getAsset(id: string): Promise<{ bytes: Uint8Array; animations?: PetAnimations } | null> { return ipcRenderer.invoke('pet:asset', id); },
   requestSnapshot(): Promise<void> {
     return ipcRenderer.invoke('pet:request-snapshot');
   },

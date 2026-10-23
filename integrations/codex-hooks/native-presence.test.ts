@@ -84,6 +84,18 @@ it('refuses ancestry changed during verification and never publishes a late resu
   await expect.poll(() => started).toBe(true); await blocked.stop(); await pending;
   expect(facts).toEqual([]);
 });
+it('accepts a new host after more than 32 retired identities', async () => {
+  const f = await fixture();
+  try {
+    expect(await f.send(start('seed'))).toBe(204);
+    for (let index = 1; index <= 33; index++) {
+      f.rows.set(10, { ...host(), startMicroseconds: 12 + index });
+      expect(await f.send(start(`restart-${index}`))).toBe(403);
+      expect(await f.send(start(`restart-${index}`))).toBe(204);
+    }
+  } finally { await f.server.stop(); }
+});
+
 it('allows successful expression callbacks and still closes on callback rejection', async () => {
   const token = randomBytes(32).toString('hex'), facts: unknown[] = [], changes: unknown[] = [];
   const server = await startCodexNativePresence({ token, executable: '/fixture/codex', observerExecutable: '/fixture/node', probePath: '/fixture/probe',

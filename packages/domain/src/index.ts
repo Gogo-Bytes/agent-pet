@@ -53,6 +53,8 @@ export type SessionState = {
   sessionMeta?: Readonly<Record<string, SessionMeta>>;
 };
 
+const MAX_RETAINED_SESSIONS = 256;
+
 export function createSessionState(): SessionState {
   return { sessions: {}, bubbles: [], sessionMeta: {} };
 }
@@ -86,24 +88,17 @@ export function applyObservation(
   const bubbles = state.bubbles.filter(
     (bubble) => bubble.sessionId !== observation.sessionId,
   );
-
-  if (!displayStatus || isAcknowledgedTerminal(previousMeta, observation)) {
-    return { sessions, bubbles, sessionMeta: meta };
-  }
-
-  return {
-    sessions,
-    sessionMeta: meta,
-    bubbles: [
-      ...bubbles,
-      {
-        sessionId: observation.sessionId,
-        name,
-        status: displayStatus,
-        unread: displayStatus !== 'working',
-      },
-    ],
-  };
+  const nextBubbles = !displayStatus || isAcknowledgedTerminal(previousMeta, observation) ? bubbles : [
+    ...bubbles,
+    {
+      sessionId: observation.sessionId,
+      name,
+      status: displayStatus,
+      unread: displayStatus !== 'working',
+    },
+  ];
+  const retained = retainSessions(sessions, meta, nextBubbles);
+  return { sessions: retained.sessions, bubbles: nextBubbles, sessionMeta: retained.meta };
 }
 
 export function acknowledgeBubble(
@@ -117,19 +112,40 @@ export function acknowledgeBubble(
     ? terminalKey(session)
     : sessionMeta[sessionId]?.acknowledgedTerminal;
 
-  return {
-    sessions: state.sessions,
-    sessionMeta: {
-      ...sessionMeta,
-      [sessionId]: {
-        ...sessionMeta[sessionId],
-        ...(acknowledgedTerminal ? { acknowledgedTerminal } : {}),
-      },
+  const bubbles = state.bubbles.filter(
+    (candidate) => candidate.sessionId !== sessionId || candidate.status === 'working',
+  );
+  const sessions = { ...state.sessions };
+  if (bubble && bubble.status !== 'working') delete sessions[sessionId];
+  const meta = {
+    ...sessionMeta,
+    [sessionId]: {
+      ...sessionMeta[sessionId],
+      ...(acknowledgedTerminal ? { acknowledgedTerminal } : {}),
     },
-    bubbles: state.bubbles.filter(
-      (candidate) => candidate.sessionId !== sessionId || candidate.status === 'working',
-    ),
   };
+  const retained = retainSessions(sessions, meta, bubbles);
+  return { sessions: retained.sessions, sessionMeta: retained.meta, bubbles };
+}
+
+function retainSessions(
+  sessions: Record<string, SessionRecord>,
+  meta: Record<string, SessionMeta>,
+  bubbles: readonly SessionBubble[],
+): { sessions: Record<string, SessionRecord>; meta: Record<string, SessionMeta> } {
+  const ids = Object.keys(sessions);
+  const protectedIds = new Set(bubbles.map(bubble => bubble.sessionId));
+  const removable = ids.filter(id => !protectedIds.has(id) && sessions[id]?.status !== 'working');
+  const removeCount = Math.min(removable.length, Math.max(0, ids.length - MAX_RETAINED_SESSIONS));
+  const removed = new Set(removable.slice(0, removeCount));
+  const metaIds = Object.keys(meta);
+  const removableMeta = metaIds.filter(id => !sessions[id] && !!meta[id]?.acknowledgedTerminal);
+  const metaRemoveCount = Math.min(removableMeta.length, Math.max(0, metaIds.length - MAX_RETAINED_SESSIONS));
+  removableMeta.slice(0, metaRemoveCount).forEach(id => removed.add(id));
+  if (!removed.size) return { sessions, meta };
+  const nextSessions = Object.fromEntries(Object.entries(sessions).filter(([id]) => !removed.has(id)));
+  const nextMeta = Object.fromEntries(Object.entries(meta).filter(([id]) => !removed.has(id)));
+  return { sessions: nextSessions, meta: nextMeta };
 }
 
 function getSessionName(observation: SessionObservation): string {
@@ -170,7 +186,7 @@ function isStale(
   previousMeta: SessionMeta | undefined,
   observation: SessionObservation,
 ): boolean {
-  if (!previousMeta) return false;
+  if (!previousMeta || (observation.baseline && observation.connected !== false)) return false;
   if (
     observation.revision !== undefined &&
     previousMeta.lastRevision !== undefined

@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, readFile, realpath, readdir, rm, stat, writeFile } from
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, it, vi } from 'vitest';
+import type { SessionObservation } from '@agent-pet/domain';
 import { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import { createApplication } from '@agent-pet/application';
 import type { PiBridgeConfig } from './pi-config.js';
@@ -21,9 +22,10 @@ async function fixture(developmentEnvironment = false) {
     selectedInstallation: null, inspection: null, scan: 'not-run', notice: 'none' };
   const adapter = new PiBridgeAdapter(); const app = createApplication([adapter]);
   const start = vi.spyOn(adapter, 'start');
-  const connection = new PiConnection({ target: () => selection, adapter, publish: app.observe, developmentEnvironment });
+  const publish = vi.fn((value: SessionObservation) => app.observe(value));
+  const connection = new PiConnection({ target: () => selection, adapter, publish, developmentEnvironment });
   cleanups.push(async () => { await connection.stop(); await rm(root, { recursive: true, force: true }); });
-  return { root, target, adapter, app, start, connection,
+  return { root, target, adapter, app, publish, start, connection,
     select(source: 'default' | 'chosen' = 'chosen') { selection = { ...selection, revision: selection.revision + 1, target: { path: target, source } }; },
     async preview() { const state = await connection.preview(); expect(state.preview?.action).toBe('create'); return state.preview!; },
   };
@@ -39,6 +41,27 @@ it('reports environment reception independently of peer connection state', async
   expect(connection.snapshot()).toMatchObject({ status: 'connected', receiving: 'active' });
   connection.connectionChanged('disconnected');
   expect(connection.snapshot()).toMatchObject({ status: 'disconnected', receiving: 'active' });
+});
+
+it('accepts a fresh baseline after a previous connection used a higher revision', async () => {
+  const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
+  const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
+  const base: SessionObservation = { sessionId: 'reconnect', provider: 'pi', status: 'working', observedAt: '2026-10-22T00:00:00Z', connected: true };
+  sink.publish({ ...base, revision: 100 });
+  sink.publish({ ...base, status: 'idle', baseline: true, revision: 1 });
+  expect(f.app.snapshot().sessions.reconnect?.status).toBe('idle');
+});
+
+it('bounds accepted observation ordering state', async () => {
+  const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
+  const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
+  const observe = f.publish;
+  for (let index = 0; index < 300; index++) sink.publish({
+    sessionId: `session-${index}`, provider: 'pi', status: 'idle', observedAt: `2026-10-22T00:00:${String(index % 60).padStart(2, '0')}Z`, connected: true,
+  });
+  expect(observe).toHaveBeenCalledTimes(300);
+  await f.connection.stop();
+  expect(observe).toHaveBeenCalledTimes(556);
 });
 
 it('is inert until native target selection and explicit preview; cancelled/forged/stale plans never write or listen', async () => {

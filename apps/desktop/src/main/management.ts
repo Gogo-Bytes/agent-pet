@@ -1,7 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
 import { dirname, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { constants, closeSync, fstatSync, openSync, readFileSync, realpathSync } from 'node:fs';
 import { PiBridgeAdapter as ConfigurationAdapter } from '@agent-pet/adapter-pi';
 import type { SessionState } from '@agent-pet/domain';
 import { Configurations } from './configurations.js';
@@ -20,7 +19,6 @@ import type { ObservationSink } from '@agent-pet/adapter-core';
 import { assertWindowSender, loadTrustedEntry } from './window-trust.js';
 import type { ManagementState, PreferencePatch, Preferences } from '../shared/preferences.js';
 import { PetAssetsStore } from './pet-assets-store.js';
-import { inspectPetFolder, installPetFolder, type PetImportPreview as SourcePetImportPreview } from './pet-assets-import.js';
 
 export function createManagement(options: {
   applyPreferences(preferences: Preferences): void;
@@ -31,7 +29,6 @@ export function createManagement(options: {
 }) {
   const preferences = new PreferenceStore(join(app.getPath('userData'), 'preferences.json'));
   const petAssets = new PetAssetsStore(app.getPath('userData'));
-  let pendingPetImport: { token: string; preview: SourcePetImportPreview } | undefined;
   let window: BrowserWindow | undefined;
   let windowRequested = false;
   const preflight = new PiPreflight({ home: app.getPath('home'), guiPath: process.env.PATH ?? '',
@@ -135,8 +132,15 @@ export function createManagement(options: {
           if (preferences.snapshot().background) current.hide(); else app.quit();
         }
       });
+      let rendererRecoveryAttempts = 0;
       current.webContents.on('did-start-loading', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
-      current.webContents.on('render-process-gone', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
+      current.webContents.on('did-finish-load', () => { rendererRecoveryAttempts = 0; });
+      current.webContents.on('render-process-gone', () => {
+        connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate();
+        if (quitting || current.isDestroyed() || rendererRecoveryAttempts >= 1) return;
+        rendererRecoveryAttempts++;
+        current.webContents.reload();
+      });
       current.once('ready-to-show', () => {
         if (!quitting && windowRequested && window === current && !current.isDestroyed()) current.show();
       });
@@ -222,12 +226,15 @@ export function createManagement(options: {
     if (!record) return null;
     const name = file === 'pet.glb' ? 'pet.glb' : record.manifest.avatar;
     if (!name || name.includes('/') || name.includes('\\')) return null;
+    let fd: number | undefined;
     try {
       const path = join(petAssets.directory, id, name);
-      const stat = lstatSync(path);
+      fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const stat = fstatSync(fd);
       if (!stat.isFile() || stat.nlink !== 1 || stat.size > (file === 'pet.glb' ? 64 * 1024 * 1024 : 4 * 1024 * 1024)) return null;
-      return new Uint8Array(readFileSync(path));
+      return new Uint8Array(readFileSync(fd));
     } catch { return null; }
+    finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve read failure */ } } }
   }
   ipcMain.handle('management:pet-assets-model', (event, id: unknown) => { assertWindowSender(window, event); return readPetAssetFile(id, 'pet.glb'); });
   ipcMain.handle('management:pet-assets-avatar', (event, id: unknown) => { assertWindowSender(window, event); return readPetAssetFile(id, 'avatar'); });
@@ -237,27 +244,16 @@ export function createManagement(options: {
     if (!petAssets.removeImported(id)) throw new Error('宠物资产不存在或删除失败。');
     const next = petAssets.snapshot(); if (window && !window.isDestroyed()) window.webContents.send('management:pet-assets-state', next); return next;
   });
-  ipcMain.handle('management:pet-assets-choose', async event => {
+  ipcMain.handle('management:pet-assets-choose', event => {
     assertWindowSender(window, event);
-    if (quitting) throw new Error('Application is quitting');
-    const result = await dialog.showOpenDialog(window!, { title: '选择宠物文件夹', properties: ['openDirectory', 'dontAddToRecent'] });
-    if (result.canceled || !result.filePaths[0]) return { ok: false, reason: 'cancelled' };
-    const inspected = inspectPetFolder(result.filePaths[0]);
-    if (!inspected.ok) return inspected;
-    const token = randomUUID(); pendingPetImport = { token, preview: inspected.preview };
-    return { ok: true, preview: { token, manifest: inspected.preview.manifest, modelBytes: inspected.preview.modelBytes, avatar: inspected.preview.avatar, avatarFile: inspected.preview.avatarFile } };
+    return { ok: false, reason: 'not-supported' } as const;
   });
-  ipcMain.handle('management:pet-assets-confirm', (event, token: unknown) => {
+  ipcMain.handle('management:pet-assets-confirm', (event, _token: unknown) => {
     assertWindowSender(window, event);
-    if (quitting || typeof token !== 'string' || !pendingPetImport || token !== pendingPetImport.token) throw new Error('Invalid pet import confirmation');
-    const pending = pendingPetImport; pendingPetImport = undefined;
-    if (!installPetFolder(pending.preview, petAssets)) throw new Error('宠物导入失败，未确认更改。');
-    const next = petAssets.snapshot(); if (window && !window.isDestroyed()) window.webContents.send('management:pet-assets-state', next); return next;
+    throw new Error('自定义宠物导入将在后续版本提供。');
   });
-  ipcMain.handle('management:pet-assets-cancel', (event, token: unknown) => {
+  ipcMain.handle('management:pet-assets-cancel', (event, _token: unknown) => {
     assertWindowSender(window, event);
-    if (typeof token !== 'string' || pendingPetImport?.token !== token) return;
-    pendingPetImport = undefined;
   });
   ipcMain.handle('management:update-preferences', (event, patch: unknown) => {
     assertWindowSender(window, event);
@@ -345,6 +341,11 @@ export function createManagement(options: {
   open();
   if (!preferences.snapshot().startConsole) { windowRequested = false; window?.hide(); }
   return { update, open, connection, configurations,
+    petAsset(id: string) {
+      const record = petAssets.snapshot().records.find(value => value.id === id && value.source === 'imported');
+      const bytes = readPetAssetFile(id, 'pet.glb');
+      return bytes ? { bytes, ...(record?.manifest.animations ? { animations: record.manifest.animations } : {}) } : null;
+    },
     publishSessions(snapshot: SessionState) { if (window && !window.isDestroyed()) window.webContents.send('management:sessions', snapshot); },
     preferences: () => preferences.snapshot(), isQuitting: () => quitting };
 }

@@ -2,8 +2,15 @@ import type { BrowserWindow, IpcMainInvokeEvent } from 'electron';
 import { pathToFileURL } from 'node:url';
 
 const entries = new WeakMap<BrowserWindow, string>();
+function trustedDevelopmentEntry(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname.toLowerCase()) || url.username || url.password) throw new Error();
+    return url.href;
+  } catch { throw new Error('Untrusted development entry'); }
+}
 export function loadTrustedEntry(window: BrowserWindow, file: string, developmentUrl?: string): void {
-  const entry = developmentUrl ? new URL(developmentUrl).href : pathToFileURL(file).href;
+  const entry = developmentUrl ? trustedDevelopmentEntry(developmentUrl) : pathToFileURL(file).href;
   entries.set(window, entry);
   // Chromium persists zoom per host. In dev both windows use localhost, so an
   // accidental menu zoom shrinks the pet and breaks CSS/native hit geometry too.

@@ -45,21 +45,56 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
   const selectedAsset = assets.records.find(asset => asset.id === selectedAssetId) ?? assets.records[0];
   const assetAnimations = useMemo(() => Object.fromEntries(assets.records.filter(asset => asset.manifest.animations).map(asset => [asset.id, asset.manifest.animations!])), [assets.records]);
   const pets = useMemo(() => snapshot.configurations ? projectHomePets(snapshot.configurations, snapshot.sessions, preferences.petName) : [], [snapshot.configurations, snapshot.sessions, preferences.petName]);
-  const importedAssetIds = assets.records.filter(asset => asset.source === 'imported').map(asset => asset.id).join('|');
+  const modelAssetIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (selectedAsset?.source === 'imported') ids.add(selectedAsset.id);
+    pets.forEach(pet => { if (pet.assetId && pet.assetId !== 'starter') ids.add(pet.assetId); });
+    return [...ids];
+  }, [pets, selectedAsset?.id, selectedAsset?.source]);
+  const importedAssetIds = useMemo(() => assets.records.filter(asset => asset.source === 'imported').map(asset => asset.id), [assets.records]);
   useEffect(() => {
     if (!bridge.petAssets) return;
-    let active = true; const urls: string[] = [];
-    const ids = importedAssetIds ? importedAssetIds.split('|') : [];
-    void Promise.all(ids.map(async id => { const bytes = await petAssets.getModel(id); if (!bytes) return null; const copy = new Uint8Array(bytes.byteLength); copy.set(bytes); const url = URL.createObjectURL(new Blob([copy.buffer], { type: 'model/gltf-binary' })); urls.push(url); return [id, url] as const; })).then(entries => { if (active) setAssetModels(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => !!entry))); });
+    let active = true; const urls: string[] = []; const entries: [string, string][] = [];
+    setAssetModels({});
+    void (async () => {
+      for (const id of modelAssetIds) {
+        if (!active) return;
+        try {
+          const bytes = await petAssets.getModel(id);
+          if (!bytes) continue;
+          const copy = new Uint8Array(bytes.byteLength); copy.set(bytes);
+          const url = URL.createObjectURL(new Blob([copy.buffer], { type: 'model/gltf-binary' }));
+          if (!active) { URL.revokeObjectURL(url); return; }
+          urls.push(url); entries.push([id, url]);
+        } catch { /* one invalid asset must not block the others */ }
+      }
+      if (active) setAssetModels(Object.fromEntries(entries));
+    })();
     return () => { active = false; urls.forEach(url => URL.revokeObjectURL(url)); };
-  }, [importedAssetIds, petAssets]);
+  }, [modelAssetIds, petAssets, bridge.petAssets]);
   useEffect(() => {
     if (!bridge.petAssets) return;
-    let active = true; const urls: string[] = [];
-    const imported = assets.records.filter(asset => asset.source === 'imported');
-    void Promise.all(imported.map(async asset => { const bytes = await petAssets.getAvatar(asset.id); if (!bytes) return null; const copy = new Uint8Array(bytes.byteLength); copy.set(bytes); const extension = asset.manifest.avatar?.toLowerCase().split('.').pop(); const type = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg'; const url = URL.createObjectURL(new Blob([copy.buffer], { type })); urls.push(url); return [asset.id, url] as const; })).then(entries => { if (active) setAssetAvatars(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => !!entry))); });
+    let active = true; const urls: string[] = []; const entries: [string, string][] = [];
+    setAssetAvatars({});
+    void (async () => {
+      for (const id of importedAssetIds) {
+        if (!active) return;
+        try {
+          const asset = assets.records.find(value => value.id === id);
+          const bytes = await petAssets.getAvatar(id);
+          if (!bytes || !asset) continue;
+          const copy = new Uint8Array(bytes.byteLength); copy.set(bytes);
+          const extension = asset.manifest.avatar?.toLowerCase().split('.').pop();
+          const type = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg';
+          const url = URL.createObjectURL(new Blob([copy.buffer], { type }));
+          if (!active) { URL.revokeObjectURL(url); return; }
+          urls.push(url); entries.push([id, url]);
+        } catch { /* one invalid asset must not block the others */ }
+      }
+      if (active) setAssetAvatars(Object.fromEntries(entries));
+    })();
     return () => { active = false; urls.forEach(url => URL.revokeObjectURL(url)); };
-  }, [importedAssetIds, assets.records, petAssets]);
+  }, [importedAssetIds, assets.records, petAssets, bridge.petAssets]);
   async function change<T extends ManagementState | ConfigurationsState>(work: () => Promise<T>, login = false): Promise<boolean> {
     if (pending.current) return false;
     pending.current = true; setBusy(true); setError('');
@@ -89,7 +124,7 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
       <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} modelUrl={selectedAsset?.source === 'imported' ? assetModels[selectedAsset.id] : undefined} animations={selectedAsset?.manifest.animations} modelUrls={assetModels} assetAnimations={assetAnimations} onClips={onClips}>
         <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} assets={assets} avatarUrls={assetAvatars} selectedAssetId={selectedAsset?.id ?? 'starter'} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
           onName={petName => change(() => bridge.updatePreferences({ petName }))} onSelectAsset={id => { setSelectedAssetId(id); void change(() => bridge.updatePreferences({ petAssetId: id })); }} onBind={(id, pet) => void change(() => bridge.configurations.bindPet(id, pet))}
-          onChooseImport={() => petAssets.choose()} onConfirmImport={token => petAssets.confirm(token)} onCancelImport={token => petAssets.cancel(token)} onRemoveAsset={async id => { try { await petAssets.remove(id); if (selectedAssetId === id) setSelectedAssetId('starter'); setWindowError(''); return true; } catch (cause) { setWindowError(cause instanceof Error ? cause.message : '宠物删除失败，请先解除绑定。'); return false; } }}
+          onRemoveAsset={async id => { try { await petAssets.remove(id); if (selectedAssetId === id) setSelectedAssetId('starter'); setWindowError(''); return true; } catch (cause) { setWindowError(cause instanceof Error ? cause.message : '宠物删除失败，请先解除绑定。'); return false; } }}
           onAction={value => { setAction(value); setReplay(previous => previous + 1); }} />
       </CompanionScene>
       <ConnectionsView visible={page === 'connections'} state={snapshot.configurations} bridge={bridge} run={change} busy={busy || !!snapshot.configurations?.busy} error={configError} />

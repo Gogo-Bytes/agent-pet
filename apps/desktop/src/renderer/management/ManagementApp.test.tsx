@@ -66,6 +66,13 @@ describe('ManagementApp formal four-page interface', () => {
     await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: '修改宠物名称' })).toBeNull();
   });
+  it('does not expose the unfinished custom asset import entry point', async () => {
+    const test = await mount(); await page(test.user, '宠物');
+    await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    expect(screen.queryByRole('button', { name: '添加宠物' })).toBeNull();
+    expect(screen.getByText(/自定义宠物导入将在后续版本提供/)).toBeTruthy();
+  });
+
   it.each(['button', 'escape', 'backdrop'] as const)('keeps the glass collection modal until its %s exit completes, then restores focus', async method => {
     const test = await mount(); await page(test.user, '宠物');
     const opener = screen.getByRole('button', { name: '打开宠物收藏' });
@@ -224,7 +231,7 @@ describe('ManagementApp formal four-page interface', () => {
     await page(test.user, '宠物');
     await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
     expect(screen.getByRole('dialog', { name: '宠物收藏' })).toBeTruthy();
-    expect(screen.getByText(/导入文件夹需包含 pet.json 和 pet.glb/)).toBeTruthy();
+    expect(screen.getByText(/自定义宠物导入将在后续版本提供/)).toBeTruthy();
     await test.user.click(screen.getByRole('button', { name: '关闭弹窗' }));
     await page(test.user, '设置');
     expect(screen.getByRole('heading', { name: '场景渲染' })).toBeTruthy();

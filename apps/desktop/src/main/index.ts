@@ -160,12 +160,20 @@ function startPrimaryInstance(): void {
     window.on('show', restoreLayer);
     window.on('restore', restoreLayer);
     window.setResizable(false);
+    let rendererRecoveryAttempts = 0;
     const resetPresentation = () => {
       interacting = false; controlsVisible = false; bubblesVisible = false; bubblesExpanded = false;
       updateHitPolicy();
     };
+    const recoverRenderer = () => {
+      resetPresentation();
+      if (management?.isQuitting() || window.isDestroyed() || rendererRecoveryAttempts >= 1) return;
+      rendererRecoveryAttempts++;
+      window.webContents.reload();
+    };
     window.webContents.on('did-start-loading', resetPresentation);
-    window.webContents.on('render-process-gone', resetPresentation);
+    window.webContents.on('did-finish-load', () => { rendererRecoveryAttempts = 0; });
+    window.webContents.on('render-process-gone', recoverRenderer);
     const rendererFile = join(__dirname, '../renderer/index.html');
     const developmentUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
     loadTrustedEntry(window, rendererFile, developmentUrl);
@@ -226,6 +234,10 @@ function startPrimaryInstance(): void {
         await adapterStart;
         await piHandle?.stop();
       },
+    });
+    ipcMain.handle('pet:asset', (event, id: unknown) => {
+      assertTrustedRenderer(event);
+      return typeof id === 'string' ? management?.petAsset(id) ?? null : null;
     });
     adapterStart = startConfiguredAdapters();
   });

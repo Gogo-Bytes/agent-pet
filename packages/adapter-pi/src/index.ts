@@ -11,6 +11,9 @@ import { parsePiBridgeMessage } from './protocol.js';
 import { PiSessionMapper } from './session-mapper.js';
 
 const MAX_LINE_BYTES = 64 * 1024;
+const MAX_PEERS = 32;
+const MAX_UNAUTHENTICATED_IDLE_MS = 1000;
+const MAX_AUTHENTICATED_IDLE_MS = 30_000;
 
 type BridgeSessionOptions = {
   token: string;
@@ -44,22 +47,37 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
 
     const sockets = new Set<net.Socket>();
     const bridges = new Set<PiBridgeSession>();
+    const sessionOwners = new Map<string, net.Socket>();
+    const publish = (socket: net.Socket, observation: SessionObservation, disconnected = false): void => {
+      const owner = sessionOwners.get(observation.sessionId);
+      if (disconnected) {
+        if (owner !== socket) return;
+        sessionOwners.delete(observation.sessionId);
+      } else if (observation.baseline) {
+        sessionOwners.set(observation.sessionId, socket);
+      } else if (owner !== socket) return;
+      sink.publish(observation);
+    };
     // TCP/socket acceptance is not online evidence. Only a validated hello counts,
     // and each start() owns its peers independently even when the adapter is shared.
     const connectedSockets = new Set<net.Socket>();
     let stopping = false;
     let stopPromise: Promise<void> | undefined;
     const server = net.createServer(socket => {
-      if (stopping) { socket.destroy(); return; }
+      if (stopping || sockets.size >= MAX_PEERS) { socket.destroy(); return; }
       sockets.add(socket);
+      let authenticated = false;
+      socket.setTimeout(MAX_UNAUTHENTICATED_IDLE_MS, () => { if (!authenticated) socket.destroy(); });
       let buffer = '';
       const bridge = new PiBridgeSession({
         token,
-        publishDisconnected: observation => sink.publish(observation),
-        publish: observation => { if (!stopping && !socket.destroyed) sink.publish(observation); },
+        publishDisconnected: observation => publish(socket, observation, true),
+        publish: observation => { if (!stopping && !socket.destroyed) publish(socket, observation); },
         connectionChanged: state => {
           if (stopping) return;
           if (state === 'connected' && !socket.destroyed) {
+            authenticated = true;
+            socket.setTimeout(MAX_AUTHENTICATED_IDLE_MS);
             const wasOnline = connectedSockets.size > 0;
             connectedSockets.add(socket);
             if (!wasOnline) sink.connectionChanged('connected');
@@ -122,6 +140,7 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
         for (const bridge of bridges) {
           try { bridge.disconnected(); } catch { cleanupFailed = true; }
         }
+        sessionOwners.clear();
         for (const socket of sockets) socket.destroy();
         return stopPromise;
       },

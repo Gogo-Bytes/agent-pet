@@ -113,6 +113,15 @@ describe('session bubble projection', () => {
     expect(next.bubbles[0]?.status).toBe('completed-unread');
   });
 
+  it('bounds retained idle session history', () => {
+    let state = createSessionState();
+    for (let index = 0; index < 300; index++) {
+      state = applyObservation(state, working({ sessionId: `session-${index}`, status: 'idle', revision: 1 }));
+    }
+
+    expect(Object.keys(state.sessions)).toHaveLength(256);
+  });
+
   it('uses a stable fallback when no display name is available', () => {
     const observation = working();
     delete observation.agentName;

@@ -116,6 +116,20 @@ describe('ScenePet actual bundled asset and multi-instance lifecycle', () => {
     expect(Number.isFinite(pet!.position.y)).toBe(true);
   });
 
+  it('does not infer bundled animation mappings for imported models', async () => {
+    vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: asset.animations } as ReturnType<typeof useGLTF>);
+    let state!: RootState;
+    function Probe() { state = useThree(); return null; }
+    const ready = vi.fn();
+    const tree = (animations: Record<string, string | null>) => <><Probe /><group name="custom"><ScenePet action="Idle" reduced={false} onReady={ready} modelUrl="blob:custom" animations={animations} /></group></>;
+    const view = await create(tree({}));
+    mounted.push(view);
+    expect(ready).toHaveBeenCalledWith([]);
+    await view.update(tree({ idle: 'Idle' }));
+    expect(ready).toHaveBeenLastCalledWith(['idle']);
+    expect(state.scene.getObjectByName('custom')).toBeTruthy();
+  });
+
   it('exposes only available clip capabilities and uses actual Idle when an optional action is absent', async () => {
     const test = await mount([{ id: 'a', action: 'Work' }], asset.animations.filter(clip => clip.name === 'Idle'));
     expect(test.ready).toHaveBeenCalledWith(['idle']);

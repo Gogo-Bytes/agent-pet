@@ -112,6 +112,24 @@ it('keeps an overlapping reconnect online without duplicate hello transitions or
   await vi.waitFor(() => expect(r.states.at(-1)).toBe('disconnected'));
 });
 
+it('clears the previous session when one socket switches sessions without going offline', async () => {
+  const r = await receiver();
+  const peer = await r.peer('switching');
+  peer.send('lifecycle', 'working');
+  await vi.waitFor(() => expect(r.observations.at(-1)?.status).toBe('working'));
+  peer.socket.write(JSON.stringify({ type: 'hello', schemaVersion: 1, token, seq: 3,
+    processInstanceId: 'switching', providerSessionId: 'next-session',
+    sentAt: '2026-10-14T00:00:01Z', status: 'idle' }) + '\n');
+  await vi.waitFor(() => expect(r.observations.at(-1)?.providerSessionId).toBe('next-session'));
+  expect(r.observations.filter(value => value.connected === false)).toEqual([
+    expect.objectContaining({ providerSessionId: 'session', connected: false,
+      facts: { activities: [], waitingForInput: false } }),
+  ]);
+  expect(r.states).toEqual(['connected']);
+  await disconnect(peer.socket);
+  await vi.waitFor(() => expect(r.observations.filter(value => value.connected === false)).toHaveLength(2));
+});
+
 it('isolates receivers started by one adapter and drains shutdown once before a new receiver starts', async () => {
   const adapter = new PiBridgeAdapter(), first = await receiver(adapter), second = await receiver(adapter);
   await first.peer('same-process'); const remaining = await second.peer('same-process');

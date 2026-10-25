@@ -10,7 +10,7 @@ import { piObservation } from '../renderer/test-support/pi-fixtures.js';
 
 const native = vi.hoisted(() => {
   const frame = { url: '' };
-  const webContents = { mainFrame: frame, send: vi.fn(), setWindowOpenHandler: vi.fn(), on: vi.fn(), reload: vi.fn() };
+  const webContents = { mainFrame: frame, send: vi.fn(), setWindowOpenHandler: vi.fn(), on: vi.fn(), reload: vi.fn(), setZoomFactor: vi.fn() };
   const window = {
     webContents, setBounds: vi.fn(), isDestroyed: () => false,
     isVisible: vi.fn(() => true), moveTop: vi.fn(), showInactive: vi.fn(), setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
@@ -351,7 +351,9 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
   it('reloads the pet renderer once after a crash and avoids a reload loop', () => {
     const listener = native.webContents.on.mock.calls.find(([name]) => name === 'render-process-gone')?.[1];
     expect(listener).toBeTypeOf('function');
-    listener(); listener();
+    listener();
+    for (const [event, callback] of native.webContents.on.mock.calls) if (event === 'did-finish-load') callback();
+    listener();
     expect(native.webContents.reload).toHaveBeenCalledTimes(1);
   });
 
@@ -389,7 +391,9 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     const listener = native.management!.webContents.on.mock.calls.find(([name]) => name === 'render-process-gone')?.[1];
     expect(listener).toBeTypeOf('function');
     native.management!.webContents.reload.mockClear();
-    listener(); listener();
+    listener();
+    for (const [event, callback] of native.management!.webContents.on.mock.calls) if (event === 'did-finish-load') callback();
+    listener();
     expect(native.management!.webContents.reload).toHaveBeenCalledTimes(1);
   });
 

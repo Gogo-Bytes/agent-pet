@@ -134,7 +134,6 @@ export function createManagement(options: {
       });
       let rendererRecoveryAttempts = 0;
       current.webContents.on('did-start-loading', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
-      current.webContents.on('did-finish-load', () => { rendererRecoveryAttempts = 0; });
       current.webContents.on('render-process-gone', () => {
         connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate();
         if (quitting || current.isDestroyed() || rendererRecoveryAttempts >= 1) return;

@@ -172,7 +172,6 @@ function startPrimaryInstance(): void {
       window.webContents.reload();
     };
     window.webContents.on('did-start-loading', resetPresentation);
-    window.webContents.on('did-finish-load', () => { rendererRecoveryAttempts = 0; });
     window.webContents.on('render-process-gone', recoverRenderer);
     const rendererFile = join(__dirname, '../renderer/index.html');
     const developmentUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;

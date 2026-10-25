@@ -84,6 +84,28 @@ it('does not count raw, wrong-token, pre-hello or malformed peers as online', as
   await vi.waitFor(() => expect(r.states).toEqual(['connected', 'disconnected']));
 });
 
+it('disables idle timeouts after legacy hello without requiring heartbeats', async () => {
+  const timeout = vi.spyOn(net.Socket.prototype, 'setTimeout');
+  try {
+    const r = await receiver();
+    const peer = await r.peer('legacy-idle');
+    expect(timeout).toHaveBeenCalledWith(0);
+    await new Promise(resolve => setTimeout(resolve, 1100));
+    expect(peer.socket.destroyed).toBe(false);
+    expect(r.states).toEqual(['connected']);
+    peer.send('lifecycle', 'working');
+    await vi.waitFor(() => expect(r.observations.at(-1)?.status).toBe('working'));
+  } finally { timeout.mockRestore(); }
+});
+
+it('closes idle unauthenticated sockets without publishing a session', async () => {
+  const r = await receiver();
+  const peer = await r.peer('idle-unauthenticated', false);
+  await vi.waitFor(() => expect(peer.socket.destroyed).toBe(true), { timeout: 2000 });
+  expect(r.states).toEqual([]);
+  expect(r.observations).toEqual([]);
+});
+
 it('bounds unauthenticated peers before they can retain socket buffers', async () => {
   const r = await receiver();
   const peers = await Promise.all(Array.from({ length: 33 }, (_, index) => r.peer(`raw-${index}`, false)));

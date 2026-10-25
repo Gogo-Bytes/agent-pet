@@ -31,10 +31,10 @@ export class PiConnection {
   private acceptedObservations = new Map<string, SessionObservation>();
   private rememberObservation(value: SessionObservation): void {
     this.acceptedObservations.set(value.sessionId, value);
-    while (this.acceptedObservations.size > 256) {
-      const oldest = this.acceptedObservations.keys().next();
-      if (oldest.done) break;
-      this.acceptedObservations.delete(oldest.value);
+    // Live observations are cleanup obligations, not disposable history.
+    for (const [id, observation] of this.acceptedObservations) {
+      if (this.acceptedObservations.size <= 256) break;
+      if (observation.connected === false) this.acceptedObservations.delete(id);
     }
   }
   private listeners = new Set<(state: PiConnectionState) => void>();

@@ -52,6 +52,40 @@ it('accepts a fresh baseline after a previous connection used a higher revision'
   expect(f.app.snapshot().sessions.reconnect?.status).toBe('idle');
 });
 
+it('allows retry after a consumer rejects an observation without losing the previous version', async () => {
+  const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
+  const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
+  const base: SessionObservation = { sessionId: 'retry', provider: 'pi', status: 'working',
+    observedAt: '2026-10-22T00:00:00Z', connected: true, revision: 1 };
+  sink.publish(base);
+  f.publish.mockImplementationOnce(() => { throw new Error('consumer failed'); });
+  const completed = { ...base, status: 'completed' as const, revision: 2 };
+  expect(() => sink.publish(completed)).toThrow('consumer failed');
+  sink.publish(completed);
+  expect(f.app.snapshot().sessions.retry?.status).toBe('completed');
+  const calls = f.publish.mock.calls.length;
+  sink.publish(base);
+  expect(f.publish).toHaveBeenCalledTimes(calls);
+});
+
+it('preserves reentrant shutdown cleanup when the consumer then throws', async () => {
+  const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
+  const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
+  let stopped: Promise<void> | undefined;
+  f.publish.mockImplementationOnce(value => {
+    f.app.observe(value);
+    stopped = f.connection.stop();
+    throw new Error('consumer failed during stop');
+  });
+  expect(() => sink.publish({ sessionId: 'stop-reentry', provider: 'pi', status: 'working',
+    observedAt: '2026-10-22T00:00:00Z', connected: true, revision: 1,
+    facts: { activities: ['executing'], waitingForInput: false },
+  })).toThrow('consumer failed during stop');
+  await stopped;
+  expect(f.app.snapshot().sessions['stop-reentry']).toMatchObject({ connected: false,
+    facts: { activities: [], waitingForInput: false } });
+});
+
 it('clears every live session on stop even beyond the history limit', async () => {
   const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
   const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };

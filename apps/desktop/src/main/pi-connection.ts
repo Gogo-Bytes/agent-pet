@@ -207,8 +207,17 @@ export class PiConnection {
           const freshBaseline = value.connected !== false && value.baseline === true;
           if (previous && !freshBaseline && (previous.revision !== undefined && value.revision !== undefined
             ? value.revision <= previous.revision : value.observedAt < previous.observedAt)) return;
-          this.rememberObservation(value);
-          this.options.publish(value);
+          // Keep pending observations visible to reentrant shutdown, but commit only on success.
+          this.acceptedObservations.set(value.sessionId, value);
+          try { this.options.publish(value); }
+          catch (error) {
+            if (!this.closed && epoch === this.callbackEpoch && this.acceptedObservations.get(value.sessionId) === value) {
+              if (previous) this.acceptedObservations.set(value.sessionId, previous);
+              else this.acceptedObservations.delete(value.sessionId);
+            }
+            throw error;
+          }
+          if (this.acceptedObservations.get(value.sessionId) === value) this.rememberObservation(value);
         },
         connectionChanged: state => { if (epoch === this.callbackEpoch) this.connectionChanged(state); },
       });

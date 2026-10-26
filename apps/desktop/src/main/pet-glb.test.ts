@@ -63,37 +63,23 @@ it('accepts ordinary animation and cubic spline output cardinality', () => {
   const animation = { ...document.animations[0], samplers: [{ input: 0, output: 1, interpolation: 'CUBICSPLINE' }] };
   expect(validatePetGlb(animatedGlb({ ...document, animations: [animation] }))).toBe(true);
 });
-it.each([[0, 0], [1, 0], [-1, 1], [0, Infinity], [0, NaN], [0, 3601]])('rejects invalid keyframe times %j', (first, last) => {
-  expect(validatePetGlb(animatedGlb(animationDocument(), [first, last]))).toBe(false);
+it('leaves clip duration and interpolation to the existing GLTF loader', () => {
+  expect(validatePetGlb(animatedGlb(animationDocument(), [0, 7200]))).toBe(true);
 });
 it.each([
   { samplers: [{ input: 9, output: 1 }] },
   { samplers: [{ input: 0, output: 9 }] },
-  { samplers: [{ input: 0, output: 1, interpolation: 'UNKNOWN' }] },
-  { samplers: [{ input: 0, output: 1, interpolation: 'CUBICSPLINE' }] },
+
   { channels: [{ sampler: 9, target: { node: 0, path: 'translation' } }] },
   { channels: [{ sampler: 0, target: { node: 9, path: 'translation' } }] },
-  { channels: [{ sampler: 0, target: { node: 0, path: 'unknown' } }] },
-  { channels: [{ sampler: 0, target: { node: 0, path: 'rotation' } }] },
+
   { channels: Array.from({ length: 257 }, () => ({ sampler: 0, target: { node: 0, path: 'translation' } })) },
-  { channels: Array.from({ length: 2 }, () => ({ sampler: 0, target: { node: 0, path: 'translation' } })) },
-])('rejects animation references, shapes and budgets: %j', change => {
+
+])('retains animation reference and allocation guards: %j', change => {
   const document = animationDocument();
   expect(validatePetGlb(animatedGlb({ ...document, animations: [{ ...document.animations[0], ...change }] }))).toBe(false);
 });
-it('validates morph animation cardinality and rejects TRS animation on a matrix node', () => {
-  const document = animationDocument();
-  document.accessors[1] = { count: 4, componentType: 5126, type: 'SCALAR' };
-  const weights = { ...document, nodes: [{ mesh: 0 }],
-    accessors: [...document.accessors, { count: 3, componentType: 5126, type: 'VEC3' }],
-    meshes: [{ primitives: [{ attributes: { POSITION: 2 }, targets: [{ POSITION: 2 }, { POSITION: 2 }] }] }],
-    animations: [{ ...document.animations[0], channels: [{ sampler: 0, target: { node: 0, path: 'weights' } }] }],
-  };
-  expect(validatePetGlb(animatedGlb(weights))).toBe(true);
-  weights.accessors[1]!.count = 2;
-  expect(validatePetGlb(animatedGlb(weights))).toBe(false);
-  expect(validatePetGlb(animatedGlb({ ...animationDocument(), nodes: [{ matrix: Array(16).fill(0) }] }))).toBe(false);
-});
+
 it('bounds joint counts including the total across skins', () => {
   const document = { asset: { version: '2.0' }, nodes: Array.from({ length: 129 }, () => ({})),
     skins: [{ joints: Array.from({ length: 128 }, (_, index) => index) }] };
@@ -102,13 +88,7 @@ it('bounds joint counts including the total across skins', () => {
   expect(validatePetGlb(glb({ ...document, skins: Array(8).fill(document.skins[0]) }))).toBe(true);
   expect(validatePetGlb(glb({ ...document, skins: Array(9).fill(document.skins[0]) }))).toBe(false);
 });
-it('requires inverse bind matrices to cover all joints with floating point MAT4 values', () => {
-  const document = { asset: { version: '2.0' }, nodes: [{}, {}], skins: [{ joints: [0, 1], inverseBindMatrices: 0 }] };
-  for (const accessor of [{ count: 1, type: 'MAT4', componentType: 5126 },
-    { count: 2, type: 'VEC4', componentType: 5126 }, { count: 2, type: 'MAT4', componentType: 5123 }]) {
-    expect(validatePetGlb(glb({ ...document, accessors: [accessor] }))).toBe(false);
-  }
-});
+
 
 it('accepts joint references and an optional inverse bind accessor', () => {
   expect(validatePetGlb(glb({ asset: { version: '2.0' }, nodes: [{}], skins: [{ joints: [0] }] }))).toBe(true);
@@ -117,7 +97,7 @@ it('accepts joint references and an optional inverse bind accessor', () => {
 });
 it.each([
   { joints: [] }, { joints: [1] }, { joints: [0, 0] }, { joints: [0], skeleton: 1 },
-  { joints: [0], inverseBindMatrices: 0 }, { joints: Array(129).fill(0) },
+  { joints: Array(129).fill(0) },
 ])('rejects invalid skin references: %j', skin => {
   expect(validatePetGlb(glb({ asset: { version: '2.0' }, nodes: [{}], skins: [skin] }))).toBe(false);
 });

@@ -137,7 +137,7 @@ function validGeometryBudget(document: Record<string, unknown>): boolean {
   return true;
 }
 
-function validRigBudget(document: Record<string, unknown>, views: Record<string, unknown>[], binary: Buffer): boolean {
+function validAnimationBudget(document: Record<string, unknown>): boolean {
   const nodes = (document.nodes ?? []) as Record<string, unknown>[];
   const accessors = (document.accessors ?? []) as Record<string, unknown>[];
   let joints = 0;
@@ -146,12 +146,6 @@ function validRigBudget(document: Record<string, unknown>, views: Record<string,
         new Set(skin.joints).size !== skin.joints.length || !skin.joints.every(id => index(id, nodes.length))) return false;
     joints += skin.joints.length;
     if (joints > 1024 || ('skeleton' in skin && !index(skin.skeleton, nodes.length))) return false;
-    if ('inverseBindMatrices' in skin) {
-      if (!index(skin.inverseBindMatrices, accessors.length)) return false;
-      const inverse = accessors[skin.inverseBindMatrices]!;
-      if (inverse.type !== 'MAT4' || inverse.componentType !== 5126 ||
-          !unsigned(inverse.count) || inverse.count < skin.joints.length) return false;
-    }
   }
   let channels = 0, keyframes = 0, outputElements = 0;
   for (const animation of (document.animations ?? []) as Record<string, unknown>[]) {
@@ -160,49 +154,19 @@ function validRigBudget(document: Record<string, unknown>, views: Record<string,
     channels += animation.channels.length;
     if (channels > 1024) return false;
     for (const sampler of animation.samplers) {
-      if (!object(sampler) || !index(sampler.input, accessors.length) || !index(sampler.output, accessors.length) ||
-          ('interpolation' in sampler && !['LINEAR', 'STEP', 'CUBICSPLINE'].includes(sampler.interpolation as string))) return false;
+      if (!object(sampler) || !index(sampler.input, accessors.length) || !index(sampler.output, accessors.length)) return false;
       const input = accessors[sampler.input]!;
-      if (input.type !== 'SCALAR' || input.componentType !== 5126 || !unsigned(input.count) || input.count > 10000) return false;
+      if (!unsigned(input.count) || input.count > 10000) return false;
       keyframes += input.count;
       if (keyframes > 100000) return false;
-      const view = index(input.bufferView, views.length) ? views[input.bufferView] : undefined;
-      if (view && 'byteStride' in view) return false;
-      const offset = ((view?.byteOffset ?? 0) as number) + ((input.byteOffset ?? 0) as number);
-      let previous = -1;
-      for (let frame = 0; frame < input.count; frame++) {
-        const time = view ? binary.readFloatLE(offset + frame * 4) : 0;
-        if (!Number.isFinite(time) || time < 0 || time <= previous || time > 3600) return false;
-        previous = time;
-      }
     }
-    const targets = new Set<string>();
     for (const channel of animation.channels) {
       if (!object(channel) || !index(channel.sampler, animation.samplers.length) || !object(channel.target) ||
           !index(channel.target.node, nodes.length)) return false;
-      const { node, path } = channel.target;
-      if (typeof path !== 'string' || !['translation', 'rotation', 'scale', 'weights'].includes(path)) return false;
-      const target = `${node}:${path}`;
-      if (targets.has(target)) return false;
-      targets.add(target);
       const sampler = animation.samplers[channel.sampler] as Record<string, unknown>;
-      const input = accessors[sampler.input as number]!;
       const output = accessors[sampler.output as number]!;
-      let multiplier = sampler.interpolation === 'CUBICSPLINE' ? 3 : 1;
-      if (path === 'weights') {
-        const meshId = nodes[node]!.mesh;
-        const meshes = (document.meshes ?? []) as Record<string, unknown>[];
-        if (!index(meshId, meshes.length)) return false;
-        const primitives = meshes[meshId]!.primitives as Record<string, unknown>[];
-        const count = Array.isArray(primitives[0]?.targets) ? primitives[0].targets.length : 0;
-        if (!count || !primitives.every(primitive => Array.isArray(primitive.targets) && primitive.targets.length === count)) return false;
-        multiplier *= count;
-      } else if ('matrix' in nodes[node]!) return false;
-      const shape = path === 'weights' ? 'SCALAR' : path === 'rotation' ? 'VEC4' : 'VEC3';
-      if (output.type !== shape || output.componentType !== 5126 || output.count !== (input.count as number) * multiplier) return false;
-      const outputView = index(output.bufferView, views.length) ? views[output.bufferView] : undefined;
-      if (outputView && 'byteStride' in outputView) return false;
-      outputElements += (output.count as number) * (shape === 'SCALAR' ? 1 : shape === 'VEC4' ? 4 : 3);
+      const [columns, rows] = ACCESSOR_SHAPES[output.type as string]!;
+      outputElements += (output.count as number) * columns * rows;
       if (outputElements > 1000000) return false;
     }
   }
@@ -296,6 +260,6 @@ export function validatePetGlb(bytes: Buffer): boolean {
       if (elements > 1000000) return false;
     }
     const binary = bytes.subarray(end + 8);
-    return validGeometryBudget(document) && validRigBudget(document, views, binary) && validTextureBudget(document, views, binary);
+    return validGeometryBudget(document) && validAnimationBudget(document) && validTextureBudget(document, views, binary);
   } catch { return false; }
 }

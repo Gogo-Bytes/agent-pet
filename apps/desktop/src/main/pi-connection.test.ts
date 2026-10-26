@@ -52,16 +52,74 @@ it('accepts a fresh baseline after a previous connection used a higher revision'
   expect(f.app.snapshot().sessions.reconnect?.status).toBe('idle');
 });
 
-it('bounds accepted observation ordering state', async () => {
+it('allows retry after a consumer rejects an observation without losing the previous version', async () => {
+  const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
+  const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
+  const base: SessionObservation = { sessionId: 'retry', provider: 'pi', status: 'working',
+    observedAt: '2026-10-22T00:00:00Z', connected: true, revision: 1 };
+  sink.publish(base);
+  f.publish.mockImplementationOnce(() => { throw new Error('consumer failed'); });
+  const completed = { ...base, status: 'completed' as const, revision: 2 };
+  expect(() => sink.publish(completed)).toThrow('consumer failed');
+  sink.publish(completed);
+  expect(f.app.snapshot().sessions.retry?.status).toBe('completed');
+  const calls = f.publish.mock.calls.length;
+  sink.publish(base);
+  expect(f.publish).toHaveBeenCalledTimes(calls);
+});
+
+it('preserves reentrant shutdown cleanup when the consumer then throws', async () => {
+  const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
+  const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
+  let stopped: Promise<void> | undefined;
+  f.publish.mockImplementationOnce(value => {
+    f.app.observe(value);
+    stopped = f.connection.stop();
+    throw new Error('consumer failed during stop');
+  });
+  expect(() => sink.publish({ sessionId: 'stop-reentry', provider: 'pi', status: 'working',
+    observedAt: '2026-10-22T00:00:00Z', connected: true, revision: 1,
+    facts: { activities: ['executing'], waitingForInput: false },
+  })).toThrow('consumer failed during stop');
+  await stopped;
+  expect(f.app.snapshot().sessions['stop-reentry']).toMatchObject({ connected: false,
+    facts: { activities: [], waitingForInput: false } });
+});
+
+it('clears every live session on stop even beyond the history limit', async () => {
   const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
   const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
   const observe = f.publish;
   for (let index = 0; index < 300; index++) sink.publish({
-    sessionId: `session-${index}`, provider: 'pi', status: 'idle', observedAt: `2026-10-22T00:00:${String(index % 60).padStart(2, '0')}Z`, connected: true,
+    sessionId: `session-${index}`, provider: 'pi', status: 'working', observedAt: '2026-10-22T00:00:00Z', connected: true,
+    facts: { activities: ['executing'], waitingForInput: false },
   });
   expect(observe).toHaveBeenCalledTimes(300);
   await f.connection.stop();
-  expect(observe).toHaveBeenCalledTimes(556);
+  expect(observe).toHaveBeenCalledTimes(600);
+  for (const session of Object.values(f.app.snapshot().sessions)) {
+    expect(session.connected).toBe(false);
+    expect(session.facts?.activities).toEqual([]);
+  }
+});
+
+it('evicts disconnected history without losing live ordering or cleanup', async () => {
+  const f = await fixture(); const preview = await f.preview(); await f.connection.confirm(preview.id);
+  const sink = f.start.mock.calls[0]![1] as { publish(value: SessionObservation): void };
+  const base: SessionObservation = { sessionId: 'live', provider: 'pi', status: 'working',
+    observedAt: '2026-10-22T00:00:00Z', connected: true, revision: 10 };
+  sink.publish(base);
+  for (let index = 0; index < 300; index++) {
+    sink.publish({ ...base, sessionId: `gone-${index}`, connected: false });
+  }
+  f.publish.mockClear();
+  sink.publish({ ...base, revision: 9 });
+  sink.publish({ ...base, sessionId: 'gone-299', connected: false, revision: 9 });
+  expect(f.publish).not.toHaveBeenCalled();
+  sink.publish({ ...base, sessionId: 'gone-0', connected: false, revision: 9 });
+  expect(f.publish).toHaveBeenCalledOnce();
+  await f.connection.stop();
+  expect(f.publish).toHaveBeenLastCalledWith(expect.objectContaining({ sessionId: 'live', connected: false }));
 });
 
 it('is inert until native target selection and explicit preview; cancelled/forged/stale plans never write or listen', async () => {

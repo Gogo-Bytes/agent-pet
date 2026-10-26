@@ -30,6 +30,11 @@ export class PiSessionMapper {
     if (message.seq <= this.lastSeq) return;
     this.lastSeq = message.seq;
     if (message.type === 'hello') {
+      if (this.connected && this.context && this.options.publishDisconnected &&
+          (message.processInstanceId !== this.context.processInstanceId || message.providerSessionId !== this.context.providerSessionId)) {
+        this.publish(this.context.status, message.sentAt, this.context.workId, false, false);
+        if (!this.connected) return; // A cleanup observer may stop the receiver.
+      }
       this.context = {
         processInstanceId: message.processInstanceId,
         providerSessionId: message.providerSessionId,
@@ -66,10 +71,10 @@ export class PiSessionMapper {
     this.options.connectionChanged?.('disconnected');
     if (this.options.publishDisconnected) this.publish(this.context!.status, new Date().toISOString(), this.context!.workId);
   }
-  private publish(status: SessionObservation['status'], sentAt: string, workId?: string, baseline = false): void {
+  private publish(status: SessionObservation['status'], sentAt: string, workId?: string, baseline = false, connected = this.connected): void {
     if (!this.context) return;
     const legacyId = createSessionId({ provider: 'pi', processInstanceId: this.context.processInstanceId, providerSessionId: this.context.providerSessionId });
-    const publish = !this.connected && this.options.publishDisconnected ? this.options.publishDisconnected : this.options.publish;
+    const publish = !connected && this.options.publishDisconnected ? this.options.publishDisconnected : this.options.publish;
     publish({
       sessionId: this.options.namespace ? `${this.options.namespace}:${legacyId}` : legacyId,
       provider: 'pi', status, observedAt: sentAt,
@@ -78,11 +83,11 @@ export class PiSessionMapper {
       ...(workId !== undefined ? { workId } : {}),
       // Even slots are wire observations; the following odd slot clears transport
       // activity on loss. A newer hello always supersedes an old peer's close.
-      revision: this.options.publishDisconnected ? this.lastSeq * 2 + (this.connected ? 0 : 1) : this.lastSeq,
-      connected: this.connected,
+      revision: this.options.publishDisconnected ? this.lastSeq * 2 + (connected ? 0 : 1) : this.lastSeq,
+      connected,
       ...(baseline || this.context.baseline ? { baseline: true } : {}),
       ...(this.context.capabilities ? { capabilities: this.context.capabilities } : {}),
-      facts: this.connected ? (this.context.facts ?? { activities: [], waitingForInput: false }) : { activities: [], waitingForInput: false },
+      facts: connected ? (this.context.facts ?? { activities: [], waitingForInput: false }) : { activities: [], waitingForInput: false },
       providerSessionId: this.context.providerSessionId,
       processInstanceId: this.context.processInstanceId,
     });

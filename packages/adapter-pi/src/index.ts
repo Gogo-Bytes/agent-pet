@@ -13,7 +13,6 @@ import { PiSessionMapper } from './session-mapper.js';
 const MAX_LINE_BYTES = 64 * 1024;
 const MAX_PEERS = 32;
 const MAX_UNAUTHENTICATED_IDLE_MS = 1000;
-const MAX_AUTHENTICATED_IDLE_MS = 30_000;
 
 type BridgeSessionOptions = {
   token: string;
@@ -77,7 +76,8 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
           if (stopping) return;
           if (state === 'connected' && !socket.destroyed) {
             authenticated = true;
-            socket.setTimeout(MAX_AUTHENTICATED_IDLE_MS);
+            // Legacy extensions do not negotiate heartbeats; silence is not disconnection.
+            socket.setTimeout(0);
             const wasOnline = connectedSockets.size > 0;
             connectedSockets.add(socket);
             if (!wasOnline) sink.connectionChanged('connected');

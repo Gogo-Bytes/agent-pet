@@ -10,7 +10,7 @@ function root() { return fs.realpathSync(mkdtempSync(join(tmpdir(), 'agent-pet-i
 function folder(withAvatar = true) {
   const directory = join(root(), 'artist-pet'); fs.mkdirSync(directory, { mode: 0o700 });
   fs.writeFileSync(join(directory, 'pet.json'), JSON.stringify({ id: 'artist-pet', version: '1.0.0', model: 'pet.glb', avatar: withAvatar ? 'portrait.webp' : 'missing.webp', license: 'CC0-1.0' }), { mode: 0o600 });
-  const glb = Buffer.alloc(12); glb.write('glTF', 0, 'ascii'); glb.writeUInt32LE(2, 4); glb.writeUInt32LE(12, 8); fs.writeFileSync(join(directory, 'pet.glb'), glb, { mode: 0o600 });
+  fs.writeFileSync(join(directory, 'pet.glb'), fs.readFileSync('packages/pet-runtime/assets/starter.glb'), { mode: 0o600 });
   if (withAvatar) { const avatar = Buffer.alloc(12); avatar.write('RIFF', 0, 'ascii'); avatar.write('WEBP', 8, 'ascii'); fs.writeFileSync(join(directory, 'portrait.webp'), avatar, { mode: 0o600 }); }
   return directory;
 }
@@ -18,7 +18,7 @@ function folder(withAvatar = true) {
 describe('pet folder import', () => {
   it('inspects the fixed model and a manifest-declared custom avatar', () => {
     const result = inspectPetFolder(folder());
-    expect(result).toMatchObject({ ok: true, preview: { avatar: 'custom', avatarFile: 'portrait.webp', modelBytes: 12 } });
+    expect(result).toMatchObject({ ok: true, preview: { avatar: 'custom', avatarFile: 'portrait.webp', modelBytes: fs.statSync('packages/pet-runtime/assets/starter.glb').size } });
   });
 
   it('falls back when the declared avatar is missing', () => {
@@ -29,6 +29,10 @@ describe('pet folder import', () => {
   it.each([
     ['missing model', (directory: string) => fs.rmSync(join(directory, 'pet.glb'))],
     ['invalid model', (directory: string) => fs.writeFileSync(join(directory, 'pet.glb'), 'not glb')],
+    ['header-only model', (directory: string) => {
+      const bytes = Buffer.alloc(12); bytes.write('glTF'); bytes.writeUInt32LE(2, 4); bytes.writeUInt32LE(12, 8);
+      fs.writeFileSync(join(directory, 'pet.glb'), bytes);
+    }],
     ['unsafe manifest model', (directory: string) => fs.writeFileSync(join(directory, 'pet.json'), JSON.stringify({ id: 'artist-pet', version: '1', model: '../pet.glb', license: 'CC0' }))],
   ])('rejects %s', (_label, change) => {
     const directory = folder(); change(directory); expect(inspectPetFolder(directory)).toMatchObject({ ok: false });

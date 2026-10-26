@@ -54,6 +54,14 @@ PiConnection 先提交版本再发布会导致消费者抛错后，同版本再�
 
 回归确认两个窗口在 did-finish-load 时重置重试次数，会让“加载完成后立即崩溃”无限重载。已删除该重置，每个窗口实例最多自动恢复一次；再次崩溃须人工重开应用/重建窗口，不伪称持续自动恢复。32 项 Main 测试、typecheck、desktop build 与 diff 检查通过；测试模拟真实事件次序，不等于原生崩溃注入验收。
 
+### 后续功能：Antigravity 阻塞与宠物导入第一阶段
+
+Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后续搜索返回 `No search provider available`。研究运行 `e83cc2af` 仅取得候选链接，不能作接口规范；用户同意暂缓该 Provider 并转入宠物导入。不得将工具失败表述为官方没有接口。
+
+宠物导入保持禁用。第一阶段把旧的 12 字节 GLB 魔数检查替换为完整容器长度/JSON/BIN 分块检查，限制 64MiB 文件、1MiB JSON、512 nodes、128 meshes、2048 accessors/bufferViews、64 images/textures/animations/skins、16 scenes、128 materials、累计一百万 accessor 元素及两万 JSON 遍历项；拒绝 URI（含 data URI）、扩展与 sparse，检查 bufferView 范围。模型读取改为 O_NOFOLLOW/O_NONBLOCK、fstat 有界读取与读前后 metadata 核对。22 项聚焦测试、typecheck、desktop build、diff 检查通过，内置 starter 实际字节作为正对照。
+
+这不是完整 glTF 安全验证：节点引用/环、accessor 类型/跨度、图像解码像素预算、动画/绘制预算仍待补；manifest/avatar 与安装复制的 TOCTOU、未知目录保护/失败回滚仍待修复。未恢复 UI/IPC、不触碰用户资产，不将读取前后检查宣称为整个安装流程抗竞争。
+
 ## Pi 观察缓存清理修正
 
 复核发现 `73977e6` 的总量 256 条淘汰会丢失仍在线会话的停止清理责任。改为仅淘汰明确断开的历史，在线或连接状态未知的观察保留到能够发布断开清理；256 是历史回收目标，不是活跃会话硬上限。新增超过 256 个在线会话全部清理，以及混合在线/断开历史的排序与淘汰回归。仅使用自有 fixture，不修改日常配置或部署扩展；不将此项视为全链路内存硬上限验收。

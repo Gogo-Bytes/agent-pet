@@ -43,6 +43,51 @@ it.each([
   expect(validatePetGlb(glb({ asset: { version: '2.0' }, ...graph }))).toBe(false);
 });
 
+function geometry(nodes = 1, vertices = 3, primitives = 1, indices?: number) {
+  return { asset: { version: '2.0' },
+    accessors: [{ count: vertices, componentType: 5126, type: 'VEC3' },
+      ...(indices === undefined ? [] : [{ count: indices, componentType: 5123, type: 'SCALAR' }])],
+    meshes: [{ primitives: Array.from({ length: primitives }, () => ({ attributes: { POSITION: 0 },
+      ...(indices === undefined ? {} : { indices: 1 }) })) }],
+    nodes: Array.from({ length: nodes }, () => ({ mesh: 0 })),
+  };
+}
+it('accepts bounded shared meshes and indexed geometry', () => {
+  expect(validatePetGlb(glb(geometry(10, 300)))).toBe(true);
+  expect(validatePetGlb(glb(geometry(2, 100, 1, 300)))).toBe(true);
+  expect(validatePetGlb(glb(geometry(256)))).toBe(true);
+  expect(validatePetGlb(glb(geometry(100, 5000)))).toBe(true);
+  expect(validatePetGlb(glb(geometry(100, 3, 1, 5000)))).toBe(true);
+});
+it.each([
+  ['draw calls', geometry(257)],
+  ['instanced vertices', geometry(100, 6000)],
+  ['instanced indices', geometry(100, 3, 1, 6000)],
+  ['primitive count', geometry(1, 3, 257)],
+  ['unused geometry', { ...geometry(0, 600000) }],
+])('rejects excessive %s', (_name, document) => {
+  expect(validatePetGlb(glb(document))).toBe(false);
+});
+it.each([
+  { attributes: { POSITION: 2 } },
+  { attributes: {} },
+  { attributes: { POSITION: 0, NORMAL: 2 } },
+  { attributes: { POSITION: 0 }, indices: 0 },
+  { attributes: { POSITION: 0 }, indices: 2 },
+  { attributes: { POSITION: 0 }, mode: 7 },
+  { attributes: { POSITION: 0 }, material: 0 },
+  { attributes: { POSITION: 0 }, targets: Array.from({ length: 9 }, () => ({ POSITION: 0 })) },
+  { attributes: { POSITION: 0 }, targets: [{ POSITION: 2 }] },
+])('rejects invalid primitive references or excessive morph targets: %j', primitive => {
+  expect(validatePetGlb(glb({ ...geometry(), meshes: [{ primitives: [primitive] }] }))).toBe(false);
+});
+
+it('counts morph target vertices in the workload budget', () => {
+  const mesh = { primitives: [{ attributes: { POSITION: 0 }, targets: [{ POSITION: 0 }] }] };
+  expect(validatePetGlb(glb({ ...geometry(1, 250000), meshes: [mesh] }))).toBe(true);
+  expect(validatePetGlb(glb({ ...geometry(1, 250001), meshes: [mesh] }))).toBe(false);
+});
+
 function accessorGlb(accessor: Record<string, unknown>, view: Record<string, unknown> = {}): Buffer {
   return glb({ asset: { version: '2.0' }, buffers: [{ byteLength: 64 }],
     bufferViews: [{ buffer: 0, byteLength: 64, ...view }],

@@ -77,6 +77,64 @@ function validNodeGraph(document: Record<string, unknown>): boolean {
   return true;
 }
 
+function validGeometryBudget(document: Record<string, unknown>): boolean {
+  const accessors = (document.accessors ?? []) as Record<string, unknown>[];
+  const meshes = (document.meshes ?? []) as Record<string, unknown>[];
+  const materials = (document.materials ?? []) as unknown[];
+  const costs: { draws: number; vertices: number; indices: number }[] = [];
+  let primitives = 0, loadedVertices = 0, loadedIndices = 0;
+  for (const mesh of meshes) {
+    if (!Array.isArray(mesh.primitives) || !mesh.primitives.length) return false;
+    primitives += mesh.primitives.length;
+    if (primitives > 256) return false;
+    const cost = { draws: mesh.primitives.length, vertices: 0, indices: 0 };
+    for (const primitive of mesh.primitives) {
+      if (!object(primitive) || !object(primitive.attributes) ||
+          !index(primitive.attributes.POSITION, accessors.length)) return false;
+      const position = accessors[primitive.attributes.POSITION]!;
+      if (position.type !== 'VEC3' || position.componentType !== 5126 || !unsigned(position.count)) return false;
+      const attributes = Object.values(primitive.attributes);
+      if (attributes.length > 16 || !attributes.every(id => index(id, accessors.length) &&
+          accessors[id]!.count === position.count)) return false;
+      if ('mode' in primitive && !index(primitive.mode, 7)) return false;
+      if ('material' in primitive && !index(primitive.material, materials.length)) return false;
+      let drawElements = position.count;
+      if ('indices' in primitive) {
+        if (!index(primitive.indices, accessors.length)) return false;
+        const indices = accessors[primitive.indices]!;
+        if (indices.type !== 'SCALAR' || ![5121, 5123, 5125].includes(indices.componentType as number) ||
+            indices.normalized === true || !unsigned(indices.count)) return false;
+        drawElements = indices.count;
+      }
+      let targets = 0;
+      if ('targets' in primitive) {
+        if (!Array.isArray(primitive.targets) || primitive.targets.length > 8) return false;
+        targets = primitive.targets.length;
+        for (const target of primitive.targets) {
+          if (!object(target) || !Object.keys(target).length ||
+              !Object.entries(target).every(([name, id]) => ['POSITION', 'NORMAL', 'TANGENT'].includes(name) &&
+                index(id, accessors.length) && accessors[id]!.type === 'VEC3' &&
+                accessors[id]!.componentType === 5126 && accessors[id]!.count === position.count)) return false;
+        }
+      }
+      cost.vertices += position.count * (1 + targets);
+      cost.indices += drawElements;
+    }
+    loadedVertices += cost.vertices; loadedIndices += cost.indices;
+    if (loadedVertices > 500000 || loadedIndices > 500000) return false;
+    costs.push(cost);
+  }
+  let draws = 0, vertices = 0, indices = 0;
+  // Count all nodes, not only the default scene, so scene selection cannot bypass the budget.
+  for (const node of (document.nodes ?? []) as Record<string, unknown>[]) {
+    if (!('mesh' in node)) continue;
+    const cost = costs[node.mesh as number]!;
+    draws += cost.draws; vertices += cost.vertices; indices += cost.indices;
+    if (draws > 256 || vertices > 500000 || indices > 500000) return false;
+  }
+  return true;
+}
+
 /** Preliminary container/resource checks only, not full glTF or decoded GPU-budget validation. */
 export function validatePetGlb(bytes: Buffer): boolean {
   try {
@@ -139,6 +197,6 @@ export function validatePetGlb(bytes: Buffer): boolean {
       elements += accessor.count;
       if (elements > 1000000) return false;
     }
-    return true;
+    return validGeometryBudget(document);
   } catch { return false; }
 }

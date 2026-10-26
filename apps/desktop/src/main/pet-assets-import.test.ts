@@ -74,6 +74,37 @@ describe('pet folder import', () => {
     } finally { save.mockRestore(); }
   });
 
+  it('installs exactly the inspected bytes even when the source changes after preview', () => {
+    const data = root(); const source = folder(); const store = new PetAssetsStore(data); const result = inspectPetFolder(source);
+    if (!result.ok) throw new Error('fixture did not inspect');
+    const expected = fs.readFileSync(join(source, 'pet.glb'));
+    fs.writeFileSync(join(source, 'pet.glb'), 'changed after preview');
+    fs.writeFileSync(join(source, 'pet.json'), '{}');
+    expect(installPetFolder(result.preview, store)?.id).toBe('artist-pet');
+    expect(fs.readFileSync(join(store.directory, 'artist-pet', 'pet.glb'))).toEqual(expected);
+    expect(JSON.parse(fs.readFileSync(join(store.directory, 'artist-pet', 'pet.json'), 'utf8')).id).toBe('artist-pet');
+  });
+
+  it('rejects symlink manifests and forged or altered previews', () => {
+    const source = folder(); const store = new PetAssetsStore(root());
+    const result = inspectPetFolder(source); if (!result.ok) throw new Error('fixture did not inspect');
+    expect(installPetFolder(structuredClone(result.preview), store)).toBeNull();
+    const modified = inspectPetFolder(source); if (!modified.ok) throw new Error('fixture did not inspect');
+    modified.preview.manifest.id = 'changed';
+    expect(installPetFolder(modified.preview, store)).toBeNull();
+    const manifest = join(source, 'pet.json'); fs.renameSync(manifest, join(source, 'other.json'));
+    fs.symlinkSync(join(source, 'other.json'), manifest);
+    expect(inspectPetFolder(source).ok).toBe(false);
+  });
+
+  it('invalidates an old preview when another folder is inspected', () => {
+    const source = folder(); const store = new PetAssetsStore(root());
+    const first = inspectPetFolder(source); if (!first.ok) throw new Error('fixture did not inspect');
+    inspectPetFolder(source);
+    expect(installPetFolder(first.preview, store)).toBeNull();
+    expect(store.snapshot().records.map(record => record.id)).toEqual(['starter']);
+  });
+
   it('copies the validated folder and persists only application metadata', () => {
     const data = root(); const source = folder(); const store = new PetAssetsStore(data); const result = inspectPetFolder(source);
     if (!result.ok) throw new Error('fixture did not inspect');

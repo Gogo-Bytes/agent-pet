@@ -31,7 +31,7 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 1. **稳定性收尾（先行门槛）**：缓存遗漏清理已由 `adad08e` 修复。继续核对 Pi 单 socket 切换 Session 时旧归属是否释放、认证超时是否真正销毁失活连接、heartbeat 与旧扩展兼容性、消费者发布失败后的重试，以及 renderer 崩溃恢复是否有循环风险。逐项用现有公开边界回归确认；仅修复能复现的问题，不增加新框架。完成后运行全量测试、typecheck、desktop build，记录未覆盖的睡眠/唤醒与长时间实机场景。
 2. **Antigravity CLI 能力核对**：先核对官方事件/扩展接口、支持版本与隐私边界，不从进程存在或正文猜业务状态。交付可支持事件表和最小接入方案；若缺可靠接口，记录阻塞并转入下一项，不做私有协议逆向或无限探测。本机安装检查、真实启动与配置改动另给精确预览。
 3. **Antigravity CLI 最小接入（以上一步证据为前提）**：按输入白名单 → 认证传输/会话身份与生命周期 → Main/配置预览与选择性撤回 → 正式 UI 四个可独立验证阶段推进，复用现有 Provider/Application 边界。每阶段有隔离 fixture 回归；真实模型/日常部署须独立授权。没有可靠任务事件时明确保持能力未知。
-4. **受约束自定义宠物导入**：先定义文件大小、节点/网格/纹理/动画预算与外部资源拒绝规则，补畸形/超预算/符号链接和竞争测试；再实现安全读取、失败回滚、资源清理及绑定，最后恢复 UI 入口。现有入口在完整闭环通过前保持禁用，不删除用户已有资产。
+4. **自定义宠物加载与播放（收窄目标）**：直接复用现有 Three.js GLTFLoader、AnimationMixer 和名称映射。只交付“选文件夹 → 安全复制 → 选择/绑定 → 播放已有 clip → 失败回退/释放资源”。不做骨骼编辑、重定向、IK、动画生成或自行重写 glTF 动画语义。保留边界安全与资源上限，不再扩展内部精细校验；先修复预览/复制竞争与失败残留，再接 UI。入口在闭环验证前保持禁用。
 5. **集中实机验收**：区分 Provider 支持与不支持的取消、下一轮、错误、等待、并发、断线恢复；补内存/GPU长时间观察及系统重启。dev 日常使用正常不替代专项验收。最新源码外 `.app` 的完整交互检查与启动 smoke 分开记录，操作前确认隔离范围。
 6. **桌面宿主接入**：Codex、Antigravity 桌面端最后分别做官方能力与身份边界核对，不能直接套用 CLI 已验收结论。方案成立后再按独立阶段实现。
 7. **正式发布**：签名、公证、分发、更新及生产隔离验收留到功能阶段之后；既有 guard 与未通过状态保留。
@@ -53,6 +53,56 @@ PiConnection 先提交版本再发布会导致消费者抛错后，同版本再�
 ### 稳定性收尾：renderer 恢复上限
 
 回归确认两个窗口在 did-finish-load 时重置重试次数，会让“加载完成后立即崩溃”无限重载。已删除该重置，每个窗口实例最多自动恢复一次；再次崩溃须人工重开应用/重建窗口，不伪称持续自动恢复。32 项 Main 测试、typecheck、desktop build 与 diff 检查通过；测试模拟真实事件次序，不等于原生崩溃注入验收。
+
+### 后续功能：Antigravity 阻塞与宠物导入第一阶段
+
+Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后续搜索返回 `No search provider available`。研究运行 `e83cc2af` 仅取得候选链接，不能作接口规范；用户同意暂缓该 Provider 并转入宠物导入。不得将工具失败表述为官方没有接口。
+
+宠物导入保持禁用。第一阶段把旧的 12 字节 GLB 魔数检查替换为完整容器长度/JSON/BIN 分块检查，限制 64MiB 文件、1MiB JSON、512 nodes、128 meshes、2048 accessors/bufferViews、64 images/textures/animations/skins、16 scenes、128 materials、累计一百万 accessor 元素及两万 JSON 遍历项；拒绝 URI（含 data URI）、扩展与 sparse，检查 bufferView 范围。模型读取改为 O_NOFOLLOW/O_NONBLOCK、fstat 有界读取与读前后 metadata 核对。22 项聚焦测试、typecheck、desktop build、diff 检查通过，内置 starter 实际字节作为正对照。
+
+这不是完整 glTF 安全验证：节点引用/环、accessor 类型/跨度、图像解码像素预算、动画/绘制预算仍待补；manifest/avatar 与安装复制的 TOCTOU、未知目录保护/失败回滚仍待修复。未恢复 UI/IPC、不触碰用户资产，不将读取前后检查宣称为整个安装流程抗竞争。
+
+### 宠物导入：失败时保留未知目录
+
+回归复现安装失败 catch 会递归删除未登记的同名用户目录。现改为排他创建目标目录、排他复制文件，拒绝已有目录（含空目录），取消所有失败路径的递归删除；索引保存失败保留未登记文件，后续同名导入拒绝自动接管。25 项相关测试、typecheck、desktop build 与 diff 检查通过，覆盖未知文件、空目录身份和保存失败期间加入的用户文件。残留需要后续所有权清理机制，暂不自动回滚；源文件竞争、解码预算与 UI 披露尚未完成，导入仍禁用。
+
+### 宠物导入：节点图与 accessor 布局
+
+已增加节点子引用/默认场景/场景根/mesh、skin、camera 索引检查，拒绝循环、重复子节点、多父节点及超过 128 层的层级；未被场景引用的节点同样检查，允许不同场景共享同一棵合法树。accessor 检查 component/type、normalized、bufferView 索引、偏移对齐、stride 范围与最终元素字节跨度；保留无 bufferView 的零初始化与矩阵列填充/末列可省略尾填充的合法情况。新增 30 项用例，相关 55 项测试、typecheck、desktop build、diff 检查通过。
+
+范围不是完整 glTF schema：skin/动画/primitive 内部引用、索引值、解码纹理和最终绘制预算仍待实现；安装竞争保护和残留清理仍未完成，UI/IPC 导入入口继续关闭。
+
+### 宠物导入：几何实例预算
+
+新增 primitive/attribute/index/material 引用与基础类型检查、单 primitive 最多 16 attributes/8 morph targets、全模型最多 256 primitives；按全部节点实例累计最多 256 个 primitive 绘制项、50 万顶点工作量（含 morph targets）及 50 万绘制元素，未实例化的几何也受总量限制，避免共享小 mesh 被大量实例引用绕过预算。预算是保守准入估计，不代表真实 draw call/GPU 性能保证。新增边界、超额、非法引用与 morph 工作量测试；71 项相关测试、typecheck、desktop build、diff 检查通过。
+
+仍未检查索引缓冲实际数值、完整属性语义、skin/动画引用或纹理解码资源；入口继续关闭，下一步补纹理预算。没有新增依赖、模型导入或日常配置变更。
+
+### 宠物导入：内嵌纹理预解码预算
+
+内嵌 PNG/JPEG 增加有界结构/尺寸预检：单图片最多 4MiB、长宽各不超过 4096、全模型图片及纹理引用分别累计最多 16Mi 像素；重复 texture 引用计入预算。检查 image.bufferView、MIME 和 texture.source/sampler 引用，拒绝 URI、WebP/KTX 等未支持内嵌格式、APNG/压缩 PNG 元数据、JPEG 多帧/动态高度及过多扫描；支持静态 PNG 和 8-bit baseline/progressive JPEG 的尺寸读取。该子集限制针对 GLB 内嵌纹理，不改变头像格式契约。
+
+85 项聚焦测试通过；最终全量 127 文件、1438 passed / 1 skipped，typecheck、desktop build、diff 检查通过。测试包括真实小 PNG 字节与明确标注的尺寸/结构合成 fixture；没有把 JPEG 合成头或修改尺寸的 PNG 当成真实解码成功。此阶段不解压像素、不校验完整压缩流/PNG CRC，也不保证真实 GPU 峰值（位深、mipmap、材质变体仍有额外开销）；损坏图片解码失败隔离、动画/skin 校验、源文件竞争保护和安装残留清理仍待完成，导入入口保持禁用。
+
+### 宠物导入：动画与 skin 引用预算
+
+新增动画 sampler/channel/target 引用、插值枚举、输出类型与数量检查（含 CUBICSPLINE 三倍输出和 morph weights 数量），拒绝同动画重复目标、matrix 节点上的 TRS 动画及动画 accessor 的交错 stride。读取实际时间缓冲区，要求有限、非负、严格递增且不超过 3600 秒；每 sampler 最多 1 万关键帧、总计 10 万，每动画最多 256 sampler/channel、总计 1024 channel、累计输出 100 万标量分量。skin 要求非空唯一 joints、有效 skeleton/inverseBindMatrices 引用与浮点 MAT4 数量，单 skin 最多 128 joints、累计 1024。
+
+112 项聚焦测试、typecheck、desktop build、diff 检查通过，真实 starter GLB 保持通过；本轮未重跑全量。仍未完成几何索引实际数值、JOINTS/WEIGHTS 与 skin 的绑定关系、动画输出/逆绑定矩阵数值语义及完整解码验证；源文件竞争、残留清理与 UI 闭环未完成。入口保持禁用，不将结构预算等同于完整安全导入。
+
+### 用户纠偏：只加载 GLB、调用已有动画
+
+本条覆盖前述继续细化骨骼/动画校验的待办。移除自写的关键帧逐值扫描/时长政策、插值与输出数量配对、morph 动画基数推导、TRS/matrix 判断、逆绑定矩阵语义检查，动画解释交给现有 GLTFLoader/AnimationMixer。删除对应的越界产品职责断言；文件边界、节点环/缓冲区越界、资源计数/纹理上限、未知文件保留测试继续保留。现有玩家只按 clip 名称播放，不新增骨骼控制层。
+
+下一步仅推进：固定预览字节的安全安装 → 失败保留/提示 → 复用现有导入 UI 与绑定 → 加载失败回退和正常/无动画 GLB 验收。不以“补全所有 glTF 语义验证”作为交付门槛，也不宣称任意第三方资产都安全或流畅。
+
+### 按收窄目标推进：固定预览字节安装
+
+`7783509` 已完成语义校验精简，相关 135 项测试及 typecheck/build 通过。随后统一 manifest/model/avatar 为有界 O_NOFOLLOW/O_NONBLOCK + fstat 读取，删除重复路径检查/魔数重读和安装时的 copyFile：只保留最近一次预览的私有字节快照，安装消耗该快照并用 wx/0600 写入，拒绝伪造、改动和旧预览。源文件在确认前被替换不会改变实际安装内容；这不是对任意祖先目录并发替换的系统级隔离保证。新增源文件变更、manifest symlink、预览篡改/失效回归，95 项相关测试和 typecheck/build 通过。未知目录/失败残留保护保持；导入仍未接回 UI，取消释放与失败提示随 UI 闭环处理。
+
+### 导入闭环：Main 预览取消与确认
+
+已接通 Main 原生文件夹选择、去路径预览、一次性 token 确认与取消；重新选择、窗口关闭/加载/renderer 退出及应用退出会失效并释放预览字节，迟到 picker 结果丢弃。旧 token 取消/确认不会破坏新预览。注册表异常、数量上限和重复资产在安装前拒绝；失败提示明确文件/残留保留，不自动删除。50 项 Main/导入/preload 测试、typecheck、desktop build、diff 检查通过。原生选择与真实文件导入尚未实机验收，Renderer 收藏页入口仍未恢复；没有读取用户模型或重启日常 dev。
 
 ## Pi 观察缓存清理修正
 

@@ -136,6 +136,57 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     expect(cancelled.notice).toBe('cancelled'); expect(cancelled.target).toEqual(snapshot.target);
     expect(native.pick).toHaveBeenCalledWith(management, expect.objectContaining({ properties: ['openDirectory', 'dontAddToRecent'] }));
   });
+  it('previews and confirms pet bytes with one-use tokens and invalidates on reload', async () => {
+    const management = native.management!;
+    const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
+    const source = join(native.path, 'artist-pet'); mkdirSync(source, { mode: 0o700 });
+    writeFileSync(join(source, 'pet.json'), JSON.stringify({ id: 'artist-pet', version: '1', model: 'pet.glb', license: 'CC0' }));
+    writeFileSync(join(source, 'pet.glb'), readFileSync('packages/pet-runtime/assets/starter.glb'));
+    const choose = async () => {
+      native.pick.mockResolvedValueOnce({ canceled: false, filePaths: [source] });
+      const result = await native.handlers.get('management:pet-assets-choose')!(trusted) as { ok: boolean; preview: { token: string } };
+      expect(result.ok).toBe(true); expect(result.preview).not.toHaveProperty('source');
+      return result.preview.token;
+    };
+    const confirm = (token: string) => native.handlers.get('management:pet-assets-confirm')!(trusted, token);
+    const cancelled = await choose();
+    native.handlers.get('management:pet-assets-cancel')!(trusted, cancelled);
+    expect(() => confirm(cancelled)).toThrow();
+    const stale = await choose();
+    management.webContents.on.mock.calls.find(([name]) => name === 'did-start-loading')![1]();
+    expect(() => confirm(stale)).toThrow();
+    const current = await choose();
+    native.handlers.get('management:pet-assets-cancel')!(trusted, stale);
+    writeFileSync(join(source, 'pet.glb'), 'changed after preview');
+    expect(confirm(current)).toMatchObject({ records: expect.arrayContaining([expect.objectContaining({ id: 'artist-pet' })]) });
+    expect(() => confirm(current)).toThrow();
+    expect(readFileSync(join(native.path, 'pet-assets/artist-pet/pet.glb'))).toEqual(readFileSync('packages/pet-runtime/assets/starter.glb'));
+  });
+
+  it('keeps pet imports behind the trusted management frame and native picker', async () => {
+    const management = native.management!;
+    const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
+    const foreign = { sender: native.webContents, senderFrame: native.webContents.mainFrame };
+    const choose = native.handlers.get('management:pet-assets-choose')!;
+    await expect(choose(foreign)).rejects.toThrow('Untrusted renderer');
+    await expect(choose(trusted, '/unapproved/path')).rejects.toThrow('Invalid pet import request');
+    for (const action of ['confirm', 'cancel']) {
+      expect(() => native.handlers.get(`management:pet-assets-${action}`)!(foreign, 'token')).toThrow('Untrusted renderer');
+    }
+    expect(native.pick).not.toHaveBeenCalled();
+  });
+
+  it('drops pet folder-picker results arriving after the management window closes', async () => {
+    const management = native.management!;
+    const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
+    let finish!: (value: { canceled: boolean; filePaths: string[] }) => void;
+    native.pick.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const request = native.handlers.get('management:pet-assets-choose')!(trusted);
+    management.on.mock.calls.find(([name]) => name === 'close')![1]({ preventDefault: vi.fn() });
+    finish({ canceled: false, filePaths: ['/must-not-be-read'] });
+    expect(await request).toEqual({ ok: false, reason: 'cancelled' });
+  });
+
   it('restricts deployment IPC to trusted management, accepts no paths, and does not replace the env bridge', async () => {
     const management = native.management!;
     const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };

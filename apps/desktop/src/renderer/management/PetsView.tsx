@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentConfiguration, PetBinding } from '../../shared/configurations.js';
-import type { PetAssetsState } from '../../shared/pet-assets.js';
+import type { PetAssetsApi, PetAssetsState } from '../../shared/pet-assets.js';
+import { PetImportControl } from './PetImportControl.js';
 import { GlassAction, GlassButton, GlassSurface, GlassToolbar } from '../shared/ui/Glass.js';
 import { Icon, type IconName } from './components/icons.js';
 import { Dialog } from './components/Dialog.js';
@@ -9,8 +10,8 @@ import { petActions } from './ScenePet.js';
 import { normalizePetAction } from '@agent-pet/pet-runtime';
 import { providerLabels } from './home-projection.js';
 
-export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId, onSelectAsset, name, clips, action, busy, onName, onBind, onAction, onRemoveAsset, error, reduced }: {
-  visible: boolean; records: AgentConfiguration[]; assets: PetAssetsState; avatarUrls: Record<string, string>; selectedAssetId: string; onSelectAsset: (id: string) => void; name: string; clips: string[]; action: string; busy: boolean;
+export function PetsView({ visible, records, assets, importApi, avatarUrls, selectedAssetId, onSelectAsset, name, clips, action, busy, onName, onBind, onAction, onRemoveAsset, error, reduced }: {
+  visible: boolean; records: AgentConfiguration[]; assets: PetAssetsState; importApi: PetAssetsApi; avatarUrls: Record<string, string>; selectedAssetId: string; onSelectAsset: (id: string) => void; name: string; clips: string[]; action: string; busy: boolean;
   onName: (value: string) => Promise<boolean>; onBind: (id: string, pet: PetBinding | null) => void;
   onAction: (value: string) => void; onRemoveAsset: (id: string) => Promise<boolean>;
   error: string; reduced: boolean;
@@ -90,7 +91,8 @@ export function PetsView({ visible, records, assets, avatarUrls, selectedAssetId
         </div>)}
       </div>
       {!assets.records.some(asset => (asset.id === 'starter' ? name : asset.manifest.id).includes(query)) && <p className="collection-empty">没有找到宠物</p>}
-      <p className="collection-empty">内置 starter.glb · 已接入实际模型与动作<br />自定义宠物导入将在后续版本提供。</p><p role="status">{notice}</p>
+      <PetImportControl api={importApi} disabled={busy} onImported={id => { onSelectAsset(id); setNotice('已加入收藏。'); }} />
+      <p role="status">{notice}</p>
     </GlassDrawer>}
     {panel === 'agents' && <Dialog label="配置 Agent" className="pet-dialog" onClose={() => setPanel(null)}>
       <header><h2>配置给 Agent</h2><button type="button" aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>

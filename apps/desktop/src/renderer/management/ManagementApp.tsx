@@ -9,6 +9,7 @@ import { SettingsView } from './SettingsView.js';
 import { Icon } from './components/icons.js';
 import { projectHomePets } from './home-projection.js';
 
+const emptyPetAssets = { version: 1 as const, records: [] };
 const pages = [['home', 'home', '首页'], ['pets', 'pet', '宠物'], ['connections', 'link', '连接'], ['settings', 'settings', '设置']] as const;
 const notices: Record<ConfigurationsState['notice'], string> = {
   none: '', invalid: '输入无效，请检查名称和位置。', duplicate: '这个配置已添加，请选择其他位置。',
@@ -33,11 +34,12 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
   const [replay, setReplay] = useState(0);
   const [selectedAssetId, setSelectedAssetId] = useState('starter');
   const [assetModels, setAssetModels] = useState<Record<string, string>>({});
+  const [modelReadFailed, setModelReadFailed] = useState(false);
   const [assetAvatars, setAssetAvatars] = useState<Record<string, string>>({});
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const onClips = useCallback((values: string[]) => setClips(previous => previous.join() === values.join() ? previous : values), []);
   const preferences = snapshot.state?.preferences ?? defaultPreferences;
-  const assets = snapshot.petAssets ?? { version: 1 as const, records: [] };
+  const assets = snapshot.petAssets ?? emptyPetAssets;
   useEffect(() => {
     const preferred = preferences.petAssetId;
     if (assets.records.some(asset => asset.id === preferred) && preferred !== selectedAssetId) setSelectedAssetId(preferred);
@@ -55,18 +57,18 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
   useEffect(() => {
     if (!bridge.petAssets) return;
     let active = true; const urls: string[] = []; const entries: [string, string][] = [];
-    setAssetModels({});
+    setAssetModels({}); setModelReadFailed(false);
     void (async () => {
       for (const id of modelAssetIds) {
         if (!active) return;
         try {
           const bytes = await petAssets.getModel(id);
-          if (!bytes) continue;
+          if (!bytes) { if (active) setModelReadFailed(true); continue; }
           const copy = new Uint8Array(bytes.byteLength); copy.set(bytes);
           const url = URL.createObjectURL(new Blob([copy.buffer], { type: 'model/gltf-binary' }));
           if (!active) { URL.revokeObjectURL(url); return; }
           urls.push(url); entries.push([id, url]);
-        } catch { /* one invalid asset must not block the others */ }
+        } catch { if (active) setModelReadFailed(true); }
       }
       if (active) setAssetModels(Object.fromEntries(entries));
     })();
@@ -120,9 +122,10 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
       </div>
     </header>
     {(windowError || snapshot.error || snapshot.state?.preferenceError) && <p className="app-alert" role="alert">{windowError || snapshot.error || snapshot.state?.preferenceError}<button onClick={() => void store.retry()}>重新读取</button></p>}
+    {modelReadFailed && <p className="app-alert" role="alert">部分宠物模型文件无法读取，暂时显示内置宠物。请重新选择或检查收藏文件。</p>}
     <div className="game-content">
       <CompanionScene pets={pets} page={page} preferences={preferences} action={action} replay={replay} modelUrl={selectedAsset?.source === 'imported' ? assetModels[selectedAsset.id] : undefined} animations={selectedAsset?.manifest.animations} modelUrls={assetModels} assetAnimations={assetAnimations} onClips={onClips}>
-        <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} assets={assets} avatarUrls={assetAvatars} selectedAssetId={selectedAsset?.id ?? 'starter'} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
+        <PetsView visible={page === 'pets'} records={snapshot.configurations?.records ?? []} assets={assets} importApi={petAssets} avatarUrls={assetAvatars} selectedAssetId={selectedAsset?.id ?? 'starter'} name={preferences.petName} clips={clips} action={action} busy={busy} error={error} reduced={preferences.reduced}
           onName={petName => change(() => bridge.updatePreferences({ petName }))} onSelectAsset={id => { setSelectedAssetId(id); void change(() => bridge.updatePreferences({ petAssetId: id })); }} onBind={(id, pet) => void change(() => bridge.configurations.bindPet(id, pet))}
           onRemoveAsset={async id => { try { await petAssets.remove(id); if (selectedAssetId === id) setSelectedAssetId('starter'); setWindowError(''); return true; } catch (cause) { setWindowError(cause instanceof Error ? cause.message : '宠物删除失败，请先解除绑定。'); return false; } }}
           onAction={value => { setAction(value); setReplay(previous => previous + 1); }} />

@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ManagementState } from '../../shared/preferences.js';
+import { starterPetAsset, type PetAssetsState } from '../../shared/pet-assets.js';
 import type { PreflightState } from '../../shared/pi-preflight.js';
 import { initialPreflight } from './test-preflight.js';
 import { ManagementApp } from './ManagementApp.js';
@@ -66,11 +67,40 @@ describe('ManagementApp formal four-page interface', () => {
     await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: '修改宠物名称' })).toBeNull();
   });
-  it('does not expose the unfinished custom asset import entry point', async () => {
+  it('offers import in the collection and reports an unavailable bridge honestly', async () => {
     const test = await mount(); await page(test.user, '宠物');
     await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
-    expect(screen.queryByRole('button', { name: '添加宠物' })).toBeNull();
-    expect(screen.getByText(/自定义宠物导入将在后续版本提供/)).toBeTruthy();
+    await test.user.click(screen.getByRole('button', { name: '添加宠物' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('当前环境不支持宠物导入');
+  });
+
+  it('imports into the collection, selects the asset and binds it using the existing configuration API', async () => {
+    const test = managementBridge();
+    const manifest = { id: 'artist-pet', version: '1', model: 'pet.glb', license: 'CC0' };
+    let assets: PetAssetsState = { version: 1, records: [starterPetAsset] };
+    const listeners = new Set<(state: PetAssetsState) => void>();
+    const api = {
+      getState: async () => assets, getModel: async () => null, getAvatar: async () => null,
+      choose: vi.fn(async () => ({ ok: true as const, preview: { token: 'token', manifest, modelBytes: 4096, avatar: 'fallback' as const, avatarFile: null } })),
+      confirm: vi.fn(async () => {
+        assets = { version: 1, records: [...assets.records, { id: manifest.id, manifest, source: 'imported', importedAt: 'now' }] };
+        listeners.forEach(listener => listener(assets)); return assets;
+      }),
+      remove: async () => assets, cancel: vi.fn(async () => {}),
+      subscribe: (listener: (state: PetAssetsState) => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    };
+    render(<ManagementApp bridge={{ ...test.bridge, petAssets: api }} />);
+    const user = userEvent.setup(); await flush(); await page(user, '宠物');
+    await user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    await user.click(screen.getByRole('button', { name: '添加宠物' }));
+    await user.click(await screen.findByRole('button', { name: '确认导入' }));
+    await waitFor(() => expect(test.bridge.updatePreferences).toHaveBeenCalledWith({ petAssetId: 'artist-pet' }));
+    expect(screen.getByRole('button', { name: 'artist-pet' }).getAttribute('aria-pressed')).toBe('true');
+    await user.click(screen.getByRole('button', { name: '关闭弹窗' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await user.click(screen.getByRole('button', { name: '配置使用此宠物的 Agent' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /配置 pi-one/ }));
+    expect(test.bridge.configurations.bindPet).toHaveBeenCalledWith('pi-one', { assetId: 'artist-pet', name: '团子' });
   });
 
   it.each(['button', 'escape', 'backdrop'] as const)('keeps the glass collection modal until its %s exit completes, then restores focus', async method => {
@@ -231,7 +261,7 @@ describe('ManagementApp formal four-page interface', () => {
     await page(test.user, '宠物');
     await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
     expect(screen.getByRole('dialog', { name: '宠物收藏' })).toBeTruthy();
-    expect(screen.getByText(/自定义宠物导入将在后续版本提供/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '添加宠物' })).toBeTruthy();
     await test.user.click(screen.getByRole('button', { name: '关闭弹窗' }));
     await page(test.user, '设置');
     expect(screen.getByRole('heading', { name: '场景渲染' })).toBeTruthy();

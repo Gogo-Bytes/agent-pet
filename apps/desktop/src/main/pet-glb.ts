@@ -2,7 +2,7 @@ const MAX_MODEL_BYTES = 64 * 1024 * 1024;
 const MAX_JSON_BYTES = 1024 * 1024;
 const COLLECTION_LIMITS: Record<string, number> = {
   nodes: 512, meshes: 128, accessors: 2048, bufferViews: 2048,
-  materials: 128, textures: 64, images: 64, animations: 64, skins: 64, scenes: 16,
+  materials: 128, textures: 64, images: 64, animations: 64, skins: 64, scenes: 16, cameras: 64,
 };
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -10,6 +10,71 @@ function object(value: unknown): value is Record<string, unknown> {
 }
 function unsigned(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+const COMPONENT_BYTES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
+const ACCESSOR_SHAPES: Record<string, readonly [number, number]> = {
+  SCALAR: [1, 1], VEC2: [1, 2], VEC3: [1, 3], VEC4: [1, 4], MAT2: [2, 2], MAT3: [3, 3], MAT4: [4, 4],
+};
+
+function validAccessor(accessor: Record<string, unknown>, views: Record<string, unknown>[]): boolean {
+  if (typeof accessor.componentType !== 'number' || !Object.hasOwn(COMPONENT_BYTES, accessor.componentType) ||
+      typeof accessor.type !== 'string' || !Object.hasOwn(ACCESSOR_SHAPES, accessor.type)) return false;
+  const component = COMPONENT_BYTES[accessor.componentType]!;
+  const [columns, rows] = ACCESSOR_SHAPES[accessor.type]!;
+  if ('normalized' in accessor && (typeof accessor.normalized !== 'boolean' ||
+      (accessor.normalized && (accessor.componentType === 5125 || accessor.componentType === 5126)))) return false;
+  const offset = accessor.byteOffset ?? 0;
+  if (!unsigned(offset) || offset % component) return false;
+  if (!('bufferView' in accessor)) return offset === 0;
+  if (!index(accessor.bufferView, views.length)) return false;
+  const view = views[accessor.bufferView]!;
+  const viewOffset = view.byteOffset ?? 0;
+  if (!unsigned(viewOffset) || (viewOffset + offset) % component) return false;
+  const columnBytes = columns > 1 ? Math.ceil(rows * component / 4) * 4 : rows * component;
+  if (columns > 1 && (viewOffset + offset) % 4) return false;
+  const stride = view.byteStride ?? columnBytes * columns;
+  if (!unsigned(stride) || stride < columnBytes * columns || stride % component) return false;
+  // Matrix columns are 4-byte aligned; padding after the final column may be omitted.
+  const span = columnBytes * (columns - 1) + rows * component;
+  return unsigned(accessor.count) && unsigned(view.byteLength) &&
+    offset + (accessor.count - 1) * stride + span <= view.byteLength;
+}
+
+function index(value: unknown, length: number): value is number {
+  return unsigned(value) && value < length;
+}
+
+function validNodeGraph(document: Record<string, unknown>): boolean {
+  const nodes = (document.nodes ?? []) as Record<string, unknown>[];
+  const parents = new Array<number>(nodes.length).fill(-1);
+  for (const [parent, node] of nodes.entries()) {
+    for (const [field, collection] of [['mesh', 'meshes'], ['skin', 'skins'], ['camera', 'cameras']] as const) {
+      if (field in node && !index(node[field], ((document[collection] ?? []) as unknown[]).length)) return false;
+    }
+    if ('children' in node) {
+      if (!Array.isArray(node.children)) return false;
+      for (const child of node.children) {
+        if (!index(child, nodes.length) || parents[child] !== -1) return false;
+        parents[child] = parent;
+      }
+    }
+  }
+  // Walk every node, including unreachable ones; cycles also exceed this depth budget.
+  for (let node = 0; node < nodes.length; node++) {
+    let depth = 0;
+    for (let ancestor = node; ancestor !== -1; ancestor = parents[ancestor]!) {
+      if (++depth > 128) return false;
+    }
+  }
+  const scenes = (document.scenes ?? []) as Record<string, unknown>[];
+  if ('scene' in document && !index(document.scene, scenes.length)) return false;
+  for (const scene of scenes) {
+    if (!('nodes' in scene)) continue;
+    if (!Array.isArray(scene.nodes) || new Set(scene.nodes).size !== scene.nodes.length ||
+        !scene.nodes.every(node => index(node, nodes.length) && parents[node] === -1)) return false;
+  }
+  return true;
 }
 
 /** Preliminary container/resource checks only, not full glTF or decoded GPU-budget validation. */
@@ -48,6 +113,7 @@ export function validatePetGlb(bytes: Buffer): boolean {
       if (name in document && (!Array.isArray(document[name]) || document[name].length > limit ||
           !document[name].every(object))) return false;
     }
+    if (!validNodeGraph(document)) return false;
     let bufferLength = 0;
     if ('buffers' in document) {
       if (!Array.isArray(document.buffers) || document.buffers.length > 1) return false;
@@ -59,14 +125,17 @@ export function validatePetGlb(bytes: Buffer): boolean {
       }
     }
     if (binaryLength && !bufferLength) return false;
-    for (const view of (document.bufferViews ?? []) as Record<string, unknown>[]) {
+    const views = (document.bufferViews ?? []) as Record<string, unknown>[];
+    for (const view of views) {
       const offset = view.byteOffset ?? 0;
       if (view.buffer !== 0 || !unsigned(offset) || !unsigned(view.byteLength) ||
           view.byteLength === 0 || offset + view.byteLength > bufferLength) return false;
+      if ('byteStride' in view && (!unsigned(view.byteStride) || view.byteStride < 4 ||
+          view.byteStride > 252 || view.byteStride % 4)) return false;
     }
     let elements = 0;
     for (const accessor of (document.accessors ?? []) as Record<string, unknown>[]) {
-      if (!unsigned(accessor.count) || accessor.count === 0) return false;
+      if (!unsigned(accessor.count) || accessor.count === 0 || !validAccessor(accessor, views)) return false;
       elements += accessor.count;
       if (elements > 1000000) return false;
     }

@@ -84,6 +84,12 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 85 项聚焦测试通过；最终全量 127 文件、1438 passed / 1 skipped，typecheck、desktop build、diff 检查通过。测试包括真实小 PNG 字节与明确标注的尺寸/结构合成 fixture；没有把 JPEG 合成头或修改尺寸的 PNG 当成真实解码成功。此阶段不解压像素、不校验完整压缩流/PNG CRC，也不保证真实 GPU 峰值（位深、mipmap、材质变体仍有额外开销）；损坏图片解码失败隔离、动画/skin 校验、源文件竞争保护和安装残留清理仍待完成，导入入口保持禁用。
 
+### 宠物导入：动画与 skin 引用预算
+
+新增动画 sampler/channel/target 引用、插值枚举、输出类型与数量检查（含 CUBICSPLINE 三倍输出和 morph weights 数量），拒绝同动画重复目标、matrix 节点上的 TRS 动画及动画 accessor 的交错 stride。读取实际时间缓冲区，要求有限、非负、严格递增且不超过 3600 秒；每 sampler 最多 1 万关键帧、总计 10 万，每动画最多 256 sampler/channel、总计 1024 channel、累计输出 100 万标量分量。skin 要求非空唯一 joints、有效 skeleton/inverseBindMatrices 引用与浮点 MAT4 数量，单 skin 最多 128 joints、累计 1024。
+
+112 项聚焦测试、typecheck、desktop build、diff 检查通过，真实 starter GLB 保持通过；本轮未重跑全量。仍未完成几何索引实际数值、JOINTS/WEIGHTS 与 skin 的绑定关系、动画输出/逆绑定矩阵数值语义及完整解码验证；源文件竞争、残留清理与 UI 闭环未完成。入口保持禁用，不将结构预算等同于完整安全导入。
+
 ## Pi 观察缓存清理修正
 
 复核发现 `73977e6` 的总量 256 条淘汰会丢失仍在线会话的停止清理责任。改为仅淘汰明确断开的历史，在线或连接状态未知的观察保留到能够发布断开清理；256 是历史回收目标，不是活跃会话硬上限。新增超过 256 个在线会话全部清理，以及混合在线/断开历史的排序与淘汰回归。仅使用自有 fixture，不修改日常配置或部署扩展；不将此项视为全链路内存硬上限验收。

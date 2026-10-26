@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
-import { inspectPetFolder, installPetFolder } from './pet-assets-import.js';
+import { cancelPetImport, inspectPetFolder, installPetFolder } from './pet-assets-import.js';
 import { PetAssetsStore } from './pet-assets-store.js';
 
 function root() { return fs.realpathSync(mkdtempSync(join(tmpdir(), 'agent-pet-import-'))); }
@@ -95,6 +95,17 @@ describe('pet folder import', () => {
     const manifest = join(source, 'pet.json'); fs.renameSync(manifest, join(source, 'other.json'));
     fs.symlinkSync(join(source, 'other.json'), manifest);
     expect(inspectPetFolder(source).ok).toBe(false);
+  });
+
+  it('releases a cancelled preview without letting stale cancellation discard a newer one', () => {
+    const source = folder(); const store = new PetAssetsStore(root());
+    const first = inspectPetFolder(source); if (!first.ok) throw new Error('fixture did not inspect');
+    cancelPetImport(first.preview);
+    expect(installPetFolder(first.preview, store)).toBeNull();
+    const second = inspectPetFolder(source); if (!second.ok) throw new Error('fixture did not inspect');
+    cancelPetImport(first.preview);
+    expect(installPetFolder(first.preview, store)).toBeNull();
+    expect(installPetFolder(second.preview, store)?.id).toBe('artist-pet');
   });
 
   it('invalidates an old preview when another folder is inspected', () => {

@@ -97,8 +97,13 @@ export function inspectPetFolder(source: string): PetImportInspection {
   return { ok: true, preview };
 }
 
+export function cancelPetImport(preview: PetImportPreview): void {
+  if (pending?.preview === preview) pending = undefined;
+}
+
 export function installPetFolder(preview: PetImportPreview, store: PetAssetsStore): PetAsset | null {
   const snapshot = pending;
+  if (!snapshot || snapshot.preview !== preview) return null;
   pending = undefined;
   try {
     if (!snapshot || snapshot.preview !== preview || snapshot.serialized !== JSON.stringify(preview)) return null;

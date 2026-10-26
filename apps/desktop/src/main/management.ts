@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } from 'electron';
 import { dirname, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { constants, closeSync, fstatSync, openSync, readFileSync, realpathSync } from 'node:fs';
 import { PiBridgeAdapter as ConfigurationAdapter } from '@agent-pet/adapter-pi';
 import type { SessionState } from '@agent-pet/domain';
@@ -19,6 +20,7 @@ import type { ObservationSink } from '@agent-pet/adapter-core';
 import { assertWindowSender, loadTrustedEntry } from './window-trust.js';
 import type { ManagementState, PreferencePatch, Preferences } from '../shared/preferences.js';
 import { PetAssetsStore } from './pet-assets-store.js';
+import { cancelPetImport, inspectPetFolder, installPetFolder, type PetImportPreview } from './pet-assets-import.js';
 
 export function createManagement(options: {
   applyPreferences(preferences: Preferences): void;
@@ -29,6 +31,14 @@ export function createManagement(options: {
 }) {
   const preferences = new PreferenceStore(join(app.getPath('userData'), 'preferences.json'));
   const petAssets = new PetAssetsStore(app.getPath('userData'));
+  let petImport: { token: string; preview: PetImportPreview } | undefined;
+  let petImportGeneration = 0;
+  let petPickerBusy = false;
+  function invalidatePetImport() {
+    petImportGeneration++;
+    if (petImport) cancelPetImport(petImport.preview);
+    petImport = undefined;
+  }
   let window: BrowserWindow | undefined;
   let windowRequested = false;
   const preflight = new PiPreflight({ home: app.getPath('home'), guiPath: process.env.PATH ?? '',
@@ -126,6 +136,7 @@ export function createManagement(options: {
           contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true } });
       const current = window;
       current.on('close', event => {
+        invalidatePetImport();
         connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate();
         if (!quitting) {
           event.preventDefault(); windowRequested = false;
@@ -133,8 +144,9 @@ export function createManagement(options: {
         }
       });
       let rendererRecoveryAttempts = 0;
-      current.webContents.on('did-start-loading', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
+      current.webContents.on('did-start-loading', () => { invalidatePetImport(); connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); });
       current.webContents.on('render-process-gone', () => {
+        invalidatePetImport();
         connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate();
         if (quitting || current.isDestroyed() || rendererRecoveryAttempts >= 1) return;
         rendererRecoveryAttempts++;
@@ -143,7 +155,7 @@ export function createManagement(options: {
       current.once('ready-to-show', () => {
         if (!quitting && windowRequested && window === current && !current.isDestroyed()) current.show();
       });
-      current.on('closed', () => { connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); if (window === current) window = undefined; });
+      current.on('closed', () => { invalidatePetImport(); connection.invalidate(); configurations.invalidateAll(); configurationIpc.invalidate(); if (window === current) window = undefined; });
       const dev = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
       loadTrustedEntry(current, join(__dirname, '../renderer/management.html'), dev ? new URL('management.html', dev.endsWith('/') ? dev : dev + '/').href : undefined);
     } else {
@@ -243,16 +255,46 @@ export function createManagement(options: {
     if (!petAssets.removeImported(id)) throw new Error('宠物资产不存在或删除失败。');
     const next = petAssets.snapshot(); if (window && !window.isDestroyed()) window.webContents.send('management:pet-assets-state', next); return next;
   });
-  ipcMain.handle('management:pet-assets-choose', event => {
+  ipcMain.handle('management:pet-assets-choose', async (event, ...args: unknown[]) => {
     assertWindowSender(window, event);
-    return { ok: false, reason: 'not-supported' } as const;
+    if (args.length) throw new Error('Invalid pet import request');
+    if (quitting || petPickerBusy) return { ok: false, reason: 'busy' };
+    invalidatePetImport();
+    if (petAssets.error) return { ok: false, reason: 'saved-invalid' };
+    if (petAssets.snapshot().records.length >= 65) return { ok: false, reason: 'limit' };
+    const generation = petImportGeneration;
+    const current = window!;
+    petPickerBusy = true;
+    try {
+      const choice = await dialog.showOpenDialog(current, { title: '选择宠物文件夹（pet.json 和 pet.glb）', properties: ['openDirectory', 'dontAddToRecent'] });
+      if (quitting || generation !== petImportGeneration || current !== window || current.isDestroyed() || choice.canceled || !choice.filePaths[0]) return { ok: false, reason: 'cancelled' };
+      const result = inspectPetFolder(choice.filePaths[0]);
+      if (!result.ok) return result;
+      if (petAssets.snapshot().records.some(asset => asset.id === result.preview.manifest.id)) {
+        cancelPetImport(result.preview); return { ok: false, reason: 'duplicate' };
+      }
+      const token = randomUUID();
+      petImport = { token, preview: result.preview };
+      const { source: _source, ...preview } = result.preview;
+      return { ok: true, preview: { ...preview, token } };
+    } catch { return { ok: false, reason: 'inspection-failed' }; }
+    finally { petPickerBusy = false; }
   });
-  ipcMain.handle('management:pet-assets-confirm', (event, _token: unknown) => {
+  ipcMain.handle('management:pet-assets-confirm', (event, token: unknown) => {
     assertWindowSender(window, event);
-    throw new Error('自定义宠物导入将在后续版本提供。');
+    if (quitting || typeof token !== 'string' || !petImport || petImport.token !== token) throw new Error('导入预览已失效，请重新选择文件夹。');
+    const preview = petImport.preview;
+    petImport = undefined;
+    const asset = installPetFolder(preview, petAssets);
+    if (!asset) throw new Error('导入未完成。已有文件或本次残留已保留，未覆盖或自动删除；请检查应用数据目录后重新选择。');
+    const next = petAssets.snapshot();
+    window!.webContents.send('management:pet-assets-state', next);
+    return next;
   });
-  ipcMain.handle('management:pet-assets-cancel', (event, _token: unknown) => {
+  ipcMain.handle('management:pet-assets-cancel', (event, token: unknown) => {
     assertWindowSender(window, event);
+    if (typeof token !== 'string') throw new Error('Invalid pet import token');
+    if (petImport?.token === token) invalidatePetImport();
   });
   ipcMain.handle('management:update-preferences', (event, patch: unknown) => {
     assertWindowSender(window, event);
@@ -327,6 +369,7 @@ export function createManagement(options: {
     event.preventDefault();
     if (quitting) return;
     quitting = true;
+    invalidatePetImport();
     preflight.close();
     void Promise.all([options.stop(), configurations.stop(), ...(collectionOwnsLegacy ? [] : [connection.stop()])]).catch(() => { console.warn('Adapter shutdown failed'); }).finally(() => {
       stopped = true; tray?.destroy();

@@ -43,6 +43,37 @@ it.each([
   expect(validatePetGlb(glb({ asset: { version: '2.0' }, ...graph }))).toBe(false);
 });
 
+function texturedGlb(width = 1, height = 1, textureCount = 1, imageCount = 1): Buffer {
+  const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC1kAAAAASUVORK5CYII=', 'base64');
+  // Header-only budget fixtures; these are not claimed to decode to the patched dimensions.
+  image.writeUInt32BE(width, 16); image.writeUInt32BE(height, 20);
+  const bytes = glb({ asset: { version: '2.0' }, buffers: [{ byteLength: image.length }],
+    bufferViews: [{ buffer: 0, byteLength: image.length }],
+    images: Array.from({ length: imageCount }, () => ({ bufferView: 0, mimeType: 'image/png' })),
+    textures: Array.from({ length: textureCount }, () => ({ source: 0 })),
+  }, image.length);
+  image.copy(bytes, 28 + bytes.readUInt32LE(12));
+  return bytes;
+}
+it('accepts embedded image metadata within the pixel budget', () => {
+  expect(validatePetGlb(texturedGlb())).toBe(true);
+  expect(validatePetGlb(texturedGlb(4096, 4096))).toBe(true);
+});
+it.each([
+  [4097, 1, 1, 1],
+  [4096, 4096, 2, 1],
+  [4096, 4096, 0, 2],
+])('rejects oversized images or repeated texture allocations: %j', (width, height, textures, images) => {
+  expect(validatePetGlb(texturedGlb(width, height, textures, images))).toBe(false);
+});
+it.each([
+  { images: [{ bufferView: 0, mimeType: 'image/png' }] },
+  { textures: [{ source: 0 }] },
+  { images: [{ bufferView: -1, mimeType: 'image/jpeg' }] },
+])('rejects dangling embedded image and texture references: %j', document => {
+  expect(validatePetGlb(glb({ asset: { version: '2.0' }, ...document }))).toBe(false);
+});
+
 function geometry(nodes = 1, vertices = 3, primitives = 1, indices?: number) {
   return { asset: { version: '2.0' },
     accessors: [{ count: vertices, componentType: 5126, type: 'VEC3' },

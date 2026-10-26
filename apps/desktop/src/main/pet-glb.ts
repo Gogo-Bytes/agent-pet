@@ -1,8 +1,10 @@
+import { petImagePixels } from './pet-image-budget.js';
+
 const MAX_MODEL_BYTES = 64 * 1024 * 1024;
 const MAX_JSON_BYTES = 1024 * 1024;
 const COLLECTION_LIMITS: Record<string, number> = {
   nodes: 512, meshes: 128, accessors: 2048, bufferViews: 2048,
-  materials: 128, textures: 64, images: 64, animations: 64, skins: 64, scenes: 16, cameras: 64,
+  materials: 128, textures: 64, images: 64, animations: 64, skins: 64, scenes: 16, cameras: 64, samplers: 64,
 };
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -135,6 +137,30 @@ function validGeometryBudget(document: Record<string, unknown>): boolean {
   return true;
 }
 
+function validTextureBudget(document: Record<string, unknown>, views: Record<string, unknown>[], binary: Buffer): boolean {
+  const images = (document.images ?? []) as Record<string, unknown>[];
+  const imagePixels: number[] = [];
+  const limit = 16 * 1024 * 1024;
+  let decoded = 0, textured = 0;
+  for (const image of images) {
+    if (!index(image.bufferView, views.length)) return false;
+    const view = views[image.bufferView]!;
+    if ('byteStride' in view) return false;
+    const start = (view.byteOffset ?? 0) as number;
+    const pixels = petImagePixels(binary.subarray(start, start + (view.byteLength as number)), image.mimeType);
+    if (pixels === null || (decoded += pixels) > limit) return false;
+    imagePixels.push(pixels);
+  }
+  const samplers = (document.samplers ?? []) as unknown[];
+  for (const texture of (document.textures ?? []) as Record<string, unknown>[]) {
+    if (!index(texture.source, images.length) ||
+        ('sampler' in texture && !index(texture.sampler, samplers.length))) return false;
+    textured += imagePixels[texture.source]!;
+    if (textured > limit) return false;
+  }
+  return true;
+}
+
 /** Preliminary container/resource checks only, not full glTF or decoded GPU-budget validation. */
 export function validatePetGlb(bytes: Buffer): boolean {
   try {
@@ -197,6 +223,6 @@ export function validatePetGlb(bytes: Buffer): boolean {
       elements += accessor.count;
       if (elements > 1000000) return false;
     }
-    return validGeometryBudget(document);
+    return validGeometryBudget(document) && validTextureBudget(document, views, bytes.subarray(end + 8));
   } catch { return false; }
 }

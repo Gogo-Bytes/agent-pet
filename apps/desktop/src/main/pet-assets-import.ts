@@ -120,21 +120,20 @@ export function inspectPetFolder(source: string): PetImportInspection {
 }
 
 export function installPetFolder(preview: PetImportPreview, store: PetAssetsStore): PetAsset | null {
+  if (!PET_ASSET_ID.test(preview.manifest.id)) return null;
   const directory = join(store.directory, preview.manifest.id);
-  const temporary = `${directory}.pending-${process.pid}-${Date.now()}`;
   try {
     if (store.snapshot().records.some(record => record.id === preview.manifest.id)) return null;
-    fs.mkdirSync(temporary, { mode: 0o700 });
-    fs.copyFileSync(join(preview.source, 'pet.json'), join(temporary, 'pet.json'), fs.constants.COPYFILE_EXCL);
-    fs.copyFileSync(join(preview.source, preview.manifest.model), join(temporary, 'pet.glb'), fs.constants.COPYFILE_EXCL);
-    if (preview.avatar === 'custom' && preview.avatarFile) fs.copyFileSync(join(preview.source, preview.avatarFile), join(temporary, preview.avatarFile), fs.constants.COPYFILE_EXCL);
-    fs.renameSync(temporary, directory);
+    // Exclusive reservation also protects existing empty directories; rename would replace them.
+    fs.mkdirSync(directory, { mode: 0o700 });
+    fs.copyFileSync(join(preview.source, 'pet.json'), join(directory, 'pet.json'), fs.constants.COPYFILE_EXCL);
+    fs.copyFileSync(join(preview.source, preview.manifest.model), join(directory, 'pet.glb'), fs.constants.COPYFILE_EXCL);
+    if (preview.avatar === 'custom' && preview.avatarFile) fs.copyFileSync(join(preview.source, preview.avatarFile), join(directory, preview.avatarFile), fs.constants.COPYFILE_EXCL);
     const asset: PetAsset = { id: preview.manifest.id, manifest: preview.manifest, source: 'imported', importedAt: new Date().toISOString() };
-    if (!store.saveImported(asset)) { fs.rmSync(directory, { recursive: true, force: true }); return null; }
+    if (!store.saveImported(asset)) return null;
     return asset;
   } catch {
-    try { fs.rmSync(temporary, { recursive: true, force: true }); } catch { /* preserve original failure */ }
-    try { if (fs.existsSync(directory) && !store.snapshot().records.some(record => record.id === preview.manifest.id)) fs.rmSync(directory, { recursive: true, force: true }); } catch { /* preserve original failure */ }
+    // Preserve partial/changed files until ownership-aware recovery exists; never recursively delete on failure.
     return null;
   }
 }

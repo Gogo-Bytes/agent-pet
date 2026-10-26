@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { inspectPetFolder, installPetFolder } from './pet-assets-import.js';
 import { PetAssetsStore } from './pet-assets-store.js';
 
@@ -36,6 +36,42 @@ describe('pet folder import', () => {
     ['unsafe manifest model', (directory: string) => fs.writeFileSync(join(directory, 'pet.json'), JSON.stringify({ id: 'artist-pet', version: '1', model: '../pet.glb', license: 'CC0' }))],
   ])('rejects %s', (_label, change) => {
     const directory = folder(); change(directory); expect(inspectPetFolder(directory)).toMatchObject({ ok: false });
+  });
+
+  it('preserves an existing unregistered destination on installation failure', () => {
+    const data = root(); const store = new PetAssetsStore(data); const result = inspectPetFolder(folder());
+    if (!result.ok) throw new Error('fixture did not inspect');
+    const destination = join(store.directory, 'artist-pet'); fs.mkdirSync(destination);
+    fs.writeFileSync(join(destination, 'user-data.txt'), 'keep me');
+    expect(installPetFolder(result.preview, store)).toBeNull();
+    expect(fs.readFileSync(join(destination, 'user-data.txt'), 'utf8')).toBe('keep me');
+  });
+
+  it('does not replace even an empty destination', () => {
+    const data = root(); const store = new PetAssetsStore(data); const result = inspectPetFolder(folder());
+    if (!result.ok) throw new Error('fixture did not inspect');
+    const destination = join(store.directory, 'artist-pet'); fs.mkdirSync(destination);
+    const before = fs.statSync(destination);
+    expect(installPetFolder(result.preview, store)).toBeNull();
+    expect(fs.statSync(destination).ino).toBe(before.ino);
+    expect(fs.readdirSync(destination)).toEqual([]);
+  });
+
+  it('preserves files added during metadata-save failure and refuses to adopt the residue', () => {
+    const data = root(); const store = new PetAssetsStore(data); const result = inspectPetFolder(folder());
+    if (!result.ok) throw new Error('fixture did not inspect');
+    const destination = join(store.directory, 'artist-pet');
+    const save = vi.spyOn(store, 'saveImported').mockImplementation(() => {
+      fs.writeFileSync(join(destination, 'user-data.txt'), 'keep me');
+      return false;
+    });
+    try {
+      expect(installPetFolder(result.preview, store)).toBeNull();
+      expect(fs.readFileSync(join(destination, 'user-data.txt'), 'utf8')).toBe('keep me');
+      expect(installPetFolder(result.preview, store)).toBeNull();
+      expect(save).toHaveBeenCalledOnce();
+      expect(store.snapshot().records.map(record => record.id)).toEqual(['starter']);
+    } finally { save.mockRestore(); }
   });
 
   it('copies the validated folder and persists only application metadata', () => {

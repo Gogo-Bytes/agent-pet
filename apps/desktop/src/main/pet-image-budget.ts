@@ -21,7 +21,7 @@ function pngPixels(bytes: Buffer): number | null {
       return length === 0 && hasData && offset + 12 === bytes.length ? result : null;
     } else if (type === 'IDAT') {
       hasData ||= length > 0;
-    } else if (!['PLTE', 'tRNS', 'sRGB', 'gAMA', 'cHRM', 'pHYs'].includes(type)) {
+    } else if (!['PLTE', 'tRNS', 'sRGB', 'gAMA', 'cHRM', 'pHYs', 'bKGD', 'tEXt'].includes(type)) {
       // Exclude animation and compressed metadata until their decode budgets are supported.
       return null;
     }

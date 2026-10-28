@@ -11,6 +11,10 @@
 .pet-import-choose p { margin:0;text-align:center;font-size:14px;line-height:1.7; }
 .pet-import-choose strong { font-weight:650; }
 .pet-import-primary { min-height:44px;padding:10px 22px;border:1px solid transparent;border-radius:14px;background:var(--glass-accent);color:#fff;font:inherit;font-size:14px;font-weight:650;cursor:pointer; }
+.pet-import-secondary { min-height:44px;padding:10px 22px;border:1px solid #b6a3cc70;border-radius:14px;background:#ffffff45;color:var(--glass-ink);font:inherit;font-size:14px;font-weight:650;cursor:pointer; }
+.pet-import-close { display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:0;border-radius:14px;background:transparent;cursor:pointer; }
+.pet-import-secondary:hover:not(:disabled),.pet-import-close:hover:not(:disabled) { background:#ffffff80; }
+.pet-import-secondary:disabled,.pet-import-close:disabled { opacity:.55;cursor:default; }
 .pet-import-primary:hover:not(:disabled) { filter:brightness(1.08); }
 .pet-import-primary:active:not(:disabled) { filter:brightness(.95); }
 .pet-import-primary:disabled { opacity:.55;cursor:default; }
@@ -25,12 +29,12 @@
 .pet-import-summary dd { margin:0;overflow-wrap:anywhere; }
 .pet-import-reselect { min-height:44px;padding:8px 0;border:0;background:transparent;color:var(--glass-accent);font:inherit;font-size:14px;font-weight:650;text-decoration:underline;text-underline-offset:4px;cursor:pointer; }
 .pet-import-reselect:disabled { opacity:.55;cursor:default; }
-.pet-import-note,.pet-import-status { margin:16px 0 0;font-size:13px;line-height:1.6; }
+.pet-import-status { margin:16px 0 0;font-size:13px;line-height:1.6; }
 .pet-import-error { margin:16px 0 0;padding:12px 14px;border-radius:12px;background:#fff3f0;color:#923f38;font-size:14px;line-height:1.6;overflow-wrap:anywhere; }
 .pet-import-panel footer { display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:24px; }
 @media(max-width:420px) { .pet-import-panel { padding:20px; }.pet-import-summary { padding:16px; } }
 @media(forced-colors:active) {
-  .pet-import-primary { background:ButtonFace;color:ButtonText;border-color:ButtonText; }
+  .pet-import-primary,.pet-import-secondary,.pet-import-close { background:ButtonFace;color:ButtonText;border-color:ButtonText; }
   .pet-import-summary,.pet-import-error { background:Canvas;color:CanvasText; }
   .pet-import-reselect { color:LinkText; }
 }

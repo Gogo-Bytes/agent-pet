@@ -80,7 +80,7 @@ export function PetImportControl({ api, disabled, onImported, onClose }: {
   const locked = confirming || busy === 'cancelling';
   return <Dialog label="导入宠物" className="pet-import-dialog" onClose={() => void close()} initialFocusRef={chooseButton}>
     <GlassSurface material="panel" className="pet-import-panel">
-      <header><h2>导入宠物</h2><GlassAction iconOnly aria-label="关闭导入弹窗" disabled={locked} onClick={() => void close()}><Icon name="close" /></GlassAction></header>
+      <header><h2>导入宠物</h2><GlassAction className="pet-import-close" iconOnly aria-label="关闭导入弹窗" disabled={locked} onClick={() => void close()}><Icon name="close" /></GlassAction></header>
       {preview ? <section className="pet-import-summary" aria-label="导入预览">
         <div className="pet-import-file"><Icon name="pet" size={32} /><div><h3>{preview.manifest.id}</h3>
           <span>pet.glb · {preview.modelBytes < 1024 * 1024 ? `${Math.ceil(preview.modelBytes / 1024)} KB` : `${(preview.modelBytes / 1024 / 1024).toFixed(1)} MB`}</span></div></div>
@@ -91,10 +91,9 @@ export function PetImportControl({ api, disabled, onImported, onClose }: {
         <p>选择包含 <strong>pet.json</strong> 和 <strong>pet.glb</strong> 的文件夹</p>
         <button type="button" ref={chooseButton} className="pet-import-primary" disabled={disabled || !!busy} onClick={() => void choose()}>{busy === 'choosing' ? '正在读取…' : '选择文件夹'}</button>
       </div>}
-      <p className="pet-import-note">确认后复制到收藏，原文件不变。</p>
       {error && <p className="pet-import-error" role="alert">{error}</p>}
       {busy && <p className="pet-import-status" role="status">{confirming ? '正在导入，请稍候…' : busy === 'cancelling' ? '正在取消预览…' : '正在读取文件夹…'}</p>}
-      <footer><GlassAction disabled={locked} onClick={() => void close()}>取消</GlassAction>
+      <footer><GlassAction className="pet-import-secondary" disabled={locked} onClick={() => void close()}>取消</GlassAction>
         {preview && <button type="button" ref={confirmButton} className="pet-import-primary" disabled={disabled || !!busy} onClick={() => void confirm()}>{confirming ? '正在导入…' : '确认导入'}</button>}</footer>
     </GlassSurface>
   </Dialog>;

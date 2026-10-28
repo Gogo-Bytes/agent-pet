@@ -13,8 +13,26 @@ function Surface({ bridge, kind = 'moveWindowBy', click }: {
   bridge: PetBridge; kind?: 'moveWindowBy' | 'resizeWindowBy'; click?: () => void;
 }) {
   const gesture = useWindowGesture(bridge, kind);
-  return <button {...gesture.handlers} onClick={click} data-active={gesture.active}><span>surface</span><svg><path data-testid="resize-icon-path" d="M0 0L10 10" /></svg></button>;
+  return <button {...gesture.handlers} onClick={click} data-active={gesture.active} data-direction={gesture.direction ?? 'none'}><span>surface</span><svg><path data-testid="resize-icon-path" d="M0 0L10 10" /></svg></button>;
 }
+
+it('reports four movement directions only after motion and clears them on release; resizing has none', async () => {
+  const user = userEvent.setup(); const bridge = createPetBridgeDouble();
+  const view = render(<Surface bridge={bridge.api} />);
+  const target = screen.getByText('surface'); const button = screen.getByRole('button');
+  await user.pointer({ target, keys: '[MouseLeft>]', coords: { screenX: 100, screenY: 100 } });
+  expect(button.dataset.direction).toBe('none');
+  for (const [screenX, screenY, direction] of [[120, 100, 'right'], [110, 100, 'left'], [110, 80, 'up'], [110, 90, 'down']] as const) {
+    await user.pointer({ target, coords: { screenX, screenY } });
+    expect(button.dataset.direction).toBe(direction);
+  }
+  await user.pointer({ target, keys: '[/MouseLeft]' });
+  expect(button.dataset.direction).toBe('none');
+  view.rerender(<Surface bridge={bridge.api} kind="resizeWindowBy" />);
+  await user.pointer([{ target, keys: '[MouseLeft>]', coords: { screenX: 100, screenY: 100 } }, { target, coords: { screenX: 120, screenY: 100 } }]);
+  expect(button.dataset.direction).toBe('none');
+  await user.pointer({ target, keys: '[/MouseLeft]' });
+});
 
 it.each(['pointercancel', 'lostpointercapture', 'window blur', 'focus blur', 'unmount'])('releases exactly once on %s and ignores subsequent motion/up', async reason => {
   const user = userEvent.setup();
@@ -29,6 +47,7 @@ it.each(['pointercancel', 'lostpointercapture', 'window blur', 'focus blur', 'un
   else if (reason === 'focus blur') fireEvent.blur(screen.getByRole('button'));
   else fireEvent(target, new window.PointerEvent(reason, { bubbles: true, pointerId: 1 }));
   expect(bridge.api.interaction.mock.calls).toEqual([[true], [false]]);
+  if (reason !== 'unmount') expect(screen.getByRole('button').dataset.direction).toBe('none');
   if (reason === 'unmount') {
     // A removed node cannot receive real pointer events; subsequent native
     // events go to the window, not user-event's detached selection target.

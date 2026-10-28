@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDrag } from '@use-gesture/react';
 import type { PetBridge } from '../app/bridge/pet-store.js';
 
+export type DragDirection = 'up' | 'down' | 'left' | 'right';
+
 // use-gesture owns recognition/capture/keys. This adapter owns only the native
 // interaction lease and incremental screen CSS-pixel (Electron DIP) commands.
 export function useWindowGesture(bridge: PetBridge, kind: 'moveWindowBy' | 'resizeWindowBy') {
@@ -10,6 +12,7 @@ export function useWindowGesture(bridge: PetBridge, kind: 'moveWindowBy' | 'resi
     target: Element | null; pointerId: number | null;
   } | null>(null);
   const [active, setActive] = useState(false);
+  const [direction, setDirection] = useState<DragDirection | null>(null);
   const release = useCallback((cancel = false) => {
     const current = lease.current;
     if (!current) return;
@@ -18,7 +21,7 @@ export function useWindowGesture(bridge: PetBridge, kind: 'moveWindowBy' | 'resi
     if (current.pointerId !== null && current.target?.hasPointerCapture(current.pointerId)) {
       current.target.releasePointerCapture(current.pointerId);
     }
-    setActive(false);
+    setActive(false); setDirection(null);
     void bridge.interaction(false);
   }, [bridge]);
   useEffect(() => {
@@ -49,7 +52,10 @@ export function useWindowGesture(bridge: PetBridge, kind: 'moveWindowBy' | 'resi
       current.point = [event.screenX, event.screenY];
     } else if (event.cancelable) event.preventDefault();
     // Never send use-gesture's cumulative offset: Main may have clamped it.
-    if (x || y) void bridge[kind]({ x, y });
+    if (x || y) {
+      if (kind === 'moveWindowBy') setDirection(Math.abs(x) >= Math.abs(y) ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up'));
+      void bridge[kind]({ x, y });
+    }
   }, { pointer: { keys: kind === 'resizeWindowBy' }, keyboardDisplacement: 10, threshold: 0 });
-  return { active, handlers: { ...bind(), onBlur: () => release(true) } };
+  return { active, direction, handlers: { ...bind(), onBlur: () => release(true) } };
 }

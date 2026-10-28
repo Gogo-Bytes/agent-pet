@@ -56,7 +56,7 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel key={asset?.url ?? 'starter'} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} {...(onHover ? { onHover } : {})} />
+            <PetModel key={asset?.url ?? 'starter'} dragDirection={drag.direction} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} {...(onHover ? { onHover } : {})} />
           </Bounds>
         </Suspense>
       </Canvas>

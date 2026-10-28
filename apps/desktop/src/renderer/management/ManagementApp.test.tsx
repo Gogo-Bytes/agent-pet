@@ -70,8 +70,17 @@ describe('ManagementApp formal four-page interface', () => {
   it('offers import in the collection and reports an unavailable bridge honestly', async () => {
     const test = await mount(); await page(test.user, '宠物');
     await test.user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
-    await test.user.click(screen.getByRole('button', { name: '添加宠物' }));
+    const opener = screen.getByRole('button', { name: '添加宠物' });
+    await test.user.click(opener);
+    const dialog = screen.getByRole('dialog', { name: '导入宠物' });
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: '选择文件夹' }));
+    expect(dialog.parentElement).toBe(screen.getByRole('dialog', { name: '宠物收藏' }).parentElement);
+    await test.user.click(within(dialog).getByRole('button', { name: '选择文件夹' }));
     expect((await screen.findByRole('alert')).textContent).toContain('当前环境不支持宠物导入');
+    fireEvent(dialog, new Event('cancel', { bubbles: true, cancelable: true }));
+    expect(screen.queryByRole('dialog', { name: '导入宠物' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: '宠物收藏' }).getAttribute('data-closing')).toBe('false');
+    expect(document.activeElement).toBe(opener);
   });
 
   it('imports into the collection, selects the asset and binds it using the existing configuration API', async () => {
@@ -93,7 +102,19 @@ describe('ManagementApp formal four-page interface', () => {
     const user = userEvent.setup(); await flush(); await page(user, '宠物');
     await user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
     await user.click(screen.getByRole('button', { name: '添加宠物' }));
+    expect(api.choose).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: '选择文件夹' }));
+    // Exercise a programmatic page transition while native modality would block user navigation.
+    fireEvent.click(screen.getByRole('tab', { name: '首页' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '导入宠物' })).toBeNull());
+    expect(api.cancel).toHaveBeenCalledWith('token');
+    expect(api.confirm).not.toHaveBeenCalled();
+    await page(user, '宠物');
+    await user.click(screen.getByRole('button', { name: '打开宠物收藏' }));
+    await user.click(screen.getByRole('button', { name: '添加宠物' }));
+    await user.click(screen.getByRole('button', { name: '选择文件夹' }));
     await user.click(await screen.findByRole('button', { name: '确认导入' }));
+    expect(screen.queryByRole('dialog', { name: '导入宠物' })).toBeNull();
     await waitFor(() => expect(test.bridge.updatePreferences).toHaveBeenCalledWith({ petAssetId: 'artist-pet' }));
     expect(screen.getByRole('button', { name: 'artist-pet' }).getAttribute('aria-pressed')).toBe('true');
     await user.click(screen.getByRole('button', { name: '关闭弹窗' }));

@@ -5,6 +5,7 @@ import type { ConfigurationsState, ConfigurationMetadata } from '../../shared/co
 import type { PreflightState } from '../../shared/pi-preflight.js';
 import type { PiConnectionState } from '../../shared/pi-connection.js';
 import type { PetAssetsState } from '../../shared/pet-assets.js';
+import starterModelUrl from '@agent-pet/pet-runtime/assets/starter.glb?url';
 
 const base: PiConnectionState = { revision: 0, status: 'not-configured', mode: 'desktop', busy: false, canConfigure: true, preview: null, deployedPath: null, canRemove: false, canResume: false, receiving: 'stopped', saved: 'none', notice: 'none' };
 export function createReviewBridge(scenario: string): ManagementBridge {
@@ -56,14 +57,37 @@ export function createReviewBridge(scenario: string): ManagementBridge {
         connected: true, observedAt: '2026-10-19T00:00:00Z', capabilities: {}, facts: { activities: [], waitingForInput: false } });
     }
   }
-  const petAssets: PetAssetsState = { version: 1, records: [{ id: 'starter', source: 'bundled', importedAt: null, manifest: { schemaVersion: 2, actionCatalogVersion: 1, id: 'starter', version: '1.0.0', model: 'starter.glb', license: 'CC0-1.0' } }] };
+  let petAssets: PetAssetsState = { version: 1, records: [{ id: 'starter', source: 'bundled', importedAt: null, manifest: { schemaVersion: 2, actionCatalogVersion: 1, id: 'starter', version: '1.0.0', model: 'starter.glb', license: 'CC0-1.0' } }] };
+  const petListeners = new Set<(value: PetAssetsState) => void>();
+  const importManifest = { id: 'artist-pet', version: '1.0', model: 'pet.glb', license: 'CC0-1.0', animations: { idle: 'Idle', working: 'Work', success: 'Success', error: 'Error' } };
+  let importPending = false;
   const preflight: PreflightState = { revision: 0, installations: [], automaticTarget: { path: '/test/AgentPet/default', source: 'default' }, selectedInstallation: null, target: { path: '/test/AgentPet', source: 'chosen' }, inspection: null, scan: 'complete', notice: 'none' };
   function pushConfigs() { configs = { ...configs, revision: configs.revision + 1 }; configListeners.forEach(listener => listener(configs)); return Promise.resolve(configs); }
   function subscribe<T>(listeners: Set<(value: T) => void>, listener: (value: T) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
   function record(id: string) { const value = configs.records.find(value => value.id === id); if (!value) throw new Error('Record missing'); return value; }
   return {
     nativeWindowControls: false,
-    petAssets: { getState: async () => petAssets, getModel: async () => null, getAvatar: async () => null, choose: async () => scenario === 'pet-import' ? ({ ok: true, preview: { token: 'browser-preview-only', manifest: { id: 'artist-pet', version: '1.0', model: 'pet.glb', license: 'CC0-1.0' }, modelBytes: 4096, avatar: 'fallback', avatarFile: null } }) : ({ ok: false, reason: 'not-supported' }), confirm: async () => petAssets, remove: async () => petAssets, cancel: async () => {}, subscribe: () => () => {} },
+    petAssets: {
+      getState: async () => petAssets,
+      getModel: async id => id === 'artist-pet' && scenario.startsWith('pet-import') ? new Uint8Array(await (await fetch(starterModelUrl)).arrayBuffer()) : null,
+      getAvatar: async () => null,
+      choose: async () => {
+        if (!scenario.startsWith('pet-import')) return { ok: false, reason: 'not-supported' };
+        if (scenario === 'pet-import-error') return { ok: false, reason: 'invalid-model' };
+        if (petAssets.records.some(asset => asset.id === importManifest.id)) return { ok: false, reason: 'duplicate' };
+        importPending = true;
+        return { ok: true, preview: { token: 'browser-fixture', manifest: importManifest, modelBytes: 4096, avatar: 'fallback', avatarFile: null } };
+      },
+      confirm: async token => {
+        if (!importPending || token !== 'browser-fixture') throw new Error('请重新选择文件夹。');
+        importPending = false;
+        if (scenario === 'pet-import-residue') throw new Error('导入未完成。已有文件或本次残留已保留，未覆盖或自动删除。');
+        petAssets = { version: 1, records: [...petAssets.records, { id: importManifest.id, manifest: importManifest, source: 'imported', importedAt: 'browser-fixture' }] };
+        petListeners.forEach(listener => listener(petAssets)); return petAssets;
+      },
+      remove: async () => petAssets, cancel: async () => { importPending = false; },
+      subscribe: listener => subscribe(petListeners, listener),
+    },
     windowAction: async () => {},
     getState: async () => state,
     subscribe: listener => subscribe(stateListeners, listener),

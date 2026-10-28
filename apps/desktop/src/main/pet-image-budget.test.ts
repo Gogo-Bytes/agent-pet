@@ -26,6 +26,26 @@ it('rejects mismatched MIME, unsupported formats and animated PNG', () => {
   const animation = Buffer.alloc(20); animation.writeUInt32BE(8); animation.write('acTL', 4);
   expect(petImagePixels(Buffer.concat([png.subarray(0, 33), animation, png.subarray(33)]), 'image/png')).toBeNull();
 });
+function metadata(type: string, data: Buffer): Buffer {
+  // Structural budget fixture only; CRC/decoding is the platform decoder's job.
+  const chunk = Buffer.alloc(data.length + 12);
+  chunk.writeUInt32BE(data.length); chunk.write(type, 4); data.copy(chunk, 8);
+  return Buffer.concat([png.subarray(0, 33), chunk, png.subarray(33)]);
+}
+it('accepts bounded background color and uncompressed text without changing the pixel budget', () => {
+  expect(petImagePixels(metadata('bKGD', Buffer.alloc(2)), 'image/png')).toBe(1);
+  expect(petImagePixels(metadata('tEXt', Buffer.from('Software\0Artist exporter')), 'image/png')).toBe(1);
+});
+it('still rejects compressed metadata, truncated chunks and metadata beyond the file budget', () => {
+  for (const type of ['zTXt', 'iTXt', 'iCCP', 'acTL']) {
+    expect(petImagePixels(metadata(type, Buffer.alloc(8)), 'image/png')).toBeNull();
+  }
+  const truncated = metadata('tEXt', Buffer.from('Name\0Pet')); truncated.writeUInt32BE(truncated.length, 33);
+  expect(petImagePixels(truncated, 'image/png')).toBeNull();
+  expect(petImagePixels(metadata('tEXt', Buffer.alloc(4 * 1024 * 1024)), 'image/png')).toBeNull();
+  const huge = metadata('bKGD', Buffer.alloc(2)); huge.writeUInt32BE(4097, 16);
+  expect(petImagePixels(huge, 'image/png')).toBeNull();
+});
 it('rejects JPEG truncation, multiple frames and deferred height markers', () => {
   const bytes = jpeg(10, 10);
   expect(petImagePixels(bytes.subarray(0, -2), 'image/jpeg')).toBeNull();

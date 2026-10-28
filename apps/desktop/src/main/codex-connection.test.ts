@@ -54,6 +54,7 @@ it('feeds independent configuration identities through shared sessions/Home and 
     const targetPath = join(f.root, `codex-${index}`); fs.mkdirSync(targetPath, { mode: 0o700 });
     const created = await collection.create({ provider: 'codex', name: `Codex ${index}`, targetPath });
     const id = created.records.at(-1)!.id; ids.push(id);
+    await collection.bindPet(id, { assetId: 'starter', name: '团子' });
     expect(projectHomePets(collection.snapshot(), sessions, '团子')).toHaveLength(index);
     const preview = (await collection.preview(id)).records.at(-1)!.codex!.preview!;
     await collection.confirm(id, preview.id); const server = f.servers[index]!;

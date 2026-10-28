@@ -12,7 +12,7 @@ const native = vi.hoisted(() => {
   const frame = { url: '' };
   const webContents = { mainFrame: frame, send: vi.fn(), setWindowOpenHandler: vi.fn(), on: vi.fn(), reload: vi.fn(), setZoomFactor: vi.fn() };
   const window = {
-    webContents, setBounds: vi.fn(), isDestroyed: () => false,
+    webContents, destroy: vi.fn(), setBounds: vi.fn(), isDestroyed: () => false,
     isVisible: vi.fn(() => true), moveTop: vi.fn(), showInactive: vi.fn(), setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(), setResizable: vi.fn(),
     loadFile: vi.fn(), loadURL: vi.fn(), once: vi.fn(), show: vi.fn(), hide: vi.fn(),
     minimize: vi.fn(), maximize: vi.fn(), unmaximize: vi.fn(), isMaximized: vi.fn(() => false), close: vi.fn(),
@@ -28,6 +28,7 @@ const native = vi.hoisted(() => {
     tray: { setContextMenu: vi.fn(), setToolTip: vi.fn(), on: vi.fn(), destroy: vi.fn() },
     window, webContents, options: vi.fn(), isPackaged: true,
     area: { x: 0, y: 25, width: 1440, height: 875 }, cursor: { x: 0, y: 0 },
+    connectionChanged: undefined as ((state: 'connected' | 'degraded' | 'disconnected') => void) | undefined,
     publish: undefined as ((value: SessionObservation) => void) | undefined,
   };
 });
@@ -51,6 +52,12 @@ vi.mock('electron', () => ({
       } : native.window;
       target.loadFile.mockImplementation((file: string) => { target.webContents.mainFrame.url = pathToFileURL(file).href; });
       target.loadURL.mockImplementation((url: string) => { target.webContents.mainFrame.url = url; });
+      if (!management) {
+        let visible = false;
+        target.isVisible.mockImplementation(() => visible);
+        target.showInactive.mockImplementation(() => { visible = true; });
+        target.hide.mockImplementation(() => { visible = false; });
+      }
       if (management) {
         target.close = vi.fn(() => target.on.mock.calls.find(([event]) => event === 'close')?.[1]({ preventDefault: vi.fn() }));
         native.management = target;
@@ -72,8 +79,9 @@ vi.mock('./pi-config.js', () => ({ readPiBridgeConfig: () => native.envConfigure
 vi.mock('@agent-pet/adapter-pi', () => ({ PiBridgeAdapter: class {
   readonly provider = 'pi';
   async openSession() { return { status: 'unsupported' }; }
-  async start(_config: unknown, sink: { publish(value: SessionObservation): void }) {
-    await native.start(); native.publish = sink.publish;
+  async start(_config: unknown, sink: { publish(value: SessionObservation): void; connectionChanged?(state: 'connected' | 'degraded' | 'disconnected'): void }) {
+    await native.start(); native.connectionChanged = sink.connectionChanged;
+    native.publish = value => { sink.connectionChanged?.('connected'); sink.publish(value); };
     return { stop: native.stop };
   }
 } }));
@@ -99,6 +107,15 @@ function expectHit(hit: boolean) {
   expect(native.window.setIgnoreMouseEvents).toHaveBeenLastCalledWith(!hit, { forward: true });
 }
 
+async function loadMain() {
+  await import('./index.js');
+  if (!native.lock || !native.envConfigured) return;
+  const event = { sender: native.management!.webContents, senderFrame: native.management!.webContents.mainFrame };
+  await (native.handlers.get('management:configurations-pet')! as (...args: unknown[]) => Promise<unknown>)(event, 'legacy-pi', { assetId: 'starter', name: '团子' });
+  native.connectionChanged?.('connected');
+  native.window.once.mock.calls.find(([name]) => name === 'ready-to-show')?.[1]();
+}
+
 beforeEach(async () => {
   vi.resetModules(); vi.clearAllMocks(); vi.useFakeTimers();
   native.handlers.clear(); native.appEvents.clear(); native.publish = undefined;
@@ -108,11 +125,33 @@ beforeEach(async () => {
   native.loginGet.mockReturnValue({ openAtLogin: false });
   native.area = { x: 0, y: 25, width: 1440, height: 875 };
   native.cursor = { x: 0, y: 0 };
-  await import('./index.js');
+  await loadMain();
 });
 afterEach(() => { native.appEvents.get('will-quit')?.(); vi.useRealTimers(); vi.unstubAllEnvs(); rmSync(native.path, { recursive: true, force: true }); });
 
 describe('Main public IPC layout/hit baseline (mock Electron, not native acceptance)', () => {
+  it('does not create a desktop pet for an unbound or not-yet-connected Agent, even with offline enabled', async () => {
+    native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks();
+    rmSync(join(native.path, 'configurations.json'));
+    await import('./index.js');
+    expect(native.options.mock.calls.filter(([options]) => options.title !== 'Agent Pet')).toHaveLength(0);
+    native.connectionChanged?.('connected');
+    expect(native.options.mock.calls.filter(([options]) => options.title !== 'Agent Pet')).toHaveLength(0);
+  });
+  it('removes a desktop pet immediately on unbind without waiting for a new Session and revokes its IPC', async () => {
+    const management = native.management!;
+    const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
+    native.window.showInactive.mockClear();
+    await (native.handlers.get('management:configurations-pet')! as (...args: unknown[]) => Promise<unknown>)(trusted, 'legacy-pi', null);
+    expect(native.window.destroy).toHaveBeenCalledOnce();
+    native.window.once.mock.calls.find(([name]) => name === 'ready-to-show')![1]();
+    expect(native.window.showInactive).not.toHaveBeenCalled();
+    expect(() => invoke('pet:request-snapshot')).toThrow('Untrusted renderer');
+    expect(() => invoke('pet:asset', 'starter')).toThrow('Untrusted renderer');
+    await expect(invoke('pet:acknowledge-and-open', { provider: 'pi', sessionId: 'other-config-session' })).rejects.toThrow('Untrusted renderer');
+    native.publish!(piObservation());
+    expect(native.options.mock.calls.filter(([options]) => options.title !== 'Agent Pet')).toHaveLength(1);
+  });
   it('restricts every preflight capability to the management main frame, rejects path payloads and owns pickers', async () => {
     const management = native.management!;
     const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
@@ -205,8 +244,9 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
   });
   it('wires selected-target preview/cancel/closure invalidation and confirmed observations to the existing Application', async () => {
     native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks(); native.envConfigured = false;
+    rmSync(join(native.path, 'configurations.json'), { force: true });
     vi.stubEnv('AGENT_PET_PI_ENDPOINT', undefined); vi.stubEnv('AGENT_PET_PI_TOKEN', undefined);
-    await import('./index.js');
+    await loadMain();
     const management = native.management!;
     const trusted = { sender: management.webContents, senderFrame: management.webContents.mainFrame };
     const request = (action: string, ...args: unknown[]) => {
@@ -246,8 +286,9 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
     const ready = await request('preview') as PreviewState;
     expect(await request('confirm', ready.preview.id)).toMatchObject({ status: 'configured-waiting', canRemove: true });
     expect(native.start).toHaveBeenCalledOnce(); expect(existsSync(ready.preview.path)).toBe(true);
-    native.publish!(piObservation()); invoke('pet:request-snapshot');
-    expect(native.webContents.send.mock.calls.filter(([name]) => name === 'pet:snapshot').at(-1)?.[1].bubbles[0]).toMatchObject({ status: 'working' });
+    native.publish!(piObservation());
+    expect(native.handlers.get('management:sessions')!(trusted)).toMatchObject({ bubbles: [expect.objectContaining({ status: 'working' })] });
+    expect(native.options.mock.calls.filter(([options]) => options.title !== 'Agent Pet')).toHaveLength(0);
     native.appEvents.get('before-quit')!({ preventDefault: vi.fn() });
     for (let i = 0; i < 12; i++) await Promise.resolve();
     expect(native.stop).toHaveBeenCalledOnce();
@@ -265,7 +306,7 @@ describe('Main public IPC layout/hit baseline (mock Electron, not native accepta
       vi.resetModules(); vi.clearAllMocks();
       native.isPackaged = false;
       vi.stubEnv('ELECTRON_RENDERER_URL', 'http://localhost:5174');
-      await import('./index.js');
+      await loadMain();
     }
     const entry = mode === 'development' ? 'http://localhost:5174/'
       : pathToFileURL(native.window.loadFile.mock.calls[0]![0]).href;
@@ -550,7 +591,7 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
   it('never registers login items at startup; dev refuses opt-in without calling OS login APIs', async () => {
     expect(native.loginSet).not.toHaveBeenCalled();
     native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks(); native.isPackaged = false;
-    await import('./index.js');
+    await loadMain();
     const result = invoke('management:set-login', true, managementEvent());
     expect(result).toMatchObject({ login: { supported: false, enabled: false, error: expect.any(String) } });
     expect(native.loginSet).not.toHaveBeenCalled(); expect(native.loginGet).not.toHaveBeenCalled();
@@ -586,10 +627,11 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
   it('restores hidden pet and size from disk; ready-to-show cannot override hidden preference', async () => {
     native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks();
     writeFileSync(join(native.path, 'preferences.json'), JSON.stringify({ schemaVersion: 1, petVisible: false, petSize: 260 }));
-    await import('./index.js');
+    await loadMain();
     expect(latestLayout().pet.width).toBe(260);
     native.window.once.mock.calls.find(([event]) => event === 'ready-to-show')![1]();
-    expect(native.window.showInactive).not.toHaveBeenCalled(); expect(native.window.hide).toHaveBeenCalled();
+    expect(native.window.showInactive).not.toHaveBeenCalled();
+    expect(native.options).toHaveBeenCalledWith(expect.objectContaining({ show: false }));
     expect(invoke('management:get-state', undefined, managementEvent())).toMatchObject({ preferences: { petVisible: false, petSize: 260 } });
   });
   it('failed toolbar persistence retains geometry and opens management with the error', () => {
@@ -604,7 +646,7 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
     native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks();
     let started!: () => void;
     native.start.mockReturnValueOnce(new Promise<void>(resolve => { started = resolve; }));
-    await import('./index.js');
+    await loadMain();
     native.appEvents.get('before-quit')!({ preventDefault: vi.fn() });
     await Promise.resolve(); expect(native.stop).not.toHaveBeenCalled(); expect(native.quit).not.toHaveBeenCalled();
     started(); for (let i = 0; i < 12; i++) await Promise.resolve();
@@ -615,7 +657,7 @@ describe('P1 actual Main entry with isolated Electron boundary', () => {
   it('a losing single instance exits before creating windows, Adapter, preferences or IPC', async () => {
     native.appEvents.get('will-quit')?.(); vi.resetModules(); vi.clearAllMocks(); native.handlers.clear();
     native.lock = false;
-    await import('./index.js');
+    await loadMain();
     expect(native.quit).toHaveBeenCalledOnce(); expect(native.options).not.toHaveBeenCalled();
     expect(native.start).not.toHaveBeenCalled(); expect(native.handlers.size).toBe(0);
   });

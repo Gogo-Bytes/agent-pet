@@ -68,7 +68,8 @@ describe('formal preference controls', () => {
     expect(input.onChange).not.toHaveBeenCalled();
     fireEvent.pointerUp(slider);
     expect(input.onChange).toHaveBeenCalledWith({ petSize: 168 });
-    expect(screen.getByRole('switch', { name: 'Agent 未启动时显示' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByRole('switch', { name: 'Agent 未启动时显示' })).toBeNull();
+    expect(screen.getByRole('switch', { name: '显示桌面宠物' })).toBeTruthy();
     expect(screen.queryByRole('switch', { name: '显示宠物名称' })).toBeNull();
   });
   it('retains reminder choices while bubbles are off and offers the actual enabling operation', async () => {

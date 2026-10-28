@@ -104,6 +104,36 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已接通 Main 原生文件夹选择、去路径预览、一次性 token 确认与取消；重新选择、窗口关闭/加载/renderer 退出及应用退出会失效并释放预览字节，迟到 picker 结果丢弃。旧 token 取消/确认不会破坏新预览。注册表异常、数量上限和重复资产在安装前拒绝；失败提示明确文件/残留保留，不自动删除。50 项 Main/导入/preload 测试、typecheck、desktop build、diff 检查通过。原生选择与真实文件导入尚未实机验收，Renderer 收藏页入口仍未恢复；没有读取用户模型或重启日常 dev。
 
+### 导入闭环：收藏页与已有播放器接线
+
+收藏页恢复“添加宠物”，使用现有抽屉/按钮展示 manifest ID、大小、许可和快照复制说明；确认后进入收藏并选择该资产，继续复用原绑定与 clip 名称播放链路。取消/关闭释放预览，迟到选择结果取消，失败不显示成功且要求新预览。模型字节不可读时明确提示内置回退；场景加载失败仍保留控件，换资产后重建错误边界恢复，不新增骨骼控制。
+
+测试首次因真实 petAssets API 下临时空数组不断重建触发启动 effect 循环超时；固定空状态引用后一次复验消除循环，另更新一处残留“未开放”旧断言。最终全量 129 文件、1465 passed / 1 skipped，typecheck、desktop build 与 diff 检查通过。正式 Renderer 隔离浏览器宽/390×844 预览可见，无按钮遮挡，截图位于 `/tmp/agent-pet-import-preview.png` 与 `/tmp/agent-pet-import-preview-narrow.png`（示例数据，未提交确认）。
+
+代码入口已开放，覆盖此前“UI 禁用”的阶段状态；尚未进行真实 Electron 原生文件夹导入/第三方 GLB 解码和长期 GPU/缓存释放验收，也未重启日常 dev、打包或触碰用户模型。失败残留目前保留并提示，不能自动接管同名目录；此限制继续记录，不宣称完整自动清理或任意模型安全保证。
+
+### 用户实测反馈：导入兼容性与显示语义
+
+用户确认动画播放正常，随后反馈解绑未立即消失、桌面无连接仍常驻且不能按 Agent 多宠物显示；新要求为仅在线且明确绑定的配置展示宠物，覆盖此前“解绑回退全局默认”和“桌面单宠物”规则。显示修复独立实施，不将反馈记为已通过。
+
+指定目录 `/Users/gan/Downloads/小小格温-AgentPet` 只读复现 `invalid-model`：GLB 5.5MB、JSON 1766708 字节、7431 accessors、213 joints、15 clips/9408 channels、241979 keyframes、820128 输出标量，纹理 256/512/256 像素轴；文件权限正常。第一阶段调整过小的元数据准入预算为 JSON 4MiB、8192 accessors、25万遍历项、每 skin 256 joints、每 clip 1024 sampler/channel、累计16384 channels/50万 keyframes；原64MiB文件、节点/缓冲区/几何/纹理和100万 accessor元素/输出标量上限保持。仅放行现有 GLTFLoader 原生支持的材质 `KHR_materials_unlit: {}`，不安装 decoder、不允许其他扩展、外部URI或扩展载荷。合成计数 fixture、边界/拒绝测试和全量1468 passed/1 skipped、typecheck/build通过，未提交用户模型/内容。
+
+**原包仍未通过，导入项在一次有界复验后停点：** 后续只读定位到内嵌 PNG 含 `bKGD` 和未压缩 `tEXt`，当前图片白名单拒绝；没有继续修改PNG guard、重写或自动导入用户文件。最小探针及失败证据保留于 `/tmp/agent-pet-user-import-repro.test.ts`、`/tmp/agent-pet-user-import-rejection.log`、`/tmp/agent-pet-artist-import-green.log`。下一步需同协议恢复后单独覆盖这两类元数据，而不是关闭图片预算。自动化绿不代表原包导入已修好；动画播放仅记录用户此前的实测，不推断该未导入资产已解码。
+
+### 显示修复交回与主工作区复验
+
+用户批准把隔离 lane 的补丁交回 Main 后，已审查并应用 `/tmp/desktop-pets-display-handoff.patch`：桌面按 configuration ID 管理独立窗口，仅在线且显式绑定时创建；解绑/离线即销毁并撤销其 IPC 身份，每窗口独立拖拽、布局、命中和一次 renderer 恢复预算。会话/气泡、绑定资产和名称按配置投递，跨窗口 Session 操作/资产请求拒绝，退出清理所有窗口。首页不再对未绑定配置回退 starter。设置移除“Agent 未启动时显示”，旧 offline 数据只保留兼容；CONTEXT 和当前需求同步新语义。
+
+原 lane `d2c776c1-56c2-41c3-ae84-8e89f061e310` / worktree 分支 `pi-subagents/desktop-pets-d2c776c-8f36-s0-t0` 基于272ddf5，构建因宿主 node_modules symlink 触发 `ERR_PNPM_UNSAFE_TASK_RUN_STATE_PATH` 停止，未绕过。停止前全量1436 passed/36 failed/4 skipped；主工作区先重现4项依赖旧 fallback 的集成断言，再给fixture显式绑定，不删除在线/断线/清理断言。另32项store-corrupt在主工作区未复现，不认定它们的原环境根因已查明。
+
+最终主工作区聚焦79项、全量130文件1478 passed/1 skipped，`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build` 与 diff检查通过。测试覆盖同Provider多配置、无eager默认窗口、即时解绑、迟到ready事件、跨配置拒绝和全部窗口清理；这是自动化/构建证据，不代替真实桌面多窗口、显示器切换、长时间资源与日常Agent实机验收。导入原包仍停在上条PNG元数据限制，未将显示交付冒充导入修好。
+
+### 用户批准恢复：PNG 元数据兼容
+
+用户要求继续修复后，仅在 PNG chunk 白名单增加 `bKGD`（背景色）和 `tEXt`（未压缩文本），不替换头像/纹理、不修改指定源文件；其余尺寸、4MiB编码大小、chunk范围/数量、纹理累计像素预算和压缩元数据/APNG拒绝保持。先以合成结构fixture复现失败，再一行修复；相关103项通过，包含指定目录的真实只读 `inspectPetFolder` 预检成功（探针未入库）。因此覆盖此前“原包仍被PNG拒绝”的停点，但不推断原生确认/安装和GLB解码已实测通过。
+
+最终全量130文件1480 passed/1 skipped，typecheck、desktop build、diff检查通过。用户仍需在新版dev重选 `/Users/gan/Downloads/小小格温-AgentPet` 确认导入、播放并复测解绑/多桌宠；没有自动安装该模型、触碰Agent配置或推送。
+
 ## Pi 观察缓存清理修正
 
 复核发现 `73977e6` 的总量 256 条淘汰会丢失仍在线会话的停止清理责任。改为仅淘汰明确断开的历史，在线或连接状态未知的观察保留到能够发布断开清理；256 是历史回收目标，不是活跃会话硬上限。新增超过 256 个在线会话全部清理，以及混合在线/断开历史的排序与淘汰回归。仅使用自有 fixture，不修改日常配置或部署扩展；不将此项视为全链路内存硬上限验收。

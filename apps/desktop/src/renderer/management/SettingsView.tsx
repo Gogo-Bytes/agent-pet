@@ -192,8 +192,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
             <div className="preference-scale"><span>60% · 小</span><span>100%</span><span>140% · 大</span></div>
           </div>
           <MenuGroup title="桌面显示" icon="pet">
-            {toggle('petVisible', '宠物常驻桌面', '关闭后可从应用入口重新显示')}
-            {toggle('offline', 'Agent 未启动时显示', values.petVisible ? '没有 Agent 运行时，也留在桌面' : '开启“宠物常驻桌面”后生效', !values.petVisible)}
+            {toggle('petVisible', '显示桌面宠物', '仅显示已连接且绑定宠物的 Agent')}
             {toggle('topmost', '始终置顶', '显示在其他窗口上方')}
           </MenuGroup>
           <MenuGroup title="动作与气泡" icon="sparkles">

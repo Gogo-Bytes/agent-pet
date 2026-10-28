@@ -7,7 +7,7 @@ import type { SessionState } from '@agent-pet/domain';
 import { Configurations } from './configurations.js';
 import { loadCodexRuntimeAssets } from './codex-runtime-assets.js';
 import { loadClaudeRuntimeAssets, claudeProcessProbePath } from './claude-runtime-assets.js';
-import { configurationOnline } from '../shared/configurations.js';
+import { configurationOnline, type ConfigurationsState } from '../shared/configurations.js';
 import { registerConfigurationIpc } from './configuration-ipc.js';
 import { PreferenceStore } from './preferences.js';
 import { PiPreflight } from './pi-preflight.js';
@@ -26,6 +26,7 @@ export function createManagement(options: {
   applyPreferences(preferences: Preferences): void;
   stop(): Promise<void>;
   onlineChanged?(online: boolean): void;
+  configurationsChanged?(snapshot: ConfigurationsState): void;
   sessions?(): SessionState;
   pi: { adapter: PiBridgeAdapter; publish: ObservationSink['publish']; developmentEnvironment: boolean };
 }) {
@@ -82,6 +83,7 @@ export function createManagement(options: {
       ? { legacy: { connection, targetPath: legacyState.deployedPath ? dirname(dirname(legacyState.deployedPath)) : preflight.snapshot().target.path } } : {}),
   });
   configurations.subscribe(snapshot => {
+    options.configurationsChanged?.(snapshot);
     options.onlineChanged?.(snapshot.records.some(configurationOnline));
     if (window && !window.isDestroyed()) window.webContents.send('management:configurations-state', snapshot);
   });

@@ -34,6 +34,7 @@ it('maps verified Claude callbacks through configuration identity, Application s
     const targetPath = join(root, `claude-${i}`); fs.mkdirSync(targetPath, { mode: 0o700 });
     const state = await collection.create({ provider: 'claude', name: `Claude ${i}`, targetPath });
     const id = state.records.at(-1)!.id; ids.push(id);
+    await collection.bindPet(id, { assetId: 'starter', name: '团子' });
     const preview = (await collection.preview(id)).records.at(-1)!.claude!.preview!;
     expect((await collection.confirm(id, preview.id)).records.at(-1)!.claude).toMatchObject({ status: 'waiting', scope: 'task-events' });
     const server = servers[i]!;

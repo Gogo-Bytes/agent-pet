@@ -1,77 +1,31 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, ipcMain, screen } from 'electron';
 import type { AdapterHandle, SessionRef } from '@agent-pet/adapter-core';
 import { PiBridgeAdapter } from '@agent-pet/adapter-pi';
 import { createApplication } from '@agent-pet/application';
-import { join } from 'node:path';
 import { createDevObservationEvidence } from './dev-observation-evidence.js';
 import { createManagement } from './management.js';
-import { assertWindowSender, loadTrustedEntry } from './window-trust.js';
-import { createPetWindowOptions } from './window-options.js';
-import { applyPetWindowLayer } from './pet-window-layer.js';
+import { createDesktopPets } from './desktop-pets.js';
 import { readPiBridgeConfig } from './pi-config.js';
 import { defaultPreferences, type Preferences } from '../shared/preferences.js';
-
-import { layoutOverlay } from './overlay-layout.js';
-import { overlayHit } from './overlay-hit.js';
-import type { Rect, OverlayLayout } from '../shared/overlay-layout.js';
 // Acquire ownership before creating the Application, Adapter, windows or IPC handlers.
 if (!app.requestSingleInstanceLock()) app.quit();
 else startPrimaryInstance();
 
 function startPrimaryInstance(): void {
   let management: ReturnType<typeof createManagement> | undefined;
-  let petVisible = true;
-  let petOnline = false;
   let currentPreferences: Preferences = { ...defaultPreferences };
-  function applyPetVisibility(): void {
-    const visible = currentPreferences.petVisible && (currentPreferences.offline || petOnline);
-    if (visible !== petVisible || !preferencesApplied) {
-      petVisible = visible;
-      if (visible) petWindow?.showInactive(); else petWindow?.hide();
-    }
-  }
-  let preferencesApplied = false;
   let adapterStart: Promise<void> = Promise.resolve();
-  let petWindow: BrowserWindow | undefined;
-  let anchor: Rect = { x: 100, y: 300, width: 140, height: 140 };
-  let overlay: OverlayLayout;
-  let interacting = false;
-  // Renderer reports committed presentation, not the user visibility preference.
-  let bubblesVisible = false;
-  let bubblesExpanded = false;
-  let controlsVisible = false;
-  ipcMain.handle('pet:controls-visible', (event, visible: unknown) => {
-    assertTrustedRenderer(event);
-    if (typeof visible !== 'boolean') throw new TypeError('Invalid controls visibility');
-    controlsVisible = visible; updateHitPolicy();
+  const pets = createDesktopPets({ directory: __dirname,
+    ...(!app.isPackaged && process.env.ELECTRON_RENDERER_URL ? { developmentUrl: process.env.ELECTRON_RENDERER_URL } : {}),
+    sessions: () => application.snapshot(), preferences: () => currentPreferences,
+    isQuitting: () => management?.isQuitting() ?? false,
+    resize: petSize => { if (management?.update({ petSize }).preferenceError) management.open(); },
+    hide: () => { if (management?.update({ petVisible: false }).preferenceError) management.open(); },
   });
-  ipcMain.handle('pet:bubbles-expanded', (event, expanded: unknown) => {
-    assertTrustedRenderer(event);
-    if (typeof expanded !== 'boolean') throw new TypeError('Invalid expansion');
-    bubblesExpanded = expanded;
-    updateHitPolicy();
-  });
-  ipcMain.handle('pet:bubbles-visible', (event, visible: unknown) => {
-    assertTrustedRenderer(event);
-    if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility');
-    bubblesVisible = visible;
-    updateHitPolicy();
-  });
-  function updateOverlay(): void {
-    if (!petWindow || petWindow.isDestroyed()) return;
-    const area = screen.getDisplayMatching(anchor).workArea;
-    overlay = layoutOverlay(anchor, area);
-    anchor = overlay.anchor;
-    petWindow.setBounds(overlay.bounds);
-    petWindow.webContents.send('pet:layout', overlay);
-    updateHitPolicy();
-  }
-  ipcMain.handle('pet:interaction', (event, active: unknown) => {
-    assertTrustedRenderer(event);
-    if (typeof active !== 'boolean') throw new TypeError('Invalid interaction');
-    interacting = active;
-    updateHitPolicy();
-  });
+  for (const [channel, key] of [
+    ['pet:controls-visible', 'controlsVisible'], ['pet:bubbles-expanded', 'bubblesExpanded'],
+    ['pet:bubbles-visible', 'bubblesVisible'], ['pet:interaction', 'interacting'],
+  ] as const) ipcMain.handle(channel, (event, value: unknown) => pets.presentation(event, key, value));
   let piHandle: AdapterHandle | undefined;
   const piConfig = readPiBridgeConfig(process.env);
   const piAdapter = new PiBridgeAdapter();
@@ -85,21 +39,10 @@ function startPrimaryInstance(): void {
   application.subscribe((snapshot) => {
     evidence?.observe(snapshot);
     management?.publishSessions(snapshot);
-    if (petWindow && !petWindow.isDestroyed()) {
-      petWindow.webContents.send('pet:snapshot', snapshot);
-    }
+    pets.publishSessions();
   });
 
-  ipcMain.handle('pet:request-snapshot', (event) => {
-    assertTrustedRenderer(event);
-    event.sender.send('pet:snapshot', application.snapshot());
-    event.sender.send('pet:preferences', currentPreferences);
-    updateOverlay();
-  });
-
-  function assertTrustedRenderer(event: Electron.IpcMainInvokeEvent): void {
-    assertWindowSender(petWindow, event);
-  }
+  ipcMain.handle('pet:request-snapshot', event => pets.requestSnapshot(event));
 
   function parseSessionRef(value: unknown): SessionRef {
     if (!value || typeof value !== 'object') {
@@ -117,8 +60,10 @@ function startPrimaryInstance(): void {
   }
 
   ipcMain.handle('pet:acknowledge-and-open', async (event, value: unknown) => {
-    assertTrustedRenderer(event);
-    return application.acknowledgeAndOpen(parseSessionRef(value));
+    pets.assertTrusted(event);
+    const ref = parseSessionRef(value);
+    pets.assertSession(event, ref.sessionId, ref.provider);
+    return application.acknowledgeAndOpen(ref);
   });
 
   function deltaValue(value: unknown): { x: number; y: number } {
@@ -128,64 +73,11 @@ function startPrimaryInstance(): void {
     return { x: value.x, y: value.y };
   }
   ipcMain.handle('pet:resize-window-by', (event, value: unknown) => {
-    assertTrustedRenderer(event);
-    const delta = deltaValue(value);
-    const size = Math.max(80, Math.min(600, anchor.width + Math.round((delta.x + delta.y) / 2)));
-    const result = management?.update({ petSize: size });
-    if (result?.preferenceError) management?.open();
+    pets.assertTrusted(event); pets.resize(event, deltaValue(value));
   });
   ipcMain.handle('pet:move-window-by', (event, value: unknown) => {
-    assertTrustedRenderer(event);
-    const delta = deltaValue(value);
-    anchor.x += Math.round(delta.x);
-    anchor.y += Math.round(delta.y);
-    updateOverlay();
+    pets.assertTrusted(event); pets.move(event, deltaValue(value));
   });
-
-  function updateHitPolicy(): void {
-    if (!petWindow || petWindow.isDestroyed() || !overlay) return;
-    const point = screen.getCursorScreenPoint();
-    const local = { x: point.x - overlay.bounds.x, y: point.y - overlay.bounds.y };
-    const hit = overlayHit(overlay, local, { interacting, controlsVisible, bubblesVisible, bubblesExpanded });
-    petWindow.setIgnoreMouseEvents(!hit, { forward: true });
-  }
-
-  function createPetWindow(): BrowserWindow {
-    const window = new BrowserWindow(
-      createPetWindowOptions(join(__dirname, '../preload/index.cjs')),
-    );
-
-    const restoreLayer = () => applyPetWindowLayer(window, currentPreferences.topmost);
-    restoreLayer();
-    window.on('show', restoreLayer);
-    window.on('restore', restoreLayer);
-    window.setResizable(false);
-    let rendererRecoveryAttempts = 0;
-    const resetPresentation = () => {
-      interacting = false; controlsVisible = false; bubblesVisible = false; bubblesExpanded = false;
-      updateHitPolicy();
-    };
-    const recoverRenderer = () => {
-      resetPresentation();
-      if (management?.isQuitting() || window.isDestroyed() || rendererRecoveryAttempts >= 1) return;
-      rendererRecoveryAttempts++;
-      window.webContents.reload();
-    };
-    window.webContents.on('did-start-loading', resetPresentation);
-    window.webContents.on('render-process-gone', recoverRenderer);
-    const rendererFile = join(__dirname, '../renderer/index.html');
-    const developmentUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
-    loadTrustedEntry(window, rendererFile, developmentUrl);
-    window.once('ready-to-show', () => { if (petVisible && !management?.isQuitting()) window.showInactive(); });
-    window.on('close', event => {
-      if (!management?.isQuitting()) {
-        event.preventDefault();
-        const result = management?.update({ petVisible: false });
-        if (result?.preferenceError) management?.open();
-      }
-    });
-    return window;
-  }
 
   async function startConfiguredAdapters(): Promise<void> {
     if (!piConfig) {
@@ -207,37 +99,29 @@ function startPrimaryInstance(): void {
   }
 
   app.whenReady().then(() => {
-    petWindow = createPetWindow();
-    updateOverlay();
-    screen.on('display-removed', updateOverlay);
-    screen.on('display-metrics-changed', updateOverlay);
-    const hitTimer = setInterval(updateHitPolicy, 50);
+    screen.on('display-removed', pets.updateLayouts);
+    screen.on('display-metrics-changed', pets.updateLayouts);
+    const hitTimer = setInterval(pets.updateHitPolicies, 50);
     hitTimer.unref();
     app.once('will-quit', () => clearInterval(hitTimer));
     management = createManagement({
       sessions: () => application.snapshot(),
       pi: { adapter: piAdapter, publish: observation => application.observe(observation), developmentEnvironment },
-      onlineChanged: online => { petOnline = online; applyPetVisibility(); },
+      configurationsChanged: snapshot => pets.updateConfigurations(snapshot),
       applyPreferences: preferences => {
-        currentPreferences = preferences;
-        applyPetVisibility();
-        preferencesApplied = true;
-        anchor.width = preferences.petSize;
-        anchor.height = preferences.petSize;
-        updateOverlay();
-        if (petWindow) applyPetWindowLayer(petWindow, preferences.topmost);
-        petWindow?.webContents.send('pet:preferences', preferences);
+        currentPreferences = preferences; pets.applyPreferences();
       },
       stop: async () => {
-        clearInterval(hitTimer);
+        clearInterval(hitTimer); pets.close();
         await adapterStart;
         await piHandle?.stop();
       },
     });
     ipcMain.handle('pet:asset', (event, id: unknown) => {
-      assertTrustedRenderer(event);
+      pets.assertAsset(event, id);
       return typeof id === 'string' ? management?.petAsset(id) ?? null : null;
     });
+    pets.updateConfigurations(management.configurations.snapshot());
     adapterStart = startConfiguredAdapters();
   });
 }

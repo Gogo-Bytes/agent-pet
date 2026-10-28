@@ -112,6 +112,14 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 代码入口已开放，覆盖此前“UI 禁用”的阶段状态；尚未进行真实 Electron 原生文件夹导入/第三方 GLB 解码和长期 GPU/缓存释放验收，也未重启日常 dev、打包或触碰用户模型。失败残留目前保留并提示，不能自动接管同名目录；此限制继续记录，不宣称完整自动清理或任意模型安全保证。
 
+### 用户实测反馈：导入兼容性与显示语义
+
+用户确认动画播放正常，随后反馈解绑未立即消失、桌面无连接仍常驻且不能按 Agent 多宠物显示；新要求为仅在线且明确绑定的配置展示宠物，覆盖此前“解绑回退全局默认”和“桌面单宠物”规则。显示修复独立实施，不将反馈记为已通过。
+
+指定目录 `/Users/gan/Downloads/小小格温-AgentPet` 只读复现 `invalid-model`：GLB 5.5MB、JSON 1766708 字节、7431 accessors、213 joints、15 clips/9408 channels、241979 keyframes、820128 输出标量，纹理 256/512/256 像素轴；文件权限正常。第一阶段调整过小的元数据准入预算为 JSON 4MiB、8192 accessors、25万遍历项、每 skin 256 joints、每 clip 1024 sampler/channel、累计16384 channels/50万 keyframes；原64MiB文件、节点/缓冲区/几何/纹理和100万 accessor元素/输出标量上限保持。仅放行现有 GLTFLoader 原生支持的材质 `KHR_materials_unlit: {}`，不安装 decoder、不允许其他扩展、外部URI或扩展载荷。合成计数 fixture、边界/拒绝测试和全量1468 passed/1 skipped、typecheck/build通过，未提交用户模型/内容。
+
+**原包仍未通过，导入项在一次有界复验后停点：** 后续只读定位到内嵌 PNG 含 `bKGD` 和未压缩 `tEXt`，当前图片白名单拒绝；没有继续修改PNG guard、重写或自动导入用户文件。最小探针及失败证据保留于 `/tmp/agent-pet-user-import-repro.test.ts`、`/tmp/agent-pet-user-import-rejection.log`、`/tmp/agent-pet-artist-import-green.log`。下一步需同协议恢复后单独覆盖这两类元数据，而不是关闭图片预算。自动化绿不代表原包导入已修好；动画播放仅记录用户此前的实测，不推断该未导入资产已解码。
+
 ## Pi 观察缓存清理修正
 
 复核发现 `73977e6` 的总量 256 条淘汰会丢失仍在线会话的停止清理责任。改为仅淘汰明确断开的历史，在线或连接状态未知的观察保留到能够发布断开清理；256 是历史回收目标，不是活跃会话硬上限。新增超过 256 个在线会话全部清理，以及混合在线/断开历史的排序与淘汰回归。仅使用自有 fixture，不修改日常配置或部署扩展；不将此项视为全链路内存硬上限验收。

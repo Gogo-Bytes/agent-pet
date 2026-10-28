@@ -1,9 +1,9 @@
 import { petImagePixels } from './pet-image-budget.js';
 
 const MAX_MODEL_BYTES = 64 * 1024 * 1024;
-const MAX_JSON_BYTES = 1024 * 1024;
+const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const COLLECTION_LIMITS: Record<string, number> = {
-  nodes: 512, meshes: 128, accessors: 2048, bufferViews: 2048,
+  nodes: 512, meshes: 128, accessors: 8192, bufferViews: 2048,
   materials: 128, textures: 64, images: 64, animations: 64, skins: 64, scenes: 16, cameras: 64, samplers: 64,
 };
 
@@ -142,23 +142,23 @@ function validAnimationBudget(document: Record<string, unknown>): boolean {
   const accessors = (document.accessors ?? []) as Record<string, unknown>[];
   let joints = 0;
   for (const skin of (document.skins ?? []) as Record<string, unknown>[]) {
-    if (!Array.isArray(skin.joints) || !skin.joints.length || skin.joints.length > 128 ||
+    if (!Array.isArray(skin.joints) || !skin.joints.length || skin.joints.length > 256 ||
         new Set(skin.joints).size !== skin.joints.length || !skin.joints.every(id => index(id, nodes.length))) return false;
     joints += skin.joints.length;
     if (joints > 1024 || ('skeleton' in skin && !index(skin.skeleton, nodes.length))) return false;
   }
   let channels = 0, keyframes = 0, outputElements = 0;
   for (const animation of (document.animations ?? []) as Record<string, unknown>[]) {
-    if (!Array.isArray(animation.samplers) || !animation.samplers.length || animation.samplers.length > 256 ||
-        !Array.isArray(animation.channels) || !animation.channels.length || animation.channels.length > 256) return false;
+    if (!Array.isArray(animation.samplers) || !animation.samplers.length || animation.samplers.length > 1024 ||
+        !Array.isArray(animation.channels) || !animation.channels.length || animation.channels.length > 1024) return false;
     channels += animation.channels.length;
-    if (channels > 1024) return false;
+    if (channels > 16384) return false;
     for (const sampler of animation.samplers) {
       if (!object(sampler) || !index(sampler.input, accessors.length) || !index(sampler.output, accessors.length)) return false;
       const input = accessors[sampler.input]!;
       if (!unsigned(input.count) || input.count > 10000) return false;
       keyframes += input.count;
-      if (keyframes > 100000) return false;
+      if (keyframes > 500000) return false;
     }
     for (const channel of animation.channels) {
       if (!object(channel) || !index(channel.sampler, animation.samplers.length) || !object(channel.target) ||
@@ -214,20 +214,25 @@ export function validatePetGlb(bytes: Buffer): boolean {
     }
     const document: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(20, end)));
     if (!object(document) || !object(document.asset) || document.asset.version !== '2.0') return false;
-    // No URI scheme or extension is admitted until its resource/decoder budget is implemented.
+    // Native unlit materials add no resource or decoder; other extensions remain rejected.
+    const materials = new Set(Array.isArray(document.materials) ? document.materials : []);
     const pending: unknown[] = [document];
     let visited = 0;
     while (pending.length) {
-      if (++visited > 20000) return false;
+      if (++visited > 250000) return false;
       const value = pending.pop();
       if (Array.isArray(value)) pending.push(...value);
       else if (object(value)) {
-        if ('uri' in value || 'extensions' in value || 'sparse' in value) return false;
+        if ('uri' in value || 'sparse' in value) return false;
+        if ('extensions' in value && (!materials.has(value) || !object(value.extensions) ||
+            Object.keys(value.extensions).length !== 1 || !object(value.extensions.KHR_materials_unlit) ||
+            Object.keys(value.extensions.KHR_materials_unlit).length !== 0)) return false;
         pending.push(...Object.values(value));
       }
     }
     for (const name of ['extensionsUsed', 'extensionsRequired']) {
-      if (name in document && (!Array.isArray(document[name]) || document[name].length !== 0)) return false;
+      if (name in document && (!Array.isArray(document[name]) ||
+          !document[name].every(extension => extension === 'KHR_materials_unlit'))) return false;
     }
     for (const [name, limit] of Object.entries(COLLECTION_LIMITS)) {
       if (name in document && (!Array.isArray(document[name]) || document[name].length > limit ||

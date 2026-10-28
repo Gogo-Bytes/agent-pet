@@ -19,6 +19,42 @@ it('accepts the bundled starter and a self-contained minimal document', () => {
   expect(validatePetGlb(readFileSync('packages/pet-runtime/assets/starter.glb'))).toBe(true);
   expect(validatePetGlb(glb({ asset: { version: '2.0' } }))).toBe(true);
 });
+function artistSizedDocument() {
+  return { asset: { version: '2.0' }, extras: { note: 'x'.repeat(1100000) },
+    nodes: Array.from({ length: 215 }, () => ({})),
+    skins: [{ joints: Array.from({ length: 213 }, (_, id) => id) }],
+    accessors: Array.from({ length: 7431 }, () => ({ count: 1, componentType: 5126, type: 'VEC3' })),
+    animations: Array.from({ length: 15 }, (_, clip) => {
+      const count = clip === 14 ? 462 : 639;
+      return { samplers: Array.from({ length: count }, () => ({ input: 0, output: 1 })),
+        channels: Array.from({ length: count }, (_, id) => ({ sampler: id, target: { node: id % 215, path: 'translation' } })) };
+    }),
+    materials: [{ extensions: { KHR_materials_unlit: {} } }], extensionsUsed: ['KHR_materials_unlit'],
+  };
+}
+it('admits artist-sized clip metadata and native unlit materials without adding a decoder', () => {
+  // Synthetic counts mirror the reported package; no user model is committed.
+  expect(validatePetGlb(glb(artistSizedDocument()))).toBe(true);
+});
+it('supports required unlit materials but not external data hidden in extension payloads', () => {
+  expect(validatePetGlb(glb({ asset: { version: '2.0' }, extensionsRequired: ['KHR_materials_unlit'],
+    materials: [{ extensions: { KHR_materials_unlit: {} } }] }))).toBe(true);
+  for (const document of [
+    { materials: [{ extensions: { KHR_materials_unlit: { uri: 'https://example.invalid' } } }] },
+    { extensions: { KHR_materials_unlit: {} } },
+    { materials: [{ extensions: { KHR_materials_unlit: {}, KHR_draco_mesh_compression: {} } }] },
+  ]) expect(validatePetGlb(glb({ asset: { version: '2.0' }, ...document }))).toBe(false);
+});
+it('retains finite limits for JSON, traversal, accessor and animation allocations', () => {
+  const base = artistSizedDocument();
+  for (const document of [
+    { ...base, extras: { note: 'x'.repeat(4 * 1024 * 1024) } },
+    { asset: { version: '2.0' }, extras: Array(250001).fill(0) },
+    { asset: { version: '2.0' }, accessors: Array(8193).fill({ count: 1, componentType: 5126, type: 'SCALAR' }) },
+    { ...base, animations: Array(17).fill({ samplers: Array(1024).fill({ input: 0, output: 1 }),
+      channels: Array(1024).fill({ sampler: 0, target: { node: 0, path: 'translation' } }) }) },
+  ]) expect(validatePetGlb(glb(document))).toBe(false);
+});
 it('accepts a forest shared between scenes without cloning node parents', () => {
   expect(validatePetGlb(glb({ asset: { version: '2.0' }, nodes: [{ children: [1] }, {}, {}],
     scenes: [{ nodes: [0, 2] }, { nodes: [0] }], scene: 0 }))).toBe(true);
@@ -73,7 +109,7 @@ it.each([
   { channels: [{ sampler: 9, target: { node: 0, path: 'translation' } }] },
   { channels: [{ sampler: 0, target: { node: 9, path: 'translation' } }] },
 
-  { channels: Array.from({ length: 257 }, () => ({ sampler: 0, target: { node: 0, path: 'translation' } })) },
+  { channels: Array.from({ length: 1025 }, () => ({ sampler: 0, target: { node: 0, path: 'translation' } })) },
 
 ])('retains animation reference and allocation guards: %j', change => {
   const document = animationDocument();
@@ -81,12 +117,12 @@ it.each([
 });
 
 it('bounds joint counts including the total across skins', () => {
-  const document = { asset: { version: '2.0' }, nodes: Array.from({ length: 129 }, () => ({})),
-    skins: [{ joints: Array.from({ length: 128 }, (_, index) => index) }] };
+  const document = { asset: { version: '2.0' }, nodes: Array.from({ length: 257 }, () => ({})),
+    skins: [{ joints: Array.from({ length: 256 }, (_, index) => index) }] };
   expect(validatePetGlb(glb(document))).toBe(true);
-  expect(validatePetGlb(glb({ ...document, skins: [{ joints: Array.from({ length: 129 }, (_, index) => index) }] }))).toBe(false);
-  expect(validatePetGlb(glb({ ...document, skins: Array(8).fill(document.skins[0]) }))).toBe(true);
-  expect(validatePetGlb(glb({ ...document, skins: Array(9).fill(document.skins[0]) }))).toBe(false);
+  expect(validatePetGlb(glb({ ...document, skins: [{ joints: Array.from({ length: 257 }, (_, index) => index) }] }))).toBe(false);
+  expect(validatePetGlb(glb({ ...document, skins: Array(4).fill(document.skins[0]) }))).toBe(true);
+  expect(validatePetGlb(glb({ ...document, skins: Array(5).fill(document.skins[0]) }))).toBe(false);
 });
 
 
@@ -97,7 +133,7 @@ it('accepts joint references and an optional inverse bind accessor', () => {
 });
 it.each([
   { joints: [] }, { joints: [1] }, { joints: [0, 0] }, { joints: [0], skeleton: 1 },
-  { joints: Array(129).fill(0) },
+  { joints: Array(257).fill(0) },
 ])('rejects invalid skin references: %j', skin => {
   expect(validatePetGlb(glb({ asset: { version: '2.0' }, nodes: [{}], skins: [skin] }))).toBe(false);
 });

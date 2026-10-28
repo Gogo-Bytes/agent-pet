@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { availablePetActions, createPetArtistTemplate, petActionCatalog, petActionIds, resolvePetAnimation, validatePetManifest } from './index.js';
 
 describe('shared optional action vocabulary', () => {
+  it('describes triggers rather than prescribing clip names or gestures, including the public catalog', () => {
+    expect(petActionCatalog.success.label).toBe('任务完成');
+    expect(petActionCatalog.error.label).toBe('发生错误');
+    expect(petActionCatalog.waiting_input.label).toBe('等待输入');
+    expect(petActionCatalog.connected.label).toBe('Agent 已连接');
+    expect(JSON.parse(readFileSync('packages/pet-runtime/templates/action-catalog.json', 'utf8')).actions).toEqual(petActionCatalog);
+    expect(resolvePetAnimation('success', { success: 'ArtistDance' }, ['ArtistDance'])?.clip).toBe('ArtistDance');
+  });
   it('exports a complete versioned artist template with no required animation', () => {
     const template = createPetArtistTemplate();
     expect(Object.keys(template.animations)).toEqual(petActionIds);

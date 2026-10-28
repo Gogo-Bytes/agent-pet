@@ -148,6 +148,12 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
+### 23 项触发接线审计与后续顺序
+
+用户要求逐项核对后，已完成[触发审计](PET-TRIGGER-AUDIT.md)：区别目录/试播、真实事件来源、Renderer接线和原生验收；不把23项目录等同23项自动支持。拖动阶段已提交 `84edb31`，Main复核62项通过，子执行全量1501 passed/1 skipped、typecheck/build通过，真实方向手感未验。
+
+后续顺序：①补有真实本地事件的 hover/selected；②按配置离线→在线边沿补 connected，明确重挂与重连幂等；③核对并接通 Claude 已有 max_output_tokens 细类，其他缺原生可靠事实的 Provider 能力保持未知；④sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；⑤按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+
 ## Pi 观察缓存清理修正
 
 复核发现 `73977e6` 的总量 256 条淘汰会丢失仍在线会话的停止清理责任。改为仅淘汰明确断开的历史，在线或连接状态未知的观察保留到能够发布断开清理；256 是历史回收目标，不是活跃会话硬上限。新增超过 256 个在线会话全部清理，以及混合在线/断开历史的排序与淘汰回归。仅使用自有 fixture，不修改日常配置或部署扩展；不将此项视为全链路内存硬上限验收。

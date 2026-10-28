@@ -126,6 +126,7 @@ it('wires generic connection APIs to Claude and home identity without Pi deploym
     claude: f.options }); cleanups.push(() => collection.stop());
   const created = await collection.create({ provider: 'claude', name: '我的 Claude', targetPath: join(f.directory, 'metadata-only') });
   const id = created.records[0]!.id;
+  await collection.bindPet(id, { assetId: 'starter', name: '雪球' });
   expect(created.records[0]).toMatchObject({ connection: null, claude: { status: 'not-configured' } });
   const plan = (await collection.preview(id)).records[0]!.claude!.preview!;
   const waiting = await collection.confirm(id, plan.id);

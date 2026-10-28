@@ -76,10 +76,11 @@ describe('home pet projection from shared configuration and Session state', () =
     const map = Object.fromEntries(values.map(([id]) => [id, 'one']));
     expect(projectHomePets(collection([config('one')], map), sessions(values), '默认')[0]).toMatchObject({ action, status });
   });
-  it('uses the persisted default pet name when unbound and removes departing configurations without changing business state', () => {
+  it('removes an unbound pet immediately without altering its Agent or unread Sessions', () => {
     const state = sessions([['completed', 'completed']]);
     const source = collection([{ ...config('one'), pet: null }], { completed: 'one' });
-    expect(projectHomePets(source, state, '团子')[0]).toMatchObject({ id: 'one', name: '团子', action: 'success' });
+    expect(projectHomePets(collection([config('one')], { completed: 'one' }), state, '团子')).toHaveLength(1);
+    expect(projectHomePets(source, state, '团子')).toEqual([]);
     expect(projectHomePets({ ...source, records: [] }, state, '团子')).toEqual([]);
     expect(state.bubbles).toHaveLength(1);
     expect(source.records).toHaveLength(1);

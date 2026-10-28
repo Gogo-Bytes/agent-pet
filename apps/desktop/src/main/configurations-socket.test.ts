@@ -38,6 +38,7 @@ it('keeps home pets online for remaining peers and isolates configuration depart
       const target = join(root, name); await mkdir(target, { mode: 0o700 });
       const id = (await collection.create({ name, provider: 'pi', targetPath: target })).records.at(-1)!.id;
       ids.push(id);
+      await collection.bindPet(id, { assetId: 'starter', name: '小伙伴' });
       const plan = (await collection.preview(id)).records.find(record => record.id === id)!.connection!.preview!;
       expect(plan.action).toBe('create');
       await collection.confirm(id, plan.id);

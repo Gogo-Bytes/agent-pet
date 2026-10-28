@@ -120,6 +120,14 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 **原包仍未通过，导入项在一次有界复验后停点：** 后续只读定位到内嵌 PNG 含 `bKGD` 和未压缩 `tEXt`，当前图片白名单拒绝；没有继续修改PNG guard、重写或自动导入用户文件。最小探针及失败证据保留于 `/tmp/agent-pet-user-import-repro.test.ts`、`/tmp/agent-pet-user-import-rejection.log`、`/tmp/agent-pet-artist-import-green.log`。下一步需同协议恢复后单独覆盖这两类元数据，而不是关闭图片预算。自动化绿不代表原包导入已修好；动画播放仅记录用户此前的实测，不推断该未导入资产已解码。
 
+### 显示修复交回与主工作区复验
+
+用户批准把隔离 lane 的补丁交回 Main 后，已审查并应用 `/tmp/desktop-pets-display-handoff.patch`：桌面按 configuration ID 管理独立窗口，仅在线且显式绑定时创建；解绑/离线即销毁并撤销其 IPC 身份，每窗口独立拖拽、布局、命中和一次 renderer 恢复预算。会话/气泡、绑定资产和名称按配置投递，跨窗口 Session 操作/资产请求拒绝，退出清理所有窗口。首页不再对未绑定配置回退 starter。设置移除“Agent 未启动时显示”，旧 offline 数据只保留兼容；CONTEXT 和当前需求同步新语义。
+
+原 lane `d2c776c1-56c2-41c3-ae84-8e89f061e310` / worktree 分支 `pi-subagents/desktop-pets-d2c776c-8f36-s0-t0` 基于272ddf5，构建因宿主 node_modules symlink 触发 `ERR_PNPM_UNSAFE_TASK_RUN_STATE_PATH` 停止，未绕过。停止前全量1436 passed/36 failed/4 skipped；主工作区先重现4项依赖旧 fallback 的集成断言，再给fixture显式绑定，不删除在线/断线/清理断言。另32项store-corrupt在主工作区未复现，不认定它们的原环境根因已查明。
+
+最终主工作区聚焦79项、全量130文件1478 passed/1 skipped，`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build` 与 diff检查通过。测试覆盖同Provider多配置、无eager默认窗口、即时解绑、迟到ready事件、跨配置拒绝和全部窗口清理；这是自动化/构建证据，不代替真实桌面多窗口、显示器切换、长时间资源与日常Agent实机验收。导入原包仍停在上条PNG元数据限制，未将显示交付冒充导入修好。
+
 ## Pi 观察缓存清理修正
 
 复核发现 `73977e6` 的总量 256 条淘汰会丢失仍在线会话的停止清理责任。改为仅淘汰明确断开的历史，在线或连接状态未知的观察保留到能够发布断开清理；256 是历史回收目标，不是活跃会话硬上限。新增超过 256 个在线会话全部清理，以及混合在线/断开历史的排序与淘汰回归。仅使用自有 fixture，不修改日常配置或部署扩展；不将此项视为全链路内存硬上限验收。

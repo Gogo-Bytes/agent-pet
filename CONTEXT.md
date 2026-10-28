@@ -27,7 +27,7 @@ A completed or failed Session result that has not been acknowledged by the user 
 A compact visual representation of one Session. It follows the Pet, shows the Session name and status, and can be clicked independently to acknowledge the Session and request opening the originating Agent window.
 
 ### Pet
-A 3D avatar associated with a Configured Agent in the shared management scene. The desktop overlay has one Pet with multiple independent Session bubbles; a Pet is not created per Session.
+A 3D avatar explicitly bound to one Configured Agent. An online, bound Configured Agent has its own Pet in management and on the desktop, with its independent Session bubbles; a Pet is not created per Session.
 
 ### Pet asset
 A 3D GLB model with optional animations and descriptive metadata. A Pet asset with no animations is a valid static Pet; the current MVP uses the bundled asset.
@@ -74,7 +74,7 @@ A user-registered Agent configuration with its own identity, name and location. 
 
 ### Agent-Pet binding
 
-The user choice that assigns a Pet asset to one Configured Agent. A binding overrides the global default Pet for that Agent; missing bindings fall back to the global default.
+The user choice that assigns a Pet asset to one Configured Agent. No binding means that Agent has no visible Pet; choosing an asset in the collection does not itself create a binding.
 
 ## Confirmed product relationships
 
@@ -88,7 +88,7 @@ Session bubble -> one Open Session action
 
 ## First-release rules
 
-- The desktop Pet represents many independent Sessions; the management home represents each online configuration with a separate Pet, including multiple configurations of the same Provider.
+- The desktop and management home each represent every online, explicitly bound configuration with a separate Pet, including multiple configurations of the same Provider. Unbinding or going offline removes that configuration's Pet.
 - The Pet and all visible bubbles move together.
 - Bubbles can be hidden without necessarily hiding the Pet; Pet visibility and bubble visibility are separate controls.
 - A working Session remains visible while working.

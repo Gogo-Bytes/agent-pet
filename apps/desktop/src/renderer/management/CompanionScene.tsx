@@ -70,7 +70,7 @@ export function CompanionScene({ pets, page, preferences, action, replay, modelU
       {!!pets.length && <div className="scene-keyboard" aria-label="选择在线宠物">{pets.map(pet => <button key={pet.id} data-focus-id={pet.id} aria-pressed={focused === pet.id}
         aria-label={`聚焦 ${pet.agent} 的${pet.name}（${pet.configuration}）`} onClick={() => setFocused(pet.id)}>{pet.agent} · {pet.configuration}</button>)}</div>}
       {pets.length && !active ? <p className="home-scene-hint">{loading ? '正在加载内置宠物…' : '点击宠物，查看信息'}</p> : !pets.length ?
-        <div className="home-scene-empty"><h1>还没有在线的 Agent</h1><p>Agent 启动并连接后，它的宠物会出现在这里。</p><p>可以从底部「连接」添加配置。</p></div> : null}
+        <div className="home-scene-empty"><h1>还没有在线宠物</h1><p>为 Agent 绑定宠物，启动并连接后会出现在这里。</p><p>可以从底部「连接」添加配置。</p></div> : null}
     </>}
   </section>;
 }

@@ -30,7 +30,7 @@ describe('preload public renderer bridge', () => {
   it('delivers initial pushed state/layout without leaking IPC events; cleans up exact listeners', async () => {
     const bridge = createPetBridgeDouble({ observations: piBaselineObservations() });
     try {
-      const snapshot = bridge.snapshot();
+      const snapshot = { ...bridge.snapshot(), connectionCue: 'connected:preload:1' };
       const layout = baselineLayout();
       electron.invoke.mockImplementation(async (channel: string) => {
         if (channel === 'pet:request-snapshot') {

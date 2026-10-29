@@ -1,10 +1,11 @@
-import { createSessionState, type SessionState } from '@agent-pet/domain';
+import { createSessionState } from '@agent-pet/domain';
 import { defaultPreferences, type Preferences } from '../../../shared/preferences.js';
 import type { OverlayLayout } from '../../../shared/overlay-layout.js';
 
+import type { PetSnapshot } from '../../../shared/pet-snapshot.js';
 import type { PetAnimations } from '@agent-pet/pet-runtime';
 export type PetBridge = Omit<Window['pet'], 'getAsset'> & { getAsset?: (id: string) => Promise<{ bytes: Uint8Array; animations?: PetAnimations } | null> };
-type Snapshot = { sessions: SessionState; layout: OverlayLayout | null; preferences: Preferences; error: string };
+type Snapshot = { sessions: PetSnapshot; layout: OverlayLayout | null; preferences: Preferences; error: string };
 
 // One IPC listener pair, regardless of how many React/scene consumers subscribe.
 // getSnapshot returns the same object until an actual bridge update arrives.

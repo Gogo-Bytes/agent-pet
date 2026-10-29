@@ -15,11 +15,20 @@ function rememberCue(key: string) {
 /** Shared desktop/home/audition player. Drei alone owns mixer advancement and disposal. */
 export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: PetAnimations,
   request: string, reduced: boolean, replay: string | number = 0, restAction = 'idle',
-  interaction: PetInteraction | null = null, onInteractionFinished?: () => void) {
+  interaction: PetInteraction | null = null, onInteractionFinished?: () => void, connectionCue?: string) {
   // Absent local clips must not reset ongoing work or consume a pending business cue.
   const local = interaction && !reduced && resolvePetAnimation(interaction.action, mappings, clips.map(clip => clip.name))?.action === interaction.action ? interaction : null;
-  const playbackRequest = local?.action ?? request;
-  const playbackReplay = local ? 0 : replay;
+  // Connection is presentation-only and lower priority than current business/local feedback.
+  const connection = useMemo(() => connectionCue && !playedCues.has(connectionCue) && !reduced && !local &&
+    (request === 'idle' || request === 'presence') ? connectionCue : undefined, [connectionCue, request, reduced, local]);
+  useEffect(() => {
+    let active = true;
+    // Superseded, missing or reduced cues are consumed too, never queued for later idle.
+    if (connectionCue) queueMicrotask(() => { if (active) rememberCue(connectionCue); });
+    return () => { active = false; };
+  }, [connectionCue]);
+  const playbackRequest = local?.action ?? (connection ? 'connected' : request);
+  const playbackReplay = local ? 0 : connection ?? replay;
   const rest = useRef(restAction);
   rest.current = restAction;
   const instance = useMemo(() => ({ current: root }), [root]);

@@ -32,7 +32,7 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
   vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: clips } as ReturnType<typeof useGLTF>);
   let state!: RootState;
   function Probe() { state = useThree(); return null; }
-  let presentation: { replay?: string; restAction?: PetMotion; animations?: PetAnimations; modelUrl?: string; dragDirection?: DragDirection | null; interactionActive?: boolean } = {};
+  let presentation: { connectionCue?: string; replay?: string; restAction?: PetMotion; animations?: PetAnimations; modelUrl?: string; dragDirection?: DragDirection | null; interactionActive?: boolean } = {};
   const ready = vi.fn();
   const hover = vi.fn();
   const tree = (value: PetMotion, visible = true) => <StrictMode><Activity mode={visible ? 'visible' : 'hidden'}><Probe /><Bounds margin={1.2} maxDuration={0}>
@@ -45,6 +45,78 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
 }
 
 describe('PetModel bundled animation behavior', () => {
+  it('plays a configuration connection once, keeps its identity through remount, and accepts only a fresh reconnect', async () => {
+    const f = await mount();
+    const animations = { connected: 'Success', idle: 'Idle' };
+    await f.present({ animations, connectionCue: 'connected:desktop:first' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await f.present({ animations, connectionCue: 'connected:desktop:first' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.y).toBeCloseTo(.3, 4);
+    await f.view.advanceFrames(10, .1); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.view.unmount(); mounted.splice(mounted.indexOf(f.view), 1);
+    const again = await mount();
+    await again.present({ animations, connectionCue: 'connected:desktop:first' });
+    await again.view.advanceFrames(3, .1); expect(again.root.position.y).toBeCloseTo(.01, 4);
+    await again.present({ animations, connectionCue: 'connected:desktop:reconnect' });
+    await again.view.advanceFrames(3, .1); expect(again.root.position.y).toBeCloseTo(.225, 4);
+  });
+
+  it('does not interrupt current business or local feedback and never queues a covered connection for later idle', async () => {
+    const f = await mount('working');
+    const animations = { connected: 'Success', working: 'Work', success: 'Success', hover: 'Work', idle: 'Idle' };
+    await f.present({ animations }); await f.view.advanceFrames(2, .1);
+    await f.present({ animations, connectionCue: 'connected:busy:work' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.switchMotion('idle'); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.switchMotion('success');
+    await f.present({ animations, replay: 'connected:business-result' });
+    await f.view.advanceFrames(2, .1);
+    await f.present({ animations, replay: 'connected:business-result', connectionCue: 'connected:busy:result' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await f.view.advanceFrames(10, .1); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.present({ animations, replay: 'connected:business-result', connectionCue: 'connected:busy:consumed-result' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.y).toBeLessThan(.05);
+    await f.switchMotion('idle');
+    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(2, .1);
+    await f.present({ animations, connectionCue: 'connected:busy:hover' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
+  });
+
+  it('replaces a connection with the latest business cue without consuming that cue early', async () => {
+    const f = await mount();
+    const animations = { connected: 'Work', success: 'Success', idle: 'Idle' };
+    await f.present({ animations, connectionCue: 'connected:latest' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.present({ animations, connectionCue: 'connected:latest', replay: 'connection-next-business' });
+    await f.switchMotion('success'); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await f.switchMotion('idle'); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+  });
+
+  it('consumes reduced and missing connection feedback without delayed playback, including a static asset', async () => {
+    const f = await mount('idle', 140, asset.animations, true);
+    const animations = { connected: 'Success', idle: 'Idle' };
+    await f.present({ animations, connectionCue: 'connected:reduced' });
+    await f.view.advanceFrames(4, .1); expect(f.root.position.y).toBe(0);
+    await f.reduce(false); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.present({ animations: { connected: 'missing', idle: 'Idle' }, connectionCue: 'connected:missing' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.present({ animations, connectionCue: 'connected:missing' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
+    const still = await mount('idle', 140, []);
+    await still.present({ animations, connectionCue: 'connected:no-clips' });
+    await still.view.advanceFrames(3, .1); expect(still.root.position.toArray()).toEqual([0, 0, 0]);
+  });
+
   it('plays hover only on model entry, once per edge, then resumes work without requiring pointer exit', async () => {
     const f = await mount('working');
     const animations = { hover: 'Success', working: 'Work' };

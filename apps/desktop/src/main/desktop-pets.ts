@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron';
 import type { SessionState } from '@agent-pet/domain';
+import type { PetSnapshot } from '../shared/pet-snapshot.js';
 import { join } from 'node:path';
 import { configurationOnline, type AgentConfiguration, type ConfigurationsState } from '../shared/configurations.js';
 import type { Preferences } from '../shared/preferences.js';
@@ -28,10 +29,11 @@ export function createDesktopPets(options: {
     assertWindowSender(pet?.window, event);
     return pet!;
   }
-  function sessions(pet: DesktopPet): SessionState {
+  function sessions(pet: DesktopPet): PetSnapshot {
     const source = options.sessions();
     const belongs = (id: string) => configurations.sessionConfigurations[id] === pet.configuration.id;
-    return { sessions: Object.fromEntries(Object.entries(source.sessions).filter(([id]) => belongs(id))),
+    return { ...(pet.configuration.connectionCue ? { connectionCue: pet.configuration.connectionCue } : {}),
+      sessions: Object.fromEntries(Object.entries(source.sessions).filter(([id]) => belongs(id))),
       bubbles: source.bubbles.filter(bubble => belongs(bubble.sessionId)) };
   }
   function preferences(pet: DesktopPet): Preferences {

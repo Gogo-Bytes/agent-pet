@@ -51,6 +51,30 @@ async function mount(options: Parameters<typeof createPetBridgeDouble>[0] = {}) 
 }
 
 describe('App session interactions', () => {
+  it('passes the routed connection cue through store and PetCanvas without replacing business motion', async () => {
+    const { bridge } = await mount({ observations: [piObservation()] });
+    const receive = bridge.api.subscribeSnapshot.mock.calls.at(-1)![0];
+    const snapshot = { ...bridge.snapshot(), connectionCue: 'connected:app:1' };
+    act(() => receive(snapshot));
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ connectionCue: snapshot.connectionCue, motion: 'working' });
+  });
+  it('does not spend the connection cue on the temporary starter while its bound model bytes are pending', async () => {
+    const fixture = createPetBridgeDouble();
+    let finish!: (value: { bytes: Uint8Array; animations: { connected: string } }) => void;
+    const bridge = { ...fixture.api, getAsset: vi.fn(() => new Promise<{ bytes: Uint8Array; animations: { connected: string } }>(resolve => { finish = resolve; })) };
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:connected-bound'), revokeObjectURL: vi.fn() });
+    try {
+      render(<App store={createPetStore(bridge)} />); await act(async () => {});
+      const snapshot = { ...fixture.snapshot(), connectionCue: 'connected:bound:1' };
+      act(() => {
+        fixture.publishPreferences({ ...defaultPreferences, petAssetId: 'artist-pet' });
+        fixture.api.subscribeSnapshot.mock.calls.at(-1)![0](snapshot);
+      });
+      expect(vi.mocked(PetModel).mock.calls.at(-1)![0].connectionCue).toBeUndefined();
+      await act(async () => finish({ bytes: new Uint8Array([1]), animations: { connected: 'Greeting' } }));
+      expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ connectionCue: snapshot.connectionCue, modelUrl: 'blob:connected-bound' });
+    } finally { cleanup(); vi.unstubAllGlobals(); }
+  });
   it.each(['release', 'pointercancel', 'lostpointercapture', 'blur', 'unmount'])('passes actual drag direction without replacing business presentation and clears on %s', async ending => {
     const user = userEvent.setup();
     const { container, unmount, bridge } = await mount({ observations: [piObservation()] });

@@ -13,7 +13,7 @@ import { bundledAnimationBounds } from './bundled-animation-bounds.js';
 const noAnimations: PetAnimations = {};
 const dragTilt = Math.PI / 18;
 
-export function PetModel({ interactionActive = true, dragDirection = null, motion, reduced = false, onReady, onHover, animations, replay = 0, restAction = 'idle', modelUrl }:  { interactionActive?: boolean; dragDirection?: DragDirection | null; replay?: number | string; restAction?: PetMotion; reduced?: boolean; motion: PetMotion; animations?: PetAnimations | undefined; onReady: (message: string) => void; onHover?: (hovered: boolean) => void; modelUrl?: string | undefined }) {
+export function PetModel({ connectionCue, interactionActive = true, dragDirection = null, motion, reduced = false, onReady, onHover, animations, replay = 0, restAction = 'idle', modelUrl }:  { connectionCue?: string | undefined; interactionActive?: boolean; dragDirection?: DragDirection | null; replay?: number | string; restAction?: PetMotion; reduced?: boolean; motion: PetMotion; animations?: PetAnimations | undefined; onReady: (message: string) => void; onHover?: (hovered: boolean) => void; modelUrl?: string | undefined }) {
   const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(modelUrl ?? starterUrl, false, false);
   // Object transforms belong to this instance. The non-skinned bundled robot's
   // geometry/materials/textures still belong to useGLTF's shared URL cache.
@@ -21,7 +21,7 @@ export function PetModel({ interactionActive = true, dragDirection = null, motio
   const envelope = useMemo(() => modelUrl ? new Box3().setFromObject(gltf.scene) : bundledAnimationBounds(gltf.scene, gltf.animations), [gltf.scene, gltf.animations, modelUrl]);
   const interaction = usePetInteraction(interactionActive && !dragDirection && !reduced);
   // Keep incoming business cues unconsumed and the drag clip stable until release.
-  usePetAnimation(root, gltf.animations, animations ?? (modelUrl ? noAnimations : bundledAnimations), dragDirection ? 'dragging' : motion, reduced, dragDirection ? 0 : replay, restAction, interaction.feedback, interaction.finish);
+  usePetAnimation(root, gltf.animations, animations ?? (modelUrl ? noAnimations : bundledAnimations), dragDirection ? 'dragging' : motion, reduced, dragDirection ? 0 : replay, restAction, interaction.feedback, interaction.finish, connectionCue);
   const pitch = reduced ? 0 : dragDirection === 'up' ? -dragTilt : dragDirection === 'down' ? dragTilt : 0;
   const yaw = reduced ? 0 : dragDirection === 'left' ? -dragTilt : dragDirection === 'right' ? dragTilt : 0;
   const bounds = useBounds();

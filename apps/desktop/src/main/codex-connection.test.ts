@@ -60,13 +60,22 @@ it('feeds independent configuration identities through shared sessions/Home and 
     await collection.confirm(id, preview.id); const server = f.servers[index]!;
     server.onFact({ runId: 'owned-host', fact: { kind: 'session-started', source: 'startup', providerSessionId: 'PRIVATE_SESSION' } });
     server.onChange?.({ observedHosts: 1, observedSessions: 1 });
+    const cue = collection.snapshot().records[index]!.connectionCue;
+    expect(cue).toEqual(expect.any(String));
+    server.onChange?.({ observedHosts: 1, observedSessions: 2 });
+    server.onChange?.({ observedHosts: 1, observedSessions: 1 });
+    expect(collection.snapshot().records[index]!.connectionCue).toBe(cue);
   }
   expect(projectHomePets(collection.snapshot(), sessions, '团子').map(pet => pet.id)).toEqual(ids);
   expect(JSON.stringify(sessions)).not.toContain('PRIVATE_SESSION');
   expect(Object.values(collection.snapshot().sessionConfigurations)).toEqual(ids);
+  const cues = collection.snapshot().records.map(record => record.connectionCue);
+  expect(new Set(cues).size).toBe(2);
   await collection.disable(ids[0]!);
   expect(projectHomePets(collection.snapshot(), sessions, '团子').map(pet => pet.id)).toEqual([ids[1]]);
   await collection.rename(ids[1]!, '新名称'); expect(collection.snapshot().records[1]!.name).toBe('新名称');
+  expect(collection.snapshot().records[0]!.connectionCue).toBeUndefined();
+  expect(collection.snapshot().records[1]!.connectionCue).toBe(cues[1]);
 });
 it('invalidates a cancelled picker and refuses user-edited hooks on restart/remove', async () => {
   const f = fixture(); let select!: (path: string) => void;

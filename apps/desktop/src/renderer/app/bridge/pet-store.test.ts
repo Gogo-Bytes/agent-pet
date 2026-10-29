@@ -59,7 +59,8 @@ describe('createPetStore', () => {
     expect(store.getSnapshot().error).toBe('');
     off();
     const snapshot = store.getSnapshot();
-    oldCallback({ sessions: {}, bubbles: [] });
+    const stale = { sessions: {}, bubbles: [], connectionCue: 'connected:stale-registration' };
+    oldCallback(stale);
     expect(store.getSnapshot()).toBe(snapshot);
   });
 

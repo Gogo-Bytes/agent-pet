@@ -1,7 +1,7 @@
 import './test-support/mock-volume-queries.js';
 import net from 'node:net';
 import { once } from 'node:events';
-import { mkdtemp, mkdir, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { expect, it, vi } from 'vitest';
@@ -45,21 +45,41 @@ it('keeps home pets online for remaining peers and isolates configuration depart
       configs.push(start.mock.calls.at(-1)![0] as PiBridgeConfig);
     }
     expect(pets()).toEqual([]); // A listening/deployed receiver does not prove Agent online.
+    const rejected = await connect({ ...configs[0]!, token: 'invalid' }, 'unauthenticated');
+    await once(rejected.socket, 'close');
+    expect(collection.snapshot().records.every(record => !record.connectionCue)).toBe(true);
     const first = await connect(configs[0]!, 'same-process');
+    await vi.waitFor(() => expect(collection.snapshot().records[0]?.connectionCue).toEqual(expect.any(String)));
+    const firstCue = collection.snapshot().records[0]!.connectionCue;
+    expect(pets()[0]?.connectionCue).toBe(firstCue);
+    await collection.rename(ids[0]!, 'renamed');
+    expect(await readFile(join(directory, 'configurations.json'), 'utf8')).not.toContain('connectionCue');
+    await collection.bindPet(ids[0]!, null); expect(pets()).toEqual([]);
+    await collection.bindPet(ids[0]!, { assetId: 'starter', name: '小伙伴' });
+    expect(collection.snapshot().records[0]!.connectionCue).toBe(firstCue);
     const second = await connect(configs[0]!, 'second-process');
     const other = await connect(configs[1]!, 'same-process');
     await vi.waitFor(() => expect(Object.keys(app.snapshot().sessions)).toHaveLength(3));
     expect(pets().map(pet => pet.id)).toEqual(ids);
+    expect(collection.snapshot().records[0]!.connectionCue).toBe(firstCue);
+    expect(collection.snapshot().records[1]!.connectionCue).not.toBe(firstCue);
     first.send('completed'); second.send('working'); other.send('working');
     await vi.waitFor(() => expect(app.snapshot().bubbles).toHaveLength(3));
     await disconnect(first.socket);
     second.send('completed');
     await vi.waitFor(() => expect(app.snapshot().sessions[`${ids[0]}:pi:second-process:same-session`]?.status).toBe('completed'));
     expect(pets().map(pet => [pet.id, pet.action])).toEqual([[ids[0], 'success'], [ids[1], 'working']]);
+    expect(collection.snapshot().records[0]!.connectionCue).toBe(firstCue);
     await disconnect(second.socket);
     await vi.waitFor(() => expect(pets().map(pet => pet.id)).toEqual([ids[1]]));
     expect(app.snapshot().bubbles.filter(bubble => bubble.status === 'error-unread')).toEqual([]);
     expect(app.snapshot().bubbles).toHaveLength(3); // Offline does not acknowledge or rewrite task results.
+    expect(collection.snapshot().records[0]!.connectionCue).toBeUndefined();
+    const reconnected = await connect(configs[0]!, 'reconnected');
+    await vi.waitFor(() => expect(collection.snapshot().records[0]!.connectionCue).toEqual(expect.any(String)));
+    expect(collection.snapshot().records[0]!.connectionCue).not.toBe(firstCue);
+    await disconnect(reconnected.socket);
+    await vi.waitFor(() => expect(pets().map(pet => pet.id)).toEqual([ids[1]]));
     expect((await collection.remove(ids[0]!)).notice).toBe('none');
     expect(pets().map(pet => pet.id)).toEqual([ids[1]]);
     other.send('completed');

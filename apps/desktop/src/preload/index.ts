@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { SessionRef, OpenSessionResult } from '@agent-pet/adapter-core';
-import type { SessionState } from '@agent-pet/domain';
+import type { PetSnapshot } from '../shared/pet-snapshot.js';
 
 const channels = {
   acknowledgeAndOpen: 'pet:acknowledge-and-open',
@@ -42,8 +42,8 @@ const petApi = {
   resizeWindowBy(delta: { x: number; y: number }): Promise<void> {
     return ipcRenderer.invoke(channels.resizeWindowBy, delta);
   },
-  subscribeSnapshot(listener: (snapshot: SessionState) => void): () => void {
-    const handler = (_event: Electron.IpcRendererEvent, snapshot: SessionState) => {
+  subscribeSnapshot(listener: (snapshot: PetSnapshot) => void): () => void {
+    const handler = (_event: Electron.IpcRendererEvent, snapshot: PetSnapshot) => {
       listener(snapshot);
     };
     ipcRenderer.on(channels.snapshot, handler);

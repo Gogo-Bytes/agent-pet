@@ -152,7 +152,7 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 用户要求逐项核对后，已完成[触发审计](PET-TRIGGER-AUDIT.md)：区别目录/试播、真实事件来源、Renderer接线和原生验收；不把23项目录等同23项自动支持。拖动阶段已提交 `84edb31`，Main复核62项通过，子执行全量1501 passed/1 skipped、typecheck/build通过，真实方向手感未验。
 
-hover/selected 已按下节完成工程接线，原生视觉待验。后续顺序：①按配置离线→在线边沿补 connected，明确重挂与重连幂等；②核对并接通 Claude 已有 max_output_tokens 细类，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+hover/selected 与 connected 已按下节完成工程接线，原生视觉待验。后续顺序：①保留连接重挂/重连有界缓存限制并待实机验收；②核对并接通 Claude 已有 max_output_tokens 细类，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
 
 ### 本地 hover / selected 接线
 
@@ -162,7 +162,21 @@ hover/selected 已按下节完成工程接线，原生视觉待验。后续顺�
 
 先以 PetModel 真实 GLB hover、HomeScene 接线、CompanionScene 明确选择分别取得红测试，再最小实现；追加子 mesh 切换红测并修复误重启。新增12项回归，聚焦 **98 passed / 7 files**；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`pnpm test --maxWorkers=1`（**1513 passed / 1 skipped / 132 files**）通过。首轮 hover 完成断言未用 act 刷新 React 状态，补 act 后一次复验通过；Home fixture 首个 Work 数值断言校正到既有已知 0.3s 姿态后确认实际缺接线红测。未改生产阈值或旧保护测试，Three 多实例警告保留。`git diff --check` 通过，完整差异已核对仅含本阶段 Renderer/回归与相关文档。
 
-这是 DOM 接线与真实 GLTFLoader/Drei/AnimationMixer 自动化证据，不是原生桌面/用户模型/GPU视觉验收。未重启 dev、未打包/推送、未操作真实 Agent/模型/配置；格温循环接缝未处理。下一独立阶段仍是 connected 的配置边沿/幂等核对，不在本次差异中。
+这是 DOM 接线与真实 GLTFLoader/Drei/AnimationMixer 自动化证据，不是原生桌面/用户模型/GPU视觉验收。未重启 dev、未打包/推送、未操作真实 Agent/模型/配置；格温循环接缝未处理。当时下一独立阶段是 connected 的配置边沿/幂等核对；现已由下节独立阶段完成。
+
+### 配置 connected 边沿接线
+
+本阶段基线 `4852c7b`（上一阶段 hover/selected 已提交、工作区干净）。Main `Configurations` 只按已认证配置聚合离线→在线生成临时 `connectionCue`，离线清除；同配置第二 Session/重复发布/部分退出/命名/绑定切换不生成新身份，真正重连才换 ID。身份不写入 configurations metadata，不改变 Provider 业务事实、未读或协议。桌面沿既有 per-window `pet:snapshot`/preload/store/PetCanvas 接线，首页沿配置投影/HomeScene 接线；无新 IPC 命令、持久事件总线或队列。
+
+共享播放器只在 idle/中性 presence 上播 connected once，当前工作/业务结果（包括已消费结果的请求）、拖动和本地交互优先；被覆盖/reduced/缺失的连接 cue 不等待下次 idle，新业务立即替换连接反馈。绑定模型URL未就绪时不让临时 starter 消费cue；读取失败保留既有fallback，不声称已播放连接。原动作键、schema、fallback、单次业务幂等、在线绑定过滤和离线立即移除保持，不实现 disconnected。
+
+每个视觉 surface 可呈现同一配置边沿，复用既有 Renderer 模块最多256项缓存：同 Renderer 页面重挂不重播；renderer崩溃/窗口销毁后缓存丢失，可再次呈现同一ID，但 Main 不制造新边沿。这是明确的缓存范围，不承诺跨Renderer exactly-once；不是用户级持久回执。
+
+红绿证据：配置真实隔离socket首次边沿缺失、PetModel真实GLB连接播放缺失、desktop/App/Home三处投递缺失，以及自定义模型等待阶段提前消费cue均先失败、最小实现后通过。新增 **10项**，更新已有pi/Claude/Codex/preload/store回归：无效peer不产cue、双Session/部分与全部断开/重连/配置隔离、未读保留、非持久化、旧窗口late-ready拒绝、恢复snapshot身份稳定、旧initial响应/订阅忽略、Home重挂、业务/局部反馈优先、最新业务替换、无clip/静态/reduced与延迟模型加载。
+
+顺序验证：聚焦 **126 passed / 13 files**；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`pnpm test --maxWorkers=1`（**1523 passed / 1 skipped / 133 files**）通过。`git diff --check`通过；差异已检查，仅本阶段源码/回归/设计与进度文档。日志 `/tmp/connected-{focused,typecheck,build,full}.log`；预期红测日志另存 `/tmp/connected-{aggregate,player,wiring,asset}-red.log`，没有非预期失败或基础设施回退。Three多实例警告和既有skip保留。
+
+以上是Main/IPC/DOM和真实GLTFLoader/Drei/AnimationMixer自动化，不是原生窗口/GPU/用户模型视觉验收。未重启dev、打包、推送、安装依赖、访问真实Agent/模型或修改用户资产/配置。格温循环接缝仍独立未解决；后续明确业务细类或真实视觉验收不混入本阶段。
 
 ## Pi 观察缓存清理修正
 

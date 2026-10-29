@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ObservationSink } from '@agent-pet/adapter-core';
 import type { PiBridgeAdapter } from '@agent-pet/adapter-pi';
-import { configurationProviders, type AgentConfiguration, type ConfigurationMetadata, type ConfigurationNotice,
+import { configurationOnline, configurationProviders, type AgentConfiguration, type ConfigurationMetadata, type ConfigurationNotice,
   type ConfigurationsState, type CreateConfiguration, type PetBinding } from '../shared/configurations.js';
 import type { Inspection, PreflightState } from '../shared/pi-preflight.js';
 import { PET_ASSET_ID } from '../shared/pet-assets.js';
@@ -16,7 +16,7 @@ import { CodexConnection, type CodexConnectionOptions } from './codex-connection
 import { ClaudeNormalPresence } from './claude-normal-presence.js';
 import { createClaudeObservations } from '../../../../integrations/claude-hooks/observations.js';
 
-type Entry = { metadata: ConfigurationMetadata; inspection: Inspection | null; revision: number;
+type Entry = { connectionCue?: string; metadata: ConfigurationMetadata; inspection: Inspection | null; revision: number;
   connection: PiConnection | null; codex?: CodexConnection; claude?: ClaudePresence | ClaudeNormalPresence;
   claudeObservations?: ReturnType<typeof createClaudeObservations>; unsubscribe?: () => void; controller?: AbortController };
 
@@ -87,6 +87,7 @@ export class Configurations {
     }
     if (metadata.provider === 'codex' && this.options.codex) this.attachCodex(entry);
     if (entry.connection) entry.unsubscribe = entry.connection.subscribe(() => this.emit());
+    this.updateConnectionCue(entry);
   }
   private attachClaude(entry: Entry): void {
     const options = this.options.claude!;
@@ -117,6 +118,7 @@ export class Configurations {
   private receiverDirectory(id: string): string { return join(this.options.directory, `configuration-${id}`); }
   snapshot(): ConfigurationsState {
     const records: AgentConfiguration[] = [...this.entries.values()].map(entry => ({ ...structuredClone(entry.metadata),
+      ...(entry.connectionCue ? { connectionCue: entry.connectionCue } : {}),
       inspection: structuredClone(entry.inspection), connection: entry.connection?.snapshot() ?? null,
       ...(entry.claude ? { claude: entry.claude.snapshot() } : {}),
       ...(entry.codex ? { codex: entry.codex.snapshot() } : {}),
@@ -137,7 +139,15 @@ export class Configurations {
   invalidateAll(): void {
     for (const entry of this.entries.values()) { entry.controller?.abort(); entry.connection?.invalidate(); entry.claude?.invalidate(); entry.codex?.invalidate(); }
   }
+  private updateConnectionCue(entry: Entry): void {
+    const online = configurationOnline({ connection: entry.connection?.snapshot() ?? null,
+      ...(entry.claude ? { claude: entry.claude.snapshot() } : {}),
+      ...(entry.codex ? { codex: entry.codex.snapshot() } : {}) });
+    if (!online) delete entry.connectionCue;
+    else entry.connectionCue ??= `connected:${entry.metadata.id}:${randomUUID()}`;
+  }
   private emit(): ConfigurationsState {
+    for (const entry of this.entries.values()) this.updateConnectionCue(entry);
     this.revision++; const state = this.snapshot();
     for (const listener of this.listeners) listener(state);
     return state;

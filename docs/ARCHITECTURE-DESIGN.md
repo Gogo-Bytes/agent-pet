@@ -136,6 +136,12 @@ Asset import is a main-side pipeline: choose local file -> check extension/MIME 
 
 The renderer still treats validated assets as untrusted data: bounded decoder options, no network fetches, no arbitrary path traversal, disposal of prior GPU resources, and render budgets (DPR/frame-rate/visibility throttling). Animation mapping is data-driven and deterministic. GLB-only is enforced; no conversion pathway silently broadens format support. License/attribution metadata should accompany bundled assets and user metadata but is not a marketplace.
 
+### Renderer-local interaction playback
+
+`PetModel` (desktop) and interactive `ScenePet` (home only) feed real R3F hit edges to `usePetInteraction`; moving between child meshes is not a model exit. `CompanionScene` supplies an explicit selection counter for model clicks and the existing keyboard-accessible online-pet buttons. Focus, rerenders, collection thumbnails and audition mounts are not selection events. Each instance owns only its latest local feedback; no business IPC or event queue is added.
+
+`usePetAnimation` overlays a mapped hover/selected clip once, suppressing business cue consumption until local feedback ends. Completion/cancellation resumes the latest request/rest action with existing once deduplication; missing local clips leave the business player untouched. Drag retains priority and cancels prior local feedback; reduced motion skips local feedback, while existing drag/business pause rules remain. Window blur, pointer cancellation/lost capture, document hiding, page disable and unmount clear/release local state or listeners. Catalog/schema/fallback order, online bound-only projection and immediate offline removal are unchanged. Automated R3F/Three tests do not certify native hit delivery or GPU visual quality.
+
 ## 8. Persistence boundaries
 
 Persist only local preferences and durable configuration needed to reconnect: enabled adapters, explicitly configured executable paths/working-directory allowlists, window/visibility preferences, selected validated asset id/hash and asset metadata, schema version, and migration data. Use an Electron main-owned OS-appropriate application data directory with atomic writes and restrictive permissions.

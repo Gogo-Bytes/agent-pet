@@ -152,7 +152,17 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 用户要求逐项核对后，已完成[触发审计](PET-TRIGGER-AUDIT.md)：区别目录/试播、真实事件来源、Renderer接线和原生验收；不把23项目录等同23项自动支持。拖动阶段已提交 `84edb31`，Main复核62项通过，子执行全量1501 passed/1 skipped、typecheck/build通过，真实方向手感未验。
 
-后续顺序：①补有真实本地事件的 hover/selected；②按配置离线→在线边沿补 connected，明确重挂与重连幂等；③核对并接通 Claude 已有 max_output_tokens 细类，其他缺原生可靠事实的 Provider 能力保持未知；④sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；⑤按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+hover/selected 已按下节完成工程接线，原生视觉待验。后续顺序：①按配置离线→在线边沿补 connected，明确重挂与重连幂等；②核对并接通 Claude 已有 max_output_tokens 细类，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+
+### 本地 hover / selected 接线
+
+桌面和首页通过真实 R3F 模型进入边沿播放 `hover`，跨同一模型子 mesh 不重播；工具栏容器进入仍只管理工具栏。首页模型点击和在线宠物选择按钮的点击/Enter/Space 经同一显式计数触发 `selected`；初始焦点、重渲染、重挂和收藏缩略图不冒充场景选择，桌面未新增选择交互。复用现有播放器和目录，增加实例内最小 latest-wins 反馈，不加业务 IPC/队列/骨骼处理。
+
+本地反馈播放一次即释放，悬停退出、取消选择、窗口失焦/隐藏、pointercancel/lostcapture、页面离开和卸载有界清理；拖动优先且不恢复被覆盖的旧 hover。交互期间业务 cue 不被消费，结束恢复最新业务请求/rest，已消费 once 不重播。缺交互 clip 不重置工作，reduced 不启动局部反馈，无动画仍静态；既有 fallback、一次语义、按配置隔离、在线绑定过滤及离线立即移除不变。
+
+先以 PetModel 真实 GLB hover、HomeScene 接线、CompanionScene 明确选择分别取得红测试，再最小实现；追加子 mesh 切换红测并修复误重启。新增12项回归，聚焦 **98 passed / 7 files**；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`pnpm test --maxWorkers=1`（**1513 passed / 1 skipped / 132 files**）通过。首轮 hover 完成断言未用 act 刷新 React 状态，补 act 后一次复验通过；Home fixture 首个 Work 数值断言校正到既有已知 0.3s 姿态后确认实际缺接线红测。未改生产阈值或旧保护测试，Three 多实例警告保留。`git diff --check` 通过，完整差异已核对仅含本阶段 Renderer/回归与相关文档。
+
+这是 DOM 接线与真实 GLTFLoader/Drei/AnimationMixer 自动化证据，不是原生桌面/用户模型/GPU视觉验收。未重启 dev、未打包/推送、未操作真实 Agent/模型/配置；格温循环接缝未处理。下一独立阶段仍是 connected 的配置边沿/幂等核对，不在本次差异中。
 
 ## Pi 观察缓存清理修正
 

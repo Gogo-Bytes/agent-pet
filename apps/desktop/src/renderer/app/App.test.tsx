@@ -92,6 +92,9 @@ describe('App session interactions', () => {
     // Hovering the compact region also reveals controls without a model event.
     await user.hover(group);
     await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('true'));
+    // Toolbar envelope does not supply model-hit or selection animation input.
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ motion: 'idle', interactionActive: true });
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0].onHover).toBeUndefined();
     act(() => window.dispatchEvent(new Event('blur')));
     await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('false'));
     await user.unhover(group);

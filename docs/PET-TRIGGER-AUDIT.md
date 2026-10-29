@@ -1,10 +1,12 @@
-# 23 个动画触发审计
+# 动画触发审计（当前 22 项）
+
+> 用户已确认删除无事件来源、无行为实现的 `sleeping`，仅保留 `idle` 空闲。公共类型、目录和模板同步移除；旧包该字段按未知可选映射忽略。下文原23项取样中的休眠行仅为删除依据，不再是待决策或待实施项。
 
 > 当前更新：拖动 `84edb31`、hover/selected `4852c7b`、connected `3a170d1` 已提交；connected 聚焦126项、全量1523 passed/1 skipped/133 files、typecheck/build通过。本轮 Claude output_limited 核对因精确原生语义证据不足停止，未实施，generic error 保持。详见下节；仍非原生/GPU视觉验收，格温接缝及其他未接项保持。
 
 ## 结论
 
-**目录有 23 项 ≠ 23 项都有自动事件。** 当前 pi 的工作/细分活动/结果链路已接；Claude/Codex 有意只发布可靠事实，工具结果是短反馈，不是持续工作或整个任务完成。`hover`、`selected` 已接真实本地交互，`connected` 已接配置边沿动画，`sleeping` 未定义来源，`attention` 仅作回退；`retrying` 没有可靠已接业务源。`disconnected` 与“离线立即销毁宠物窗口/移除首页实例”直接冲突。
+**目录有 23 项 ≠ 23 项都有自动事件。** 当前 pi 的工作/细分活动/结果链路已接；Claude/Codex 有意只发布可靠事实，工具结果是短反馈，不是持续工作或整个任务完成。`hover`、`selected` 已接真实本地交互，`connected` 已接配置边沿动画，`sleeping` 已删除，`attention` 仅作回退；`retrying` 没有可靠已接业务源。`disconnected` 与“离线立即销毁宠物窗口/移除首页实例”直接冲突。
 
 原只读审计时拖动尚在实施，以下未更新的行号仍是当时快照，原1491测试数字仅属历史基线；当前拖动状态由页首覆盖。本轮新增下面 connected 范围，hover/selected 为上一阶段，没有运行真实应用/Agent/模型、外网、安装或用户资产操作（仅隔离测试socket）。
 
@@ -30,7 +32,7 @@
 - 干净基线 `3a170d1`；仓库有界检索仅证实 normalize 对 `StopFailure.error=max_output_tokens` 的精确白名单及合成测试，未找到证明其触发条件的版本化原生字段定义/实现。observations 仍统一发布 error，不暴露正文，不制造 success。
 - Main 一次核对[官方 StopFailure input](https://code.claude.com/docs/en/hooks#stopfailure-input)：类别表确有 `max_output_tokens`，与 `rate_limit`、`unknown` 并列，但没有解释其精确触发语义，未提 `model_context_window_exceeded`。类别存在不等于已证明它只表示输出上限，而非上下文容量等限制。README 的 2.1.78 release 引用也只证明 StopFailure 事件新增。
 - **阻塞的是细分映射，不是既有错误反馈。** 在取得可区分输出上限/上下文容量/限流/未知错误的精确官方或原生实现依据前，不加 output_limited occurrence/capability。没有改生产/测试，没有扩展其他Provider；本轮仅文档 diff 检查，未重跑测试/typecheck/build、未做原生/GPU验收或真实Agent操作。上节测试数字只属于已提交的 connected 阶段。
-- 来源问题：何处有已支持 Claude 版本该原生字段的精确触发定义？另待产品决定 sleeping 来源/恢复、attention 是否需要独立事件、离线立即移除下 disconnected 的可见位置；retrying 仍无可靠源。本轮不实现这些待定项，也不处理格温接缝。
+- 来源问题：何处有已支持 Claude 版本该原生字段的精确触发定义？另待产品决定 attention 是否需要独立事件、离线立即移除下 disconnected 的可见位置；retrying 仍无可靠源。本轮不实现这些待定项，也不处理格温接缝。
 
 ## 共用证据索引
 
@@ -85,7 +87,7 @@
 |鼠标悬停时 `hover`|本地真实 pointer 命中，与 Provider 无关|**已接**桌面 PetModel / 首页 ScenePet → usePetInteraction → L；工具栏容器不触发，子 mesh 切换不重播|本轮真实GLB/R3F、DOM与生命周期回归通过；原生入/出、透明空域与用户资产视觉仍待验|
 |选中宠物时 `selected`|首页模型 click / 在线宠物选择按钮，与 Provider 无关|**已接** CompanionScene 显式 selection counter → HomeScene / ScenePet → L；点击、Enter/Space同源，初始focus/缩略图不触发，桌面无选择操作|本轮DOM与R3F覆盖重复点击/取消、配置隔离、最新业务恢复；原生键盘/动画视觉待验|
 |被拖动 `dragging`|本地窗口 gesture，不是 Provider 事件|**已交付** `84edb31`，同一 dragging 映射；本轮保留拖动优先|原capture/cancel/blur/unmount及方向/业务回归保留，本轮补hover→drag→业务恢复；原生方向手感待验|
-|进入休眠时 `sleeping`|未定义是用户空闲、Agent 空闲、系统睡眠还是手动|**缺定义/缺源/缺接线**：A:26 有目录；Q 无分支；PreferenceRenderLoop.tsx:9-10 的 hidden 暂停只是停绘制，不是 sleeping|无专门自动触发测试；定义后才做对应时钟/恢复/系统事件验收，不凭静默猜离线或休眠|
+|进入休眠时 `sleeping`|未定义是用户空闲、Agent 空闲、系统睡眠还是手动|**已删除**：原目录预留但无事件来源/实现；hidden 停绘制不等于 Agent 休眠|回归验证目录/模板无此项、旧包字段忽略、直接请求不回退到idle；不新增计时器|
 
 ## 跨链路风险与生命周期
 
@@ -93,7 +95,7 @@
 2. **once 幂等有明确边界。** L 使用 `sessionId:occurrenceId` 或 `sessionId:workId:success/error`；重命名、restAction 更新不应重播，数字 replay 只用于手动试播。缓存为每 Renderer 模块内最多256项；不是跨原生窗口/进程持久化。窗口因离线销毁后重建、renderer 崩溃重载会丢缓存，Application 保留的未读终态可能重新播放。M 去掉 reconnect occurrence 不等于跨 Renderer 保留结果“不重播”。建议补这一有界回归，按当前产品决定是允许新呈现还是需保存展示身份，不先做持久消息系统。
 3. **cue 在 effect 微任务记为已见，不是播放完成才记。** 无 clip、reduced 暂停、隐藏无帧、下一状态立即替换也可消费 cue。`reduced` 改变会重新跑 effect，已消费 once 回 rest；hidden 只停帧不禁止 effect。应验证“已接收但没看到”的边界，不能把 cue 去重测试当肉眼看见。
 4. **fallback 已实现且应保留。** 可选全部 clip，包括 idle；未知请求/无匹配最终静态。细活动→working→idle；waiting→attention→idle；业务 once 回退 attention 仍一次；缺 transient 且当前有活动时不切 idle。结束后使用最新 restAction。不会自动生成或猜 clip 名，也不把导入资产当 starter 映射。
-5. **试播与自动触发完全分开。** `PetsView.tsx:45,78-82` 展示可用映射；`ManagementApp.tsx:131` 每次手动增加数字 replay。即使 connected/hover/sleeping 可在这里播放，也不证明真实监听已接。首页显式选择和桌面真实命中现已接动画，但收藏选择仍不代表场景命中。
+5. **试播与自动触发完全分开。** `PetsView.tsx:45,78-82` 展示可用映射；`ManagementApp.tsx:131` 每次手动增加数字 replay。即使 connected/hover 可在这里播放，也不证明真实监听已接。首页显式选择和桌面真实命中现已接动画，但收藏选择仍不代表场景命中。
 6. **在线/任务状态不应混淆。** Claude/Codex unknown 渲染 idle 是视觉默认，不是观测到任务闲置；旧 Claude presence-only 首页静态与桌面 idle 可统一为明确的未知状态策略，但不能引入假工作事件。waiting 状态必须有受支持 facts 配对清除。
 7. **Gwen 循环卡顿独立未解决。** 既有“尾部闭合约0.25秒、首尾端点不连续”仅是待处理线索，本审计没有读取用户模型或证明根因/修复；触发接通不解决 clip 自身接缝。另开现有 clip 播放验证，不做骨骼、IK、retargeting、生成动画或新框架。
 
@@ -105,10 +107,10 @@
 2. **补 UI 有真实来源的 hover / selected。** 范围：App/PetCanvas/PetModel、HomeScene/CompanionScene/ScenePet、L 的既有 request/replay/rest 参数及对应测试。用真实命中入边沿、明确 selection 边沿驱动局部 cue；键盘与鼠标一致，退出/blur/卸载清理。不把工具栏容器进入算命中模型；不影响业务 state/未读/IPC。先明确和拖拽、业务 once 的覆盖规则，优先最小 latest-wins，而非新框架。
 3. **补 connected 并核对幂等（本轮已完成工程范围，原生待验）。** 复用已认证配置在线事实；按“配置从离线→在线”而非每条 hello/每个 Session/每次场景挂载生成展示身份。范围：Configurations/Main 每配置投递 seam、desktop/home presentation、必要 shared/preload 类型和 tests。保持 per-config 隔离与迟到窗口 ready 守卫。本轮已红绿验证重连未读/renderer重建边界，身份仅放Main Entry；复用Renderer模块缓存、不加持久回执，不改Provider业务事实。
 4. **补明确已有细分事实，其他能力保持未知（Claude本轮证据阻塞）。** Claude `max_output_tokens` 只有类别列举，精确触发语义尚未证实，当前不实施；取得可靠原生依据后才沿现有 occurrence/capability 加 output_limited，保留 error 未读、不制造 success，并先做 normalize→observations→Application/Q 及重复/旧prompt/retire/新work/fallback回归。其余 C/X thinking/responding/working/success/wait/retry 等无可靠源的不强补；不解析 transcript、shell 或错误正文。
-5. **决策后才做 sleeping / disconnected / 独立 attention。** sleeping 要定义来源、进入阈值/唤醒条件（若选择计时）及忙碌时是否禁止；没有定义不加任意计时器。disconnected 要在“保持离线立即移除”与“特定可见处展示断开”中明确产品范围；前者意味着桌面 disconnected 只能手动预览，不应宣称自动可见。**不默认为延迟销毁窗口。** attention 若仅保留 fallback，直接记录无需独立事件；若要未读持续关注，需用户确认其与 success/error once、确认和多 Session 的关系。
+5. **sleeping 已删除；disconnected / 独立 attention 保持当前边界。** 不为空闲增加休眠计时器。disconnected 要在“保持离线立即移除”与“特定可见处展示断开”中明确产品范围；前者意味着桌面 disconnected 只能手动预览，不应宣称自动可见。**不默认为延迟销毁窗口。** attention 若仅保留 fallback，直接记录无需独立事件；若要未读持续关注，需用户确认其与 success/error once、确认和多 Session 的关系。
 6. **集中真实验收，与 Gwen 接缝分开。** 各 Provider 用允许的已有原生事件、绑定已有 clips：事件事实→每配置投影→桌面/Home实际播放→退出/下一轮/重连；包括无映射/无idle/静态资产、切页隐藏、reduced、快速连续事件及长clip。先复用授权范围，新增 Agent/模型/用户文件操作另取精确授权。每阶段测试+typecheck+desktop build 通过仅是工程证据，不等于原生桌面动画验收。
 
-需产品决定的真正阻塞：sleeping 的含义；disconnected 可见性与立即移除规则；是否要求每个短事件完整播完（当前 latest-wins），以及独立 attention 是否确实需要。其余清晰接线/回归无需人为增加审批仪式。
+需产品决定的真正阻塞：disconnected 可见性与立即移除规则；是否要求每个短事件完整播完（当前 latest-wins），以及独立 attention 是否确实需要。其余清晰接线/回归无需人为增加审批仪式。
 
 未做：日常配置/用户模型读取、原生/GPU视觉验收、dev 重启、打包或推送。
 风险：23 项不能宣称全自动支持；latest-wins不保证快速事件完整播放，Gwen 循环接缝仍未解决。

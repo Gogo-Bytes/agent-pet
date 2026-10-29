@@ -27,7 +27,6 @@
     "disconnected": null,
     "hover": null,
     "selected": null,
-    "dragging": null,
-    "sleeping": null
+    "dragging": null
   }
 }

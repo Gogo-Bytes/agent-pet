@@ -148,11 +148,13 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
-### 23 项触发接线审计与后续顺序
+### 触发接线审计与后续顺序（当前22项）
+
+用户确认：Agent无独立休眠概念，删除仅目录预留的 `sleeping`，保留 `idle`。同步公共类型、JSON目录、作者模板和设计说明；旧包携带该字段按既有未知映射规则忽略，不修改用户模型/包，不增加休眠计时器，不改变其他fallback。新增回归覆盖删除与旧包兼容。验证：聚焦10项、全量133文件/1524 passed/1 skipped，typecheck与desktop build通过；未修改用户资产、未重启应用或做原生视觉验收。
 
 用户要求逐项核对后，已完成[触发审计](PET-TRIGGER-AUDIT.md)：区别目录/试播、真实事件来源、Renderer接线和原生验收；不把23项目录等同23项自动支持。拖动阶段已提交 `84edb31`，Main复核62项通过，子执行全量1501 passed/1 skipped、typecheck/build通过，真实方向手感未验。
 
-hover/selected 与 connected 已按下节完成工程接线，原生视觉待验。后续顺序：①保留连接重挂/重连有界缓存限制并待实机验收；②Claude max_output_tokens 细类核对已到证据停点（见下节），取得精确原生语义前保持 generic error，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+hover/selected 与 connected 已按下节完成工程接线，原生视觉待验。后续顺序：①保留连接重挂/重连有界缓存限制并待实机验收；②Claude max_output_tokens 细类核对已到证据停点（见下节），取得精确原生语义前保持 generic error，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping已按用户确认删除，仅保留idle空闲；disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
 
 ### 本地 hover / selected 接线
 
@@ -190,7 +192,7 @@ Main 另做一次有界[官方 StopFailure input 文档核对](https://code.clau
 
 本轮仅同步证据停点文档，`git diff --check` 通过；未运行测试、typecheck/build（没有代码或测试变更），不声称本细类已实现或原生/GPU验收通过。此文档记录可独立提交，不是未完成实现的提交。未重启dev、安装、打包、推送或读取/修改用户Agent配置/资产。
 
-后续仍待产品决定且本轮不实施：sleeping 指用户空闲、Agent空闲、系统睡眠还是手动（以及进入/恢复条件）？attention 是否仅保留 fallback，还是需要独立关注及确认语义？若保持离线立即移除，disconnected 是否只保留手动预览，或另定义可见位置？retrying 仍缺可靠业务来源；格温循环卡顿独立未解决。
+后续仍待产品决定且本轮不实施：sleeping 后续已由用户明确删除，不再待定义；attention 是否仅保留 fallback，还是需要独立关注及确认语义？若保持离线立即移除，disconnected 是否只保留手动预览，或另定义可见位置？retrying 仍缺可靠业务来源；格温循环卡顿独立未解决。
 
 ## Pi 观察缓存清理修正
 

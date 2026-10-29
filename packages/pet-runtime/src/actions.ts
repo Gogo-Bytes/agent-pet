@@ -23,7 +23,6 @@ export const petActionCatalog = {
   hover: { label: '鼠标悬停时', playback: 'once', fallback: ['idle'] },
   selected: { label: '选中宠物时', playback: 'once', fallback: ['idle'] },
   dragging: { label: '被拖动', playback: 'loop', fallback: ['idle'] },
-  sleeping: { label: '进入休眠时', playback: 'loop', fallback: ['idle'] },
 } as const;
 export type PetAnimationTrigger = keyof typeof petActionCatalog;
 /** Compatibility name for existing consumers; values identify triggers, not GLB clips. */

@@ -2,19 +2,19 @@
   "actionCatalogVersion": 1,
   "actions": {
     "idle": {
-      "label": "待机",
+      "label": "空闲时",
       "playback": "loop",
       "fallback": []
     },
     "working": {
-      "label": "工作",
+      "label": "任务进行中",
       "playback": "loop",
       "fallback": [
         "idle"
       ]
     },
     "thinking": {
-      "label": "思考",
+      "label": "正在思考",
       "playback": "loop",
       "fallback": [
         "working",
@@ -22,7 +22,7 @@
       ]
     },
     "responding": {
-      "label": "回答",
+      "label": "正在输出回答",
       "playback": "loop",
       "fallback": [
         "working",
@@ -30,7 +30,7 @@
       ]
     },
     "reading": {
-      "label": "阅读",
+      "label": "正在读取文件",
       "playback": "loop",
       "fallback": [
         "working",
@@ -38,7 +38,7 @@
       ]
     },
     "writing": {
-      "label": "写作",
+      "label": "正在修改文件",
       "playback": "loop",
       "fallback": [
         "working",
@@ -46,7 +46,7 @@
       ]
     },
     "searching": {
-      "label": "查找",
+      "label": "正在搜索",
       "playback": "loop",
       "fallback": [
         "working",
@@ -54,7 +54,7 @@
       ]
     },
     "executing": {
-      "label": "执行",
+      "label": "正在执行命令",
       "playback": "loop",
       "fallback": [
         "working",
@@ -62,7 +62,7 @@
       ]
     },
     "compacting": {
-      "label": "整理",
+      "label": "正在压缩上下文",
       "playback": "loop",
       "fallback": [
         "working",
@@ -70,7 +70,7 @@
       ]
     },
     "waiting_input": {
-      "label": "等你操作",
+      "label": "等待输入",
       "playback": "loop",
       "fallback": [
         "attention",
@@ -78,7 +78,7 @@
       ]
     },
     "success": {
-      "label": "庆祝",
+      "label": "任务完成",
       "playback": "once",
       "fallback": [
         "attention",
@@ -86,7 +86,7 @@
       ]
     },
     "error": {
-      "label": "出错",
+      "label": "发生错误",
       "playback": "once",
       "fallback": [
         "attention",
@@ -94,7 +94,7 @@
       ]
     },
     "tool_error": {
-      "label": "遇到问题",
+      "label": "工具执行失败",
       "playback": "once",
       "fallback": [
         "attention",
@@ -102,7 +102,7 @@
       ]
     },
     "retrying": {
-      "label": "再试一次",
+      "label": "正在重试",
       "playback": "loop",
       "fallback": [
         "working",
@@ -110,7 +110,7 @@
       ]
     },
     "output_limited": {
-      "label": "回答中断",
+      "label": "输出达到限制",
       "playback": "once",
       "fallback": [
         "attention",
@@ -118,42 +118,42 @@
       ]
     },
     "cancelled": {
-      "label": "停下",
+      "label": "任务已取消",
       "playback": "once",
       "fallback": [
         "idle"
       ]
     },
     "attention": {
-      "label": "提醒",
+      "label": "需要关注",
       "playback": "loop",
       "fallback": [
         "idle"
       ]
     },
     "connected": {
-      "label": "欢迎",
+      "label": "Agent 已连接",
       "playback": "once",
       "fallback": [
         "idle"
       ]
     },
     "disconnected": {
-      "label": "寻找连接",
+      "label": "Agent 已断开",
       "playback": "loop",
       "fallback": [
         "idle"
       ]
     },
     "hover": {
-      "label": "看向你",
+      "label": "鼠标悬停时",
       "playback": "once",
       "fallback": [
         "idle"
       ]
     },
     "selected": {
-      "label": "回应点击",
+      "label": "选中宠物时",
       "playback": "once",
       "fallback": [
         "idle"
@@ -167,7 +167,7 @@
       ]
     },
     "sleeping": {
-      "label": "睡觉",
+      "label": "进入休眠时",
       "playback": "loop",
       "fallback": [
         "idle"

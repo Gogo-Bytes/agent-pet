@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '../test-support/dom-platform.js';
 import { Children, StrictMode, isValidElement, useEffect, type ReactNode } from 'react';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { configure, getConfig } from '@testing-library/dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -51,6 +51,28 @@ async function mount(options: Parameters<typeof createPetBridgeDouble>[0] = {}) 
 }
 
 describe('App session interactions', () => {
+  it.each(['release', 'pointercancel', 'lostpointercapture', 'blur', 'unmount'])('passes actual drag direction without replacing business presentation and clears on %s', async ending => {
+    const user = userEvent.setup();
+    const { container, unmount, bridge } = await mount({ observations: [piObservation()] });
+    const target = container.querySelector('canvas')!;
+    const model = () => vi.mocked(PetModel).mock.calls.at(-1)![0];
+    await user.pointer({ target, keys: '[MouseLeft>]', coords: { screenX: 200, screenY: 200 } });
+    expect(model().dragDirection).toBeNull();
+    for (const [screenX, screenY, direction] of [[220, 200, 'right'], [210, 200, 'left'], [210, 180, 'up'], [210, 190, 'down']] as const) {
+      await user.pointer({ target, coords: { screenX, screenY } });
+      expect(model().dragDirection).toBe(direction);
+      expect(model().motion).toBe('working');
+    }
+    if (ending === 'unmount') { unmount(); expect(container.querySelector('canvas')).toBeNull(); }
+    else {
+      if (ending === 'blur') act(() => window.dispatchEvent(new Event('blur')));
+      else if (ending === 'release') await user.pointer({ target, keys: '[/MouseLeft]' });
+      else fireEvent(target, new window.PointerEvent(ending, { bubbles: true, pointerId: 1 }));
+      expect(model().dragDirection).toBeNull();
+      await user.pointer({ target, keys: '[/MouseLeft]' });
+    }
+    expect(bridge.api.interaction.mock.calls).toEqual([[true], [false]]);
+  });
   it('keeps controls visible across a slow pet-to-toolbar handoff inside the shared hover envelope', async () => {
     const user = userEvent.setup();
     const { bridge, container } = await mount();

@@ -8,6 +8,7 @@ import { Box3, Mesh, Raycaster, Vector2, Vector3, type Group, type AnimationClip
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PetModel } from './PetModel.js';
 import { bundledAnimationBounds } from './bundled-animation-bounds.js';
+import type { DragDirection } from '../../shared/use-window-gesture.js';
 import type { PetMotion, PetAnimations } from '@agent-pet/pet-runtime';
 
 // Real parsed asset, R3F reconciler, Drei Bounds/useAnimations, Three actions.
@@ -31,7 +32,7 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
   vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: clips } as ReturnType<typeof useGLTF>);
   let state!: RootState;
   function Probe() { state = useThree(); return null; }
-  let presentation: { replay?: string; restAction?: PetMotion; animations?: PetAnimations } = {};
+  let presentation: { replay?: string; restAction?: PetMotion; animations?: PetAnimations; modelUrl?: string; dragDirection?: DragDirection | null } = {};
   const ready = vi.fn();
   const hover = vi.fn();
   const tree = (value: PetMotion, visible = true) => <StrictMode><Activity mode={visible ? 'visible' : 'hidden'}><Probe /><Bounds margin={1.2} maxDuration={0}>
@@ -40,10 +41,72 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
   const view = await create(tree(motion), { width: size, height: size, camera: { fov: 35, position: [0, 0, 5] } });
   mounted.push(view);
   const root = state.scene.getObjectByName('Pet')!;
-  return { view, root, state, ready, hover, present: (value: typeof presentation) => { presentation = value; return view.update(tree(motion)); }, switchMotion: (value: PetMotion) => view.update(tree(value)), show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
+  return { view, root, state, ready, hover, present: (value: typeof presentation) => { presentation = value; return view.update(tree(motion)); }, switchMotion: (value: PetMotion) => { motion = value; return view.update(tree(value)); }, show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
 }
 
 describe('PetModel bundled animation behavior', () => {
+  it('plays one dragging clip continuously through direction changes, rotates only the outer group and restores work', async () => {
+    const { view, root, state, present } = await mount('working');
+    const animations = { dragging: 'Success', working: 'Work' };
+    await present({ animations, dragDirection: 'right' });
+    await view.advanceFrames(2, .1);
+    const target = state.scene.getObjectByName('pet-pointer-target')!;
+    expect(target.rotation.y).toBeCloseTo(Math.PI / 18);
+    expect(root.rotation.y).toBe(0);
+    expect(root.position.y).toBeCloseTo(.15, 4);
+    for (const [direction, x, y] of [['left', 0, -Math.PI / 18], ['up', -Math.PI / 18, 0], ['down', Math.PI / 18, 0]] as const) {
+      await present({ animations, dragDirection: direction });
+      expect(target.rotation.x).toBeCloseTo(x); expect(target.rotation.y).toBeCloseTo(y);
+    }
+    await view.advanceFrames(1, .1);
+    expect(root.position.y).toBeCloseTo(.225, 4); // Direction changes did not restart the clip.
+    await present({ animations, dragDirection: null }); await view.advanceFrames(3, .1);
+    expect(target.rotation.toArray().slice(0, 3)).toEqual([0, 0, 0]);
+    expect(root.position.x).toBeCloseTo(.06, 4); expect(root.position.y).toBeCloseTo(.08, 4);
+  });
+
+  it('returns to the latest business state and does not replay a cue already played before dragging', async () => {
+    const f = await mount('success');
+    const animations = { dragging: 'Work', success: 'Success', idle: 'Idle' };
+    await f.present({ animations, modelUrl: 'blob:imported', replay: 'drag-already-played' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await f.present({ animations, modelUrl: 'blob:imported', replay: 'drag-already-played', dragDirection: 'up' });
+    await f.view.advanceFrames(3, .1);
+    await f.present({ animations, modelUrl: 'blob:imported', replay: 'drag-already-played', dragDirection: null });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.present({ animations, dragDirection: 'down' });
+    await f.switchMotion('idle');
+    await f.present({ animations, dragDirection: null });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
+  });
+
+  it('does not consume or restart business cues received during drag, then plays the latest result on release', async () => {
+    const { view, root, present, switchMotion } = await mount('working');
+    const animations = { dragging: 'Work', success: 'Success', error: 'Error' };
+    await present({ animations, dragDirection: 'right', replay: 'drag-result-first' });
+    await switchMotion('success'); await view.advanceFrames(2, .1);
+    await present({ animations, dragDirection: 'left', replay: 'drag-result-latest' });
+    await view.advanceFrames(1, .1);
+    expect(root.position.x).toBeCloseTo(.06, 4); // Work still at 0.3s, not restarted by replay.
+    await present({ animations, dragDirection: null, replay: 'drag-result-latest' });
+    await view.advanceFrames(3, .1);
+    expect(root.position.y).toBeCloseTo(.225, 4);
+  });
+
+  it('keeps tilt neutral and pauses the dragging clip with reduced motion, including unmapped/static assets', async () => {
+    const f = await mount('working', 140, asset.animations, true);
+    const animations = { dragging: 'Work' };
+    await f.present({ animations, dragDirection: 'up' }); await f.view.advanceFrames(1, .1);
+    const position = f.root.position.clone();
+    await f.view.advanceFrames(5, .1);
+    expect(f.root.position.equals(position)).toBe(true);
+    expect(f.state.scene.getObjectByName('pet-pointer-target')!.rotation.toArray().slice(0, 3)).toEqual([0, 0, 0]);
+    const staticPet = await mount('success', 140, []);
+    await staticPet.present({ animations: {}, dragDirection: 'left', replay: 'unmapped-drag' });
+    await staticPet.view.advanceFrames(3, .1);
+    expect(staticPet.root.position.toArray()).toEqual([0, 0, 0]);
+    expect(staticPet.state.scene.getObjectByName('pet-pointer-target')!.rotation.y).toBeCloseTo(-Math.PI / 18);
+  });
   it('raycasts the real GLB instead of its transparent canvas corners and clears hover on teardown', async () => {
     const { view, state, hover } = await mount();
     await view.advanceFrames(2, .016);

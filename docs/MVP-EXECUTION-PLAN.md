@@ -134,6 +134,26 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 最终全量130文件1480 passed/1 skipped，typecheck、desktop build、diff检查通过。用户仍需在新版dev重选 `/Users/gan/Downloads/小小格温-AgentPet` 确认导入、播放并复测解绑/多桌宠；没有自动安装该模型、触碰Agent配置或推送。
 
+### 用户验收与导入弹窗重设计
+
+用户在 d13d976 上确认 Agent 启动/关闭、切换宠物和导入均正常；这是用户实测反馈，不扩大到未测的长期资源/发布项。随后要求将粗糙的收藏内联导入改为独立弹窗。
+
+正式 Renderer 现以现有原生 Dialog + 共享玻璃 panel 承载“选择文件夹 → 预览 ID/大小/许可 → 确认”。收藏抽屉保留在下层，两个 dialog 为同级，导入期间仅保留一层遮罩；Escape/背景/取消只关闭导入并回焦“添加宠物”。支持重新选择、读取状态、失败重试及残留提示；取消请求失败保留弹窗并允许重试，关闭/页面切换释放预览，迟到 picker 结果取消且不重新打开弹窗。确认期间禁用关闭，强制卸载后的迟到确认不自动切换宠物；已发送的安装不是可撤销操作，未修改 Main 的快照/一次性 token 或文件边界。
+
+先用正式 ManagementApp 回归得到2项红测，再实现；聚焦52项通过，最终全量131文件1490 passed/1 skipped，typecheck、desktop build和diff检查通过。新增浏览器隔离场景 `/management-review.html?case=pet-import`、`pet-import-error`、`pet-import-residue`，只用内存收藏和内置 GLB。此次实现尚未进行浏览器视觉/真实原生弹窗验收，待 Main 独立检查宽窄布局、遮罩和焦点；未重启日常 dev、未改 Agent 配置或模型文件、未提交/推送。
+
+### 桌面宠物拖动反馈
+
+仅复用现有 `dragging`（被拖动）触发项：实际屏幕 DIP 位移后播放对应 clip，按最近非零位移主轴识别上下左右，在动画根节点外的 group 上施加固定 ±10° pitch/yaw；不新增方向动画、不操作骨骼。按下未移动不触发，尺寸拖拽不触发；松开、取消、丢失捕获、失焦或卸载释放反馈。减少动画时倾斜为零且 clip 暂停；缺少映射沿用 idle/静态回退。拖动期间不消耗业务一次性 cue，方向/新业务 replay 不重启拖动 clip，结束后恢复最新业务展示。
+
+已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
+
+### 23 项触发接线审计与后续顺序
+
+用户要求逐项核对后，已完成[触发审计](PET-TRIGGER-AUDIT.md)：区别目录/试播、真实事件来源、Renderer接线和原生验收；不把23项目录等同23项自动支持。拖动阶段已提交 `84edb31`，Main复核62项通过，子执行全量1501 passed/1 skipped、typecheck/build通过，真实方向手感未验。
+
+后续顺序：①补有真实本地事件的 hover/selected；②按配置离线→在线边沿补 connected，明确重挂与重连幂等；③核对并接通 Claude 已有 max_output_tokens 细类，其他缺原生可靠事实的 Provider 能力保持未知；④sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；⑤按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+
 ## Pi 观察缓存清理修正
 
 复核发现 `73977e6` 的总量 256 条淘汰会丢失仍在线会话的停止清理责任。改为仅淘汰明确断开的历史，在线或连接状态未知的观察保留到能够发布断开清理；256 是历史回收目标，不是活跃会话硬上限。新增超过 256 个在线会话全部清理，以及混合在线/断开历史的排序与淘汰回归。仅使用自有 fixture，不修改日常配置或部署扩展；不将此项视为全链路内存硬上限验收。

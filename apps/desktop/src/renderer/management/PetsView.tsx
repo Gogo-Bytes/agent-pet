@@ -18,6 +18,7 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
 }) {
   const [panel, setPanel] = useState<'pets' | 'agents' | null>(null);
   const [motionsOpen, setMotionsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState(false);
@@ -50,7 +51,7 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
     onSelectAsset(assets.records[(selectedIndex + delta + assets.records.length) % assets.records.length]!.id);
   }
   const providerIcon = (provider: AgentConfiguration['provider']): IconName => provider === 'codex' ? 'command' : provider === 'claude' ? 'flower' : provider === 'pi' ? 'pi' : 'code';
-  useEffect(() => { if (!visible) { setPanel(null); setMotionsOpen(false); setEditing(false); } }, [visible]);
+  useEffect(() => { if (!visible) { setPanel(null); setImportOpen(false); setMotionsOpen(false); setEditing(false); } }, [visible]);
   useEffect(() => {
     if (!motionsOpen) return;
     const close = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setMotionsOpen(false); motionTrigger.current?.focus(); } };
@@ -82,7 +83,7 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
       </GlassSurface>}
     </div>
     {(notice || error) && <p className="pet-notice" role={error ? 'alert' : 'status'}>{error || notice}</p>}
-    {panel === 'pets' && <GlassDrawer label="宠物收藏" reduced={reduced} onClose={() => setPanel(null)}>
+    {panel === 'pets' && <GlassDrawer label="宠物收藏" reduced={reduced} onClose={() => { setPanel(null); setImportOpen(false); }}>
       <label className="collection-search glass-inset"><Icon name="search" /><input autoFocus aria-label="搜索宠物" placeholder="搜索宠物" value={query} onChange={event => setQuery(event.target.value)} /></label>
       <div className="pet-avatar-grid">{assets.records.filter(asset => asset.manifest.id === 'starter' ? name.includes(query) : asset.manifest.id.includes(query)).map(asset =>
         <div className="pet-card" key={asset.id}>
@@ -91,9 +92,11 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
         </div>)}
       </div>
       {!assets.records.some(asset => (asset.id === 'starter' ? name : asset.manifest.id).includes(query)) && <p className="collection-empty">没有找到宠物</p>}
-      <PetImportControl api={importApi} disabled={busy} onImported={id => { onSelectAsset(id); setNotice('已加入收藏。'); }} />
+      <GlassButton className="pet-import-open" disabled={busy} onClick={() => setImportOpen(true)}><Icon name="plus" />添加宠物</GlassButton>
       <p role="status">{notice}</p>
     </GlassDrawer>}
+    {visible && panel === 'pets' && importOpen && <PetImportControl api={importApi} disabled={busy} onClose={() => setImportOpen(false)}
+      onImported={id => { onSelectAsset(id); setNotice('已加入收藏。'); }} />}
     {panel === 'agents' && <Dialog label="配置 Agent" className="pet-dialog" onClose={() => setPanel(null)}>
       <header><h2>配置给 Agent</h2><button type="button" aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>
       <div className="pet-agent-options">{records.map(record => <button key={record.id} disabled={busy} aria-pressed={record.pet?.assetId === selectedAssetId} onClick={() => onBind(record.id, record.pet?.assetId === selectedAssetId ? null : { assetId: selectedAssetId, name })}><Icon name="link" /><span>{record.name}<br /><small>{providerLabels[record.provider]}</small></span><small>{record.pet?.assetId === selectedAssetId ? '已配置 ✓' : record.pet ? '已配置其他宠物' : '未配置'}</small></button>)}</div>

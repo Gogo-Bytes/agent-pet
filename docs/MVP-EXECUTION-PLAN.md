@@ -152,7 +152,7 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 用户要求逐项核对后，已完成[触发审计](PET-TRIGGER-AUDIT.md)：区别目录/试播、真实事件来源、Renderer接线和原生验收；不把23项目录等同23项自动支持。拖动阶段已提交 `84edb31`，Main复核62项通过，子执行全量1501 passed/1 skipped、typecheck/build通过，真实方向手感未验。
 
-hover/selected 与 connected 已按下节完成工程接线，原生视觉待验。后续顺序：①保留连接重挂/重连有界缓存限制并待实机验收；②核对并接通 Claude 已有 max_output_tokens 细类，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+hover/selected 与 connected 已按下节完成工程接线，原生视觉待验。后续顺序：①保留连接重挂/重连有界缓存限制并待实机验收；②Claude max_output_tokens 细类核对已到证据停点（见下节），取得精确原生语义前保持 generic error，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
 
 ### 本地 hover / selected 接线
 
@@ -177,6 +177,20 @@ hover/selected 与 connected 已按下节完成工程接线，原生视觉待验
 顺序验证：聚焦 **126 passed / 13 files**；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`pnpm test --maxWorkers=1`（**1523 passed / 1 skipped / 133 files**）通过。`git diff --check`通过；差异已检查，仅本阶段源码/回归/设计与进度文档。日志 `/tmp/connected-{focused,typecheck,build,full}.log`；预期红测日志另存 `/tmp/connected-{aggregate,player,wiring,asset}-red.log`，没有非预期失败或基础设施回退。Three多实例警告和既有skip保留。
 
 以上是Main/IPC/DOM和真实GLTFLoader/Drei/AnimationMixer自动化，不是原生窗口/GPU/用户模型视觉验收。未重启dev、打包、推送、安装依赖、访问真实Agent/模型或修改用户资产/配置。格温循环接缝仍独立未解决；后续明确业务细类或真实视觉验收不混入本阶段。
+
+### Claude output_limited 细类：证据阻塞，未实施
+
+本轮从干净 `3a170d1` 开始；此前 hover/selected `4852c7b`、connected `3a170d1` 已分别提交，其测试证据保持上节范围，不作为本细类实现证据。
+
+有界仓库检索与源码核对仅确认：`integrations/claude-hooks/normalize.ts` 对 `StopFailure.error` 做精确白名单，接受 `max_output_tokens`，其他未知字符串归为 `unknown`；对应测试是合成输入。`observations.ts` 当前把同一已知 prompt 的 `turn-failed` 统一发布为 error，保留错误未读，没有 output_limited occurrence/capability。README 的官方 hooks 链接及 2.1.78 新增 StopFailure 的 release 说明只证明事件/类别存在，不能证明输出限制的精确触发条件。
+
+Main 另做一次有界[官方 StopFailure input 文档核对](https://code.claude.com/docs/en/hooks#stopfailure-input)：`error` 列举 `max_output_tokens`，与 `rate_limit` / `unknown` 并列，但该页未定义其精确触发语义，也未提 `model_context_window_exceeded`。因此尚不能排除上下文容量等不同含义，不以类别名字、合成测试或一般模型错误实测替代版本化原生字段证据。
+
+**安全停点：** 没有修改生产代码/测试，没有把 Claude 的 output_limited 能力标为支持；generic/unknown 错误仍走原 error 未读，pi/Codex、latest-wins、once、fallback、在线绑定过滤与离线立即移除完全不变。继续实施所需来源：明确说明已支持 Claude 版本 `StopFailure.error=max_output_tokens` 何时产生、并能与上下文容量/限流/未知错误区分的官方字段定义或可定位的原生实现证据。未获此证据前不猜测、不继续搜索或请求真实模型。
+
+本轮仅同步证据停点文档，`git diff --check` 通过；未运行测试、typecheck/build（没有代码或测试变更），不声称本细类已实现或原生/GPU验收通过。此文档记录可独立提交，不是未完成实现的提交。未重启dev、安装、打包、推送或读取/修改用户Agent配置/资产。
+
+后续仍待产品决定且本轮不实施：sleeping 指用户空闲、Agent空闲、系统睡眠还是手动（以及进入/恢复条件）？attention 是否仅保留 fallback，还是需要独立关注及确认语义？若保持离线立即移除，disconnected 是否只保留手动预览，或另定义可见位置？retrying 仍缺可靠业务来源；格温循环卡顿独立未解决。
 
 ## Pi 观察缓存清理修正
 

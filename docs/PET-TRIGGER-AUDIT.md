@@ -1,6 +1,6 @@
 # 23 个动画触发审计
 
-> 当前更新：拖动 `84edb31`、hover/selected `4852c7b` 已提交；connected 本轮已完成配置聚合边沿到桌面/Home接线（聚焦126项、全量1523 passed/1 skipped/133 files、typecheck/build通过）。详见下节；仍非原生/GPU视觉验收，格温接缝及其他未接项保持。
+> 当前更新：拖动 `84edb31`、hover/selected `4852c7b`、connected `3a170d1` 已提交；connected 聚焦126项、全量1523 passed/1 skipped/133 files、typecheck/build通过。本轮 Claude output_limited 核对因精确原生语义证据不足停止，未实施，generic error 保持。详见下节；仍非原生/GPU视觉验收，格温接缝及其他未接项保持。
 
 ## 结论
 
@@ -24,6 +24,13 @@
 - connected只覆盖idle/neutral presence；业务请求（含已消费结果）、拖动/局部反馈优先，被覆盖/reduced/缺clip的cue消费但不排队，新的业务cue立即接管。自定义模型URL未就绪时不在临时starter消费，读失败保持原fallback；无动画静态。既有fallback/once/schema不变，离线立即移除，不新增disconnected。
 - 同一配置可在桌面/Home各呈现一次；复用Renderer模块256项缓存，页面重挂不重播。**Renderer销毁/崩溃恢复丢缓存可再次呈现同一ID，并非Main制造新edge**；不承诺跨进程或缓存淘汰后的exactly-once。
 - 回归：`configurations-socket.test.ts` 真实隔离认证、双Session/部分与全部断开/重连/未读/非持久化；Claude/Codex配置测试验证聚合身份；`desktop-pets.test.ts`窗口恢复/替换/late-ready；preload、App/PetStore、management-store、HomeScene/ScenePet/PetModel覆盖实际投递、迟到快照、重挂、业务优先、missing/reduced/static和延迟模型加载。先红后绿新增10项，聚焦126、全量1523 passed/1 skipped/133 files、typecheck/desktop源码build通过；详见[执行计划](MVP-EXECUTION-PLAN.md#配置-connected-边沿接线)。未做原生/GPU视觉验收。
+
+## Claude output_limited 核对停点
+
+- 干净基线 `3a170d1`；仓库有界检索仅证实 normalize 对 `StopFailure.error=max_output_tokens` 的精确白名单及合成测试，未找到证明其触发条件的版本化原生字段定义/实现。observations 仍统一发布 error，不暴露正文，不制造 success。
+- Main 一次核对[官方 StopFailure input](https://code.claude.com/docs/en/hooks#stopfailure-input)：类别表确有 `max_output_tokens`，与 `rate_limit`、`unknown` 并列，但没有解释其精确触发语义，未提 `model_context_window_exceeded`。类别存在不等于已证明它只表示输出上限，而非上下文容量等限制。README 的 2.1.78 release 引用也只证明 StopFailure 事件新增。
+- **阻塞的是细分映射，不是既有错误反馈。** 在取得可区分输出上限/上下文容量/限流/未知错误的精确官方或原生实现依据前，不加 output_limited occurrence/capability。没有改生产/测试，没有扩展其他Provider；本轮仅文档 diff 检查，未重跑测试/typecheck/build、未做原生/GPU验收或真实Agent操作。上节测试数字只属于已提交的 connected 阶段。
+- 来源问题：何处有已支持 Claude 版本该原生字段的精确触发定义？另待产品决定 sleeping 来源/恢复、attention 是否需要独立事件、离线立即移除下 disconnected 的可见位置；retrying 仍无可靠源。本轮不实现这些待定项，也不处理格温接缝。
 
 ## 共用证据索引
 
@@ -70,7 +77,7 @@
 |发生错误 `error`|P settled 原生 error（length亦是错误终态）；C StopFailure；X 无可靠统一失败事实|P/C 已接 P:202-214、C normalize:117-120 / observations:92-93→D/Q；X 源不足，exit7不可猜 error|TP:63,105、TC:58、TX 负例；P 整轮真实错误仍需补；C 历史错误事实不证明对应 clip|
 |工具执行失败 `tool_error`|P tool end isError 且非 aborted；C PostToolUseFailure 且 is_interrupt===false；X 无可靠失败字段|P/C 已接 P:239-244、C observations:83-87→Q:21-25；不改整个任务为失败|TP/TC/TL；真实失败后继续、重复 tool ID、并发短事件|
 |正在重试 `retrying`|三者没有已接可靠业务重试事件|源不足；P:61 保持 unknown，Q:4 可消费受能力约束事实但无生产者。socket reconnect 不可替代|TP:39 负例、TQ；暂不安排伪造实机事件|
-|输出达到限制 `output_limited`|P stopReason length→settled；C StopFailure max_output_tokens 类别已归一化但 observations 丢失细类；X 无源|P 已接 P:198,210-213；**C 是可用事实未接细分**（C normalize:4,117-120；observations:92），目前只 error。需确认该类别与公开 trigger 语义/原生版本一致后可最小接 occurrence|TP:63、TC normalize；P/C 真实长度限制与非限制错误，禁止解析正文|
+|输出达到限制 `output_limited`|P stopReason length→settled；C StopFailure max_output_tokens 类别已归一化但 observations 丢失细类；X 无源|P 已接 P:198,210-213；**C 类别存在，但精确语义证据不足，细分阻塞**（C normalize:4,117-120；observations:92），目前只 error；官方类别列举未证明其与输出上限而非上下文容量的对应关系，不能猜测接 occurrence|TP:63、TC normalize；P/C 真实长度限制与非限制错误，禁止解析正文|
 |任务已取消 `cancelled`|P aborted / 本轮 AbortSignal；X Interrupt；C 工具中止不证明整轮取消|P/X 已接 P:202-213、X observations:82-85；C 源不足|TP:105-135、TX:33；P/X 有历史事实实测，仍验动画及下一轮不受旧取消污染|
 |需要关注 `attention`|无独立生产事件；waiting_input/error/success/tool_error/output_limited 的资产 fallback|**部分：回退已接，独立自动 trigger 未接** A:13-20,48-51；Q 从不直接产 attention。配置 availability='attention' 不进宠物动画|A/TL；有 attention clip、无主 clip 的 fallback，业务 once 回退 attention 应只播一次；不要无请求增加提醒轮询|
 |Agent 已连接 `connected`|P/C/X认证配置聚合离线→在线；不是单条hello/每Session|**已接** Main运行时connectionCue→每窗口snapshot/Home→共享播放器；业务/局部反馈优先，不排队，Q业务投影不改|本节双Session/部分退出/重连/重挂/恢复身份测试；缓存限当前Renderer，原生视觉待验|
@@ -92,12 +99,12 @@
 
 ## 最小分阶段实施顺序
 
-实施按下列独立阶段推进；拖拽阶段已由 Main 审查交付，第2项上一阶段已完成工程接线（原生视觉待验），第3项connected本轮已完成工程接线（见上节），下一项是已知细分业务事实核对。以下保留原顺序与验收要求。
+实施按下列独立阶段推进；拖拽阶段已由 Main 审查交付，第2项上一阶段已完成工程接线（原生视觉待验），第3项connected本轮已完成工程接线（见上节），细分业务事实核对本轮已到上述证据停点，不自动进入后续产品决策项。以下保留原顺序与验收要求。
 
 1. **先收口拖拽独立阶段。** 审查最终 diff，只复用当前 gesture 和 L；跑 writer 聚焦测试/typecheck/build，再做原生拖动。关注完成/工具错误在拖拽中到达、松手恢复最新 activity、无 dragging clip、reduced。方向变化不应不断 reset clip。不把中间红/绿测试误报为完成。
 2. **补 UI 有真实来源的 hover / selected。** 范围：App/PetCanvas/PetModel、HomeScene/CompanionScene/ScenePet、L 的既有 request/replay/rest 参数及对应测试。用真实命中入边沿、明确 selection 边沿驱动局部 cue；键盘与鼠标一致，退出/blur/卸载清理。不把工具栏容器进入算命中模型；不影响业务 state/未读/IPC。先明确和拖拽、业务 once 的覆盖规则，优先最小 latest-wins，而非新框架。
 3. **补 connected 并核对幂等（本轮已完成工程范围，原生待验）。** 复用已认证配置在线事实；按“配置从离线→在线”而非每条 hello/每个 Session/每次场景挂载生成展示身份。范围：Configurations/Main 每配置投递 seam、desktop/home presentation、必要 shared/preload 类型和 tests。保持 per-config 隔离与迟到窗口 ready 守卫。本轮已红绿验证重连未读/renderer重建边界，身份仅放Main Entry；复用Renderer模块缓存、不加持久回执，不改Provider业务事实。
-4. **补明确已有细分事实，其他能力保持未知。** Claude `max_output_tokens` 若原生类别与目标语义已证实，沿现有 occurrence/capability 加 output_limited，保留 error 未读、不制造 success；normalize→observations→Application/Q 回归即可。其余 C/X thinking/responding/working/success/wait/retry 等无可靠源的不强补；不解析 transcript、shell 或错误正文。
+4. **补明确已有细分事实，其他能力保持未知（Claude本轮证据阻塞）。** Claude `max_output_tokens` 只有类别列举，精确触发语义尚未证实，当前不实施；取得可靠原生依据后才沿现有 occurrence/capability 加 output_limited，保留 error 未读、不制造 success，并先做 normalize→observations→Application/Q 及重复/旧prompt/retire/新work/fallback回归。其余 C/X thinking/responding/working/success/wait/retry 等无可靠源的不强补；不解析 transcript、shell 或错误正文。
 5. **决策后才做 sleeping / disconnected / 独立 attention。** sleeping 要定义来源、进入阈值/唤醒条件（若选择计时）及忙碌时是否禁止；没有定义不加任意计时器。disconnected 要在“保持离线立即移除”与“特定可见处展示断开”中明确产品范围；前者意味着桌面 disconnected 只能手动预览，不应宣称自动可见。**不默认为延迟销毁窗口。** attention 若仅保留 fallback，直接记录无需独立事件；若要未读持续关注，需用户确认其与 success/error once、确认和多 Session 的关系。
 6. **集中真实验收，与 Gwen 接缝分开。** 各 Provider 用允许的已有原生事件、绑定已有 clips：事件事实→每配置投影→桌面/Home实际播放→退出/下一轮/重连；包括无映射/无idle/静态资产、切页隐藏、reduced、快速连续事件及长clip。先复用授权范围，新增 Agent/模型/用户文件操作另取精确授权。每阶段测试+typecheck+desktop build 通过仅是工程证据，不等于原生桌面动画验收。
 

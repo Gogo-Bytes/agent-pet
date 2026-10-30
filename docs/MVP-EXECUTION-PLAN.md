@@ -198,6 +198,18 @@ hover/selected 与 connected 已按下节完成工程接线，原生视觉待验
 
 以上是Main/IPC/DOM和真实GLTFLoader/Drei/AnimationMixer自动化，不是原生窗口/GPU/用户模型视觉验收。未重启dev、打包、推送、安装依赖、访问真实Agent/模型或修改用户资产/配置。格温循环接缝仍独立未解决；后续明确业务细类或真实视觉验收不混入本阶段。
 
+### connected 审查修复：首次 preferences 之前不消费连接 cue
+
+基线 `c40dc61`，独立审查 Finding 1 经实际 App→PetStore→PetCanvas 回归确认：按 Main 的真实顺序分开发布带 cue 的 idle snapshot、首次 preferences，允许 React effect/微任务执行，临时 starter 在绑定未知时仍收到 `connected:bound:1`（预期 undefined）。原测试在同一 act 先发 preferences，漏掉了此竞争；现已改为真实顺序，随后等待自定义资产字节再放行。
+
+最小实现仅增加 store 的 `preferencesReady` 与 PetCanvas 的连接 cue 门槛：仅当前订阅的 preferences 回调标记就绪，窗口 store 重订阅保留已知绑定；generation、旧响应/订阅守卫不变。真实 starter 首次确认后正常放行，自定义模型等待/读失败保持原 fallback，不新增 IPC 或调整 Main 发送顺序。播放器、业务/本地/拖动优先、latest-wins、Renderer 256 项缓存、22 项目录和离线立即移除均不变。
+
+新增5项、更新1项回归：App 独立消息顺序/真实 starter/资产不存在和读取拒绝/卸载，store 同对象首次偏好/旧订阅/重订阅，以及 PetModel 真实 GLTFLoader/Drei/AnimationMixer 的临时 starter→绑定模型 connected once、普通重渲染不重启/不重播。播放器 seam 使用仓库内置 GLB，不依赖用户文件；App seam 验投递 props，非原生 IPC/GPU 端到端。
+
+验证：预期红测1项；最小修复后该项通过；聚焦 **99 passed / 6 files**（含 Main desktop-pets、App/PetStore、PetModel、ScenePet/HomeScene、WebGL失败隔离）；最终 `pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`pnpm test --maxWorkers=1`（**1529 passed / 1 skipped / 133 files**）通过。首次 typecheck 在两处新增 fixture 的 inline snapshot 报 TS2353（旧 bridge double 参数为 SessionState），按原测试用具名 snapshot 变量后一次有界复验通过，无生产类型放宽。日志 `/tmp/connection-preferences-{red,green,focused,typecheck-initial,typecheck,build,full}.log`。diff 检查和自审通过；独立复审由 Main 接续，不提前宣称 review gate 通过。
+
+未重启 dev、访问用户资产/已安装宠物/Agent 配置、调用模型/外网、安装依赖、打包或推送。未做原生窗口/GPU/用户模型视觉验收；格温源循环接缝保持独立未解决，不加工 clip/骨骼或新增作者控制。
+
 ### Claude output_limited 细类：证据阻塞，未实施
 
 本轮从干净 `3a170d1` 开始；此前 hover/selected `4852c7b`、connected `3a170d1` 已分别提交，其测试证据保持上节范围，不作为本细类实现证据。

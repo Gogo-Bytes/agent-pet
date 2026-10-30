@@ -5,12 +5,12 @@ import type { OverlayLayout } from '../../../shared/overlay-layout.js';
 import type { PetSnapshot } from '../../../shared/pet-snapshot.js';
 import type { PetAnimations } from '@agent-pet/pet-runtime';
 export type PetBridge = Omit<Window['pet'], 'getAsset'> & { getAsset?: (id: string) => Promise<{ bytes: Uint8Array; animations?: PetAnimations } | null> };
-type Snapshot = { sessions: PetSnapshot; layout: OverlayLayout | null; preferences: Preferences; error: string };
+type Snapshot = { sessions: PetSnapshot; layout: OverlayLayout | null; preferences: Preferences; preferencesReady: boolean; error: string };
 
 // One IPC listener pair, regardless of how many React/scene consumers subscribe.
 // getSnapshot returns the same object until an actual bridge update arrives.
 export function createPetStore(bridge: PetBridge) {
-  let snapshot: Snapshot = { sessions: createSessionState(), layout: null, preferences: { ...defaultPreferences }, error: '' };
+  let snapshot: Snapshot = { sessions: createSessionState(), layout: null, preferences: { ...defaultPreferences }, preferencesReady: false, error: '' };
   const listeners = new Set<() => void>();
   let disconnect: (() => void) | undefined;
   let generation = 0;
@@ -36,7 +36,7 @@ export function createPetStore(bridge: PetBridge) {
           if (current === generation && layout !== snapshot.layout) publish({ ...snapshot, layout });
         });
         const offPreferences = bridge.subscribePreferences(preferences => {
-          if (current === generation && preferences !== snapshot.preferences) publish({ ...snapshot, preferences });
+          if (current === generation && (!snapshot.preferencesReady || preferences !== snapshot.preferences)) publish({ ...snapshot, preferences, preferencesReady: true });
         });
         disconnect = () => { offSnapshot(); offLayout(); offPreferences(); };
         // StrictMode's synchronous teardown cancels its first request. Both IPC

@@ -45,6 +45,23 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
 }
 
 describe('PetModel bundled animation behavior', () => {
+  it('plays connected once on the bound model after the temporary starter unmounts without a cue', async () => {
+    // App.test covers the snapshot → first preferences → bytes gate that supplies these props.
+    const temporary = await mount();
+    await temporary.view.advanceFrames(3, .1);
+    expect(temporary.root.position.y).toBeCloseTo(.01, 4);
+    await temporary.view.unmount(); mounted.splice(mounted.indexOf(temporary.view), 1);
+    const bound = await mount();
+    const presentation = { modelUrl: 'blob:preferences-bound', animations: { connected: 'Success', idle: 'Idle' }, connectionCue: 'connected:first-preferences' };
+    await bound.present(presentation);
+    await bound.view.advanceFrames(3, .1); expect(bound.root.position.y).toBeCloseTo(.225, 4);
+    await bound.present({ ...presentation });
+    await bound.view.advanceFrames(1, .1); expect(bound.root.position.y).toBeCloseTo(.3, 4);
+    await bound.view.advanceFrames(10, .1); await bound.view.advanceFrames(3, .1);
+    expect(bound.root.position.y).toBeCloseTo(.01, 4);
+    await bound.present({ ...presentation });
+    await bound.view.advanceFrames(3, .1); expect(bound.root.position.y).toBeCloseTo(.02, 4);
+  });
   it('plays a configuration connection once, keeps its identity through remount, and accepts only a fresh reconnect', async () => {
     const f = await mount();
     const animations = { connected: 'Success', idle: 'Idle' };

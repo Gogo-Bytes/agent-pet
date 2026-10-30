@@ -5,6 +5,31 @@ import { piObservation } from '../../test-support/pi-fixtures.js';
 
 const flush = async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
 describe('createPetStore', () => {
+  it('marks preferences ready only on a current callback and retains readiness across resubscription', async () => {
+    const bridge = createPetBridgeDouble();
+    bridge.api.requestSnapshot.mockResolvedValue();
+    const store = createPetStore(bridge.api);
+    expect(store.getSnapshot().preferencesReady).toBe(false);
+    const off = store.subscribe(vi.fn());
+    const oldPreferences = bridge.api.subscribePreferences.mock.calls.at(-1)![0];
+    off();
+    const offAgain = store.subscribe(vi.fn());
+    const initial = store.getSnapshot();
+    oldPreferences(initial.preferences);
+    expect(store.getSnapshot()).toBe(initial);
+    // Even an identical default object confirms the real starter binding.
+    bridge.api.subscribePreferences.mock.calls.at(-1)![0](initial.preferences);
+    expect(store.getSnapshot().preferencesReady).toBe(true);
+    const ready = store.getSnapshot();
+    oldPreferences({ ...initial.preferences, petAssetId: 'stale-pet' });
+    expect(store.getSnapshot()).toBe(ready);
+    offAgain();
+    const offLast = store.subscribe(vi.fn());
+    expect(store.getSnapshot()).toBe(ready);
+    offLast();
+    await flush();
+    expect(bridge.api.requestSnapshot).not.toHaveBeenCalled();
+  });
   it('caches snapshot identity and shares IPC subscriptions until the last consumer leaves', async () => {
     const bridge = createPetBridgeDouble({ observations: [piObservation()] });
     const store = createPetStore(bridge.api);

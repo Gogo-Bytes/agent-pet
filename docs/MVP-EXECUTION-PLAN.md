@@ -148,6 +148,14 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
+### 格温循环卡顿：有界诊断完成，未实施推测性修复
+
+基于 `82fed8c`，只读授权的原包，使用实际 GLTFLoader/Three 姿态取样及正式 PetModel/ScenePet→Drei→PreferenceRenderLoop 控制流探针。Idle_Base/Cast_Cycle/Dance_Loop 两入口各3轮，在受控60Hz与普通重渲染下没有额外 reset/finished 或边界等待，相位误差<3e-13秒；不等于原生RAF/GPU无卡顿。原素材Idle_Base/Cast_Cycle/Run_Haste的0.25秒尾段骨骼位置RMS平均速度分别为正文约2.08%/2.65%/4.02%，但Idle_In约94.75%、Cast_Damage约129.59%；部分源迟滞已量化，仍不能解释用户“所有动画”。Dance_Loop无补尾却有端点姿态差，而且原映射success实际是单次，不因clip名称而循环。
+
+完整方法、指标、探针路径和停点见[格温循环诊断](GWEN-LOOP-DIAGNOSIS.md)。首次探针spy落在错误Three实例，修正为实际Drei mixer后一次复验1 passed；独立固定时刻源姿态断言通过，原播放器/调度器53项通过。模型前后SHA-256一致，没有生产/测试实现变更、依赖、用户资产写入、dev重启或推送；仅提交完成的诊断与进度报告，未重复typecheck/build/全量。
+
+下一步须取得一个明确场景/触发项的至少3轮录屏及FPS/减少动画设置，必要时在精确范围内同步原生帧间隔和动作时间。尚无完整用户症状红/绿信号，不盲裁尾、变速、混合/生成动画或改骨骼；源素材调整须另行决定，原22项触发与fallback保持。
+
 ### 触发接线审计与后续顺序（当前22项）
 
 用户确认：Agent无独立休眠概念，删除仅目录预留的 `sleeping`，保留 `idle`。同步公共类型、JSON目录、作者模板和设计说明；旧包携带该字段按既有未知映射规则忽略，不修改用户模型/包，不增加休眠计时器，不改变其他fallback。新增回归覆盖删除与旧包兼容。验证：聚焦10项、全量133文件/1524 passed/1 skipped，typecheck与desktop build通过；未修改用户资产、未重启应用或做原生视觉验收。

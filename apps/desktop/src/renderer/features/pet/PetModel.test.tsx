@@ -32,7 +32,7 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
   vi.mocked(useGLTF).mockReturnValue({ ...asset, animations: clips } as ReturnType<typeof useGLTF>);
   let state!: RootState;
   function Probe() { state = useThree(); return null; }
-  let presentation: { replay?: string; restAction?: PetMotion; animations?: PetAnimations; modelUrl?: string; dragDirection?: DragDirection | null } = {};
+  let presentation: { connectionCue?: string; replay?: string; restAction?: PetMotion; animations?: PetAnimations; modelUrl?: string; dragDirection?: DragDirection | null; interactionActive?: boolean } = {};
   const ready = vi.fn();
   const hover = vi.fn();
   const tree = (value: PetMotion, visible = true) => <StrictMode><Activity mode={visible ? 'visible' : 'hidden'}><Probe /><Bounds margin={1.2} maxDuration={0}>
@@ -45,6 +45,183 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
 }
 
 describe('PetModel bundled animation behavior', () => {
+  it('plays connected once on the bound model after the temporary starter unmounts without a cue', async () => {
+    // App.test covers the snapshot → first preferences → bytes gate that supplies these props.
+    const temporary = await mount();
+    await temporary.view.advanceFrames(3, .1);
+    expect(temporary.root.position.y).toBeCloseTo(.01, 4);
+    await temporary.view.unmount(); mounted.splice(mounted.indexOf(temporary.view), 1);
+    const bound = await mount();
+    const presentation = { modelUrl: 'blob:preferences-bound', animations: { connected: 'Success', idle: 'Idle' }, connectionCue: 'connected:first-preferences' };
+    await bound.present(presentation);
+    await bound.view.advanceFrames(3, .1); expect(bound.root.position.y).toBeCloseTo(.225, 4);
+    await bound.present({ ...presentation });
+    await bound.view.advanceFrames(1, .1); expect(bound.root.position.y).toBeCloseTo(.3, 4);
+    await bound.view.advanceFrames(10, .1); await bound.view.advanceFrames(3, .1);
+    expect(bound.root.position.y).toBeCloseTo(.01, 4);
+    await bound.present({ ...presentation });
+    await bound.view.advanceFrames(3, .1); expect(bound.root.position.y).toBeCloseTo(.02, 4);
+  });
+  it('plays a configuration connection once, keeps its identity through remount, and accepts only a fresh reconnect', async () => {
+    const f = await mount();
+    const animations = { connected: 'Success', idle: 'Idle' };
+    await f.present({ animations, connectionCue: 'connected:desktop:first' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await f.present({ animations, connectionCue: 'connected:desktop:first' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.y).toBeCloseTo(.3, 4);
+    await f.view.advanceFrames(10, .1); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.view.unmount(); mounted.splice(mounted.indexOf(f.view), 1);
+    const again = await mount();
+    await again.present({ animations, connectionCue: 'connected:desktop:first' });
+    await again.view.advanceFrames(3, .1); expect(again.root.position.y).toBeCloseTo(.01, 4);
+    await again.present({ animations, connectionCue: 'connected:desktop:reconnect' });
+    await again.view.advanceFrames(3, .1); expect(again.root.position.y).toBeCloseTo(.225, 4);
+  });
+
+  it('does not interrupt current business or local feedback and never queues a covered connection for later idle', async () => {
+    const f = await mount('working');
+    const animations = { connected: 'Success', working: 'Work', success: 'Success', hover: 'Work', idle: 'Idle' };
+    await f.present({ animations }); await f.view.advanceFrames(2, .1);
+    await f.present({ animations, connectionCue: 'connected:busy:work' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.switchMotion('idle'); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.switchMotion('success');
+    await f.present({ animations, replay: 'connected:business-result' });
+    await f.view.advanceFrames(2, .1);
+    await f.present({ animations, replay: 'connected:business-result', connectionCue: 'connected:busy:result' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await f.view.advanceFrames(10, .1); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.present({ animations, replay: 'connected:business-result', connectionCue: 'connected:busy:consumed-result' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.y).toBeLessThan(.05);
+    await f.switchMotion('idle');
+    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(2, .1);
+    await f.present({ animations, connectionCue: 'connected:busy:hover' });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
+  });
+
+  it('replaces a connection with the latest business cue without consuming that cue early', async () => {
+    const f = await mount();
+    const animations = { connected: 'Work', success: 'Success', idle: 'Idle' };
+    await f.present({ animations, connectionCue: 'connected:latest' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.present({ animations, connectionCue: 'connected:latest', replay: 'connection-next-business' });
+    await f.switchMotion('success'); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await f.switchMotion('idle'); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+  });
+
+  it('consumes reduced and missing connection feedback without delayed playback, including a static asset', async () => {
+    const f = await mount('idle', 140, asset.animations, true);
+    const animations = { connected: 'Success', idle: 'Idle' };
+    await f.present({ animations, connectionCue: 'connected:reduced' });
+    await f.view.advanceFrames(4, .1); expect(f.root.position.y).toBe(0);
+    await f.reduce(false); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.present({ animations: { connected: 'missing', idle: 'Idle' }, connectionCue: 'connected:missing' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
+    await f.present({ animations, connectionCue: 'connected:missing' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
+    const still = await mount('idle', 140, []);
+    await still.present({ animations, connectionCue: 'connected:no-clips' });
+    await still.view.advanceFrames(3, .1); expect(still.root.position.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it('plays hover only on model entry, once per edge, then resumes work without requiring pointer exit', async () => {
+    const f = await mount('working');
+    const animations = { hover: 'Success', working: 'Work' };
+    await f.present({ animations, restAction: 'working' });
+    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(2, .1);
+    expect(f.root.position.y).toBeCloseTo(.15, 4);
+    // R3F emits out/over when crossing child meshes of the same model.
+    await f.view.fireEvent(target, 'pointerOut', { eventObject: target.instance, intersections: [{ eventObject: target.instance }] });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.present({ animations, restAction: 'working' });
+    await f.view.advanceFrames(1, .1);
+    expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await act(async () => { await f.view.advanceFrames(10, .1); }); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(2, .1);
+    expect(f.root.position.y).toBeCloseTo(.15, 4);
+    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.view.advanceFrames(3, .1);
+    expect(f.root.position.x).toBeCloseTo(.06, 4);
+  });
+  it('keeps business cues pending during hover, resumes only the latest, and never replays a consumed result', async () => {
+    const f = await mount('working');
+    const animations = { hover: 'Work', success: 'Success', tool_error: 'Success', working: 'Work', idle: 'Idle' };
+    await f.present({ animations, restAction: 'working' });
+    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(3, .1);
+    await f.switchMotion('success');
+    await f.present({ animations, replay: 'hover-old-result', restAction: 'idle' });
+    await f.switchMotion('tool_error');
+    await f.present({ animations, replay: 'hover-latest-result', restAction: 'working' });
+    await f.view.advanceFrames(1, .1);
+    expect(f.root.position.x).not.toBe(0); // Still local Work, not business Success.
+    await act(async () => { await f.view.advanceFrames(15, .1); });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.225, 4);
+    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(3, .1);
+    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+  });
+
+  it('ignores absent hover mappings without resetting work and skips local feedback when reduced or hidden', async () => {
+    const f = await mount('working');
+    const animations = { working: 'Work', hover: 'missing', idle: 'Idle' };
+    await f.present({ animations }); await f.view.advanceFrames(2, .1);
+    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(1, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    const mapped = { ...animations, hover: 'Success' };
+    await f.present({ animations: mapped });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(2, .1); expect(f.root.position.y).toBeCloseTo(.15, 4);
+    await f.present({ animations: mapped, interactionActive: false });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.present({ animations: mapped }); await f.reduce(true);
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).not.toBeCloseTo(.225, 4);
+    await f.reduce(false); await f.view.advanceFrames(3, .1);
+    expect(f.root.position.x).toBeCloseTo(.06, 4);
+    const still = await mount('working', 140, []);
+    await still.present({ animations: mapped });
+    await still.view.fireEvent(still.view.scene.findByProps({ name: 'pet-pointer-target' }), 'pointerOver', { stopPropagation() {} });
+    await still.view.advanceFrames(3, .1); expect(still.root.position.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it('cancels hover on drag entry, ignores new hover while dragging, and resumes the latest business cue on release', async () => {
+    const f = await mount('working');
+    const animations = { working: 'Work', dragging: 'Work', hover: 'Success', success: 'Success' };
+    await f.present({ animations });
+    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.view.advanceFrames(2, .1); expect(f.root.position.y).toBeCloseTo(.15, 4);
+    await f.present({ animations, dragDirection: 'right' });
+    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.switchMotion('success');
+    await f.present({ animations, dragDirection: 'left', replay: 'hover-drag-result' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
+    await f.present({ animations, replay: 'hover-drag-result' });
+    await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.225, 4);
+  });
+
   it('plays one dragging clip continuously through direction changes, rotates only the outer group and restores work', async () => {
     const { view, root, state, present } = await mount('working');
     const animations = { dragging: 'Success', working: 'Work' };
@@ -119,7 +296,7 @@ describe('PetModel bundled animation behavior', () => {
     const target = view.scene.findByProps({ name: 'pet-pointer-target' });
     await view.fireEvent(target, 'pointerOver', { stopPropagation: vi.fn() });
     expect(hover).toHaveBeenLastCalledWith(true);
-    await view.fireEvent(target, 'pointerOut', {});
+    await view.fireEvent(target, 'pointerOut', { intersections: [] });
     expect(hover).toHaveBeenLastCalledWith(false);
     await view.unmount(); mounted.splice(mounted.indexOf(view), 1);
     expect(hover).toHaveBeenLastCalledWith(false);

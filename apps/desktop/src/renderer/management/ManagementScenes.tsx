@@ -4,7 +4,7 @@ import { MathUtils, Vector3 } from 'three';
 import { ScenePet } from './ScenePet.js';
 import type { PetAnimations } from '@agent-pet/pet-runtime';
 
-export type HomePet = { id: string; assetId?: string; agent: string; name: string; configuration: string; status: string; action: string; replay?: number | string; restAction?: string };
+export type HomePet = { connectionCue?: string | undefined; id: string; assetId?: string; agent: string; name: string; configuration: string; status: string; action: string; replay?: number | string; restAction?: string };
 export type Point = [number, number, number];
 export function petPosition(index: number, count: number): Point {
   const columns = Math.min(count, 3) || 1;
@@ -42,8 +42,8 @@ function SceneCamera({ target, count, reduced, mode }: {
 }
 
 /** Home has configuration instances, a floor and selection. The Canvas owns their lifetime. */
-export function HomeScene({ pets, focused, reduced, onFocus, onReady, modelUrls, animations }: {
-  pets: HomePet[]; focused: string | null; reduced: boolean; onFocus: (id: string) => void; onReady: (clips: string[]) => void; modelUrls?: Record<string, string> | undefined; animations?: Record<string, PetAnimations> | undefined;
+export function HomeScene({ pets, focused, reduced, onFocus, onReady, modelUrls, animations, selection = null, interactive = true }: {
+  selection?: { id: string; sequence: number } | null; interactive?: boolean; pets: HomePet[]; focused: string | null; reduced: boolean; onFocus: (id: string) => void; onReady: (clips: string[]) => void; modelUrls?: Record<string, string> | undefined; animations?: Record<string, PetAnimations> | undefined;
 }) {
   const index = pets.findIndex(pet => pet.id === focused);
   return <group name="home-scene">
@@ -53,7 +53,7 @@ export function HomeScene({ pets, focused, reduced, onFocus, onReady, modelUrls,
     </mesh>
     <Suspense fallback={null}>{pets.map((pet, index) =>
       <group key={pet.id} name={pet.id} position={petPosition(index, pets.length)} onClick={event => { event.stopPropagation(); onFocus(pet.id); }}>
-        <ScenePet key={pet.assetId ?? 'starter'} action={pet.action} replay={pet.replay ?? 0} restAction={pet.restAction ?? 'idle'} reduced={reduced} onReady={onReady} modelUrl={modelUrls?.[pet.assetId ?? 'starter']} animations={animations?.[pet.assetId ?? 'starter']} />
+        <ScenePet connectionCue={!pet.assetId || pet.assetId === 'starter' || modelUrls?.[pet.assetId] ? pet.connectionCue : undefined} key={pet.assetId ?? 'starter'} interactive={interactive} selection={selection?.id === pet.id ? selection.sequence : 0} action={pet.action} replay={pet.replay ?? 0} restAction={pet.restAction ?? 'idle'} reduced={reduced} onReady={onReady} modelUrl={modelUrls?.[pet.assetId ?? 'starter']} animations={animations?.[pet.assetId ?? 'starter']} />
       </group>)}</Suspense>
   </group>;
 }

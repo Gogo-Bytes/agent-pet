@@ -36,6 +36,88 @@ async function mount(instances: Instance[], clips = asset.animations) {
 }
 
 describe('ScenePet actual bundled asset and multi-instance lifecycle', () => {
+  it('presents each home connection once across page remounts without manufacturing another edge', async () => {
+    vi.mocked(useGLTF).mockReturnValue(asset as ReturnType<typeof useGLTF>);
+    let state!: RootState;
+    function Probe() { state = useThree(); return null; }
+    const ready = vi.fn(), focus = vi.fn();
+    const animations = { starter: { connected: 'Success', idle: 'Idle' } };
+    const pets = ['a', 'b'].map(id => ({ id, agent: 'pi', name: id, configuration: id, status: '陪伴中', action: 'idle', connectionCue: `connected:home:${id}` }));
+    const tree = (visible: boolean) => <StrictMode><Probe />{visible && <HomeScene pets={pets} focused={null} reduced={false} onFocus={focus} onReady={ready} animations={animations} />}</StrictMode>;
+    const view = await create(tree(true)); mounted.push(view);
+    const root = (id: string) => state.scene.getObjectByName(id)!.getObjectByName('Pet')!;
+    await view.advanceFrames(3, .1);
+    expect(root('a').position.y).toBeCloseTo(.225, 4); expect(root('b').position.y).toBeCloseTo(.225, 4);
+    await view.update(tree(false)); await view.update(tree(true)); await view.advanceFrames(3, .1);
+    expect(root('a').position.y).toBeCloseTo(.01, 4); expect(root('b').position.y).toBeCloseTo(.01, 4);
+    pets[0]!.connectionCue = 'connected:home:a:reconnect';
+    await view.update(tree(true)); await view.advanceFrames(3, .1);
+    expect(root('a').position.y).toBeCloseTo(.225, 4); expect(root('b').position.y).toBeLessThan(.05);
+  });
+  it('waits for the bound home model rather than consuming its connection on the loading fallback', async () => {
+    vi.mocked(useGLTF).mockReturnValue(asset as ReturnType<typeof useGLTF>);
+    let state!: RootState;
+    function Probe() { state = useThree(); return null; }
+    const ready = vi.fn(), focus = vi.fn();
+    const pets = [{ id: 'bound', assetId: 'artist-pet', agent: 'pi', name: 'pet', configuration: 'bound', status: '', action: 'idle', connectionCue: 'connected:home:bound' }];
+    const animations = { 'artist-pet': { connected: 'Success', idle: 'Idle' } };
+    const tree = (modelUrls: Record<string, string>) => <><Probe /><HomeScene pets={pets} focused={null} reduced={false} onFocus={focus} onReady={ready} animations={animations} modelUrls={modelUrls} /></>;
+    const view = await create(tree({})); mounted.push(view);
+    await view.advanceFrames(3, .1);
+    expect(state.scene.getObjectByName('Pet')!.position.y).toBeCloseTo(.01, 4);
+    await view.update(tree({ 'artist-pet': 'blob:home-bound' })); await view.advanceFrames(3, .1);
+    expect(state.scene.getObjectByName('Pet')!.position.y).toBeCloseTo(.225, 4);
+  });
+  it('wires home hit hover and explicit selection independently of passive focus and other configurations', async () => {
+    vi.mocked(useGLTF).mockReturnValue(asset as ReturnType<typeof useGLTF>);
+    let state!: RootState;
+    function Probe() { state = useThree(); return null; }
+    const ready = vi.fn(); const onFocus = vi.fn();
+    const pets = ['a', 'b'].map(id => ({ id, agent: 'pi', name: id, configuration: id, status: '工作中', action: 'working' }));
+    const animations = { starter: { working: 'Work', hover: 'Success', selected: 'Success' } };
+    const tree = (selection: { id: string; sequence: number } | null = null) => <><Probe /><HomeScene pets={pets} focused="a" selection={selection} reduced={false} onFocus={onFocus} onReady={ready} animations={animations} /></>;
+    const view = await create(tree()); mounted.push(view);
+    const a = state.scene.getObjectByName('a')!.getObjectByName('Pet')!;
+    const b = state.scene.getObjectByName('b')!.getObjectByName('Pet')!;
+    await view.advanceFrames(3, .1); expect(a.position.x).toBeCloseTo(.06, 4);
+    const target = view.scene.findByProps({ name: 'a' }).findByProps({ name: 'scene-pet-pointer-target' });
+    await view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await view.advanceFrames(2, .1); expect(a.position.y).toBeCloseTo(.15, 4);
+    expect(b.position.x).not.toBe(0);
+    await view.update(tree({ id: 'a', sequence: 1 }));
+    await view.advanceFrames(1, .1); expect(a.position.y).toBeCloseTo(.075, 4);
+    await view.update(tree({ id: 'a', sequence: 1 }));
+    await view.advanceFrames(1, .1); expect(a.position.y).toBeCloseTo(.15, 4);
+    await view.update(tree({ id: 'a', sequence: 2 }));
+    await view.advanceFrames(1, .1); expect(a.position.y).toBeCloseTo(.075, 4);
+    await act(async () => { await view.advanceFrames(12, .1); });
+    await view.advanceFrames(3, .1); expect(a.position.x).toBeCloseTo(.06, 4);
+    await view.update(tree({ id: 'a', sequence: 3 }));
+    await view.advanceFrames(2, .1); expect(a.position.y).toBeCloseTo(.15, 4);
+    await view.update(tree()); await view.advanceFrames(3, .1);
+    expect(a.position.x).toBeCloseTo(.06, 4);
+  });
+  it('defers a simultaneous business cue during selection, then restores latest rest without replaying it on another click', async () => {
+    vi.mocked(useGLTF).mockReturnValue(asset as ReturnType<typeof useGLTF>);
+    let state!: RootState;
+    function Probe() { state = useThree(); return null; }
+    const ready = vi.fn(); const onFocus = vi.fn();
+    const animations = { starter: { selected: 'Work', success: 'Success', working: 'Work', idle: 'Idle' } };
+    const tree = (sequence: number, action = 'working', restAction = 'working') => <><Probe /><HomeScene
+      pets={[{ id: 'a', agent: 'pi', name: 'a', configuration: 'a', status: '', action, restAction, replay: 'selection-business' }]}
+      focused="a" selection={sequence ? { id: 'a', sequence } : null} reduced={false} onFocus={onFocus} onReady={ready} animations={animations} /></>;
+    const view = await create(tree(0)); mounted.push(view);
+    const root = state.scene.getObjectByName('a')!.getObjectByName('Pet')!;
+    await view.update(tree(1, 'success')); await view.advanceFrames(3, .1);
+    expect(root.position.x).toBeCloseTo(.06, 4);
+    await view.update(tree(1, 'success', 'idle'));
+    await act(async () => { await view.advanceFrames(15, .1); });
+    await view.advanceFrames(3, .1); expect(root.position.y).toBeCloseTo(.225, 4);
+    await view.update(tree(2, 'success', 'idle'));
+    await act(async () => { await view.advanceFrames(18, .1); });
+    await view.advanceFrames(3, .1); expect(root.position.y).toBeCloseTo(.01, 4);
+  });
+
   it.each([[1280, 720], [390, 700], [1000, 360], [390, 350]])('switches home to a centered pet-only scene at %sx%s without replacing the R3F root', async (width, height) => {
     vi.mocked(useGLTF).mockReturnValue(asset as ReturnType<typeof useGLTF>);
     let state!: RootState;

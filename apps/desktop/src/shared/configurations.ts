@@ -20,13 +20,15 @@ export interface ConfigurationMetadata {
   pet: PetBinding | null;
 }
 export interface AgentConfiguration extends ConfigurationMetadata {
+  /** Runtime-only authenticated offline→online identity; never saved with metadata. */
+  connectionCue?: string;
   availability: 'unchecked' | 'available' | 'attention' | 'unsupported';
   inspection: Inspection | null;
   connection: PiConnectionState | null;
   claude?: ClaudeConnectionState;
   codex?: CodexConnectionState;
 }
-export function configurationOnline(record: AgentConfiguration): boolean {
+export function configurationOnline(record: Pick<AgentConfiguration, 'connection' | 'claude' | 'codex'>): boolean {
   return record.connection?.status === 'connected' || record.claude?.status === 'observing' || record.codex?.status === 'observing';
 }
 export type ConfigurationNotice = 'none' | 'invalid' | 'duplicate' | 'not-found' | 'busy' |

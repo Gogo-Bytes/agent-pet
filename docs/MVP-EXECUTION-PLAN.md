@@ -148,11 +148,81 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
-### 23 项触发接线审计与后续顺序
+### 格温循环接缝：源特定候选拒绝，待作者修订
+
+用户已澄清是动画末尾停顿/前后衔接不自然而非掉帧，并确认作者只交付自然循环动画；对外仍只有触发时机→准确clip名，不新增裁尾、混合、速度或循环区间控制，应用不自动加工导入素材。契约同步至[作者指南](PET-ARTIST-GUIDE.md#循环动画交付要求)与架构设计；原22项、fallback、单次/rest和可见性保持。
+
+在`a8a006b`基线上仅克隆Three内存clip做一次/tmp源特定缩尾实验：Idle_Base/Cast_Cycle/Run_Haste的0.25秒人工闭合压至原采样帧约1/30秒，保留关键帧值和正文。两种差分步长均显示Run_Haste接缝速度差恶化约43.1%；前两项仅改善约3.4%/5.0%，不构成自然循环证明。候选整体拒绝，未导出GLB/可安装包，未继续调参。首探针LoopOnce终点clamp取样问题经一次有界修正后复验；原慢尾信号、track校验、原clip/原文件摘要不变断言通过，不代表候选通过。
+
+详细数字与临时脚本路径见[循环诊断后续实验](GWEN-LOOP-DIAGNOSIS.md#源特定时间修正实验候选拒绝)。原GLB SHA-256仍为`3f0aeb7490c46ac279c6263604503e2871e50c7fb1226d0b05a057bbbfc5dae1`；无生产/永久测试变更、资产写入、安装/重绑定、依赖、dev重启或推送。文档阶段只做diff与链接检查，未重跑typecheck/build/全量；没有候选可做GLTF重载/导入预算验收。
+
+**当前阻塞：需作者在DCC中修订原循环轨迹的首尾姿态/速度/方向，去掉人工慢闭合段并重新制作自然接缝，不是仅删尾或增加manifest选项。** 重新导出后再做格式/预算及实际循环至少3轮视觉验收。本次未修复用户可见停顿，不再将掉帧录屏作为素材接缝工作的前置。
+
+### 格温循环卡顿：初次有界诊断记录
+
+基于 `82fed8c`，只读授权的原包，使用实际 GLTFLoader/Three 姿态取样及正式 PetModel/ScenePet→Drei→PreferenceRenderLoop 控制流探针。Idle_Base/Cast_Cycle/Dance_Loop 两入口各3轮，在受控60Hz与普通重渲染下没有额外 reset/finished 或边界等待，相位误差<3e-13秒；不等于原生RAF/GPU无卡顿。原素材Idle_Base/Cast_Cycle/Run_Haste的0.25秒尾段骨骼位置RMS平均速度分别为正文约2.08%/2.65%/4.02%，但Idle_In约94.75%、Cast_Damage约129.59%；部分源迟滞已量化，仍不能解释用户“所有动画”。Dance_Loop无补尾却有端点姿态差，而且原映射success实际是单次，不因clip名称而循环。
+
+完整方法、指标、探针路径和停点见[格温循环诊断](GWEN-LOOP-DIAGNOSIS.md)。首次探针spy落在错误Three实例，修正为实际Drei mixer后一次复验1 passed；独立固定时刻源姿态断言通过，原播放器/调度器53项通过。模型前后SHA-256一致，没有生产/测试实现变更、依赖、用户资产写入、dev重启或推送；仅提交完成的诊断与进度报告，未重复typecheck/build/全量。
+
+初次诊断曾要求一个明确场景/触发项的至少3轮录屏及FPS/减少动画设置，必要时同步原生帧间隔和动作时间；该下一步已被上节用户澄清与源特定实验更新。尚无完整用户症状红/绿信号，不盲裁尾、变速、混合/生成动画或改骨骼；源素材调整须另行决定，原22项触发与fallback保持。
+
+### 触发接线审计与后续顺序（当前22项）
+
+用户确认：Agent无独立休眠概念，删除仅目录预留的 `sleeping`，保留 `idle`。同步公共类型、JSON目录、作者模板和设计说明；旧包携带该字段按既有未知映射规则忽略，不修改用户模型/包，不增加休眠计时器，不改变其他fallback。新增回归覆盖删除与旧包兼容。验证：聚焦10项、全量133文件/1524 passed/1 skipped，typecheck与desktop build通过；未修改用户资产、未重启应用或做原生视觉验收。
 
 用户要求逐项核对后，已完成[触发审计](PET-TRIGGER-AUDIT.md)：区别目录/试播、真实事件来源、Renderer接线和原生验收；不把23项目录等同23项自动支持。拖动阶段已提交 `84edb31`，Main复核62项通过，子执行全量1501 passed/1 skipped、typecheck/build通过，真实方向手感未验。
 
-后续顺序：①补有真实本地事件的 hover/selected；②按配置离线→在线边沿补 connected，明确重挂与重连幂等；③核对并接通 Claude 已有 max_output_tokens 细类，其他缺原生可靠事实的 Provider 能力保持未知；④sleeping须先定义来源，disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；⑤按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+hover/selected 与 connected 已按下节完成工程接线，原生视觉待验。后续顺序：①保留连接重挂/重连有界缓存限制并待实机验收；②Claude max_output_tokens 细类核对已到证据停点（见下节），取得精确原生语义前保持 generic error，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping已按用户确认删除，仅保留idle空闲；disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
+
+### 本地 hover / selected 接线
+
+桌面和首页通过真实 R3F 模型进入边沿播放 `hover`，跨同一模型子 mesh 不重播；工具栏容器进入仍只管理工具栏。首页模型点击和在线宠物选择按钮的点击/Enter/Space 经同一显式计数触发 `selected`；初始焦点、重渲染、重挂和收藏缩略图不冒充场景选择，桌面未新增选择交互。复用现有播放器和目录，增加实例内最小 latest-wins 反馈，不加业务 IPC/队列/骨骼处理。
+
+本地反馈播放一次即释放，悬停退出、取消选择、窗口失焦/隐藏、pointercancel/lostcapture、页面离开和卸载有界清理；拖动优先且不恢复被覆盖的旧 hover。交互期间业务 cue 不被消费，结束恢复最新业务请求/rest，已消费 once 不重播。缺交互 clip 不重置工作，reduced 不启动局部反馈，无动画仍静态；既有 fallback、一次语义、按配置隔离、在线绑定过滤及离线立即移除不变。
+
+先以 PetModel 真实 GLB hover、HomeScene 接线、CompanionScene 明确选择分别取得红测试，再最小实现；追加子 mesh 切换红测并修复误重启。新增12项回归，聚焦 **98 passed / 7 files**；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`pnpm test --maxWorkers=1`（**1513 passed / 1 skipped / 132 files**）通过。首轮 hover 完成断言未用 act 刷新 React 状态，补 act 后一次复验通过；Home fixture 首个 Work 数值断言校正到既有已知 0.3s 姿态后确认实际缺接线红测。未改生产阈值或旧保护测试，Three 多实例警告保留。`git diff --check` 通过，完整差异已核对仅含本阶段 Renderer/回归与相关文档。
+
+这是 DOM 接线与真实 GLTFLoader/Drei/AnimationMixer 自动化证据，不是原生桌面/用户模型/GPU视觉验收。未重启 dev、未打包/推送、未操作真实 Agent/模型/配置；格温循环接缝未处理。当时下一独立阶段是 connected 的配置边沿/幂等核对；现已由下节独立阶段完成。
+
+### 配置 connected 边沿接线
+
+本阶段基线 `4852c7b`（上一阶段 hover/selected 已提交、工作区干净）。Main `Configurations` 只按已认证配置聚合离线→在线生成临时 `connectionCue`，离线清除；同配置第二 Session/重复发布/部分退出/命名/绑定切换不生成新身份，真正重连才换 ID。身份不写入 configurations metadata，不改变 Provider 业务事实、未读或协议。桌面沿既有 per-window `pet:snapshot`/preload/store/PetCanvas 接线，首页沿配置投影/HomeScene 接线；无新 IPC 命令、持久事件总线或队列。
+
+共享播放器只在 idle/中性 presence 上播 connected once，当前工作/业务结果（包括已消费结果的请求）、拖动和本地交互优先；被覆盖/reduced/缺失的连接 cue 不等待下次 idle，新业务立即替换连接反馈。绑定模型URL未就绪时不让临时 starter 消费cue；读取失败保留既有fallback，不声称已播放连接。原动作键、schema、fallback、单次业务幂等、在线绑定过滤和离线立即移除保持，不实现 disconnected。
+
+每个视觉 surface 可呈现同一配置边沿，复用既有 Renderer 模块最多256项缓存：同 Renderer 页面重挂不重播；renderer崩溃/窗口销毁后缓存丢失，可再次呈现同一ID，但 Main 不制造新边沿。这是明确的缓存范围，不承诺跨Renderer exactly-once；不是用户级持久回执。
+
+红绿证据：配置真实隔离socket首次边沿缺失、PetModel真实GLB连接播放缺失、desktop/App/Home三处投递缺失，以及自定义模型等待阶段提前消费cue均先失败、最小实现后通过。新增 **10项**，更新已有pi/Claude/Codex/preload/store回归：无效peer不产cue、双Session/部分与全部断开/重连/配置隔离、未读保留、非持久化、旧窗口late-ready拒绝、恢复snapshot身份稳定、旧initial响应/订阅忽略、Home重挂、业务/局部反馈优先、最新业务替换、无clip/静态/reduced与延迟模型加载。
+
+顺序验证：聚焦 **126 passed / 13 files**；`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`pnpm test --maxWorkers=1`（**1523 passed / 1 skipped / 133 files**）通过。`git diff --check`通过；差异已检查，仅本阶段源码/回归/设计与进度文档。日志 `/tmp/connected-{focused,typecheck,build,full}.log`；预期红测日志另存 `/tmp/connected-{aggregate,player,wiring,asset}-red.log`，没有非预期失败或基础设施回退。Three多实例警告和既有skip保留。
+
+以上是Main/IPC/DOM和真实GLTFLoader/Drei/AnimationMixer自动化，不是原生窗口/GPU/用户模型视觉验收。未重启dev、打包、推送、安装依赖、访问真实Agent/模型或修改用户资产/配置。格温循环接缝仍独立未解决；后续明确业务细类或真实视觉验收不混入本阶段。
+
+### connected 审查修复：首次 preferences 之前不消费连接 cue
+
+基线 `c40dc61`，独立审查 Finding 1 经实际 App→PetStore→PetCanvas 回归确认：按 Main 的真实顺序分开发布带 cue 的 idle snapshot、首次 preferences，允许 React effect/微任务执行，临时 starter 在绑定未知时仍收到 `connected:bound:1`（预期 undefined）。原测试在同一 act 先发 preferences，漏掉了此竞争；现已改为真实顺序，随后等待自定义资产字节再放行。
+
+最小实现仅增加 store 的 `preferencesReady` 与 PetCanvas 的连接 cue 门槛：仅当前订阅的 preferences 回调标记就绪，窗口 store 重订阅保留已知绑定；generation、旧响应/订阅守卫不变。真实 starter 首次确认后正常放行，自定义模型等待/读失败保持原 fallback，不新增 IPC 或调整 Main 发送顺序。播放器、业务/本地/拖动优先、latest-wins、Renderer 256 项缓存、22 项目录和离线立即移除均不变。
+
+新增5项、更新1项回归：App 独立消息顺序/真实 starter/资产不存在和读取拒绝/卸载，store 同对象首次偏好/旧订阅/重订阅，以及 PetModel 真实 GLTFLoader/Drei/AnimationMixer 的临时 starter→绑定模型 connected once、普通重渲染不重启/不重播。播放器 seam 使用仓库内置 GLB，不依赖用户文件；App seam 验投递 props，非原生 IPC/GPU 端到端。
+
+验证：预期红测1项；最小修复后该项通过；聚焦 **99 passed / 6 files**（含 Main desktop-pets、App/PetStore、PetModel、ScenePet/HomeScene、WebGL失败隔离）；最终 `pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`、`pnpm test --maxWorkers=1`（**1529 passed / 1 skipped / 133 files**）通过。首次 typecheck 在两处新增 fixture 的 inline snapshot 报 TS2353（旧 bridge double 参数为 SessionState），按原测试用具名 snapshot 变量后一次有界复验通过，无生产类型放宽。日志 `/tmp/connection-preferences-{red,green,focused,typecheck-initial,typecheck,build,full}.log`。diff 检查和自审通过；独立复审由 Main 接续，不提前宣称 review gate 通过。
+
+未重启 dev、访问用户资产/已安装宠物/Agent 配置、调用模型/外网、安装依赖、打包或推送。未做原生窗口/GPU/用户模型视觉验收；格温源循环接缝保持独立未解决，不加工 clip/骨骼或新增作者控制。
+
+### Claude output_limited 细类：证据阻塞，未实施
+
+本轮从干净 `3a170d1` 开始；此前 hover/selected `4852c7b`、connected `3a170d1` 已分别提交，其测试证据保持上节范围，不作为本细类实现证据。
+
+有界仓库检索与源码核对仅确认：`integrations/claude-hooks/normalize.ts` 对 `StopFailure.error` 做精确白名单，接受 `max_output_tokens`，其他未知字符串归为 `unknown`；对应测试是合成输入。`observations.ts` 当前把同一已知 prompt 的 `turn-failed` 统一发布为 error，保留错误未读，没有 output_limited occurrence/capability。README 的官方 hooks 链接及 2.1.78 新增 StopFailure 的 release 说明只证明事件/类别存在，不能证明输出限制的精确触发条件。
+
+Main 另做一次有界[官方 StopFailure input 文档核对](https://code.claude.com/docs/en/hooks#stopfailure-input)：`error` 列举 `max_output_tokens`，与 `rate_limit` / `unknown` 并列，但该页未定义其精确触发语义，也未提 `model_context_window_exceeded`。因此尚不能排除上下文容量等不同含义，不以类别名字、合成测试或一般模型错误实测替代版本化原生字段证据。
+
+**安全停点：** 没有修改生产代码/测试，没有把 Claude 的 output_limited 能力标为支持；generic/unknown 错误仍走原 error 未读，pi/Codex、latest-wins、once、fallback、在线绑定过滤与离线立即移除完全不变。继续实施所需来源：明确说明已支持 Claude 版本 `StopFailure.error=max_output_tokens` 何时产生、并能与上下文容量/限流/未知错误区分的官方字段定义或可定位的原生实现证据。未获此证据前不猜测、不继续搜索或请求真实模型。
+
+本轮仅同步证据停点文档，`git diff --check` 通过；未运行测试、typecheck/build（没有代码或测试变更），不声称本细类已实现或原生/GPU验收通过。此文档记录可独立提交，不是未完成实现的提交。未重启dev、安装、打包、推送或读取/修改用户Agent配置/资产。
+
+后续仍待产品决定且本轮不实施：sleeping 后续已由用户明确删除，不再待定义；attention 是否仅保留 fallback，还是需要独立关注及确认语义？若保持离线立即移除，disconnected 是否只保留手动预览，或另定义可见位置？retrying 仍缺可靠业务来源；格温循环卡顿独立未解决。
 
 ## Pi 观察缓存清理修正
 

@@ -11,6 +11,15 @@ describe('shared optional action vocabulary', () => {
     expect(JSON.parse(readFileSync('packages/pet-runtime/templates/action-catalog.json', 'utf8')).actions).toEqual(petActionCatalog);
     expect(resolvePetAnimation('success', { success: 'ArtistDance' }, ['ArtistDance'])?.clip).toBe('ArtistDance');
   });
+  it('removes the unused sleeping trigger while accepting older pet packages', () => {
+    expect(petActionIds).not.toContain('sleeping');
+    expect(createPetArtistTemplate().animations).not.toHaveProperty('sleeping');
+    expect(resolvePetAnimation('sleeping', { idle: 'Idle' }, ['Idle'])).toBeNull();
+    expect(validatePetManifest({ id: 'old-pet', version: '1', model: 'pet.glb', license: 'CC0',
+      animations: { sleeping: 'Sleep', idle: 'Idle' } })).toMatchObject({ valid: true, manifest: { animations: { idle: 'Idle' } } });
+    const result = validatePetManifest({ id: 'old-pet', version: '1', model: 'pet.glb', license: 'CC0', animations: { sleeping: 'Sleep' } });
+    expect(result.valid && result.manifest.animations).toEqual({});
+  });
   it('exports a complete versioned artist template with no required animation', () => {
     const template = createPetArtistTemplate();
     expect(Object.keys(template.animations)).toEqual(petActionIds);

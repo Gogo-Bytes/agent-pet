@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useAnimations } from '@react-three/drei';
 import { LoopOnce, LoopRepeat, type AnimationAction, type AnimationClip, type Group } from 'three';
 import { resolvePetAnimation, normalizePetAction, petActionCatalog, type PetAnimations } from '@agent-pet/pet-runtime';
+import type { PetInteraction } from './usePetInteraction.js';
 
 // Renderer-local, bounded cue memory survives scene/page remounts. Explicit audition
 // uses numeric replay counters and is never consumed as a business notification.
@@ -13,7 +14,21 @@ function rememberCue(key: string) {
 
 /** Shared desktop/home/audition player. Drei alone owns mixer advancement and disposal. */
 export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: PetAnimations,
-  request: string, reduced: boolean, replay: string | number = 0, restAction = 'idle') {
+  request: string, reduced: boolean, replay: string | number = 0, restAction = 'idle',
+  interaction: PetInteraction | null = null, onInteractionFinished?: () => void, connectionCue?: string) {
+  // Absent local clips must not reset ongoing work or consume a pending business cue.
+  const local = interaction && !reduced && resolvePetAnimation(interaction.action, mappings, clips.map(clip => clip.name))?.action === interaction.action ? interaction : null;
+  // Connection is presentation-only and lower priority than current business/local feedback.
+  const connection = useMemo(() => connectionCue && !playedCues.has(connectionCue) && !reduced && !local &&
+    (request === 'idle' || request === 'presence') ? connectionCue : undefined, [connectionCue, request, reduced, local]);
+  useEffect(() => {
+    let active = true;
+    // Superseded, missing or reduced cues are consumed too, never queued for later idle.
+    if (connectionCue) queueMicrotask(() => { if (active) rememberCue(connectionCue); });
+    return () => { active = false; };
+  }, [connectionCue]);
+  const playbackRequest = local?.action ?? (connection ? 'connected' : request);
+  const playbackReplay = local ? 0 : connection ?? replay;
   const rest = useRef(restAction);
   rest.current = restAction;
   const instance = useMemo(() => ({ current: root }), [root]);
@@ -39,17 +54,20 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
     }
     // Never rebind during mixer.update: it would capture the outgoing animated pose.
     const finished = (event: { action: AnimationAction }) => { queueMicrotask(() => {
-      if (active && event.action === playing) play(rest.current);
+      if (active && event.action === playing) {
+        if (local) onInteractionFinished?.();
+        else play(rest.current);
+      }
     }); };
     mixer.addEventListener('finished', finished);
-    const requested = normalizePetAction(request);
-    const cue = typeof replay === 'string' && replay && requested && petActionCatalog[requested].playback === 'once' ? replay : undefined;
+    const requested = normalizePetAction(playbackRequest);
+    const cue = typeof playbackReplay === 'string' && playbackReplay && requested && petActionCatalog[requested].playback === 'once' ? playbackReplay : undefined;
     if (cue && playedCues.has(cue)) play(rest.current);
     else {
-      play(request);
+      play(playbackRequest);
       // StrictMode's discarded effect cannot consume a cue before the real setup.
       if (cue) queueMicrotask(() => { if (active) rememberCue(cue); });
     }
     return () => { active = false; mixer.removeEventListener('finished', finished); playing?.stop(); };
-  }, [actions, mixer, root, clips, mappings, request, reduced, replay]);
+  }, [actions, mixer, root, clips, mappings, playbackRequest, reduced, playbackReplay, local, onInteractionFinished]);
 }

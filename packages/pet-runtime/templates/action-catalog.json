@@ -165,13 +165,6 @@
       "fallback": [
         "idle"
       ]
-    },
-    "sleeping": {
-      "label": "进入休眠时",
-      "playback": "loop",
-      "fallback": [
-        "idle"
-      ]
     }
   }
 }

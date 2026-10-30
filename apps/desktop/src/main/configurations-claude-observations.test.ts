@@ -39,7 +39,13 @@ it('maps verified Claude callbacks through configuration identity, Application s
     expect((await collection.confirm(id, preview.id)).records.at(-1)!.claude).toMatchObject({ status: 'waiting', scope: 'task-events' });
     const server = servers[i]!;
     server.onFact?.({ runId: 'opaque-run', fact: { kind: 'session-started', source: 'startup', providerSessionId: 'private-same-session' } });
+    expect(collection.snapshot().records[i]!.connectionCue).toBeUndefined();
     server.onChange({ observedRuns: 1, launchers: 1 });
+    const cue = collection.snapshot().records[i]!.connectionCue;
+    expect(cue).toEqual(expect.any(String));
+    server.onChange({ observedRuns: 2, launchers: 2 });
+    server.onChange({ observedRuns: 1, launchers: 1 });
+    expect(collection.snapshot().records[i]!.connectionCue).toBe(cue);
     server.onFact?.({ runId: 'opaque-run', fact: { kind: 'turn-submitted', providerSessionId: 'private-same-session', promptId: 'private-prompt' } });
     server.onFact?.({ runId: 'opaque-run', fact: { kind: 'tool-succeeded', providerSessionId: 'private-same-session', promptId: 'private-prompt', toolCallId: 'private-tool', activity: 'reading' } });
   }
@@ -47,12 +53,17 @@ it('maps verified Claude callbacks through configuration identity, Application s
   expect(Object.values(collection.snapshot().sessionConfigurations)).toEqual(ids);
   expect(projectHomePets(collection.snapshot(), sessions, '团子').map(pet => [pet.id, pet.action, pet.status])).toEqual(ids.map(id => [id, 'reading', '刚刚读取了文件']));
   expect(sessions.bubbles).toEqual([]); expect(JSON.stringify(published)).not.toMatch(/private-same-session|private-prompt|private-tool/);
+  const cues = collection.snapshot().records.map(record => record.connectionCue);
+  expect(new Set(cues).size).toBe(2);
   await collection.rename(ids[0]!, '新名字');
+  expect(collection.snapshot().records.map(record => record.connectionCue)).toEqual(cues);
   servers[0]!.onFact?.({ runId: 'opaque-run', fact: { kind: 'turn-failed', providerSessionId: 'private-same-session', promptId: 'private-prompt', failure: 'unknown' } });
   expect(sessions.bubbles[0]?.name).toBe('新名字');
   expect(projectHomePets(collection.snapshot(), sessions, '团子')[0]).toMatchObject({ configuration: '新名字', action: 'error', status: '回答出错了' });
   await collection.disable(ids[0]!);
   expect(projectHomePets(collection.snapshot(), sessions, '团子').map(pet => pet.id)).toEqual([ids[1]]);
+  expect(collection.snapshot().records[0]!.connectionCue).toBeUndefined();
+  expect(collection.snapshot().records[1]!.connectionCue).toBe(cues[1]);
   expect(Object.values(sessions.sessions).filter(session => session.connected)).toHaveLength(1);
   expect(sessions.bubbles[0]?.status).toBe('error-unread');
   const length = published.length;

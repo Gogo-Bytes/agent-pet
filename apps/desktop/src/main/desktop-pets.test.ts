@@ -48,6 +48,28 @@ function setup() {
 }
 beforeEach(() => { native.windows = []; native.cursor = { x: 0, y: 0 }; });
 describe('desktop pets own one native overlay per online, explicitly bound configuration', () => {
+  it('routes stable connection identities through snapshots, reloads and replacement-window readiness', () => {
+    const { pets } = setup();
+    const one = { ...record('one'), connectionCue: 'connected:one:1' };
+    const two = { ...record('two'), connectionCue: 'connected:two:1' };
+    pets.updateConfigurations(state([one, two]));
+    const [first, other] = native.windows;
+    pets.requestSnapshot(event(first)); pets.publishSessions();
+    expect(last(first, 'pet:snapshot').connectionCue).toBe(one.connectionCue);
+    expect(last(other, 'pet:snapshot').connectionCue).toBe(two.connectionCue);
+    const crash = first.webContents.on.mock.calls.find(([name]: string[]) => name === 'render-process-gone')![1];
+    crash(); pets.requestSnapshot(event(first));
+    expect(last(first, 'pet:snapshot').connectionCue).toBe(one.connectionCue); // Same ID, new renderer may lose its module cache.
+    pets.updateConfigurations(state([two]));
+    pets.updateConfigurations(state([{ ...one, connectionCue: 'connected:one:2' }, two]));
+    callback(first, 'ready-to-show')();
+    expect(first.showInactive).not.toHaveBeenCalled();
+    expect(() => pets.requestSnapshot(event(first))).toThrow('Untrusted renderer');
+    const replacement = native.windows[2];
+    pets.requestSnapshot(event(replacement));
+    expect(last(replacement, 'pet:snapshot').connectionCue).toBe('connected:one:2');
+    expect(last(other, 'pet:snapshot').connectionCue).toBe(two.connectionCue);
+  });
   it('creates no eager default pet for empty, offline or unbound configurations despite offline preference', () => {
     const { pets } = setup();
     pets.updateConfigurations(state([]));

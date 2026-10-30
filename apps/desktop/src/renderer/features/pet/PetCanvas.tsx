@@ -25,9 +25,9 @@ class PetErrorBoundary extends Component<{ children: ReactNode; onNotice: (messa
 export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
   visible: boolean; store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void; onHover?: (hovered: boolean) => void;
 }) {
-  const { sessions, preferences } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const { sessions, preferences, preferencesReady } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const presentation = projectPetPresentation(sessions);
-  const [asset, setAsset] = useState<{ url: string; animations?: PetAnimations } | null>(null);
+  const [asset, setAsset] = useState<{ id: string; url: string; animations?: PetAnimations } | null>(null);
   const assetId = preferences.petAssetId;
   useEffect(() => {
     let active = true;
@@ -38,7 +38,7 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
       if (!value) { setAsset(null); return; }
       const bytes = new Uint8Array(value.bytes);
       const url = URL.createObjectURL(new Blob([bytes.buffer], { type: 'model/gltf-binary' }));
-      setAsset({ url, ...(value.animations ? { animations: value.animations } : {}) });
+      setAsset({ id: assetId, url, ...(value.animations ? { animations: value.animations } : {}) });
     }).catch(() => { if (active) setAsset(null); });
     return () => { active = false; setAsset(current => { if (current) URL.revokeObjectURL(current.url); return null; }); };
   }, [assetId, store.bridge]);
@@ -56,7 +56,7 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel key={asset?.url ?? 'starter'} dragDirection={drag.direction} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} {...(onHover ? { onHover } : {})} />
+            <PetModel connectionCue={preferencesReady && (!assetId || assetId === 'starter' || asset?.id === assetId) ? sessions.connectionCue : undefined} key={asset?.url ?? 'starter'} interactionActive={visible} dragDirection={drag.direction} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} {...(onHover ? { onHover } : {})} />
           </Bounds>
         </Suspense>
       </Canvas>

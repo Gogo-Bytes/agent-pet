@@ -51,6 +51,58 @@ async function mount(options: Parameters<typeof createPetBridgeDouble>[0] = {}) 
 }
 
 describe('App session interactions', () => {
+  it('passes the routed connection cue through store and PetCanvas without replacing business motion', async () => {
+    const { bridge } = await mount({ observations: [piObservation()] });
+    const receive = bridge.api.subscribeSnapshot.mock.calls.at(-1)![0];
+    const snapshot = { ...bridge.snapshot(), connectionCue: 'connected:app:1' };
+    act(() => receive(snapshot));
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ connectionCue: snapshot.connectionCue, motion: 'working' });
+  });
+  it('waits for first preferences and bound model bytes before passing the connection cue to PetModel', async () => {
+    const fixture = createPetBridgeDouble();
+    fixture.api.requestSnapshot.mockResolvedValue();
+    let finish!: (value: { bytes: Uint8Array; animations: { connected: string } }) => void;
+    const bridge = { ...fixture.api, getAsset: vi.fn(() => new Promise<{ bytes: Uint8Array; animations: { connected: string } }>(resolve => { finish = resolve; })) };
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:connected-bound'), revokeObjectURL: vi.fn() });
+    try {
+      render(<App store={createPetStore(bridge)} />); await act(async () => {});
+      const snapshot = { ...fixture.snapshot(), connectionCue: 'connected:bound:1' };
+      // Main sends snapshot first, preferences in a separate IPC callback.
+      await act(async () => { fixture.api.subscribeSnapshot.mock.calls.at(-1)![0](snapshot); });
+      expect(vi.mocked(PetModel).mock.calls.at(-1)![0].connectionCue).toBeUndefined();
+      expect(bridge.getAsset).not.toHaveBeenCalled();
+      await act(async () => { fixture.publishPreferences({ ...defaultPreferences, petAssetId: 'artist-pet' }); });
+      expect(vi.mocked(PetModel).mock.calls.at(-1)![0].connectionCue).toBeUndefined();
+      await act(async () => finish({ bytes: new Uint8Array([1]), animations: { connected: 'Greeting' } }));
+      expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ connectionCue: snapshot.connectionCue, modelUrl: 'blob:connected-bound' });
+    } finally { cleanup(); vi.unstubAllGlobals(); }
+  });
+  it('releases the connection cue when first preferences confirm the bundled starter', async () => {
+    const bridge = createPetBridgeDouble();
+    bridge.api.requestSnapshot.mockResolvedValue();
+    const { unmount } = render(<App store={createPetStore(bridge.api)} />);
+    const snapshot = { ...bridge.snapshot(), connectionCue: 'connected:confirmed-starter' };
+    await act(async () => { bridge.api.subscribeSnapshot.mock.calls.at(-1)![0](snapshot); });
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0].connectionCue).toBeUndefined();
+    await act(async () => { bridge.publishPreferences({ ...defaultPreferences }); });
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ connectionCue: 'connected:confirmed-starter', modelUrl: undefined });
+    expect(bridge.api.getAsset).not.toHaveBeenCalled();
+    unmount();
+    const calls = vi.mocked(PetModel).mock.calls.length;
+    act(() => { bridge.publishPreferences({ ...defaultPreferences, petAssetId: 'after-unmount' }); });
+    expect(vi.mocked(PetModel)).toHaveBeenCalledTimes(calls);
+  });
+  it.each(['missing', 'rejected'] as const)('keeps starter fallback without claiming a connection playback when the bound asset is %s', async outcome => {
+    const fixture = createPetBridgeDouble();
+    fixture.api.requestSnapshot.mockResolvedValue();
+    if (outcome === 'rejected') fixture.api.getAsset.mockRejectedValue(Error('unreadable'));
+    render(<App store={createPetStore(fixture.api)} />);
+    const snapshot = { ...fixture.snapshot(), connectionCue: `connected:unreadable:${outcome}` };
+    await act(async () => { fixture.api.subscribeSnapshot.mock.calls.at(-1)![0](snapshot); });
+    await act(async () => { fixture.publishPreferences({ ...defaultPreferences, petAssetId: 'unreadable-pet' }); });
+    expect(fixture.api.getAsset).toHaveBeenCalledWith('unreadable-pet');
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ connectionCue: undefined, modelUrl: undefined, motion: 'idle' });
+  });
   it.each(['release', 'pointercancel', 'lostpointercapture', 'blur', 'unmount'])('passes actual drag direction without replacing business presentation and clears on %s', async ending => {
     const user = userEvent.setup();
     const { container, unmount, bridge } = await mount({ observations: [piObservation()] });
@@ -92,6 +144,9 @@ describe('App session interactions', () => {
     // Hovering the compact region also reveals controls without a model event.
     await user.hover(group);
     await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('true'));
+    // Toolbar envelope does not supply model-hit or selection animation input.
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ motion: 'idle', interactionActive: true });
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0].onHover).toBeUndefined();
     act(() => window.dispatchEvent(new Event('blur')));
     await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('false'));
     await user.unhover(group);

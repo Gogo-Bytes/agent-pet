@@ -1,8 +1,77 @@
 # 格温循环边界诊断
 
-状态：**用户已授权由开发侧承担离线素材修订；Idle_Base 原生制作候选已有数值改善，但 Blender 重导出超过导入预算，尚未交付可安装修复。** 最新基线 `f24ab87`，详见下节。原包、已安装宠物、生产代码和播放策略不变；对外仍只有触发时机→clip。此前缩尾拒绝和“待作者修订”是历史停点，最新授权覆盖责任归属，但不授权放宽导入 guard、安装工具或覆盖原包。数值指标不是视觉验收。
+状态：**尚未交付可安装修复。用户拒绝安装新工具，另授权仅用已有 Blender 清理冗余内容、导出并整理独立宠物包。** 本轮从 `9b04e59` 做一次新清理候选：accessors 降至4457，但4460个bufferViews仍超过2048；原生全采样还改变部分非目标时长/轨迹，候选拒绝。没有创建 Downloads 成品包。最新证据见下节；不把当前失败路径推断成 Blender 所有方法都不可行。原包、已安装宠物、生产代码和播放策略不变，数值改善不等于视觉验收。
 
-## 离线作者修订：Idle 候选与导出阻塞
+## 仅用 Blender 清理：候选拒绝与明确停点
+
+### 授权与实际清理
+
+用户明确拒绝安装任何新工具/依赖；此前“待批准隔离安装”的路线关闭。本轮允许用现有 Blender 清理无用内容，但不允许擅自删除已映射动作、明显改变外观/运动、降低导入 guard 或自写二进制优化器。原15个clip均有映射，不是无用内容。
+
+先读取本机 Blender 5.1.1 原生 exporter 源码和 `.blend` 动作结构：原9408组TRS通道有大量近似rest的常量。`fcurves/sampler.py` 非全采样路径为每组输出直接创建Accessor；之前的keep-armature开关主要作用于sampled路径，不能消除已存在的rest关键帧。原生 `sampled/armature/sampler.py` 才通过缓存Accessor复用相同输出。未改动工具源码、使用扩展hook或下载脚本。
+
+唯一新候选从既有 `idle-candidate.blend` 开始，未再次编辑运动边界：
+
+- 删除3841组rest常量曲线（关键帧与控制柄均距location=0、quaternion=(1,0,0,0)、scale=1小于1e-5）。这是有界数值简化，不声称精确零损失；有意义的恒定偏移和动态曲线保留。
+- 移除导入器生成的骨骼显示 `Icosphere` 占位对象（它从未属于原GLB或先前导出集合），没有删原几何/骨骼。
+- 用原生ACTIONS、60fps全采样、标准动画优化/去重、reset-pose导出；关闭extras输出，明确丢弃非渲染自定义metadata而非保留其未知类型。原许可和归属仍保存在预检manifest。
+- 保留15个clip名、213个joint、5个primitive、3张PNG；仅Idle有此前作者曲线修订，其他循环未制作修复。
+
+### 验证结果：不能交付
+
+| 项目 | 上轮Idle导出 | 本次清理候选 | 结论 |
+| --- | ---: | ---: | --- |
+| GLB字节 | 8397344 | 8106284 | 均小于64MiB，不等于可导入 |
+| accessors | 10212 | 4457 | 新候选低于8192 |
+| bufferViews | 10215 | 4460 | **仍超过2048，拒绝** |
+| 动画channels总数 | 9408 | 5567 | 没有删除动作 |
+
+正式 `inspectPetFolder` 探针 **1 passed**：原包 `ok:true`，本次隔离候选 `invalid-model`；22个原根普通文件hash全部匹配既有证据。候选不是可安装交付，未创建 `/Users/gan/Downloads/小小格温-AgentPet-循环修订`，没有自动导入/替换/重绑定。
+
+真实GLTFLoader/AnimationMixer加载通过（数值探针仍用空Texture略过解码）。3份PNG字节、5个primitive绘制索引数及213joint名/数量与原包一致。四组stop/reset切换（Idle→Cast、Cast→Idle、Dance_Loop→Run01、Death→Greeting）与新场景目标clip同刻一致，未测到旧姿态残留。
+
+**运动保真也未通过，不能只解决计数就放行。** 相对上轮Idle候选，各clip取121个固定时刻：Idle骨骼RMS差最大约模型对角线5.55e-8；但非目标Cast_Damage最大约0.678%、Doll_IdleIn约0.652%、Idle_In约0.425%。Dance_In/Run01导出时长各减少约1/60秒；部分骨骼角度差更大，不能据平均位置或图片hash声称动作保真。此证据只定位到新的全采样/清理导出路径，未单独归因于曲线省略或重采样；不再追加修订/导出。没有对本次不合格候选生成或验收新视觉预览。
+
+### 各动作占用与未实施的精简提案
+
+下表只读现有候选JSON/BIN。变化通道按输出各分量范围>1e-4统计，是粗计数（四元数分量变化不等于视觉运动）；输出views/总引用views均按clip内去重。不同clip共享views，**各行不能直接相加**，不是可单独删除的独占字节量。
+
+| clip | 通道 | 变化通道 | 输出views | 输入+输出views |
+| --- | ---: | ---: | ---: | ---: |
+| Cast_Cycle | 352 | 118 | 338 | 340 |
+| Cast_Damage | 362 | 182 | 348 | 350 |
+| Damage_Hurt | 435 | 219 | 414 | 416 |
+| Dance_In | 350 | 152 | 340 | 342 |
+| Dance_Loop | 386 | 136 | 376 | 378 |
+| Death | 374 | 186 | 361 | 363 |
+| Greeting | 401 | 166 | 385 | 387 |
+| Idle_Base | 351 | 139 | 336 | 338 |
+| Idle_In | 341 | 109 | 326 | 328 |
+| Interact | 413 | 141 | 396 | 398 |
+| Laugh01 | 380 | 185 | 367 | 369 |
+| Laugh02 | 375 | 176 | 357 | 359 |
+| PetChibiGwen_Base_Doll_IdleIn.anm | 341 | 121 | 329 | 331 |
+| Run01 | 354 | 158 | 343 | 345 |
+| Run_Haste | 352 | 138 | 337 | 339 |
+
+一个供用户决策的最小功能集合是保留 **Idle_Base / Cast_Cycle / Run_Haste / Dance_Loop / Death**（空闲/任务进行中/拖动/任务完成/错误）。按现有bufferView引用并集，加全部非动画数据，估计1662个views，距2048余386；不是删改GLB或新的导出验证，不能保证正式Blender重导出和其他预算通过，也不能掩盖上面的运动保真问题。
+
+如选择该提案，另外10个已映射clip会被删除，其映射需明确清空，相关细活动转既有working/idle回退、等待及本地反馈等失去专用动作。**尚未授权/实施任何删除或映射变更。** 若必须保留全部15动作，当前验证路径继续阻塞；不擅改外观、运动或安全上限。作者修订仍只覆盖Idle，Cast_Cycle/Run_Haste尚有原慢尾，不把精简方案当全部循环修好。
+
+### 可复查本机证据
+
+新私有根：`/private/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/gwen-blender-cleanup-z3pfk7gj`（指针 `/tmp/gwen-blender-cleanup-path`）。资产/制作脚本不入Git、不上传：
+
+- `inventory.json`、`inventory-detail.json`及对应脚本/日志：改动前的对象、曲线和阈值清点。
+- `clean-idle.blend`、`clean-idle.glb`、`cleanup.json`、`clean-export.log`：唯一清理候选和实际原生导出参数。
+- `export-counts.json`、`clip-budget.py/json/log`：预算及5clip引用并集估计，不写GLB。
+- `preservation-clean.mjs/json/log`：15clip时长/轨迹、图像/几何/skin与4组切换检查；不代替GPU视觉。
+- `rejected-inspection/`、`import-probe.test.ts`、`import-probe.executed.ts`、`import-probe.log`、`import-results.json`：正式预检拒绝fixture/测试（临时位于Main同目录以导入正式seam，运行后移走，不依赖用户资产进入CI）。fixture仅含pet.json、pet.glb、avatar.png与NOT-FOR-IMPORT说明。
+- 新GLB SHA-256：`e4d5af133e710ad0d13ee25dd3419f9c3bc9d36302f1f3ff80185bfe89e0c8a6`；原GLB仍为`3f0aeb7490c46ac279c6263604503e2871e50c7fb1226d0b05a057bbbfc5dae1`。
+
+本轮仅提交上述完成的清理实验/拒绝证据和进度。没有生产代码、API、永久测试或依赖变化，未重跑全量/typecheck/build、启动dev、操作Agent或推送。此前同视角3圈视频仅属于上轮未清理Idle候选，不得作为本次候选外观/动作验收证据。
+
+## 离线作者修订：Idle 候选与导出阻塞（历史阶段）
 
 ### 范围与制作
 
@@ -39,7 +108,7 @@ h=1/960秒下改善方向相同；候选首尾骨骼/表面姿态RMS差约1e-9�
 
 已生成同镜头并排离线预览：768×384、15fps、96帧、6.4秒，覆盖原版约3.46圈和候选4圈。单帧已确认模型/纹理/标签可见；完整动态顺滑、原生GPU和应用内播放未验收。预览不代表候选可导入，**没有安装、替换或重绑定宠物**。
 
-后续需要用户批准在新临时工具目录安装固定版本标准 glTF 优化工具（候选 `@gltf-transform/cli`，只做无损accessor去重/缓冲打包，并处理原材质extras类型保真），不进入项目依赖；版本、下载量/磁盘范围须安装前核对。未安装或调用该工具，不能预先保证其能满足预算。先验证当前Idle候选可导入及视觉，再处理其他循环clip，不扩大未经验证的修订。
+当时建议隔离安装标准glTF优化工具；**用户随后明确拒绝，该路线已关闭，没有安装或调用。** 最新仅Blender清理尝试及拒绝证据以上节为准，不再把安装授权列为下一步。
 
 ### 本机证据路径
 

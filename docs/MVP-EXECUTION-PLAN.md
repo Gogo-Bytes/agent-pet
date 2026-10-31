@@ -148,7 +148,17 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
-### 格温离线作者修订：Idle候选已制作，导出兼容性阻塞
+### 格温仅用 Blender 清理：仍阻塞，未创建成品包
+
+用户已拒绝安装工具，另授权仅用已有Blender删除冗余内容/简化并整理独立宠物文件夹。基线`9b04e59`，先清点原9408组TRS及原生导出器路径：非全采样输出不复用Accessor，旧keep-armature旗标不删除已有rest曲线。唯一新候选删除3841组近似rest常量曲线和导入器Icosphere显示占位（非原几何），禁extras输出，保留15clip/213joint/5primitive/3PNG，用原生60fps全采样与缓存导出；未改曲线修订范围或应用接口。
+
+结果accessors 10212→4457，但bufferViews 10215→4460仍>2048，GLB8106284字节。正式inspect探针1 passed是**原包通过/候选invalid-model/原22根文件hash不变**的拒绝验证，不是导入成功。真实Three重载和4组stop/reset切换无残留，图片字节/primitive索引数/joint名数量一致；但Dance_In/Run01时长各减少约1/60秒，非目标轨迹RMS差最大约模型对角线0.678%，运动保真亦未通过，不继续调参或输出不合格成品。
+
+Downloads最终文件夹未创建，没有安装/导入/替换/重绑定、放宽guard、下载或自写二进制优化器。原包SHA-256保持`3f0aeb7490c46ac279c6263604503e2871e50c7fb1226d0b05a057bbbfc5dae1`。当前只读占用估计：若用户另行同意只保留Idle_Base/Cast_Cycle/Run_Haste/Dance_Loop/Death，现有引用并集含非动画数据约1662views；这是**未经导出验证的取舍提案**，其他10clip都有映射，不得当作无用数据擅删，也未解决重采样保真或Cast/Run原慢尾。需要用户决定保留全部动作继续阻塞，还是明确接受精简动作集合；不宣称Blender所有路径不可能。
+
+[完整清理依据、15clip占用表、保真结果与证据路径](GWEN-LOOP-DIAGNOSIS.md#仅用-blender-清理候选拒绝与明确停点)。本轮仅文档提交与本机制作证据，未新增永久测试、未跑全量/typecheck/build、未做新视觉验收或推送；上轮预览不得冒充本轮候选通过。
+
+### 格温离线作者修订：Idle候选已制作，导出兼容性阻塞（历史阶段）
 
 用户已明确由开发侧承担素材修订，覆盖此前仅等待外部作者的责任停点；不授权覆盖原包/已安装宠物或扩展作者API。基线`f24ab87`，发现现有Blender5.1.1/ffmpeg，未安装工具。原包无DCC源文件，已在新临时目录原生导入；只编辑`Idle_Base`首尾各100ms原生Bezier轨迹并移除人工慢闭合，保留中段节拍，其他14clip不作作者编辑。不是继续旧缩尾实验，播放器/22项触发/fallback完全不变。
 
@@ -156,7 +166,7 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 **尚不能导入：** Blender原生输出10212 accessors/10215 bufferViews超出既有8192/2048，连未修订roundtrip也超限；Main允许的一次标准静态通道导出优化无效，停止导出。正式`inspectPetFolder`确认原包通过、候选invalid-model，22个原根文件hash不变；临时测试1 passed，未修改guard、安装或重绑定。原版/候选同视角768×384/15fps/6.4秒预览已生成（各至少3圈），动态视觉和应用内验收尚未通过。
 
-下一步需批准**隔离固定版本标准glTF工具**的安装范围，做无损去重/缓冲打包及元数据类型保真；尚未安装、下载量须先核对，不自写GLB加工引擎、不放宽预算。Idle先过格式/保真/视觉，再修Cast_Cycle、Run_Haste及其他循环片段；未声明格温修复完成。仅文档阶段，未跑全量/typecheck/build，未推送；临时资产/制作文件不入Git，未授予再分发许可。
+当时建议隔离安装标准glTF工具；用户随后明确拒绝，**安装路线关闭**，最新只用Blender清理结果见上节。Idle尚未通过格式/保真/视觉，Cast_Cycle、Run_Haste及其他循环片段未修订。仅文档阶段，未跑全量/typecheck/build，未推送；临时资产/制作文件不入Git，未授予再分发许可。
 
 ### 格温循环接缝：源特定候选拒绝，待作者修订（历史停点）
 

@@ -1,6 +1,60 @@
 # 格温循环边界诊断
 
-状态：**用户已明确是末尾停顿/接续不自然；一次源特定缩尾候选不合格，未交付修复。** 初次诊断基线 `82fed8c`，本次实验基线 `a8a006b`。没有生产代码或播放策略变更；继续需要作者修订源动画，不再以原生掉帧录屏作为本次素材接缝工作的前置条件。数值指标不是视觉验收。
+状态：**用户已授权由开发侧承担离线素材修订；Idle_Base 原生制作候选已有数值改善，但 Blender 重导出超过导入预算，尚未交付可安装修复。** 最新基线 `f24ab87`，详见下节。原包、已安装宠物、生产代码和播放策略不变；对外仍只有触发时机→clip。此前缩尾拒绝和“待作者修订”是历史停点，最新授权覆盖责任归属，但不授权放宽导入 guard、安装工具或覆盖原包。数值指标不是视觉验收。
+
+## 离线作者修订：Idle 候选与导出阻塞
+
+### 范围与制作
+
+本机已有 Blender 5.1.1、ffmpeg；原包没有 `.blend` 等 DCC 源文件。因此仅将原 GLB/manifest/头像/闭合记录复制到新建私有临时目录，用 Blender 原生 glTF 导入生成制作文件。没有执行包内脚本、加载第三方插件、安装依赖、改播放器/接口或操作 Agent。
+
+只做一个代表性运动候选：`Idle_Base` 去掉人工0.25秒慢闭合，保留1.6秒原正文节拍；首尾各100ms以 Blender 原生 Bezier 曲线衔接共同的边界切线，内部曲线和其余14个clip不做作者编辑。不是仅缩短旧尾段或复制端点。保存为 `idle-candidate.blend`，保留动作名；Cast_Cycle、Run_Haste及其他循环片段尚未修订。
+
+### 重载与有界数值证据
+
+用真实 GLTFLoader/AnimationMixer 重载导出的 GLB；骨骼位置按原模型包围盒对角线归一化，旋转用世界空间四元数差分；蒙皮表面按各primitive实际绘制的索引角点取样，不把共享position accessor里的未绘制顶点重复当作该材质表面。纹理解码在此数值探针中仍由空Texture替代，真实图片另由Blender预览加载。
+
+| 指标（h=1/240秒） | 原版 | Idle候选 |
+| --- | ---: | ---: |
+| 最后100ms骨骼平均速度 | 0.002285 | 0.080015 |
+| 最初100ms骨骼平均速度 | 0.054299 | 0.054838 |
+| 正文平均速度 | 0.116546 | 0.116547 |
+| 首尾骨骼速度向量差 | 0.049991 | 0.011658 |
+| 首尾蒙皮表面速度向量差 | 0.059693 | 0.011169 |
+| 首尾角速度向量差（rad/s RMS） | 0.607354 | 0.181354 |
+| 全片蒙皮速度峰值 | 0.276850 | 0.276852 |
+| 全片蒙皮差分加速度峰值 | 33.69857 | 33.69962 |
+
+h=1/960秒下改善方向相同；候选首尾骨骼/表面姿态RMS差约1e-9，7个手/脚/剪刀节点端点位置差为0，速度差均下降。正文没有被减速成静态，峰值差约为数值重采样量级；但60Hz LINEAR导出仍有残余速度差，不能据数值称完全光滑或用户已验收。
+
+14个非目标clip时长不变，各121个固定时刻与**同设置未编辑roundtrip**的骨骼轨迹差为0。与原包相比，Dance_Loop/Dance_In/Run01最大差约模型对角线0.0162%，其余小于0.000044%；这是原生往返已有误差，不归因为Idle修订，也不宣称字节保真。Idle→Cast、Cast→Idle、Dance_Loop→Run01、Death→Greeting四组按既有stop/reset规则切换，结果与独立新场景同一目标clip一致，没有测到旧姿态残留。
+
+图片3份PNG字节摘要、5个primitive绘制索引数量、1个skin/213个joint和15个clip名称保持；原生重导出重新组织顶点/缓冲，并把部分材质 `extras.hash` 大整数变成字符串，还显式写入unlit下不参与渲染的PBR默认值。**未知元数据类型保真未通过**，后续工具处理必须保留原字段含义，不能把当前重导出视为无损包。
+
+### 当前阻塞与预览
+
+未修改曲线的roundtrip也生成10211 accessors/10214 bufferViews；Idle候选为10212/10215，超过既有8192/2048上限。经Main批准仅一次标准 `export_optimize_animation_keep_anim_armature=False` 导出复验，数量未下降，停止导出尝试，不写自制GLB去重器、不放宽guard。
+
+实际 `inspectPetFolder`：原包 `ok:true`，候选 `invalid-model`。首次临时探针传入macOS `/var`别名，正确被safeRoot拒绝为not-directory；改用同一自有目录的canonical realpath后一次复验得到预期invalid-model，没有修改guard。原根目录22个普通文件的摘要均不变，GLB仍为 `3f0aeb7490c46ac279c6263604503e2871e50c7fb1226d0b05a057bbbfc5dae1`。
+
+已生成同镜头并排离线预览：768×384、15fps、96帧、6.4秒，覆盖原版约3.46圈和候选4圈。单帧已确认模型/纹理/标签可见；完整动态顺滑、原生GPU和应用内播放未验收。预览不代表候选可导入，**没有安装、替换或重绑定宠物**。
+
+后续需要用户批准在新临时工具目录安装固定版本标准 glTF 优化工具（候选 `@gltf-transform/cli`，只做无损accessor去重/缓冲打包，并处理原材质extras类型保真），不进入项目依赖；版本、下载量/磁盘范围须安装前核对。未安装或调用该工具，不能预先保证其能满足预算。先验证当前Idle候选可导入及视觉，再处理其他循环clip，不扩大未经验证的修订。
+
+### 本机证据路径
+
+临时根：`/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/gwen-author-revision-vl_6l6d8`（canonical前缀为`/private/var`）。内容仅本机保留，未入Git/上传/授予再分发许可：
+
+- `source/`、`original-hashes.json`：原文件只读副本及根文件摘要。
+- `imported.blend`、`idle-candidate.blend`：原生导入和Idle制作候选。
+- `roundtrip.glb`、`idle-candidate.glb`、`*-compatible.glb`：导出证据；均不是可安装交付。
+- `rejected-inspection/`：只用于正式预检的拒绝fixture，ID为`chibi-gwen-loop-review`；原归属与未核实许可保留，内有NOT-FOR-IMPORT提示。
+- `inspect-blender.py`、`author-idle.py`、`export-compatible.py`及对应日志：标准工具操作。首轮作者脚本删除关键帧后持有失效RNA引用，已唯一修正为逆序索引删除；失败日志单独保留。最初全量强制重采样roundtrip同样未通过预算，现已改用原生非强制采样导出，非目标插值不统一重烘焙。
+- `measure.mjs`、`metrics.json`、`verify-evidence.py`：最终导出重载指标及证据自检；早期错误计入未绘制顶点的表面样本另存`metrics-unused-vertices.*`，以上数字以修正后的实际索引角点取样为准。一次最终自检错误要求两次候选导出字节完全相同而失败：Blender重载后重排部分动画/accessor/bufferView，改为分别用真实Loader重载比较，数值结果完全一致（`metrics-first-export.json`保留首次导出结果），不把二进制重排称为动画变化。
+- `preservation.mjs`、`preservation.json`：图片/几何计数、非目标和切换证据；`import-probe.test.ts`、`import-probe.log`、`import-results.json`：正式预检及原文件不变断言（1 passed）。临时测试曾按相对import seam放在Main目录，运行后已移除，未成为依赖用户模型的CI测试。
+- `render-comparison.py`、`preview-frames/`、`idle-comparison-3cycles.mp4`、`original-seam-contact.png`、`revised-seam-contact.png`：标准Blender渲染与ffmpeg合成。原接缝接触表为1.667–2.000秒，候选为1.400–1.733秒，各6帧。
+
+本轮只提交制作进展/阻塞文档；没有生产或永久测试变化，不重跑全量/typecheck/build，不宣称格温所有动画已修好。
 
 ## 范围与信号
 

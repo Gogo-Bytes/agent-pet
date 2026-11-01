@@ -36,6 +36,53 @@ it('admits artist-sized clip metadata and native unlit materials without adding 
   // Synthetic counts mirror the reported package; no user model is committed.
   expect(validatePetGlb(glb(artistSizedDocument()))).toBe(true);
 });
+function splitBufferDocument(count: number) {
+  // A valid exporter layout with one small view per accessor, not decoded image/GPU evidence.
+  return { asset: { version: '2.0' }, buffers: [{ byteLength: count * 12 }],
+    bufferViews: Array.from({ length: count }, (_, id) => ({ buffer: 0, byteOffset: id * 12, byteLength: 12 })),
+    accessors: Array.from({ length: count }, (_, id) => ({ bufferView: id, count: 1, componentType: 5126, type: id === count - 1 ? 'SCALAR' : 'VEC3' })),
+    nodes: Array.from({ length: 512 }, () => ({})),
+    animations: Array.from({ length: 16 }, (_, clip) => ({
+      samplers: Array.from({ length: 512 }, (_, node) => ({ input: count - 1, output: clip * 512 + node })),
+      channels: Array.from({ length: 512 }, (_, node) => ({ sampler: node, target: { node, path: 'translation' } })),
+    })),
+  };
+}
+it('accepts bounded per-accessor buffer views from native exporters, including the exact collection boundary', () => {
+  for (const count of [10215, 16384]) expect(validatePetGlb(glb(splitBufferDocument(count), count * 12))).toBe(true);
+});
+it('rejects either split buffer collection just above its finite limit', () => {
+  const count = 16384, document = splitBufferDocument(count);
+  expect(validatePetGlb(glb({ ...document, accessors: [...document.accessors, document.accessors[0]] }, count * 12))).toBe(false);
+  expect(validatePetGlb(glb({ ...document, bufferViews: [...document.bufferViews, document.bufferViews[0]] }, count * 12))).toBe(false);
+});
+it('keeps aggregate allocation budgets even with exporter-sized collections and shared animation data', () => {
+  const count = 10215, document = splitBufferDocument(count);
+  const oversized = { count: 1000000, componentType: 5126, type: 'SCALAR' };
+  expect(validatePetGlb(glb({ ...document, accessors: [...document.accessors, oversized] }, count * 12))).toBe(false);
+  const shared = { samplers: [{ input: count - 1, output: 0 }],
+    channels: Array.from({ length: 512 }, (_, node) => ({ sampler: 0, target: { node, path: 'translation' } })) };
+  const outputs = [{ count: 652, componentType: 5126, type: 'VEC3' }, ...document.accessors.slice(1)];
+  expect(validatePetGlb(glb({ ...document, accessors: outputs, animations: [shared] }, count * 12))).toBe(false);
+  outputs[0]!.count = 651;
+  expect(validatePetGlb(glb({ ...document, accessors: outputs, animations: [shared] }, count * 12))).toBe(true);
+  const inputs = [...document.accessors.slice(0, -1), { count: 1000, componentType: 5126, type: 'SCALAR' }];
+  expect(validatePetGlb(glb({ ...document, accessors: inputs }, count * 12))).toBe(false);
+  inputs[count - 1]!.count = 61;
+  expect(validatePetGlb(glb({ ...document, accessors: inputs }, count * 12))).toBe(true);
+});
+it('bounds cumulative buffer-view slices, counting overlapping data separately', () => {
+  const size = 4 * 1024 * 1024;
+  const document = { asset: { version: '2.0' }, buffers: [{ byteLength: size }],
+    bufferViews: Array.from({ length: 16 }, () => ({ buffer: 0, byteLength: size })),
+    accessors: Array.from({ length: 17 }, (_, id) => ({ bufferView: id % 16, count: 1, componentType: 5126, type: 'SCALAR' })),
+  };
+  // A tiny accessor may still cause the loader to copy its entire bufferView.
+  expect(validatePetGlb(glb(document, size))).toBe(true);
+  document.bufferViews.push({ buffer: 0, byteLength: 4 });
+  document.accessors[16]!.bufferView = 16;
+  expect(validatePetGlb(glb(document, size))).toBe(false);
+});
 it('supports required unlit materials but not external data hidden in extension payloads', () => {
   expect(validatePetGlb(glb({ asset: { version: '2.0' }, extensionsRequired: ['KHR_materials_unlit'],
     materials: [{ extensions: { KHR_materials_unlit: {} } }] }))).toBe(true);
@@ -50,7 +97,7 @@ it('retains finite limits for JSON, traversal, accessor and animation allocation
   for (const document of [
     { ...base, extras: { note: 'x'.repeat(4 * 1024 * 1024) } },
     { asset: { version: '2.0' }, extras: Array(250001).fill(0) },
-    { asset: { version: '2.0' }, accessors: Array(8193).fill({ count: 1, componentType: 5126, type: 'SCALAR' }) },
+    { asset: { version: '2.0' }, accessors: Array(16385).fill({ count: 1, componentType: 5126, type: 'SCALAR' }) },
     { ...base, animations: Array(17).fill({ samplers: Array(1024).fill({ input: 0, output: 1 }),
       channels: Array(1024).fill({ sampler: 0, target: { node: 0, path: 'translation' } }) }) },
   ]) expect(validatePetGlb(glb(document))).toBe(false);

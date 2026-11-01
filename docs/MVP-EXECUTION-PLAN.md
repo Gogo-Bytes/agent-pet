@@ -148,7 +148,15 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
-### 格温仅用 Blender 清理：仍阻塞，未创建成品包
+### GLB 原生导出布局：有界结构扩容与切片复制保护
+
+用户允许必要时有界调整限制。一次完整预算核对确认：旧非全采样 Idle 候选（保留15动作）的10212 accessors/10215 bufferViews仅超结构计数；JSON2301536字节、遍历183466项、accessor元素526181、输入关键帧248520、输出标量843404均在既有预算内。未编辑原生roundtrip也因相同布局被拒绝。文件夹中的报告/.blend/其他文件不参与GLB检查，导入只读pet.json/pet.glb/声明头像。此前全采样清理候选还有1087366输出标量超100万及运动保真失败，继续拒绝、不用于交付。
+
+仅将accessors 8192→16384、bufferViews 2048→16384；无新增接口参数。核对实际GLTFLoader会逐view执行buffer.slice，故经Main确认同时增加全部view.byteLength累计≤64MiB（重叠范围逐个计费）的必要保护，避免小accessor引用大重叠view放大复制。不是总体Loader/GPU内存保证；会保守拒绝某些重叠布局。原文件64MiB/JSON4MiB/遍历25万/几何/图像/节点深度/skin/累计动画与accessor工作量/外部URI等守卫不变。
+
+红测分别证明旧计数拒绝正常分片与旧逻辑允许切片复制放大；新增4项合成回归，无用户资产入库，覆盖16384精确边界/两集合各自超一、共享输出/输入和累计元素超限、重叠切片64MiB边界/超一。聚焦106项、全量133文件1533 passed/1 skipped，typecheck、desktop build通过。尚无新的Downloads包、无自动导入/重绑或原生视觉验收；下一独立阶段用原曲线非全采样、禁extras导出核对保真与真实预检后交付仅Idle修订包。
+
+### 格温仅用 Blender 清理：仍阻塞，未创建成品包（历史阶段）
 
 用户已拒绝安装工具，另授权仅用已有Blender删除冗余内容/简化并整理独立宠物文件夹。基线`9b04e59`，先清点原9408组TRS及原生导出器路径：非全采样输出不复用Accessor，旧keep-armature旗标不删除已有rest曲线。唯一新候选删除3841组近似rest常量曲线和导入器Icosphere显示占位（非原几何），禁extras输出，保留15clip/213joint/5primitive/3PNG，用原生60fps全采样与缓存导出；未改曲线修订范围或应用接口。
 

@@ -148,6 +148,14 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
+### 格温空闲修订包：独立交付，其他循环与视觉验收未完成
+
+在结构扩容阶段`ad05b70`后，用现有Blender从原Idle修订工程按原非强制采样设置导出，仅关闭非渲染extras；没有使用时长/轨迹失败的全采样清理候选。新建`/Users/gan/Downloads/小小格温-AgentPet-空闲修订`，ID `chibi-gwen-idle-revised`、版本1.1.1，保留15clip与22映射（仅删除废弃sleeping:null）、原头像/许可/归属；4文件8,699,877字节，没有覆盖原包或已安装宠物。
+
+最终GLB8,393,696字节，10212 accessors/10215 views、累计源切片6,095,774字节。实际Downloads目录正式inspect成功并取消预览；真实GLTFLoader加载验证全部动画轨道/几何/skin/变换与旧Idle预览候选一致，材质仅去extras，3PNG字节及213joint保持。14非目标时长/轨迹与未编辑原生往返一致，原往返相对源的最大骨骼RMS误差0.0162%模型对角线仍披露；4组切换无残留，原包22文件hash未变。源码全量1533 passed/1 skipped/typecheck/build属前阶段，本包临时staging与实际目录各1通过、数值/元数据保真检查通过，不重复宣称全量含用户模型。
+
+只修订Idle；Cast_Cycle/Run_Haste等未修。既有三圈Blender预览与最终包解码后的运动相同，可供用户比较；动态顺滑和应用内/GPU验收未通过。需要新版源码预算（旧版会拒绝），没有自动安装/重绑/重启dev、依赖或Agent操作。完整哈希、步骤、文件路径与剩余工作见[当前格温交付](GWEN-LOOP-DIAGNOSIS.md#当前交付空闲动画修订包与结构预算)。
+
 ### GLB 原生导出布局：有界结构扩容与切片复制保护
 
 用户允许必要时有界调整限制。一次完整预算核对确认：旧非全采样 Idle 候选（保留15动作）的10212 accessors/10215 bufferViews仅超结构计数；JSON2301536字节、遍历183466项、accessor元素526181、输入关键帧248520、输出标量843404均在既有预算内。未编辑原生roundtrip也因相同布局被拒绝。文件夹中的报告/.blend/其他文件不参与GLB检查，导入只读pet.json/pet.glb/声明头像。此前全采样清理候选还有1087366输出标量超100万及运动保真失败，继续拒绝、不用于交付。

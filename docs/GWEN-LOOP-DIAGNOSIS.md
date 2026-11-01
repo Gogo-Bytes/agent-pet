@@ -1,6 +1,36 @@
 # 格温循环边界诊断
 
-状态：**尚未交付可安装修复。用户拒绝安装新工具，另授权仅用已有 Blender 清理冗余内容、导出并整理独立宠物包。** 本轮从 `9b04e59` 做一次新清理候选：accessors 降至4457，但4460个bufferViews仍超过2048；原生全采样还改变部分非目标时长/轨迹，候选拒绝。没有创建 Downloads 成品包。最新证据见下节；不把当前失败路径推断成 Blender 所有方法都不可行。原包、已安装宠物、生产代码和播放策略不变，数值改善不等于视觉验收。
+状态：**已交付可通过当前源码导入预检的独立“空闲动画修订版”，不是全部循环修复，未自动安装或完成视觉验收。** 用户允许有依据的有界结构预算调整后，`ad05b70` 兼容原生非全采样布局并补充切片复制保护。全部15动画保留；仅Idle曲线修订。此前全采样清理候选仍拒绝，未使用；原包和已安装宠物不动，不安装工具、不增加作者控制接口。
+
+## 当前交付：空闲动画修订包与结构预算
+
+### 根目录文件不等于 GLB 内部数据
+
+`pet-assets-import.ts`只读取 `pet.json`、固定的`pet.glb`及manifest声明头像，安装也只复制这三类预览快照。原包里的报告、预览网页、`.blend`、制作脚本等不参与GLB的accessor/bufferView限制；删除这些根文件不会解决内部计数。此次包只包含pet.json、pet.glb、avatar.png与修订说明，不复制旧vendor/脚本或误导性的旧验证报告。原作者/许可未知仍在manifest和说明中保留。
+
+一次只读全向量核对：非全采样Idle候选的10212 accessors/10215 bufferViews确实超旧8192/2048，但JSON2.30MB、遍历183466项、accessor元素526181、输入关键帧248520、输出标量843404均在原预算内；未编辑roundtrip也因同样布局被拒绝。全采样清理候选另有输出1087366>100万，且时长/轨迹失真，不能只扩大计数后交付。
+
+因此源码仅将两结构集合各限16384，同时新增全部bufferView.byteLength累计≤64MiB（重叠逐个计费），因为实际GLTFLoader逐view执行buffer.slice。其他文件/JSON/遍历/元素/动画/几何/图像/图与URI守卫不变，64MiB切片预算不是整体内存/GPU保证。边界/放大攻击及工作量回归见`pet-glb.test.ts`；源码阶段聚焦106项、全量1533 passed/1 skipped、typecheck/build通过。
+
+### 独立文件夹与保真范围
+
+- 最终路径：`/Users/gan/Downloads/小小格温-AgentPet-空闲修订`（排他新建，没有覆盖已有路径）。
+- manifest：`chibi-gwen-idle-revised` / `1.1.1`；原22项映射保持，移除已废弃的`sleeping:null`，15个实际clip全保留。原`LicenseRef-UserSupplied-Unverified`与attribution原样保留，不授予再分发许可。
+- 4文件总计8,699,877字节；GLB8,393,696字节，SHA-256 `4e5f1d59efc7e0611aeb6990c32623ef4a54ed5ea6ccf4cba994a10fb1c5f205`。
+- 使用现有Blender5.1.1，从先前`idle-candidate.blend`同一曲线、相同非强制全采样设置导出，仅关闭extras；没有继续调曲线、清理运动或删动作。原生混合Bezier轨道仍按原设置由导出器采样，不是后来被拒绝的全片强制采样路径。
+- 最终10212 accessors/10215 views，累计源切片6,095,774字节；移除非渲染自定义extras，避免大整数转字符串的未知metadata语义。不宣称二进制或未知metadata无损保留。
+- 最终真实GLTFLoader加载后，15clip的轨道时间/值/插值、几何属性/索引、skin逆绑定/骨骼顺序、节点变换与原Idle预览候选全部一致；材质仅去extras，纹理引用保持。3份PNG字节、5primitive绘制索引数量、213joint名字/数量与原包一致。
+- 14非目标clip时长不变，121个固定时刻与未编辑原生roundtrip骨骼轨迹差为0；相对原包最大RMS差约模型对角线0.0162%，属于既有原生往返误差，不把它说成精确无损。Idle首尾速度数值仍与下方制作记录一致，四组stop/reset切换无残留。
+
+实际最终文件夹`inspectPetFolder`成功并取消私有预览，未调用install；原包22根普通文件摘要全部不变，原GLB仍为`3f0aeb7490c46ac279c6263604503e2871e50c7fb1226d0b05a057bbbfc5dae1`。导入旧版应用仍可能因旧cap拒绝，需运行包含`ad05b70`的代码；本轮未自动重启dev、替换/绑定宠物或修改Agent配置。
+
+### 验证材料与剩余工作
+
+新本机证据根：`/private/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/gwen-bounded-import-9g8xbuag`（`/tmp/gwen-bounded-import-path`）。`budget-vector.json`、`export-idle.py/log`、`idle-revised.glb`、`metrics.json`、`preservation.json`、`metadata-only-check.mjs/json/log`、`final-package-loader.mjs/json/log`、`final-package-files.json`及`gwen-final-package-probe.test.ts`/`final-package-inspect.log`保存实际命令与断言。正式probe先在自有staging、后在Downloads实际目录各1 passed；运行时临时位于Main相对seam，随后移出仓库，不把用户模型依赖加入CI。
+
+可复用先前`gwen-author-revision-vl_6l6d8/idle-comparison-3cycles.mp4`与两份接缝接触表：最终解码后的全部运动/外观属性与该预览候选一致，extras删除不改变预览。它仍只是Blender离线同视角3圈预览，**尚未由用户确认动态顺滑，也不是应用内/GPU验收**。纹理解码在Three数值探针中替换为空Texture，图片字节和Blender预览另验。
+
+交付只覆盖Idle；Cast_Cycle、Run_Haste及其他循环仍待按独立制作阶段修订。无模型入Git/上传、无新工具、无自动安装；最新事实覆盖下方旧“不可导入/未创建包”停点。下一步用新版应用手动导入此独立ID，验证空闲至少3轮，再做后续循环，不以格式预检代替主观验收。
 
 ## 仅用 Blender 清理：候选拒绝与明确停点
 

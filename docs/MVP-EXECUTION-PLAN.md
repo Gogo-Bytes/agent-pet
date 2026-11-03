@@ -158,7 +158,7 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 新增`PetCanvas.test.tsx`的12项真实DOM/Fiber/Three集成（只替换GPU上下文和资产IO，用仓库starter及区分姿态的合成clip），覆盖上述两症状、完成/退出重入、内部切换、toolbar/resize、拖动、业务cue、硬取消与换模型；原PetModel及共享22项送绘制姿态回归适配输入所有权，未删除完成/清理保护。聚焦8文件134 passed，typecheck/desktop build通过；全量135文件1567 passed/1 skipped通过。首轮全量新增拖动fixture在DOM→Canvas跨React根未完全提交前取样，保留原1 failed/1566 passed/1 skipped证据，显式异步act后有界复验通过；后续将user-event的act wrapper限定在已挂载后的输入，避免其默认flag切换警告。初始ResizeObserver未派发、按钮旧label、fixture复用业务cue、wrapper错误覆盖waitFor的失败及各一次修正复验均保留于`/tmp/hover-viewport-*.log`，未改变生产阈值/测试保护以掩盖失败。
 
-这是输入接线/实际Three姿态自动化，不是macOS原生/GPU/用户模型视觉验收。未重启或操纵运行中dev、读写用户模型/已安装宠物/Agent配置、安装依赖、访问网络或推送。独立审查与用户桌面hover复验由Main接续。
+这是输入接线/实际Three姿态自动化，不是macOS原生/GPU/用户模型视觉验收。未重启或操纵运行中dev、读写用户模型/已安装宠物/Agent配置、安装依赖、访问网络或推送。用户在`9078075`交付后反馈“可以了”，桌面hover本次问题复验通过；该确认不扩大为首页、多显示器或完整触发矩阵验收。独立工程审查不由用户反馈替代。
 
 ### hover 结束闪烁：共享播放器交接修复
 

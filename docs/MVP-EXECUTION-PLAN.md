@@ -148,7 +148,19 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
-### 格温跑步修订：Idle已由用户验收，两移动clip独立交付待动态验收
+### hover 结束闪烁：共享播放器交接修复
+
+用户已确认空闲与移动修订包“验收动画正常”，只覆盖Idle、Run_Haste、Run01，不扩展到其他clip/所有触发/长期GPU验收；随后报告hover结束回空闲时闪一下。本轮基线`facdf18`干净，只处理播放器交接，不编辑/读取用户模型、已安装宠物或Agent配置，不做尾段/拼接制作。
+
+真实GLTFLoader解析仓库starter，增加与默认姿势明确区分的合成clip，经两正式入口PetModel/ScenePet→Drei→R3F `advance`，在实际`gl.render`调用前后取姿态。4项红测同时确认：LoopOnce在完成帧自动disabled，画面用默认姿势x=0而非hover末姿x=12；微任务/React cleanup/setup后、下一帧尚未推进时仍是x=0而非idle x=2或working x=4。这不是素材首尾跳变或帧率猜测。
+
+最小共享修复：once用`clampWhenFinished`保留末姿供完成帧绘制，继续在mixer完成后的微任务交接；stop/play后仅`mixer.update(0)`立即采样新动作，不加逐帧推进、不在正在执行的mixer.update内重绑定。缺映射/无idle仍恢复静态，reduced仍暂停，unmount仍释放；latest-wins、拖动优先、连接低优先、业务cue延后消费/去重和最新rest保持。没有混合/过渡引擎或作者控制参数；消除默认姿势插帧，不承诺不同clip姿态天然平滑衔接。
+
+新增共享播放器22项两入口回归，覆盖开始/中间/完成帧、React延迟释放时末姿保持、交接后立即姿态、idle/working恢复、最新/已消费业务cue、重复hover、无idle静态、pointer退出/取消/丢捕获/失焦/隐藏/disabled/reduced及unmount。聚焦7文件114 passed；最终typecheck、desktop build、全量134文件 **1555 passed / 1 skipped**通过。首次扩大jsdom生命周期fixture时import.meta URL变为非file，改用既有根目录资产路径后一次复验通过；首次typecheck发现once为可选boolean，显式判断requested存在后一次复验通过。日志`/tmp/hover-finish-flash-{red,green,lifecycle,lifecycle-retest,focused,typecheck,typecheck-retest,build,full}.log`保留原失败与通过证据；原Three多实例警告/既有skip保留。
+
+这是实际Three/Drei/R3F顺序与送绘制姿态自动化，不是原生桌面/GPU/用户模型视觉验收。未重启/操纵运行中dev，未安装依赖/访问网络/发起模型请求或改原包；独立审查与用户hover视觉复验由Main继续，不提前宣称通过。
+
+### 格温跑步修订：Idle与两移动clip已由用户验收
 
 用户确认上一版空闲“丝滑”，只记Idle主观验收通过；另授权先修跑步/移动，不处理其他长尾，后续片段合并仅在离线Blender制作、不提供项目能力。本轮从既有Idle工程独立复制，只编辑`Run_Haste`（dragging/retrying）和`Run01`（searching/disconnected），原映射/15clip/所有guard/fallback不变。已验收Idle及另12非目标clip的时长、轨道时间/值/插值精确保持。
 
@@ -156,7 +168,7 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 最终排他创建`/Users/gan/Downloads/小小格温-AgentPet-空闲与移动修订`，ID `chibi-gwen-idle-move-revised`、版本1.1.2，只有4个必要文件，原许可/归属保留。GLB8,519,172字节，10214accessors/10217views、累计view6,220,734、输出874576均原预算内，无本轮源码/guard改动。实际目录正式inspect成功并取消预览；15clip/213joint/几何/skin/材质/PNG完全保留，7组动画切换与fresh目标一致，原包22文件和空闲修订包4文件hash不变。可继续编辑的打包纹理.blend、制作脚本与两段6秒30fps对比预览存于相邻`小小格温-AgentPet-空闲与移动修订-制作`，无临时图片依赖，未提交/上传资产或自动安装/重绑。
 
-Main只独立查看4张接缝接触表，未见明显模型/肢体/贴图异常；未动态播放，新的跑步节奏/丝滑/滑步仍待用户至少3轮实机比较。staging与实际目录probe各1通过、真实GLTFLoader/数值保真断言通过、既有导入相关97项通过；本轮仅文档与外部素材，无永久测试/生产变化，未重跑全量/typecheck/build，未重启运行中dev或安装工具。详细失败/修复数据、稳定产物与证据见[两跑步交付](GWEN-LOOP-DIAGNOSIS.md#当前交付保留已验收-idle仅修订两段跑步)。其他长尾和离线合并均暂停，等用户确认后再定范围。
+交付时Main只独立查看4张接缝接触表，未见明显模型/肢体/贴图异常且未动态播放；用户随后反馈“验收动画正常”，确认本包两跑步修订可用。该主观反馈不扩展为所有动画/完整触发矩阵通过；hover结束闪烁单独按上节修复。staging与实际目录probe各1通过、真实GLTFLoader/数值保真断言通过、既有导入相关97项通过；本轮仅文档与外部素材，无永久测试/生产变化，未重跑全量/typecheck/build，未重启运行中dev或安装工具。详细失败/修复数据、稳定产物与证据见[两跑步交付](GWEN-LOOP-DIAGNOSIS.md#当前交付保留已验收-idle仅修订两段跑步)。其他长尾和离线合并均暂停，等用户确认后再定范围。
 
 ### 格温空闲修订包：独立交付，后续仅Idle已由用户验收
 

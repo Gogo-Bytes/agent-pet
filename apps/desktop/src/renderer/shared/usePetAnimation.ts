@@ -41,7 +41,7 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
       playing?.stop(); playing = undefined;
       const resolved = resolvePetAnimation(value, mappings, clips.map(clip => clip.name));
       const requested = normalizePetAction(value);
-      const oneShot = requested && petActionCatalog[requested].playback === 'once';
+      const oneShot = requested !== undefined && petActionCatalog[requested].playback === 'once';
       // Missing transient animation must not interrupt the current running activity.
       if (oneShot && rest.current !== value && rest.current !== 'idle' && (!resolved || resolved.action === 'idle')) { play(rest.current); return; }
       const next = resolved ? actions[resolved.clip] : undefined;
@@ -49,8 +49,11 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
       playing = next;
       const once = resolved.playback === 'once' || (oneShot && resolved.action === 'attention');
       next.reset().setLoop(once ? LoopOnce : LoopRepeat, once ? 1 : Infinity);
-      next.clampWhenFinished = false;
+      // Keep the final pose through the completion draw, until the deferred handoff.
+      next.clampWhenFinished = once;
       next.play(); next.paused = reduced;
+      // Sample the new pose now; play() alone leaves stop()'s default pose until the next frame.
+      mixer.update(0);
     }
     // Never rebind during mixer.update: it would capture the outgoing animated pose.
     const finished = (event: { action: AnimationAction }) => { queueMicrotask(() => {

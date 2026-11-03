@@ -1,6 +1,6 @@
 # 格温循环边界诊断
 
-状态：**用户已确认空闲修订动画流畅；新增独立“空闲与移动修订”包通过数值/保真/导入预检，两个跑步动画仍待用户动态验收。** 已验收Idle精确保留，本轮只编辑Run_Haste、Run01，全部15动画和原映射保持。其他长尾、工作动画及多片段合并均暂缓；未来合并只做离线Blender制作，不新增项目接口。原包、空闲修订包、已安装宠物与运行中dev均未改动；不安装工具、不调整guard。
+状态：**用户已确认空闲修订动画流畅，并在“空闲与移动修订”包交付后反馈“验收动画正常”，Idle与两跑步修订已获用户认可。** 已验收Idle精确保留，本轮只编辑Run_Haste、Run01，全部15动画和原映射保持。其他长尾、工作动画及多片段合并均暂缓；未来合并只做离线Blender制作，不新增项目接口。原包、空闲修订包、已安装宠物与运行中dev均未改动；不安装工具、不调整guard。
 
 ## 当前交付：保留已验收 Idle，仅修订两段跑步
 
@@ -38,7 +38,7 @@
 
 ### 预览、检查与剩余项
 
-稳定制作目录内`Run_Haste-comparison-3cycles.mp4`与`Run01-comparison-3cycles.mp4`均6秒/30fps，同视角、尺度、光照及绝对时间，各版均至少3圈。另有每clip的baseline/revised-seam.png。Main独立读取4张接触表：模型/贴图及头身手脚剪刀可见，所示边界帧未见明显肢体脱离或损坏；**未播放mp4，不能据稀疏帧称动态节奏、流畅或滑步验收通过**。用户仍需手动导入新ID并分别观察至少3轮。
+稳定制作目录内`Run_Haste-comparison-3cycles.mp4`与`Run01-comparison-3cycles.mp4`均6秒/30fps，同视角、尺度、光照及绝对时间，各版均至少3圈。另有每clip的baseline/revised-seam.png。Main独立读取4张接触表：模型/贴图及头身手脚剪刀可见，所示边界帧未见明显肢体脱离或损坏；**未播放mp4，不能据稀疏帧称动态节奏、流畅或滑步验收通过**。交付后用户反馈“验收动画正常”，只记录Idle和两跑步的主观验收通过，不外推全部clip或触发。另报hover结束闪烁，属于播放器交接问题，修复与验证单列在[MVP计划](MVP-EXECUTION-PLAN.md#hover-结束闪烁共享播放器交接修复)，未修改本包素材。
 
 本机实验根`/private/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/gwen-running-revision-kg6bwu5y`（指针`/tmp/gwen-running-revision-path`）。两作者脚本、native-seam诊断、measure-revised.mjs、boundary-and-feet.mjs、verify-numerical.py和verify-preservation.mjs保存可复查步骤；稳定制作目录另留关键脚本/JSON/日志。staging和实际最终目录正式inspect各1 passed，最终GLB真实重载/数值断言通过；既有pet-glb与pet-assets-import共97项通过。没有生产/永久CI测试改动，不重复运行全量/typecheck/build，上一阶段1533项不当本轮素材视觉证据。
 

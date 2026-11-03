@@ -1,8 +1,52 @@
 # 格温循环边界诊断
 
-状态：**已交付可通过当前源码导入预检的独立“空闲动画修订版”，不是全部循环修复，未自动安装或完成视觉验收。** 用户允许有依据的有界结构预算调整后，`ad05b70` 兼容原生非全采样布局并补充切片复制保护。全部15动画保留；仅Idle曲线修订。此前全采样清理候选仍拒绝，未使用；原包和已安装宠物不动，不安装工具、不增加作者控制接口。
+状态：**用户已确认空闲修订动画流畅；新增独立“空闲与移动修订”包通过数值/保真/导入预检，两个跑步动画仍待用户动态验收。** 已验收Idle精确保留，本轮只编辑Run_Haste、Run01，全部15动画和原映射保持。其他长尾、工作动画及多片段合并均暂缓；未来合并只做离线Blender制作，不新增项目接口。原包、空闲修订包、已安装宠物与运行中dev均未改动；不安装工具、不调整guard。
 
-## 当前交付：空闲动画修订包与结构预算
+## 当前交付：保留已验收 Idle，仅修订两段跑步
+
+### 范围与独立产物
+
+用户在运行最新版应用后反馈“目前看的动画是丝滑的了”，该视觉验收仅对应上一版Idle，不扩大到其他clip。随后明确先处理跑步/移动，暂不修其他长尾或决定如何合并。原映射 `Run_Haste → dragging/retrying`、`Run01 → searching/disconnected` 不变；素材有对应clip不等于所有触发来源已实现。
+
+- 可手动导入包：`/Users/gan/Downloads/小小格温-AgentPet-空闲与移动修订`，排他创建，ID `chibi-gwen-idle-move-revised` / `1.1.2`。仅pet.json、pet.glb、avatar.png、修订说明.txt；原未核实许可与attribution原样保留，无再分发授权。
+- 稳定制作目录：`/Users/gan/Downloads/小小格温-AgentPet-空闲与移动修订-制作`。`小小格温-空闲与移动.blend`可继续离线编辑，3张纹理全部内嵌；`accepted-idle.blend`保留制作前基线。包含两步作者脚本、拒绝覆盖输出的原生导出脚本、对比视频/接触表及`验证记录/`。不要求新增运行时控制能力。
+- 最终GLB 8,519,172字节，SHA-256 `3cb4b0e14d45aadb24aee4079f3125411e94cd823366cc403c82abc47f20cf41`。4文件共8,825,327字节。实际Downloads目录正式inspect通过并取消预览，未install/重绑/覆盖。
+- 原包22个根普通文件与已验收空闲包4文件摘要均完全不变；原GLB `3f0aeb7490c46ac279c6263604503e2871e50c7fb1226d0b05a057bbbfc5dae1`，空闲包GLB `4e5f1d59efc7e0611aeb6990c32623ef4a54ed5ea6ccf4cba994a10fb1c5f205`。
+
+### 制作与一次有界修复
+
+使用现有Blender5.1.1，从已验收Idle对应制作工程独立复制，移除两跑步片段人工0.25秒慢闭合；原正文长度分别保留0.733333/1.5秒，首尾各100ms以原生Bezier共同切线制作过渡。保持非强制全采样ACTIONS导出、60fps、extras=False，不用此前被拒绝的全采样清理路线。
+
+第一候选整体拒绝：末段速度恢复，但Run_Haste角速度接缝1.225→1.835rad/s、左脚速度差0.309→0.450，不能用端点或平均表面改善掩盖局部退化。Main批准一次诊断→假设修复→复验：原生曲线取0.01frame时世界角速度差约0.020/0.028，1frame弦差约1.840/2.421，与实际导出退化吻合，确认细采样共同切线并不能约束60Hz LINEAR导出首末弦斜率。
+
+唯一修复仅改两个目标clip边界插值：首末相邻1frame显式采用对称切线位置/四元数指数步（先归一化、投影四元数切向），再接余下Bezier窗口；不把归一化四元数分量斜率当世界角速度保证，复验实际骨骼链和蒙皮。无后续调参，未做IK、retargeting、运行时混合或重写glTF；中间不合格候选只留证据，不交付为成品。
+
+### 导出重载与数值边界
+
+真实GLTFLoader/AnimationMixer、213骨骼与全部实际绘制蒙皮索引角点取样；距离/速度按模型静态包围盒对角线归一化。下表h=1/240秒，h=1/960复验改善方向相同且残差更小；这不是主观流畅评分。
+
+| clip | 最后100ms骨骼平均速度（旧→新） | 骨骼速度接缝差 | 蒙皮速度接缝差 | 世界角速度接缝差rad/s | 边界蒙皮加速度峰值 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Run_Haste | 0.02331→0.48277 | 0.15196→0.00570 | 0.16587→0.00388 | 1.22460→0.01525 | 162.65→93.34 |
+| Run01 | 0.11641→0.52326 | 0.23329→0.00228 | 0.22519→0.00159 | 2.38427→0.01274 | 191.30→121.80 |
+
+- 手/脚/剪刀7关键点各自首尾速度差均改善；原失败Run_Haste左脚0.30907→0.000416，右脚0.24586→0.02260。边界窗口骨骼/蒙皮/角加速度及7关键点峰值均下降；全片原有峰值保留，数值差低于0.01%，未以减速/静态掩盖停顿。
+- 两clip中段121时刻轨迹比较：最大骨骼RMS差分别约对角线0.000408%/0.001070%，蒙皮最大0.000954%，旋转最大5.03e-6rad；仅混合插值原生导出数值重采样级差异，不宣称目标clip中段导出字节完全相同。正文原生曲线没有另行编辑。
+- 两脚最低高度差<1e-6对角线；在各自最低点上方0.005对角线内，低位样本相位/数量精确相同，水平速度最大差<1e-4对角线/秒。它只是足部接触代理，不证明真实地面接触或无主观滑步，仍须看动态。
+- **Idle和其余非目标共13个clip的时长、全部track时间/值/插值精确一致。** 首次探针误把导出track数组重排视为差异；一次改按唯一track名称比较后通过，未改资产来迁就断言。15名称、213joint、全部几何属性/索引、skin逆绑定、节点变换、材质/纹理引用及3PNG字节相同。7组stop/reset切换覆盖两跑步互切、Idle双向、工作双向及Death→Greeting，均与新场景目标姿态精确相同。
+- 完整预算：10214 accessors、10217 views、累计view 6,220,734字节，JSON2,298,404、遍历183472、accessor元素534760、输入关键帧257031、输出标量874576、9408channels。全部在当前既有guard内；没有再次扩大上限。Three数值探针仍跳过纹理解码，PNG字节与Blender预览另验。
+
+### 预览、检查与剩余项
+
+稳定制作目录内`Run_Haste-comparison-3cycles.mp4`与`Run01-comparison-3cycles.mp4`均6秒/30fps，同视角、尺度、光照及绝对时间，各版均至少3圈。另有每clip的baseline/revised-seam.png。Main独立读取4张接触表：模型/贴图及头身手脚剪刀可见，所示边界帧未见明显肢体脱离或损坏；**未播放mp4，不能据稀疏帧称动态节奏、流畅或滑步验收通过**。用户仍需手动导入新ID并分别观察至少3轮。
+
+本机实验根`/private/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/gwen-running-revision-kg6bwu5y`（指针`/tmp/gwen-running-revision-path`）。两作者脚本、native-seam诊断、measure-revised.mjs、boundary-and-feet.mjs、verify-numerical.py和verify-preservation.mjs保存可复查步骤；稳定制作目录另留关键脚本/JSON/日志。staging和实际最终目录正式inspect各1 passed，最终GLB真实重载/数值断言通过；既有pet-glb与pet-assets-import共97项通过。没有生产/永久CI测试改动，不重复运行全量/typecheck/build，上一阶段1533项不当本轮素材视觉证据。
+
+本轮只提交设计/进度记录，不提交用户模型、预览或制作工程，不推送。应用、映射、fallback、导入guard及运行中dev均不变；不自动安装/绑定新包。其他长尾与拼接尚未实施，后者待用户选定片段后再在Blender离线制作。
+
+## 既有交付：空闲动画修订包与结构预算
+
+以下为最初交付时证据；当时的“视觉未验”已由上节用户Idle验收覆盖，不扩大为跑步或全部动画通过。
 
 ### 根目录文件不等于 GLB 内部数据
 
@@ -28,9 +72,9 @@
 
 新本机证据根：`/private/var/folders/sr/gztw7n8x7fncz4nmpgvbj3zc0000gn/T/gwen-bounded-import-9g8xbuag`（`/tmp/gwen-bounded-import-path`）。`budget-vector.json`、`export-idle.py/log`、`idle-revised.glb`、`metrics.json`、`preservation.json`、`metadata-only-check.mjs/json/log`、`final-package-loader.mjs/json/log`、`final-package-files.json`及`gwen-final-package-probe.test.ts`/`final-package-inspect.log`保存实际命令与断言。正式probe先在自有staging、后在Downloads实际目录各1 passed；运行时临时位于Main相对seam，随后移出仓库，不把用户模型依赖加入CI。
 
-可复用先前`gwen-author-revision-vl_6l6d8/idle-comparison-3cycles.mp4`与两份接缝接触表：最终解码后的全部运动/外观属性与该预览候选一致，extras删除不改变预览。它仍只是Blender离线同视角3圈预览，**尚未由用户确认动态顺滑，也不是应用内/GPU验收**。纹理解码在Three数值探针中替换为空Texture，图片字节和Blender预览另验。
+可复用先前`gwen-author-revision-vl_6l6d8/idle-comparison-3cycles.mp4`与两份接缝接触表：最终解码后的全部运动/外观属性与该预览候选一致，extras删除不改变预览。它仍只是Blender离线同视角3圈预览，**最初交付时未确认动态顺滑；随后用户已确认Idle流畅，不扩大为GPU性能验收**。纹理解码在Three数值探针中替换为空Texture，图片字节和Blender预览另验。
 
-交付只覆盖Idle；Cast_Cycle、Run_Haste及其他循环仍待按独立制作阶段修订。无模型入Git/上传、无新工具、无自动安装；最新事实覆盖下方旧“不可导入/未创建包”停点。下一步用新版应用手动导入此独立ID，验证空闲至少3轮，再做后续循环，不以格式预检代替主观验收。
+交付只覆盖Idle；Cast_Cycle、Run_Haste及其他循环仍待按独立制作阶段修订。无模型入Git/上传、无新工具、无自动安装；最新事实覆盖下方旧“不可导入/未创建包”停点。该独立ID随后已由用户确认Idle流畅；新的两跑步修订仍须单独验收，不以格式预检代替主观验收。
 
 ## 仅用 Blender 清理：候选拒绝与明确停点
 

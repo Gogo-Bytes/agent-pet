@@ -9,6 +9,7 @@ import { AnimationClip, VectorKeyframeTrack, type Group } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { PetAnimations, PetMotion } from '@agent-pet/pet-runtime';
 import { PetModel } from '../features/pet/PetModel.js';
+import { usePetInteraction } from './usePetInteraction.js';
 import { ScenePet } from '../management/ScenePet.js';
 
 // Real GLTFLoader, production components, Drei mixer and R3F render ordering.
@@ -37,8 +38,13 @@ async function mount(surface: 'desktop' | 'home', motion: PetMotion = 'idle') {
     motion, restAction: 'idle', replay: '', reduced: false, interactionActive: true,
     animations: { idle: 'IdlePose', working: 'WorkPose', hover: 'HoverPose', success: 'ResultPose' },
   };
+  let interaction!: ReturnType<typeof usePetInteraction>;
+  function Desktop() {
+    interaction = usePetInteraction(props.interactionActive && !props.reduced);
+    return <Bounds><PetModel {...props} interaction={interaction.feedback} onInteractionFinished={interaction.finish} onReady={ready} modelUrl="blob:frame-poses" /></Bounds>;
+  }
   const tree = () => <StrictMode><Probe />{surface === 'desktop'
-    ? <Bounds><PetModel {...props} onReady={ready} modelUrl="blob:frame-poses" /></Bounds>
+    ? <Desktop />
     : <ScenePet {...props} action={props.motion} interactive={props.interactionActive} onReady={ready} modelUrl="blob:frame-poses" />}</StrictMode>;
   const view = await create(tree(), { frameloop: 'never' }); mounted.push(view);
   const root = state.scene.getObjectByName('Pet')!;
@@ -47,8 +53,8 @@ async function mount(surface: 'desktop' | 'home', motion: PetMotion = 'idle') {
   const target = view.scene.findByProps({ name: surface === 'desktop' ? 'pet-pointer-target' : 'scene-pet-pointer-target' });
   return { root, drawn, view, state,
     draw(delta: number) { state.advance(state.clock.elapsedTime + delta, false); },
-    enter: () => view.fireEvent(target, 'pointerOver', { stopPropagation() {} }),
-    leave: () => view.fireEvent(target, 'pointerOut', { intersections: [] }),
+    enter: () => surface === 'desktop' ? act(async () => interaction.hover(true)) : view.fireEvent(target, 'pointerOver', { stopPropagation() {} }),
+    leave: () => surface === 'desktop' ? act(async () => interaction.hover(false)) : view.fireEvent(target, 'pointerOut', { intersections: [] }),
     update(next: Partial<typeof props>) { props = { ...props, ...next }; return view.update(tree()); },
   };
 }

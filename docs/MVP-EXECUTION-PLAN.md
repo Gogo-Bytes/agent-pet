@@ -148,6 +148,18 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
+### 桌面 hover 不触发/提前结束：改用稳定宠物视口
+
+基线`b7b59af`干净；用户在干净重启后报告hover有时不触发、有时未播完回空闲，并明确桌面应使用外框元素而不是运动中的模型。本条覆盖下方早期桌面“仅真实模型命中”的设计，不改变首页多宠物各自模型命中规则，也不归因于HMR。
+
+正式App→PetCanvas DOM Canvas→PetModel→GLTFLoader/Drei/Three/Fiber射线回归先得到两项行为红测：视口透明角未命中模型，动作未启动；模型首次命中启动后移出同一光标位置，下一次pointermove产生模型out并提前取消。无blur、capture、拖动、重挂参与即可复现，不能把该结果扩展为排除了所有原生输入异常。
+
+最小实现将`usePetInteraction`所有权移到PetCanvas，已有pet矩形外框的DOM enter/leave直接驱动反馈；PetModel仅接反馈/完成回调，删除重复射线hover入口。透明视口部分可触发，工具栏/resize/连接空隙不触发；Main命中/穿透、窗口大小及App工具栏显示envelope不变。DOM子元素移动、动画自移出、普通重渲染不重启/取消；完成后保持在视口内不重播，真实离开仍取消，重新进入可再播。换模型释放旧反馈，拖动/失焦/隐藏/pointercancel/lostcapture/reduced/unmount硬取消、缺映射、业务cue延后消费/latest-wins和b7b59af完成帧保护保持；首页语义和素材不改，无延时/debounce/队列/新接口。
+
+新增`PetCanvas.test.tsx`的12项真实DOM/Fiber/Three集成（只替换GPU上下文和资产IO，用仓库starter及区分姿态的合成clip），覆盖上述两症状、完成/退出重入、内部切换、toolbar/resize、拖动、业务cue、硬取消与换模型；原PetModel及共享22项送绘制姿态回归适配输入所有权，未删除完成/清理保护。聚焦8文件134 passed，typecheck/desktop build通过；全量135文件1567 passed/1 skipped通过。首轮全量新增拖动fixture在DOM→Canvas跨React根未完全提交前取样，保留原1 failed/1566 passed/1 skipped证据，显式异步act后有界复验通过；后续将user-event的act wrapper限定在已挂载后的输入，避免其默认flag切换警告。初始ResizeObserver未派发、按钮旧label、fixture复用业务cue、wrapper错误覆盖waitFor的失败及各一次修正复验均保留于`/tmp/hover-viewport-*.log`，未改变生产阈值/测试保护以掩盖失败。
+
+这是输入接线/实际Three姿态自动化，不是macOS原生/GPU/用户模型视觉验收。未重启或操纵运行中dev、读写用户模型/已安装宠物/Agent配置、安装依赖、访问网络或推送。独立审查与用户桌面hover复验由Main接续。
+
 ### hover 结束闪烁：共享播放器交接修复
 
 用户已确认空闲与移动修订包“验收动画正常”，只覆盖Idle、Run_Haste、Run01，不扩展到其他clip/所有触发/长期GPU验收；随后报告hover结束回空闲时闪一下。本轮基线`facdf18`干净，只处理播放器交接，不编辑/读取用户模型、已安装宠物或Agent配置，不做尾段/拼接制作。
@@ -233,6 +245,8 @@ Downloads最终文件夹未创建，没有安装/导入/替换/重绑定、放�
 hover/selected 与 connected 已按下节完成工程接线，原生视觉待验。后续顺序：①保留连接重挂/重连有界缓存限制并待实机验收；②Claude max_output_tokens 细类核对已到证据停点（见下节），取得精确原生语义前保持 generic error，其他缺原生可靠事实的 Provider 能力保持未知；③sleeping已按用户确认删除，仅保留idle空闲；disconnected保持现有离线立即移除、不私加延迟，attention暂仅回退；④按Provider/多Session/隐藏与reduced/快速事件/缺映射集中验收。短事件当前latest-wins，不保证每段完整播完，不擅加队列。格温循环接缝单独处理，不归入触发接通完成。
 
 ### 本地 hover / selected 接线
+
+> 历史接线阶段；桌面hover输入已按上文用户新要求改为宠物视口DOM边沿，首页仍保留模型命中。以下原阶段数字与模型命中描述只作为当时证据。
 
 桌面和首页通过真实 R3F 模型进入边沿播放 `hover`，跨同一模型子 mesh 不重播；工具栏容器进入仍只管理工具栏。首页模型点击和在线宠物选择按钮的点击/Enter/Space 经同一显式计数触发 `selected`；初始焦点、重渲染、重挂和收藏缩略图不冒充场景选择，桌面未新增选择交互。复用现有播放器和目录，增加实例内最小 latest-wins 反馈，不加业务 IPC/队列/骨骼处理。
 

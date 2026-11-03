@@ -144,9 +144,8 @@ describe('App session interactions', () => {
     // Hovering the compact region also reveals controls without a model event.
     await user.hover(group);
     await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('true'));
-    // Toolbar envelope does not supply model-hit or selection animation input.
-    expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ motion: 'idle', interactionActive: true });
-    expect(vi.mocked(PetModel).mock.calls.at(-1)![0].onHover).toBeUndefined();
+    // Toolbar envelope is separate from the pet viewport's animation input.
+    expect(vi.mocked(PetModel).mock.calls.at(-1)![0]).toMatchObject({ motion: 'idle', interaction: null });
     act(() => window.dispatchEvent(new Event('blur')));
     await waitFor(() => expect(toolbar.getAttribute('data-visible')).toBe('false'));
     await user.unhover(group);
@@ -293,7 +292,7 @@ describe('App lifecycle and notices', () => {
     expect(screen.getByRole('button', { name: '显示气泡' })).toBeTruthy();
   });
 
-  it('pauses the preference render loop while hidden and resumes it, retaining one visibility subscription through StrictMode', async () => {
+  it('pauses the preference render loop while hidden and resumes it, retaining only App and interaction visibility subscriptions through StrictMode', async () => {
     let hidden = false;
     vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
     const add = vi.spyOn(document, 'addEventListener');
@@ -306,7 +305,7 @@ describe('App lifecycle and notices', () => {
     act(() => { hidden = false; document.dispatchEvent(new Event('visibilitychange')); });
     expect(loop()).toBe('true');
     const count = (calls: typeof add.mock.calls) => calls.filter(([event]) => event === 'visibilitychange').length;
-    expect(count(add.mock.calls) - count(remove.mock.calls)).toBe(1);
+    expect(count(add.mock.calls) - count(remove.mock.calls)).toBe(2); // App visibility + PetCanvas interaction cleanup.
     unmount();
     expect(count(add.mock.calls)).toBe(count(remove.mock.calls));
   });

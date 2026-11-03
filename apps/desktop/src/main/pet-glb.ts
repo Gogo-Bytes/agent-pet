@@ -3,7 +3,8 @@ import { petImagePixels } from './pet-image-budget.js';
 const MAX_MODEL_BYTES = 64 * 1024 * 1024;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const COLLECTION_LIMITS: Record<string, number> = {
-  nodes: 512, meshes: 128, accessors: 8192, bufferViews: 2048,
+  // Exporters may split every accessor into its own view; decoded workload is bounded separately below.
+  nodes: 512, meshes: 128, accessors: 16384, bufferViews: 16384,
   materials: 128, textures: 64, images: 64, animations: 64, skins: 64, scenes: 16, cameras: 64, samplers: 64,
 };
 
@@ -251,10 +252,14 @@ export function validatePetGlb(bytes: Buffer): boolean {
     }
     if (binaryLength && !bufferLength) return false;
     const views = (document.bufferViews ?? []) as Record<string, unknown>[];
+    let viewBytes = 0;
     for (const view of views) {
       const offset = view.byteOffset ?? 0;
       if (view.buffer !== 0 || !unsigned(offset) || !unsigned(view.byteLength) ||
           view.byteLength === 0 || offset + view.byteLength > bufferLength) return false;
+      // GLTFLoader slices each view separately, including overlapping ranges.
+      viewBytes += view.byteLength;
+      if (viewBytes > MAX_MODEL_BYTES) return false;
       if ('byteStride' in view && (!unsigned(view.byteStride) || view.byteStride < 4 ||
           view.byteStride > 252 || view.byteStride % 4)) return false;
     }

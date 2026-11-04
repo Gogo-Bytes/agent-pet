@@ -2,6 +2,14 @@
 
 # Codex CLI hook input boundary
 
+## Connection setup: scan once, never pick a program file
+
+Codex setup uses Main-owned, currently valid installation discovery evidence, not a native executable picker or a Renderer-supplied path. The approved resolver is retained for preview retries and rechecks the scan identity, entry/standalone layout and target; confirmation also rechecks the CLI and resolved host before any installation writes. Canceling a preview does not discard a still-valid scan; a replaced/removed installation, invalidated scan/window or changed target requires an explicit rescan. Layout compatibility remains limited to the existing 0.163.0 standalone checks, not binary attestation.
+
+An existing **unconfigured** record now continues through the same read-consent and exact hooks preview as a new record; merely adding a record does not mean hooks are installed. For a custom target, the existing preparation API accepts only its opaque configuration ID. Main binds it to the target captured with the scan and rejects unknown IDs, wrong providers, changed/removed targets and arbitrary paths. It never silently configures the default target instead. Already configured records retain view/resume and validated persisted-executable restoration, with no new scan or duplicate installation on restart.
+
+No hook writes occur until the separate confirmation. Existing content/ownership, cancellation generations, one-use plans and native `/hooks` review remain required. Claude and pet/configuration-folder pickers are unchanged. Regression coverage lives in `configuration-ipc.test.ts`, `codex-connection.test.ts`, `CodexConnectionControls.test.tsx` and the management preload test; fixtures use self-owned files and a stub observation bridge, not a real Codex process. Focused checks: 164 passed; full suite: 1603 passed / 1 skipped (135 files); typecheck and desktop source build passed. Native UI/real Codex acceptance remains pending.
+
 `normalize.ts` accepts bounded JSON and emits metadata facts. Transport, standalone hook command and shared-state projection are now implemented and tested with isolated self-owned processes. Main/Renderer registration and daily configuration installation are not yet enabled; the current dev does not connect to Codex.
 
 Latest: [native first-turn mock passed](../../docs/CODEX-FIRST-TURN-MOCK-PREVIEW.md); [normal-start private discovery/OS-bound bridge modules](../../docs/CODEX-NORMAL-START-IMPLEMENTATION.md) are implemented with isolated verification. A Main private-runtime controller exists, but Configurations/IPC/Renderer registration and daily hook installation remain disabled. Native review of the new file-based command is a separate pending step, not inherited from the previously trusted environment-based command.

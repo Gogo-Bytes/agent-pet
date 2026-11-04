@@ -24,14 +24,14 @@ function fixture() {
   });
   const options: CodexConnectionOptions = { directory: data, targetDirectory: target,
     configurationId: '12345678-1234-4234-8234-123456789012', nodeExecutable: process.execPath, observerExecutable: process.execPath,
-    probePath: '/owned/probe', runAsNode: false, chooseExecutable: async () => '/owned/codex', inspectExecutable: value => value,
+    probePath: '/owned/probe', runAsNode: false, inspectExecutable: value => value,
     runtimeAssets: async () => ({ nativeHook: '// own fixture only' }), name: () => 'Codex', publish: vi.fn() };
-  return { root, data, target, options, servers };
+  return { root, data, target, options, servers, discover: async () => '/owned/codex' };
 }
 it('previews without writes, confirms additively, persists pause, restores with rotation and selectively withdraws', async () => {
   const f = fixture(); let connection = new CodexConnection(f.options); cleanups.push(() => connection.stop());
   const before = fs.readFileSync(join(f.target, 'hooks.json'), 'utf8');
-  const preview = (await connection.preview()).preview!;
+  const preview = (await connection.preview(f.discover)).preview!;
   expect(preview.canApply).toBe(true); expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe(before);
   expect((await connection.confirm(preview.id)).status).toBe('waiting'); expect(f.servers).toHaveLength(1);
   expect(fs.readFileSync(join(f.target, 'config.toml'), 'utf8')).toBe('token = "PRIVATE"\n');
@@ -56,7 +56,7 @@ it('feeds independent configuration identities through shared sessions/Home and 
     const id = created.records.at(-1)!.id; ids.push(id);
     await collection.bindPet(id, { assetId: 'starter', name: '团子' });
     expect(projectHomePets(collection.snapshot(), sessions, '团子')).toHaveLength(index);
-    const preview = (await collection.preview(id)).records.at(-1)!.codex!.preview!;
+    const preview = (await collection.previewDetectedCodex(id, f.discover)).records.at(-1)!.codex!.preview!;
     await collection.confirm(id, preview.id); const server = f.servers[index]!;
     server.onFact({ runId: 'owned-host', fact: { kind: 'session-started', source: 'startup', providerSessionId: 'PRIVATE_SESSION' } });
     server.onChange?.({ observedHosts: 1, observedSessions: 1 });
@@ -77,12 +77,12 @@ it('feeds independent configuration identities through shared sessions/Home and 
   expect(collection.snapshot().records[0]!.connectionCue).toBeUndefined();
   expect(collection.snapshot().records[1]!.connectionCue).toBe(cues[1]);
 });
-it('invalidates a cancelled picker and refuses user-edited hooks on restart/remove', async () => {
+it('invalidates cancelled discovery and refuses user-edited hooks on restart/remove', async () => {
   const f = fixture(); let select!: (path: string) => void;
-  const deferred = new CodexConnection({ ...f.options, chooseExecutable: () => new Promise(done => { select = done; }) });
-  const pending = deferred.preview(); deferred.invalidate(); select('/owned/codex'); await pending;
+  const deferred = new CodexConnection(f.options);
+  const pending = deferred.preview(() => new Promise(done => { select = done; })); deferred.invalidate(); select('/owned/codex'); await pending;
   expect(deferred.snapshot()).toMatchObject({ busy: false, preview: null, configured: false }); await deferred.stop();
-  let connection = new CodexConnection(f.options); const preview = (await connection.preview()).preview!;
+  let connection = new CodexConnection(f.options); const preview = (await connection.preview(f.discover)).preview!;
   await connection.confirm(preview.id); await connection.stop();
   const path = join(f.target, 'hooks.json'), changed = fs.readFileSync(path, 'utf8').replace('"timeout":2', '"timeout":99'); fs.writeFileSync(path, changed);
   connection = new CodexConnection(f.options); cleanups.push(() => connection.stop()); await connection.restore();
@@ -90,7 +90,7 @@ it('invalidates a cancelled picker and refuses user-edited hooks on restart/remo
   expect(await connection.remove()).toBe(false); expect(fs.readFileSync(path, 'utf8')).toBe(changed);
 });
 it('preserves edited app-private registration evidence and refuses restoring an interrupted write', async () => {
-  const f = fixture(); let connection = new CodexConnection(f.options); const preview = (await connection.preview()).preview!;
+  const f = fixture(); let connection = new CodexConnection(f.options); const preview = (await connection.preview(f.discover)).preview!;
   await connection.confirm(preview.id); await connection.stop();
   const saved = join(f.data, `codex-registration-${f.options.configurationId}`), file = join(saved, 'state.json');
   const original = fs.readFileSync(file, 'utf8'), hooks = fs.readFileSync(join(f.target, 'hooks.json'), 'utf8');
@@ -106,11 +106,24 @@ it('preserves edited app-private registration evidence and refuses restoring an 
 
 it('does not adopt a concurrent private state edit as the overwrite baseline', async () => {
   const f = fixture(); const connection = new CodexConnection(f.options);
-  const plan = (await connection.preview()).preview!; await connection.confirm(plan.id); await connection.stop();
+  const plan = (await connection.preview(f.discover)).preview!; await connection.confirm(plan.id); await connection.stop();
   const directory = join(f.data, `codex-registration-${f.options.configurationId}`), path = join(directory, 'state.json');
   const original = fs.readFileSync(path, 'utf8'), edited = original.replace('"removed":false', '"removed":true');
   const store = new CodexRegistrationStore(directory, f.options.configurationId, f.target), read = store.read.bind(store);
   vi.spyOn(store, 'read').mockImplementationOnce(() => { const validated = read(); fs.writeFileSync(path, edited); return validated; });
   expect(store.update(true)).toBe(false);
   expect(fs.readFileSync(path, 'utf8')).toBe(edited);
+});
+it('rejects unsupported discovered executables and changed host selection without writing', async () => {
+  const f = fixture();
+  const unsupported = new CodexConnection({ ...f.options, inspectExecutable: () => null });
+  expect(await unsupported.preview(f.discover)).toMatchObject({ notice: 'unsupported-installation', preview: null });
+  await unsupported.stop();
+  const connection = new CodexConnection(f.options); cleanups.push(() => connection.stop());
+  const plan = (await connection.preview(f.discover)).preview!;
+  const daemon = join(f.target, 'packages/app-server-daemon/current');
+  fs.mkdirSync(daemon, { recursive: true, mode: 0o700 });
+  expect(await connection.confirm(plan.id)).toMatchObject({ notice: 'rescan-required', configured: false, preview: null });
+  expect(fs.existsSync(join(f.data, `codex-registration-${f.options.configurationId}`))).toBe(false);
+  expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe('{"existing":true}');
 });

@@ -10,7 +10,7 @@ import { prepareCodexUserHook, applyCodexUserHook, inspectCodexUserHook, withdra
 export interface CodexConnectionOptions {
   directory: string; configurationId: string; targetDirectory: string;
   nodeExecutable: string; observerExecutable: string; probePath: string; runAsNode: boolean;
-  chooseExecutable(): Promise<string | null>; inspectExecutable?(path: string): string | null;
+  inspectExecutable?(path: string): string | null;
   runtimeAssets(): Promise<{ nativeHook: string }>;
   name(): string; publish(observation: SessionObservation): void;
   /** Explicit self-owned fixture seam; never selected by Renderer. */
@@ -22,16 +22,17 @@ export class CodexConnection {
   private observer: CodexNormalObserver | undefined;
   private readonly runtimeDirectory: string;
   private readonly listeners = new Set<() => void>();
-  private plan: { id: string; executable: string; source: string; hook: CodexHookPlan } | undefined;
+  private discover: (() => Promise<string | null>) | undefined;
+  private plan: { id: string; cli: string; executable: string; source: string; hook: CodexHookPlan } | undefined;
   private status: CodexConnectionState['status'] = 'not-configured';
-  private notice: CodexConnectionState['notice'] = 'none';
+  private notice: CodexConnectionState['notice'] = 'rescan-required';
   private busy = false; private closed = false; private configured = false; private generation = 0; private revision = 0;
   constructor(private readonly options: CodexConnectionOptions) {
     this.runtimeDirectory = join(options.directory, `codex-normal-${options.configurationId}`);
     this.store = new CodexRegistrationStore(join(options.directory, `codex-registration-${options.configurationId}`), options.configurationId, options.targetDirectory);
     const saved = this.store.read(); this.configured = !!saved;
     if (this.store.error) { this.status = 'failed'; this.notice = 'saved-invalid'; }
-    else if (saved) this.status = saved.disabled || saved.removed ? 'disabled' : 'waiting';
+    else if (saved) { this.status = saved.disabled || saved.removed ? 'disabled' : 'waiting'; this.notice = 'none'; }
   }
   snapshot(): CodexConnectionState {
     const current = this.observer?.snapshot();
@@ -56,20 +57,27 @@ export class CodexConnection {
     return new CodexNormalObserver({ ...this.options, directory: this.runtimeDirectory, executable,
       onChange: () => { if (!this.closed) this.emit(); } });
   }
-  async preview(discoveredExecutable?: string): Promise<CodexConnectionState> {
+  /** Main-owned discovery evidence, rechecked on retries and before any installation writes. */
+  async preview(discover?: () => Promise<string | null>): Promise<CodexConnectionState> {
     if (!this.snapshot().canConfigure) return this.snapshot();
+    if (discover) this.discover = discover;
     const generation = ++this.generation; this.plan = undefined; this.busy = true; this.notice = 'none'; this.emit();
     try {
-      const chosen = discoveredExecutable ?? await this.options.chooseExecutable(); if (this.closed || generation !== this.generation || !chosen) return this.snapshot();
+      const chosen = await this.discover?.();
+      if (this.closed || generation !== this.generation) return this.snapshot();
+      if (!chosen) { this.notice = 'rescan-required'; return this.snapshot(); }
       const inspect = this.options.inspectExecutable ?? inspectCodexExecutable;
       const cli = inspect(chosen);
       const executable = cli && resolveCodexHostExecutable(cli, this.options.targetDirectory, inspect);
-      if (!executable) { this.notice = 'unsupported-installation'; return this.snapshot(); }
+      if (!cli || !executable) { this.notice = 'unsupported-installation'; return this.snapshot(); }
       const { nativeHook: source } = await this.options.runtimeAssets();
       if (this.closed || generation !== this.generation) return this.snapshot();
       if (!source || Buffer.byteLength(source) > 512 * 1024) throw new Error();
+      const current = await this.discover?.();
+      if (this.closed || generation !== this.generation) return this.snapshot();
+      if (current !== chosen) { this.notice = 'rescan-required'; return this.snapshot(); }
       const hook = prepareCodexUserHook(this.options.targetDirectory, this.document());
-      this.plan = { id: randomUUID(), executable, source, hook };
+      this.plan = { id: randomUUID(), cli, executable, source, hook };
     } catch { if (generation === this.generation) this.notice = 'preview-failed'; }
     finally { this.busy = false; this.emit(); }
     return this.snapshot();
@@ -81,7 +89,13 @@ export class CodexConnection {
     }
     this.plan = undefined; this.busy = true; const generation = ++this.generation; this.emit();
     try {
-      if ((this.options.inspectExecutable ?? inspectCodexExecutable)(plan.executable) !== plan.executable) throw new Error();
+      const chosen = await this.discover?.();
+      if (this.closed || generation !== this.generation) return this.snapshot();
+      const inspect = this.options.inspectExecutable ?? inspectCodexExecutable;
+      if (!chosen || inspect(chosen) !== plan.cli || resolveCodexHostExecutable(plan.cli, this.options.targetDirectory, inspect) !== plan.executable) {
+        this.notice = 'rescan-required'; return this.snapshot();
+      }
+      if (inspect(plan.executable) !== plan.executable) throw new Error();
       if (!this.store.initialize({ schemaVersion: 1, configurationId: this.options.configurationId, target: this.options.targetDirectory,
         executable: plan.executable, disabled: true, removed: false, ownership: plan.hook.ownership, original: plan.hook.original })) throw new Error();
       this.configured = true; this.observer = this.createObserver(plan.executable);

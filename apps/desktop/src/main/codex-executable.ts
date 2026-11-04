@@ -6,7 +6,7 @@ export function codexExecutableLayout(path: string): 'standalone' | 'app-server-
   return /\/packages\/(standalone|app-server-daemon)\/releases\/(?:v)?0\.163\.0(?:-(?:aarch64|x86_64)-apple-darwin)?\/(?:bin\/)?codex$/.exec(path)?.[1] as 'standalone' | 'app-server-daemon' | undefined ?? null;
 }
 
-/** Explicit native selection only. No PATH scan, execution, settings or credential reads. */
+/** Revalidate a Main-owned program path. No PATH scan, execution, settings or credential reads. */
 export function inspectCodexExecutable(selected: string): string | null {
   return inspectCodexPath(selected, false);
 }

@@ -4,9 +4,9 @@ import type { ManagementBridge } from './management-store.js';
 import { Dialog } from './components/Dialog.js';
 import { Icon } from './components/icons.js';
 
-/** Read consent for a Main-resolved default only. Closing also revokes in-flight work. */
-export function DetectedSetupDialog({ installationId, targetPath, provider = 'pi', state, bridge, run, onClose, onPrepared, onCancelError }: {
-  installationId: string; targetPath: string; state: ConfigurationsState; bridge: ManagementBridge;
+/** Read consent for a Main-resolved target. Closing also revokes in-flight work. */
+export function DetectedSetupDialog({ installationId, targetPath, configurationId: selectedConfigurationId, provider = 'pi', state, bridge, run, onClose, onPrepared, onCancelError }: {
+  installationId: string; targetPath: string; configurationId?: string; state: ConfigurationsState; bridge: ManagementBridge;
   provider?: 'pi' | 'claude' | 'codex';
   run(work: () => Promise<ConfigurationsState>): Promise<boolean>;
   onClose(): void; onPrepared(id: string): void;
@@ -35,7 +35,7 @@ export function DetectedSetupDialog({ installationId, targetPath, provider = 'pi
     } };
     pending.current = job;
     const saved = await run(async () => {
-      const result = await Promise.race([provider === 'codex' ? bridge.configurations.prepareDetectedCodex(installationId, requestId) : provider === 'claude' ? bridge.configurations.prepareDetectedClaude(installationId, requestId) : bridge.configurations.prepareDetected(installationId, requestId), cancellation]);
+      const result = await Promise.race([provider === 'codex' ? (selectedConfigurationId ? bridge.configurations.prepareDetectedCodex(installationId, requestId, selectedConfigurationId) : bridge.configurations.prepareDetectedCodex(installationId, requestId)) : provider === 'claude' ? bridge.configurations.prepareDetectedClaude(installationId, requestId) : bridge.configurations.prepareDetected(installationId, requestId), cancellation]);
       if (!cancelled) { configurationId = result.configurationId; timedOut = result.reason === 'timeout'; }
       return result.state;
     });

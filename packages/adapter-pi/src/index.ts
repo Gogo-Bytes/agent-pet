@@ -16,7 +16,7 @@ const MAX_UNAUTHENTICATED_IDLE_MS = 1000;
 
 type BridgeSessionOptions = {
   token: string;
-  publish(observation: SessionObservation): void;
+  publish(observation: SessionObservation, isHello?: boolean): void;
   publishDisconnected?(observation: SessionObservation): void;
   connectionChanged?(state: 'connected' | 'degraded' | 'disconnected'): void;
 };
@@ -47,12 +47,13 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
     const sockets = new Set<net.Socket>();
     const bridges = new Set<PiBridgeSession>();
     const sessionOwners = new Map<string, net.Socket>();
-    const publish = (socket: net.Socket, observation: SessionObservation, disconnected = false): void => {
+    const publish = (socket: net.Socket, observation: SessionObservation, isHello = false, disconnected = false): void => {
       const owner = sessionOwners.get(observation.sessionId);
       if (disconnected) {
         if (owner !== socket) return;
         sessionOwners.delete(observation.sessionId);
-      } else if (observation.baseline) {
+      } else if (isHello) {
+        // Metadata can preserve an unread baseline, but only hello admits a new owner.
         sessionOwners.set(observation.sessionId, socket);
       } else if (owner !== socket) return;
       sink.publish(observation);
@@ -70,8 +71,8 @@ export class PiBridgeAdapter implements SessionObservationAdapter {
       let buffer = '';
       const bridge = new PiBridgeSession({
         token,
-        publishDisconnected: observation => publish(socket, observation, true),
-        publish: observation => { if (!stopping && !socket.destroyed) publish(socket, observation); },
+        publishDisconnected: observation => publish(socket, observation, false, true),
+        publish: (observation, isHello) => { if (!stopping && !socket.destroyed) publish(socket, observation, isHello); },
         connectionChanged: state => {
           if (stopping) return;
           if (state === 'connected' && !socket.destroyed) {

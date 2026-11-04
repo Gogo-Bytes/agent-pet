@@ -13,18 +13,19 @@ export function codexConnectionSummary(state: CodexConnectionState | undefined):
   }
 }
 const notices: Record<CodexConnectionState['notice'], string> = {
-  none: '', 'unsupported-installation': '请选择已验证的 Codex standalone 0.163.0 程序。其他安装方式仍待验证。',
+  none: '', 'rescan-required': '请重新扫描 Codex 安装，然后继续连接。', 'unsupported-installation': '当前仅支持已验证的 Codex standalone 0.163.0 安装。请重新扫描。',
   'preview-failed': '无法检查连接设置。请检查文件夹权限后重试。', 'stale-preview': '预览已失效，请重新查看设置。',
   'save-failed': '未能确认保存成功。已有文件会保留，请重新打开应用后检查。',
   'saved-invalid': '原连接文件发生变化或无法读取。请检查原文件，本应用不会覆盖。',
   retained: '未能完整移除连接。原文件和记录已保留，请检查是否修改过通知条目。',
 };
-export function CodexConnectionControls({ record, api, run, busy, visible, error, statusHeadingRef }: {
+export function CodexConnectionControls({ record, api, run, busy, visible, error, statusHeadingRef, onScan }: {
   record: AgentConfiguration; api: ConfigurationsApi; run(action: () => Promise<ConfigurationsState>): Promise<boolean>;
-  busy: boolean; visible: boolean; error: string; statusHeadingRef: RefObject<HTMLHeadingElement | null>;
+  busy: boolean; visible: boolean; error: string; statusHeadingRef: RefObject<HTMLHeadingElement | null>; onScan(): void;
 }) {
   const state = record.codex, preview = state?.preview;
   const summary = codexConnectionSummary(state), disabled = busy || !!state?.busy;
+  const needsScan = state?.notice === 'rescan-required' || state?.notice === 'unsupported-installation';
   const cancelButton = useRef<HTMLButtonElement>(null), configureButton = useRef<HTMLButtonElement>(null);
   const previousPreview = useRef<string | null>(null), pendingFocus = useRef<'preview' | 'return' | null>(null);
   useEffect(() => {
@@ -53,7 +54,7 @@ export function CodexConnectionControls({ record, api, run, busy, visible, error
   };
   return <div className="cfg-deployment" data-quiet={state?.status === 'observing'}>
     <div className={`cfg-connection-status cfg-connection-${summary.tone}`}><p className={state?.status === 'observing' ? 'cfg-sr-only' : undefined}>{summary.description}</p>
-      {state?.canConfigure && !preview && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={openPreview}>设置连接</button>}
+      {state?.canConfigure && !preview && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={needsScan ? onScan : openPreview}>{needsScan ? '重新扫描' : '设置连接'}</button>}
       {state?.canResume && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{state.status === 'disabled' ? '继续连接' : '重新连接'}</button>}
     </div>
     {state && state.notice !== 'none' && <p role="alert">{notices[state.notice]}</p>}

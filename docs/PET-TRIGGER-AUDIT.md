@@ -6,18 +6,20 @@
 
 ## 结论
 
-**目录有 23 项 ≠ 23 项都有自动事件。** 当前 pi 的工作/细分活动/结果链路已接；Claude/Codex 有意只发布可靠事实，工具结果是短反馈，不是持续工作或整个任务完成。`hover`、`selected` 已接真实本地交互，`connected` 已接配置边沿动画，`sleeping` 已删除，`attention` 仅作回退；`retrying` 没有可靠已接业务源。`disconnected` 与“离线立即销毁宠物窗口/移除首页实例”直接冲突。
+**第3项最新证据（基线 `37ac506`）：** 官方抓取本轮成功；pi 0.85.1 的 retry start/end 只在 AgentSession 订阅流，当前 ExtensionAPI 声明/转发链不可直接接收；Claude 官方分别定义了输出截断和 Hook 类别，但精确分类关联及版本化依据仍缺失。保留 pi retrying unknown、Claude通用错误未读，未实施新映射。来源与恢复条件集中在[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)。仅检查本地文档/源码引用及diff，未改生产/测试或运行测试/typecheck/build；动画拼接/其他尾段继续暂缓。
+
+**目录有 22 项 ≠ 22 项都有自动事件。** 当前 pi 的工作/细分活动/结果链路已接；Claude/Codex 有意只发布可靠事实，工具结果是短反馈，不是持续工作或整个任务完成。`hover`、`selected` 已接真实本地交互，`connected` 已接配置边沿动画，`sleeping` 已删除，`attention` 仅作回退；`retrying` 没有可靠已接业务源。`disconnected` 与“离线立即销毁宠物窗口/移除首页实例”直接冲突。
 
 原只读审计时拖动尚在实施，以下未更新的行号仍是当时快照，原1491测试数字仅属历史基线；当前拖动状态由页首覆盖。本轮新增下面 connected 范围，hover/selected 为上一阶段，没有运行真实应用/Agent/模型、外网、安装或用户资产操作（仅隔离测试socket）。
 
 ## hover / selected 当前接线与证据
 
-- `PetModel`、首页 `ScenePet` 的 R3F pointer over/out → `shared/usePetInteraction.ts` → `usePetAnimation`。仅真实模型进入触发 hover；out 的新 intersections 仍命中同一 group 时不算退出，因此子 mesh 切换不重启。App 工具栏 envelope 不提供动画输入。
+- 桌面按最新用户设计改为 `PetCanvas` 宠物视口外框 DOM enter/leave → `shared/usePetInteraction.ts` → `PetModel`/`usePetAnimation`，包含矩形内透明部分；移除桌面模型的重复射线触发，模型自身移动/DOM子元素切换不会中断或重启。App 工具栏 envelope、toolbar/resize仍不提供动画输入，Main命中范围不变。首页 `ScenePet` 仍使用各模型 R3F over/out；新 intersections 仍命中同一 group 时不算退出，未改首页语义。
 - `CompanionScene` 的模型点击回调、在线宠物选择按钮点击/Enter/Space共用显式 selection counter → `HomeScene` → 对应配置 ScenePet。没有初始聚焦/重渲染/重挂触发；收藏选择和 PetPreviewScene 仍只是资产选择/试播。桌面无新增 selected 操作。
 - 实例内 latest-wins；hover/selected 单次完成释放，拖动优先且取消旧局部反馈。退出 hover、取消选择、窗口失焦、隐藏、pointercancel/lostcapture、切页/卸载清理；reduced 不启动局部反馈。缺对应 clip 保持现有业务播放（不重置 Work/idle），手动试播及目录 fallback 不变。
 - 局部 clip 正在播放时不消费/重启新业务 cue，结束恢复最新请求/rest，已消费业务 once 不重播。快速被覆盖的事件不排队；在线绑定过滤、每配置实例与离线立即移除保持。
-- 红绿证据：`PetModel.test.tsx` 实际 GLB hover/重复进入/子 mesh/拖动/无映射/reduced/新业务与已消费 once；`ScenePet.test.tsx` Home接线、独立实例、显式选择及同帧业务 cue；`CompanionScene.test.tsx` DOM点击/Enter/Space、被动焦点、重复点击、Escape/返回全景/切页；`usePetInteraction.test.tsx` blur/cancel/hidden/unmount 清理。`App.test.tsx` 继续覆盖真实 DOM drag/cancel，并断言工具栏 envelope 不给模型命中输入。
-- 聚焦98项、全量1513 passed/1 skipped/132 files、typecheck、desktop源码build通过；新增12项。测试不认证原生命中事件、GPU质量或用户模型视觉；没有 dev 重启、真实 Agent/模型请求、配置或用户资产修改。
+- 红绿证据：新增 `PetCanvas.test.tsx` 真实DOM/Fiber射线/GLTF/Drei链路覆盖透明角不触发与动画移出光标提前结束两症状，及视口进入/退出、内部切换、toolbar/resize排除、drag/硬取消/换模型/业务cue；`PetModel.test.tsx` 保留实际 GLB反馈/重复输入/拖动/无映射/reduced/新业务与已消费 once；`ScenePet.test.tsx` Home接线、独立实例、显式选择及同帧业务 cue；`CompanionScene.test.tsx` DOM点击/Enter/Space、被动焦点、重复点击、Escape/返回全景/切页；`usePetInteraction.test.tsx` blur/cancel/hidden/unmount 清理。`App.test.tsx` 继续覆盖真实 DOM drag/cancel，并断言工具栏 envelope 不给模型命中输入。
+- 原接线阶段聚焦98项、全量1513 passed/1 skipped/132 files；最新桌面视口修复的134项聚焦、1567 passed/1 skipped全量及失败/复验边界见[MVP进度](MVP-EXECUTION-PLAN.md#桌面-hover-不触发提前结束改用稳定宠物视口)。typecheck/desktop源码build通过。自动化不认证原生命中事件、GPU质量或用户模型视觉；没有dev重启、真实Agent/模型请求、配置或用户资产修改。
 
 ## connected 当前接线与证据
 
@@ -28,6 +30,8 @@
 - 回归：`configurations-socket.test.ts` 真实隔离认证、双Session/部分与全部断开/重连/未读/非持久化；Claude/Codex配置测试验证聚合身份；`desktop-pets.test.ts`窗口恢复/替换/late-ready；preload、App/PetStore、management-store、HomeScene/ScenePet/PetModel覆盖实际投递、迟到快照、重挂、业务优先、missing/reduced/static和延迟模型加载。先红后绿新增10项，聚焦126、全量1523 passed/1 skipped/133 files、typecheck/desktop源码build通过；详见[执行计划](MVP-EXECUTION-PLAN.md#配置-connected-边沿接线)。未做原生/GPU视觉验收。
 
 ## Claude output_limited 核对停点
+
+> 下列为首次核对；本轮官方 Errors 新证据区分输出截断与上下文容量，但仍未关联到 `StopFailure.error` 的精确版本化分类。完整证据与当前处理见[细类核验](PROVIDER-ANIMATION-EVIDENCE.md)，不把更多错误说明当作可以接线的证明。
 
 - 干净基线 `3a170d1`；仓库有界检索仅证实 normalize 对 `StopFailure.error=max_output_tokens` 的精确白名单及合成测试，未找到证明其触发条件的版本化原生字段定义/实现。observations 仍统一发布 error，不暴露正文，不制造 success。
 - Main 一次核对[官方 StopFailure input](https://code.claude.com/docs/en/hooks#stopfailure-input)：类别表确有 `max_output_tokens`，与 `rate_limit`、`unknown` 并列，但没有解释其精确触发语义，未提 `model_context_window_exceeded`。类别存在不等于已证明它只表示输出上限，而非上下文容量等限制。README 的 2.1.78 release 引用也只证明 StopFailure 事件新增。
@@ -78,13 +82,13 @@
 |任务完成 `success`|P message stop/toolUse 仅记候选，agent_settled 且 idle 才发 completed；C/X Stop 可继续|P 已接 P:38-50,192-214→D→Q:18-26；C/X 源不足。tool_execution_end/PostToolUse 都不是任务成功|TP:36,89、TL；真实整批完成/下一轮/未读确认/重连|
 |发生错误 `error`|P settled 原生 error（length亦是错误终态）；C StopFailure；X 无可靠统一失败事实|P/C 已接 P:202-214、C normalize:117-120 / observations:92-93→D/Q；X 源不足，exit7不可猜 error|TP:63,105、TC:58、TX 负例；P 整轮真实错误仍需补；C 历史错误事实不证明对应 clip|
 |工具执行失败 `tool_error`|P tool end isError 且非 aborted；C PostToolUseFailure 且 is_interrupt===false；X 无可靠失败字段|P/C 已接 P:239-244、C observations:83-87→Q:21-25；不改整个任务为失败|TP/TC/TL；真实失败后继续、重复 tool ID、并发短事件|
-|正在重试 `retrying`|三者没有已接可靠业务重试事件|源不足；P:61 保持 unknown，Q:4 可消费受能力约束事实但无生产者。socket reconnect 不可替代|TP:39 负例、TQ；暂不安排伪造实机事件|
-|输出达到限制 `output_limited`|P stopReason length→settled；C StopFailure max_output_tokens 类别已归一化但 observations 丢失细类；X 无源|P 已接 P:198,210-213；**C 类别存在，但精确语义证据不足，细分阻塞**（C normalize:4,117-120；observations:92），目前只 error；官方类别列举未证明其与输出上限而非上下文容量的对应关系，不能猜测接 occurrence|TP:63、TC normalize；P/C 真实长度限制与非限制错误，禁止解析正文|
+|正在重试 `retrying`|P 0.85.1 AgentSession 有真实auto_retry_start/end，但现用ExtensionAPI不转发；C/X无本轮已证实可接源|当前观察面不足而非抓取失败；P:61保持unknown，Q:4有消费能力但不能制造事实。SDK订阅、压缩willRetry和socket reconnect均不可替代|TP:39既有负例、TQ；本轮只读核对未运行。固定版声明/发送链见[证据](PROVIDER-ANIMATION-EVIDENCE.md)|
+|输出达到限制 `output_limited`|P stopReason length→settled；C StopFailure max_output_tokens 类别已归一化但 observations 丢失细类；X 无源|P 已接 P:198,210-213；**C 类别存在，但精确分类关联/版本证据不足，细分阻塞**（C normalize:4,117-120；observations:92），目前只 error；官方Errors虽分别定义输出截断/上下文超限，仍未连接到Hook分类，不能猜测接occurrence|TP:63、TC normalize；P/C 真实长度限制与非限制错误，禁止解析正文|
 |任务已取消 `cancelled`|P aborted / 本轮 AbortSignal；X Interrupt；C 工具中止不证明整轮取消|P/X 已接 P:202-213、X observations:82-85；C 源不足|TP:105-135、TX:33；P/X 有历史事实实测，仍验动画及下一轮不受旧取消污染|
 |需要关注 `attention`|无独立生产事件；waiting_input/error/success/tool_error/output_limited 的资产 fallback|**部分：回退已接，独立自动 trigger 未接** A:13-20,48-51；Q 从不直接产 attention。配置 availability='attention' 不进宠物动画|A/TL；有 attention clip、无主 clip 的 fallback，业务 once 回退 attention 应只播一次；不要无请求增加提醒轮询|
 |Agent 已连接 `connected`|P/C/X认证配置聚合离线→在线；不是单条hello/每Session|**已接** Main运行时connectionCue→每窗口snapshot/Home→共享播放器；业务/局部反馈优先，不排队，Q业务投影不改|本节双Session/部分退出/重连/重挂/恢复身份测试；缓存限当前Renderer，原生视觉待验|
 |Agent 已断开 `disconnected`|P transport disconnect、C/X 运行退出/retire；事实存在|**缺动画且产品冲突**：Q:14 过滤离线，W:96-101 立即 destroy，H:7 移除；当前没有可见载体播放 disconnected loop|TW/TP/TC/TX 验离线清理；须用户先决策可见范围，不暗加 grace period|
-|鼠标悬停时 `hover`|本地真实 pointer 命中，与 Provider 无关|**已接**桌面 PetModel / 首页 ScenePet → usePetInteraction → L；工具栏容器不触发，子 mesh 切换不重播|本轮真实GLB/R3F、DOM与生命周期回归通过；原生入/出、透明空域与用户资产视觉仍待验|
+|鼠标悬停时 `hover`|桌面宠物视口DOM边沿；首页每模型射线，与Provider无关|**已接并修订桌面输入** PetCanvas / 首页ScenePet → usePetInteraction → L；工具栏/resize不触发，桌面模型自移出不取消；真实热区离开仍取消|真实DOM/Fiber/GLTF/Drei回归通过；最新原生输入/用户资产视觉仍待复验|
 |选中宠物时 `selected`|首页模型 click / 在线宠物选择按钮，与 Provider 无关|**已接** CompanionScene 显式 selection counter → HomeScene / ScenePet → L；点击、Enter/Space同源，初始focus/缩略图不触发，桌面无选择操作|本轮DOM与R3F覆盖重复点击/取消、配置隔离、最新业务恢复；原生键盘/动画视觉待验|
 |被拖动 `dragging`|本地窗口 gesture，不是 Provider 事件|**已交付** `84edb31`，同一 dragging 映射；本轮保留拖动优先|原capture/cancel/blur/unmount及方向/业务回归保留，本轮补hover→drag→业务恢复；原生方向手感待验|
 |进入休眠时 `sleeping`|未定义是用户空闲、Agent 空闲、系统睡眠还是手动|**已删除**：原目录预留但无事件来源/实现；hidden 停绘制不等于 Agent 休眠|回归验证目录/模板无此项、旧包字段忽略、直接请求不回退到idle；不新增计时器|
@@ -95,7 +99,7 @@
 2. **once 幂等有明确边界。** L 使用 `sessionId:occurrenceId` 或 `sessionId:workId:success/error`；重命名、restAction 更新不应重播，数字 replay 只用于手动试播。缓存为每 Renderer 模块内最多256项；不是跨原生窗口/进程持久化。窗口因离线销毁后重建、renderer 崩溃重载会丢缓存，Application 保留的未读终态可能重新播放。M 去掉 reconnect occurrence 不等于跨 Renderer 保留结果“不重播”。建议补这一有界回归，按当前产品决定是允许新呈现还是需保存展示身份，不先做持久消息系统。
 3. **cue 在 effect 微任务记为已见，不是播放完成才记。** 无 clip、reduced 暂停、隐藏无帧、下一状态立即替换也可消费 cue。`reduced` 改变会重新跑 effect，已消费 once 回 rest；hidden 只停帧不禁止 effect。应验证“已接收但没看到”的边界，不能把 cue 去重测试当肉眼看见。
 4. **fallback 已实现且应保留。** 可选全部 clip，包括 idle；未知请求/无匹配最终静态。细活动→working→idle；waiting→attention→idle；业务 once 回退 attention 仍一次；缺 transient 且当前有活动时不切 idle。结束后使用最新 restAction。不会自动生成或猜 clip 名，也不把导入资产当 starter 映射。
-5. **试播与自动触发完全分开。** `PetsView.tsx:45,78-82` 展示可用映射；`ManagementApp.tsx:131` 每次手动增加数字 replay。即使 connected/hover 可在这里播放，也不证明真实监听已接。首页显式选择和桌面真实命中现已接动画，但收藏选择仍不代表场景命中。
+5. **试播与自动触发完全分开。** `PetsView.tsx:45,78-82` 展示可用映射；`ManagementApp.tsx:131` 每次手动增加数字 replay。即使 connected/hover 可在这里播放，也不证明真实监听已接。首页显式选择和桌面视口进入现已接动画，但收藏选择仍不代表场景命中。
 6. **在线/任务状态不应混淆。** Claude/Codex unknown 渲染 idle 是视觉默认，不是观测到任务闲置；旧 Claude presence-only 首页静态与桌面 idle 可统一为明确的未知状态策略，但不能引入假工作事件。waiting 状态必须有受支持 facts 配对清除。
 7. **Gwen 循环卡顿独立未解决。** 既有“尾部闭合约0.25秒、首尾端点不连续”仅是待处理线索，本审计没有读取用户模型或证明根因/修复；触发接通不解决 clip 自身接缝。另开现有 clip 播放验证，不做骨骼、IK、retargeting、生成动画或新框架。
 
@@ -106,7 +110,7 @@
 1. **先收口拖拽独立阶段。** 审查最终 diff，只复用当前 gesture 和 L；跑 writer 聚焦测试/typecheck/build，再做原生拖动。关注完成/工具错误在拖拽中到达、松手恢复最新 activity、无 dragging clip、reduced。方向变化不应不断 reset clip。不把中间红/绿测试误报为完成。
 2. **补 UI 有真实来源的 hover / selected。** 范围：App/PetCanvas/PetModel、HomeScene/CompanionScene/ScenePet、L 的既有 request/replay/rest 参数及对应测试。用真实命中入边沿、明确 selection 边沿驱动局部 cue；键盘与鼠标一致，退出/blur/卸载清理。不把工具栏容器进入算命中模型；不影响业务 state/未读/IPC。先明确和拖拽、业务 once 的覆盖规则，优先最小 latest-wins，而非新框架。
 3. **补 connected 并核对幂等（本轮已完成工程范围，原生待验）。** 复用已认证配置在线事实；按“配置从离线→在线”而非每条 hello/每个 Session/每次场景挂载生成展示身份。范围：Configurations/Main 每配置投递 seam、desktop/home presentation、必要 shared/preload 类型和 tests。保持 per-config 隔离与迟到窗口 ready 守卫。本轮已红绿验证重连未读/renderer重建边界，身份仅放Main Entry；复用Renderer模块缓存、不加持久回执，不改Provider业务事实。
-4. **补明确已有细分事实，其他能力保持未知（Claude本轮证据阻塞）。** Claude `max_output_tokens` 只有类别列举，精确触发语义尚未证实，当前不实施；取得可靠原生依据后才沿现有 occurrence/capability 加 output_limited，保留 error 未读、不制造 success，并先做 normalize→observations→Application/Q 及重复/旧prompt/retire/新work/fallback回归。其余 C/X thinking/responding/working/success/wait/retry 等无可靠源的不强补；不解析 transcript、shell 或错误正文。
+4. **补明确已有细分事实，其他能力保持未知（本轮未实施新映射）。** Claude `max_output_tokens` 的Hook分类与官方输出错误说明尚无精确关联/版本依据；pi 0.85.1 已查清重试不转发给当前扩展，不通过伪注册或更换宿主补齐。当前不实施；取得可靠原生依据后才沿现有 occurrence/capability 加 output_limited，保留 error 未读、不制造 success，并先做 normalize→observations→Application/Q 及重复/旧prompt/retire/新work/fallback回归。其余 C/X thinking/responding/working/success/wait/retry 等无可靠源的不强补；不解析 transcript、shell 或错误正文。
 5. **sleeping 已删除；disconnected / 独立 attention 保持当前边界。** 不为空闲增加休眠计时器。disconnected 要在“保持离线立即移除”与“特定可见处展示断开”中明确产品范围；前者意味着桌面 disconnected 只能手动预览，不应宣称自动可见。**不默认为延迟销毁窗口。** attention 若仅保留 fallback，直接记录无需独立事件；若要未读持续关注，需用户确认其与 success/error once、确认和多 Session 的关系。
 6. **集中真实验收，与 Gwen 接缝分开。** 各 Provider 用允许的已有原生事件、绑定已有 clips：事件事实→每配置投影→桌面/Home实际播放→退出/下一轮/重连；包括无映射/无idle/静态资产、切页隐藏、reduced、快速连续事件及长clip。先复用授权范围，新增 Agent/模型/用户文件操作另取精确授权。每阶段测试+typecheck+desktop build 通过仅是工程证据，不等于原生桌面动画验收。
 

@@ -26,22 +26,26 @@ export function createClaudeObservations(options: {
     clearTimeout(session.timer); delete session.timer; delete session.feedback;
   };
   const emit = (runId: string, session: Session) => {
-    options.publish({ sessionId: session.id, provider: 'claude', processInstanceId: runId,
-      providerSessionId: session.id, status: session.failed ? 'error' : 'unknown', connected: session.connected,
-      agentName: options.name(), observedAt: (options.now?.() ?? new Date()).toISOString(), revision: ++session.revision,
-      ...(session.work ? { workId: session.work } : {}), capabilities: { ...session.capabilities },
-      facts: session.feedback ?? { activities: [], waitingForInput: false } });
+    try {
+      const observation: SessionObservation = { sessionId: session.id, provider: 'claude', processInstanceId: runId,
+        providerSessionId: session.id, status: session.failed ? 'error' : 'unknown', connected: session.connected,
+        agentName: options.name(), observedAt: (options.now?.() ?? new Date()).toISOString(), revision: ++session.revision,
+        ...(session.work ? { workId: session.work } : {}), capabilities: { ...session.capabilities },
+        facts: session.feedback ?? { activities: [], waitingForInput: false } };
+      const result: unknown = options.publish(observation); void Promise.resolve(result).catch(() => {});
+    } catch { /* Consumer failure must not interrupt timer/session cleanup or affect the Agent. */ }
   };
   const retireSession = (runId: string, session: Session) => {
     clear(session); session.connected = false; emit(runId, session);
   };
   const feedback = (runId: string, session: Session, facts: CompanionFacts) => {
-    clear(session); session.feedback = facts; emit(runId, session);
+    clear(session); session.feedback = facts;
+    // Install before publishing: a synchronous subscriber may stop or retire us.
     session.timer = setTimeout(() => {
       if (closed || runs.get(runId)?.current !== session || !session.connected) return;
       clear(session); emit(runId, session);
     }, CLAUDE_FEEDBACK_MS);
-    session.timer.unref?.();
+    session.timer.unref?.(); emit(runId, session);
   };
   return {
     accept({ runId, fact }: { runId: string; fact: ClaudeHookFact }): void {
@@ -51,7 +55,11 @@ export function createClaudeObservations(options: {
         if (run?.sessions.has(fact.providerSessionId)) return;
         if (!run && runs.size >= 32) return;
         if (run && run.sessions.size >= 32) return;
-        if (run) retireSession(runId, run.current);
+        if (run) {
+          const previous = run.current;
+          if (previous.connected) retireSession(runId, previous);
+          if (closed || runs.get(runId) !== run || run.current !== previous) return;
+        }
         const session: Session = { nativeId: fact.providerSessionId, id: randomUUID(), revision: 0,
           connected: true, failed: false, ended: false, saturated: false, prompts: new Set(), tools: new Set(), capabilities: {} };
         if (run) { run.sessions.set(session.nativeId, session); run.current = session; }

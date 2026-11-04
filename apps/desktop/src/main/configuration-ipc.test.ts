@@ -9,6 +9,7 @@ import { registerConfigurationIpc } from './configuration-ipc.js';
 import { loadTrustedEntry } from './window-trust.js';
 import { PiPreflight } from './pi-preflight.js';
 import { CodexDiscovery } from './codex-discovery.js';
+import * as protectedJson from './protected-json-file.js';
 import { ClaudeDiscovery } from './claude-discovery.js';
 import { PiConnectionStore } from './pi-connection-store.js';
 import { ConfigurationsStore } from './configurations-store.js';
@@ -35,7 +36,8 @@ beforeEach(() => {
   start.mockClear();
   chooseClaude.mockClear();
   registry = new Configurations({ directory: profile, adapter: () => ({ start }), publish: vi.fn(),
-    codex: { nodeExecutable: process.execPath, observerExecutable: process.execPath, probePath: '/isolated/probe', runAsNode: false, chooseExecutable: chooseClaude, runtimeAssets: async () => ({ nativeHook: '// isolated codex fixture' }) },
+    codex: { nodeExecutable: process.execPath, observerExecutable: process.execPath, probePath: '/isolated/probe', runAsNode: false, runtimeAssets: async () => ({ nativeHook: '// isolated codex fixture' }),
+      startBridge: async () => ({ activation: '{"fixture":true}', stop: async () => {} }) },
     claude: { nodeExecutable: process.execPath, runAsNode: false, chooseExecutable: chooseClaude,
       runtimeAssets: async () => ({ hook: '// legacy fixture', launcher: '// legacy fixture', nativeHook: '// isolated observer fixture' }),
       normal: { probePath: '/isolated/probe', observerExecutable: process.execPath } } });
@@ -414,4 +416,139 @@ it('invalidates completed Codex scan capabilities without affecting a later scan
   const next = await invoke('configurations-detect-codex', 'new-scan') as Awaited<ReturnType<CodexDiscovery['detect']>>;
   await invoke('configurations-cancel-codex-scan', 'scan-codex');
   expect(codexDiscovery.candidate(next.installations[0]!.id)).not.toBeNull();
+});
+it('reuses approved Codex discovery after cancel through generic preview without a picker', async () => {
+  const f = await codexFixture();
+  const first = await invoke('configurations-prepare-detected-codex', f.id, 'first') as { configurationId: string };
+  await invoke('configurations-cancel', first.configurationId);
+  const retry = await invoke('configurations-preview', first.configurationId) as ReturnType<Configurations['snapshot']>;
+  expect(retry.records[0]?.codex?.preview).toMatchObject({ executable: f.executable, canApply: true });
+  expect(chooseClaude).not.toHaveBeenCalled(); expect(native.pick).not.toHaveBeenCalled();
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+});
+it('requires a new scan instead of a picker when approved Codex evidence expires', async () => {
+  const f = await codexFixture();
+  const first = await invoke('configurations-prepare-detected-codex', f.id, 'first') as { configurationId: string };
+  await invoke('configurations-cancel', first.configurationId); codexDiscovery.invalidate();
+  const retry = await invoke('configurations-preview', first.configurationId) as ReturnType<Configurations['snapshot']>;
+  expect(retry.records[0]?.codex).toMatchObject({ preview: null, notice: 'rescan-required', configured: false });
+  expect(chooseClaude).not.toHaveBeenCalled(); expect(native.pick).not.toHaveBeenCalled();
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+});
+it('confirms a scan-owned Codex preview without a picker, then restores the saved executable without discovery', async () => {
+  const f = await codexFixture();
+  const first = await invoke('configurations-prepare-detected-codex', f.id, 'first') as { configurationId: string };
+  const plan = registry.snapshot().records[0]!.codex!.preview!;
+  const result = await invoke('configurations-confirm', first.configurationId, plan.id) as ReturnType<Configurations['snapshot']>;
+  expect(result.records[0]?.codex).toMatchObject({ configured: true, status: 'waiting', preview: null });
+  const installed = readFileSync(f.hooks, 'utf8'); expect(JSON.parse(installed).keep).toBe('original');
+  expect(Object.keys(JSON.parse(installed).hooks)).toHaveLength(10);
+  codexDiscovery.invalidate(); await invoke('configurations-disable', first.configurationId);
+  const restored = await invoke('configurations-resume', first.configurationId) as ReturnType<Configurations['snapshot']>;
+  expect(restored.records[0]?.codex).toMatchObject({ configured: true, status: 'waiting' });
+  expect(readFileSync(f.hooks, 'utf8')).toBe(installed);
+  expect(chooseClaude).not.toHaveBeenCalled(); expect(native.pick).not.toHaveBeenCalled();
+});
+it.each(['new-scan', 'window', 'removed', 'replaced', 'target'] as const)('refuses Codex confirmation without writes after %s invalidates discovery evidence', async reason => {
+  const f = await codexFixture();
+  const first = await invoke('configurations-prepare-detected-codex', f.id, 'first') as { configurationId: string };
+  const plan = registry.snapshot().records[0]!.codex!.preview!;
+  if (reason === 'new-scan') await invoke('configurations-detect-codex', 'second-scan');
+  if (reason === 'window') capabilities.invalidate();
+  if (reason === 'removed') rmSync(f.executable);
+  if (reason === 'replaced') { rmSync(f.entry); symlinkSync('/unapproved/codex', f.entry); }
+  if (reason === 'target') {
+    const changedTarget = join(directory, 'other'); mkdirSync(changedTarget, { mode: 0o700 });
+    await registry.changeTarget(first.configurationId, changedTarget);
+  }
+  await invoke('configurations-confirm', first.configurationId, plan.id);
+  expect(registry.snapshot().records[0]?.codex?.configured).toBe(false);
+  expect(existsSync(join(directory, 'profile', `codex-registration-${first.configurationId}`))).toBe(false);
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+  expect(native.pick).not.toHaveBeenCalled(); expect(chooseClaude).not.toHaveBeenCalled();
+});
+it('rejects late scan revalidation on generic Codex preview after cancellation and retries on the current scan', async () => {
+  const f = await codexFixture();
+  const first = await invoke('configurations-prepare-detected-codex', f.id, 'first') as { configurationId: string };
+  await invoke('configurations-cancel', first.configurationId);
+  const finish = delayInstallation(f.entry);
+  const pending = invoke('configurations-preview', first.configurationId);
+  await invoke('configurations-cancel', first.configurationId); finish(); await pending;
+  expect(registry.snapshot().records[0]?.codex?.preview).toBeNull();
+  const retry = await invoke('configurations-preview', first.configurationId) as ReturnType<Configurations['snapshot']>;
+  expect(retry.records[0]?.codex?.preview?.executable).toBe(f.executable);
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original); expect(native.pick).not.toHaveBeenCalled();
+});
+it('rejects late Codex confirmation revalidation after cancellation before any write', async () => {
+  const f = await codexFixture();
+  const first = await invoke('configurations-prepare-detected-codex', f.id, 'first') as { configurationId: string };
+  const plan = registry.snapshot().records[0]!.codex!.preview!;
+  const finish = delayInstallation(f.entry);
+  const pending = invoke('configurations-confirm', first.configurationId, plan.id);
+  await invoke('configurations-cancel', first.configurationId); finish(); await pending;
+  expect(registry.snapshot().records[0]?.codex).toMatchObject({ configured: false, preview: null });
+  expect(existsSync(join(directory, 'profile', `codex-registration-${first.configurationId}`))).toBe(false);
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+});
+it('requires scanning for a manual Codex configuration and never opens a program picker', async () => {
+  const target = join(directory, 'manual'); mkdirSync(target, { mode: 0o700 });
+  const created = await registry.create({ provider: 'codex', name: 'Manual', targetPath: target });
+  const result = await invoke('configurations-preview', created.records[0]!.id) as ReturnType<Configurations['snapshot']>;
+  expect(result.records[0]?.codex).toMatchObject({ configured: false, preview: null, notice: 'rescan-required' });
+  expect(native.pick).not.toHaveBeenCalled(); expect(chooseClaude).not.toHaveBeenCalled();
+  expect(existsSync(join(target, 'hooks.json'))).toBe(false);
+});
+it('prepares the scanned executable for an existing custom Codex target without creating a default record or reading default hooks', async () => {
+  const target = join(directory, 'project-codex'); mkdirSync(target, { mode: 0o700 });
+  const created = await registry.create({ provider: 'codex', name: 'Project Codex', targetPath: target });
+  const configurationId = created.records[0]!.id;
+  const f = await codexFixture();
+  const read = vi.spyOn(protectedJson, 'readSource');
+  const result = await invoke('configurations-prepare-detected-codex', f.id, 'custom', configurationId) as { configurationId: string };
+  expect(result.configurationId).toBe(configurationId);
+  expect(registry.snapshot().records).toHaveLength(1);
+  expect(registry.snapshot().records[0]?.codex?.preview).toMatchObject({ path: join(target, 'hooks.json'), executable: f.executable });
+  expect(read).toHaveBeenCalled();
+  expect(read.mock.calls.every(([context]) => context.path === join(target, 'hooks.json'))).toBe(true);
+  await invoke('configurations-cancel', configurationId);
+  const retry = await invoke('configurations-preview', configurationId) as ReturnType<Configurations['snapshot']>;
+  expect(retry.records[0]?.codex?.preview?.path).toBe(join(target, 'hooks.json'));
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+  expect(existsSync(join(target, 'hooks.json'))).toBe(false); expect(native.pick).not.toHaveBeenCalled();
+});
+it.each(['unknown', 'wrong-provider', 'path', 'target-changed', 'removed'] as const)('rejects %s custom Codex scope before reading target hooks', async reason => {
+  const target = join(directory, 'project'); mkdirSync(target, { mode: 0o700 });
+  const created = await registry.create({ provider: reason === 'wrong-provider' ? 'claude' : 'codex', name: 'Project', targetPath: target });
+  const record = created.records[0]!;
+  const f = await codexFixture();
+  if (reason === 'target-changed') {
+    const next = join(directory, 'moved'); mkdirSync(next, { mode: 0o700 }); await registry.changeTarget(record.id, next);
+  }
+  if (reason === 'removed') await registry.remove(record.id);
+  const configurationId = reason === 'unknown' ? 'unknown-id' : reason === 'path' ? '/renderer/forged-path' : record.id;
+  await expect(invoke('configurations-prepare-detected-codex', f.id, 'scope', configurationId)).rejects.toThrow('重新扫描');
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+  expect(existsSync(join(target, 'hooks.json'))).toBe(false);
+  expect(native.pick).not.toHaveBeenCalled(); expect(chooseClaude).not.toHaveBeenCalled();
+});
+it('rejects extra parameters and never accepts a renderer executable with custom Codex scope', async () => {
+  const f = await codexFixture();
+  await expect(invoke('configurations-prepare-detected-codex', f.id, 'request', {}, 'extra')).rejects.toThrow('Invalid');
+  await expect(invoke('configurations-prepare-detected-codex', f.id, 'request', { executable: f.executable })).rejects.toThrow('Invalid');
+  expect(registry.snapshot().records).toEqual([]); expect(native.pick).not.toHaveBeenCalled();
+});
+it.each(['change', 'remove'] as const)('cancels a custom-target prepare after a concurrent %s without target reads', async change => {
+  const target = join(directory, 'custom'); mkdirSync(target, { mode: 0o700 });
+  const created = await registry.create({ provider: 'codex', name: 'Custom', targetPath: target });
+  const configurationId = created.records[0]!.id;
+  const f = await codexFixture(), finish = delayInstallation(f.entry);
+  const reads = vi.spyOn(protectedJson, 'readSource');
+  const pending = invoke('configurations-prepare-detected-codex', f.id, 'custom', configurationId);
+  if (change === 'remove') await registry.remove(configurationId);
+  else { const next = join(directory, 'next'); mkdirSync(next, { mode: 0o700 }); await registry.changeTarget(configurationId, next); }
+  finish();
+  expect(await pending).toMatchObject({ configurationId: null, reason: 'cancelled' });
+  expect(reads).not.toHaveBeenCalled();
+  expect(registry.snapshot().records.some(record => record.targetPath === f.target)).toBe(false);
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
 });

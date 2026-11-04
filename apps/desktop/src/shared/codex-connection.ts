@@ -7,6 +7,6 @@ export interface CodexConnectionState {
   observedSessions: number;
   canConfigure: boolean;
   canResume: boolean;
-  notice: 'none' | 'unsupported-installation' | 'preview-failed' | 'stale-preview' | 'save-failed' | 'saved-invalid' | 'retained';
+  notice: 'none' | 'rescan-required' | 'unsupported-installation' | 'preview-failed' | 'stale-preview' | 'save-failed' | 'saved-invalid' | 'retained';
   preview: { id: string; executable: string; path: string; canApply: boolean; exists: boolean; events: readonly string[] } | null;
 }

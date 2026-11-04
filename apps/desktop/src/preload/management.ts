@@ -36,7 +36,9 @@ const configurations: ConfigurationsApi = {
   prepareDetected: (id, requestId) => ipcRenderer.invoke('management:configurations-prepare-detected', id, requestId),
   detectCodex: requestId => ipcRenderer.invoke('management:configurations-detect-codex', requestId),
   cancelCodexScan: requestId => ipcRenderer.invoke('management:configurations-cancel-codex-scan', requestId),
-  prepareDetectedCodex: (id, requestId) => ipcRenderer.invoke('management:configurations-prepare-detected-codex', id, requestId),
+  prepareDetectedCodex: (id, requestId, configurationId) => configurationId === undefined
+    ? ipcRenderer.invoke('management:configurations-prepare-detected-codex', id, requestId)
+    : ipcRenderer.invoke('management:configurations-prepare-detected-codex', id, requestId, configurationId),
   detectClaude: requestId => ipcRenderer.invoke('management:configurations-detect-claude', requestId),
   cancelClaudeScan: requestId => ipcRenderer.invoke('management:configurations-cancel-claude-scan', requestId),
   prepareDetectedClaude: (id, requestId) => ipcRenderer.invoke('management:configurations-prepare-detected-claude', id, requestId),

@@ -71,13 +71,7 @@ export function createManagement(options: {
         return result.canceled ? null : result.filePaths[0] ?? null;
       } },
     codex: { nodeExecutable: process.execPath, observerExecutable: realpathSync(process.execPath), runAsNode: true,
-      probePath: claudeProcessProbePath(), runtimeAssets: loadCodexRuntimeAssets,
-      async chooseExecutable() {
-        if (!window || window.isDestroyed() || quitting) return null;
-        const result = await dialog.showOpenDialog(window, { title: '选择 Codex CLI 程序（已验证 standalone 0.163.0）',
-          properties: ['openFile', 'showHiddenFiles', 'dontAddToRecent'] });
-        return result.canceled ? null : result.filePaths[0] ?? null;
-      } },
+      probePath: claudeProcessProbePath(), runtimeAssets: loadCodexRuntimeAssets },
     developmentEnvironment: options.pi.developmentEnvironment,
     ...(collectionOwnsLegacy
       ? { legacy: { connection, targetPath: legacyState.deployedPath ? dirname(dirname(legacyState.deployedPath)) : preflight.snapshot().target.path } } : {}),

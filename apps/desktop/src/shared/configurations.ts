@@ -56,7 +56,7 @@ export interface ConfigurationsApi {
   prepareDetectedClaude(installationId: string, requestId: string): Promise<DetectedSetupResult>;
   detectCodex(requestId: string): Promise<CodexDiscoveryState>;
   cancelCodexScan(requestId: string): Promise<void>;
-  prepareDetectedCodex(installationId: string, requestId: string): Promise<DetectedSetupResult>;
+  prepareDetectedCodex(installationId: string, requestId: string, configurationId?: string): Promise<DetectedSetupResult>;
   cancelDetected(requestId: string): Promise<void>;
   rename(id: string, name: string): Promise<ConfigurationsState>;
   changeTarget(id: string, path: string): Promise<ConfigurationsState>;

@@ -87,12 +87,13 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     let scanPending = false;
     let scanJob: { requestId: string; cancelled: boolean } | undefined;
     let completedScanId: string | undefined;
+    let scannedTargets = new Map<string, string>();
   ipcMain.handle(`management:configurations-detect-${provider}`, async (event, ...args: unknown[]) => {
     assert(event); if (args.length !== 1 || !discovery) throw new Error('Installation discovery unavailable');
     const requestId = id(args[0]);
     if (scanPending) throw new Error('扫描正在进行，请稍候。');
     scanPending = true; discovery.invalidate();
-    completedScanId = undefined;
+    completedScanId = undefined; scannedTargets.clear();
     const job = { requestId, cancelled: false }; scanJob = job;
     const current = window()!, revision = generation;
     try {
@@ -104,7 +105,11 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
         return { installations: [], targetPath: discovery.targetPath, scan: 'complete', notice: 'cancelled' };
       }
       assert(event); const result = await discovery.detect();
-      if (!job.cancelled && revision === generation) completedScanId = requestId;
+      if (!job.cancelled && revision === generation) {
+        completedScanId = requestId;
+        if (provider === 'codex') scannedTargets = new Map(configurations.snapshot().records
+          .filter(record => record.provider === 'codex' && record.codex?.canConfigure).map(record => [record.id, record.targetPath]));
+      }
       return result;
     } finally { scanPending = false; if (scanJob === job) scanJob = undefined; }
   });
@@ -117,13 +122,17 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
   });
   ipcMain.handle(`management:configurations-prepare-detected-${provider}`, async (event, ...args: unknown[]) => {
     assert(event);
-    if (args.length !== 2 || typeof args[1] !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(args[1])) throw new TypeError('Invalid detected configuration');
+    if ((args.length !== 2 && !(provider === 'codex' && args.length === 3)) || typeof args[1] !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(args[1])) throw new TypeError('Invalid detected configuration');
     const candidateId = id(args[0]), requestId = args[1];
+    const configurationId = args.length === 3 ? id(args[2]) : undefined;
+    const selectedRecord = configurationId ? configurations.snapshot().records.find(record => record.id === configurationId) : undefined;
+    if (configurationId && (!selectedRecord || selectedRecord.provider !== 'codex' || !selectedRecord.codex?.canConfigure ||
+        scannedTargets.get(configurationId) !== selectedRecord.targetPath)) throw new Error('Codex 配置已变化，请重新扫描。');
     const candidate = discovery?.candidate(candidateId);
     if (!candidate) throw new Error(`${label} 安装已变化，请重新扫描。`);
     if (setupWorkPending) throw new Error('配置检查正在结束，请稍候重试。');
     setupWorkPending = true;
-    const current = window()!, revision = generation, target = discovery!.targetPath;
+    const current = window()!, revision = generation, target = selectedRecord?.targetPath ?? discovery!.targetPath;
     const controller = new AbortController(); let cancelled = false;
     let settle!: (value: DetectedSetupResult) => void;
     const cancellation = new Promise<DetectedSetupResult>(done => { settle = done; });
@@ -134,9 +143,10 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     const active = () => {
       if (cancelled || revision !== generation || quitting() || window() !== current || current.isDestroyed() || !current.isVisible()) return false;
       assert(event); const latest = discovery?.candidate(candidateId);
-      return latest?.executable === candidate.executable && latest.entryPath === candidate.entryPath;
+      return latest?.executable === candidate.executable && latest.entryPath === candidate.entryPath &&
+        (!configurationId || configurations.snapshot().records.some(record => record.id === configurationId && record.provider === 'codex' && record.targetPath === target));
     };
-    // The trusted Renderer presents the default target/settings read scope first. Deployment still requires confirm.
+    // The trusted Renderer presents this Main-owned target's read scope first. Writes still require confirm.
     const work = (async (): Promise<DetectedSetupResult> => {
       const stopped = (): DetectedSetupResult => ({ state: configurations.snapshot(), configurationId: null, reason: 'cancelled' });
       const checked = await inspect(candidate.entryPath, dirname(target), new ReadBudget(controller.signal));
@@ -149,7 +159,15 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
       if (created.notice !== 'none') return { state: created, configurationId: null };
       const record = created.records.find(value => value.provider === provider && value.targetPath === targetPath);
       if (!record || !active()) return stopped();
-      const state = record[provider]?.canConfigure ? await (provider === 'claude' ? configurations.previewDetectedClaude(record.id, candidate.executable) : configurations.previewDetectedCodex(record.id, candidate.executable)) : created;
+      const discoverCodex = async (): Promise<string | null> => {
+        try {
+          if (!active() || configurations.snapshot().records.find(value => value.id === record.id)?.targetPath !== targetPath) return null;
+          const checked = await inspectCodexInstallation(candidate.entryPath, new ReadBudget());
+          return active() && checked?.compatibility === 'verified' && checked.executable === candidate.executable &&
+            configurations.snapshot().records.find(value => value.id === record.id)?.targetPath === targetPath ? candidate.executable : null;
+        } catch { return null; }
+      };
+      const state = record[provider]?.canConfigure ? await (provider === 'claude' ? configurations.previewDetectedClaude(record.id, candidate.executable) : configurations.previewDetectedCodex(record.id, discoverCodex)) : created;
       const planId = state.records.find(value => value.id === record.id)?.[provider]?.preview?.id;
       if (!active()) {
         if (planId && configurations.snapshot().records.find(value => value.id === record.id)?.[provider]?.preview?.id === planId) await configurations.cancel(record.id);

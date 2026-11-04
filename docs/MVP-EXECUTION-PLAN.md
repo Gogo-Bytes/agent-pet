@@ -26,6 +26,24 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## 下一轮待办实施顺序
 
+**当前用户指定顺序：先完善 pi / Claude Code / Codex 适配，动画制作与拼接暂停。** 本轮从干净 `95dd667` 核对审计，仅实施可复现的生命周期/归属缺陷，不新增 SDK/RPC 宿主或猜测业务事件。Claude 输出限制与业务重试的来源阻塞继续保留：[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)；22项触发/fallback与已验收素材不动。
+
+### Provider 修复第一阶段：pi 重叠连接归属
+
+4项永久红测复现旧peer的迟到名称/companion继承baseline并夺回Session，旧peer关闭后把当前working改为idle/disconnected。现mapper单独标记本次发布是否来自有效hello，只有hello可更换接收器owner；baseline仍负责保留已有未读，metadata不再取得传输归属。未扩展协议、认证或能力。
+
+真实自有socket→PiConnection→Configurations/Application→Home投影覆盖两种迟到数据、旧peer退出、当前完成未读、同原生身份的两配置隔离及connectionCue稳定；旧同socket切Session、重复hello、无heartbeat旧扩展、未读重连/no replay守卫保留。聚焦14文件111 passed；typecheck、desktop源码build、全量135文件 **1571 passed / 1 skipped**及diff检查通过。红/绿日志 `/tmp/provider-pi-{red,focused,typecheck,build,full}.log`。没有真实Agent/模型调用、日常配置读写/部署、依赖升级、dev重启、资产修改、打包或推送。原生重叠时序、睡眠/唤醒与长时间运行仍待独立授权验收；自动化不等于native/UI视觉通过。
+
+### Provider 修复第二阶段：Claude 发布重入与清理
+
+第一阶段本地提交 `0e4e74d` 后独立实施。7项红测经真实normalize→mapper→Application同步订阅→共享宠物投影复现：反馈发布时stop/retire遗留timer，替换Session的断开回调中stop/retire后仍发布新连接，重入替换产生两个在线Session，抛错订阅中断多run停止和timer过期。复用Codex既有局部模式：先持有timer再发布，隔离消费者抛错/拒绝Promise，回调后重新核对closed/run/current身份；没有共享新框架、重试/ACK或hook安装变更。
+
+新增8项回归（7项红绿及1项拒绝Promise清理），原generic错误未读、tool-error区分、旧/缺prompt与child拒绝、Stop/approval/precursor负语义保持。聚焦8文件134 passed；typecheck、desktop源码build、全量135文件 **1579 passed / 1 skipped**及diff检查通过，日志 `/tmp/provider-claude-{red,focused,typecheck,build,full}.log`。现有Three重复实例警告/skip保留；无非预期失败或基础设施回退。源码独立审查由Main接续，不提前宣称通过。
+
+本轮只交付这两项可复现修复，没有凭空扩展第三项Codex能力。发布是best-effort，不能修复消费者已部分提交/未通知其余订阅者，也不承诺重送。真实pi重叠、Claude退出/重入时序、其他未验动作与GPU视觉仍需精确授权验收；没有Agent/模型调用、日常配置/部署、升级、dev重启、资产操作、打包或推送。
+
+以下保留既定主线与历史阶段顺序，当前动画细类以本段及上述证据为准。
+
 用户要求先处理现有问题，再规划并推进功能；生产签名、公证、自动更新放到最后。以下是执行顺序，不将历史未测项改为通过。
 
 1. **稳定性收尾（先行门槛）**：缓存遗漏清理已由 `adad08e` 修复。继续核对 Pi 单 socket 切换 Session 时旧归属是否释放、认证超时是否真正销毁失活连接、heartbeat 与旧扩展兼容性、消费者发布失败后的重试，以及 renderer 崩溃恢复是否有循环风险。逐项用现有公开边界回归确认；仅修复能复现的问题，不增加新框架。完成后运行全量测试、typecheck、desktop build，记录未覆盖的睡眠/唤醒与长时间实机场景。
@@ -148,13 +166,47 @@ Antigravity 官方 hooks/plugins 原文抓取被网络安全检查阻止，后�
 
 已先复现 gesture 和真实 Three 播放测试失败，再最小接线；聚焦62项通过，全量131文件1501 passed/1 skipped，typecheck、desktop build、diff检查通过。测试包含真实 DOM 手势到 PetModel props、真实 GLTFLoader/Drei/AnimationMixer 的姿态与 cue 行为；未做原生桌面/用户资产视觉拖动验收，不宣称 GPU 或实机手感通过。没有改 Main/IPC、导入弹窗、用户模型或 Agent 配置，也未处理格温循环边界卡顿。
 
-### 格温空闲修订包：独立交付，其他循环与视觉验收未完成
+### 桌面 hover 不触发/提前结束：改用稳定宠物视口
+
+基线`b7b59af`干净；用户在干净重启后报告hover有时不触发、有时未播完回空闲，并明确桌面应使用外框元素而不是运动中的模型。本条覆盖下方早期桌面“仅真实模型命中”的设计，不改变首页多宠物各自模型命中规则，也不归因于HMR。
+
+正式App→PetCanvas DOM Canvas→PetModel→GLTFLoader/Drei/Three/Fiber射线回归先得到两项行为红测：视口透明角未命中模型，动作未启动；模型首次命中启动后移出同一光标位置，下一次pointermove产生模型out并提前取消。无blur、capture、拖动、重挂参与即可复现，不能把该结果扩展为排除了所有原生输入异常。
+
+最小实现将`usePetInteraction`所有权移到PetCanvas，已有pet矩形外框的DOM enter/leave直接驱动反馈；PetModel仅接反馈/完成回调，删除重复射线hover入口。透明视口部分可触发，工具栏/resize/连接空隙不触发；Main命中/穿透、窗口大小及App工具栏显示envelope不变。DOM子元素移动、动画自移出、普通重渲染不重启/取消；完成后保持在视口内不重播，真实离开仍取消，重新进入可再播。换模型释放旧反馈，拖动/失焦/隐藏/pointercancel/lostcapture/reduced/unmount硬取消、缺映射、业务cue延后消费/latest-wins和b7b59af完成帧保护保持；首页语义和素材不改，无延时/debounce/队列/新接口。
+
+新增`PetCanvas.test.tsx`的12项真实DOM/Fiber/Three集成（只替换GPU上下文和资产IO，用仓库starter及区分姿态的合成clip），覆盖上述两症状、完成/退出重入、内部切换、toolbar/resize、拖动、业务cue、硬取消与换模型；原PetModel及共享22项送绘制姿态回归适配输入所有权，未删除完成/清理保护。聚焦8文件134 passed，typecheck/desktop build通过；全量135文件1567 passed/1 skipped通过。首轮全量新增拖动fixture在DOM→Canvas跨React根未完全提交前取样，保留原1 failed/1566 passed/1 skipped证据，显式异步act后有界复验通过；后续将user-event的act wrapper限定在已挂载后的输入，避免其默认flag切换警告。初始ResizeObserver未派发、按钮旧label、fixture复用业务cue、wrapper错误覆盖waitFor的失败及各一次修正复验均保留于`/tmp/hover-viewport-*.log`，未改变生产阈值/测试保护以掩盖失败。
+
+这是输入接线/实际Three姿态自动化，不是macOS原生/GPU/用户模型视觉验收。未重启或操纵运行中dev、读写用户模型/已安装宠物/Agent配置、安装依赖、访问网络或推送。用户在`9078075`交付后反馈“可以了”，桌面hover本次问题复验通过；该确认不扩大为首页、多显示器或完整触发矩阵验收。独立工程审查不由用户反馈替代。
+
+### hover 结束闪烁：共享播放器交接修复
+
+用户已确认空闲与移动修订包“验收动画正常”，只覆盖Idle、Run_Haste、Run01，不扩展到其他clip/所有触发/长期GPU验收；随后报告hover结束回空闲时闪一下。本轮基线`facdf18`干净，只处理播放器交接，不编辑/读取用户模型、已安装宠物或Agent配置，不做尾段/拼接制作。
+
+真实GLTFLoader解析仓库starter，增加与默认姿势明确区分的合成clip，经两正式入口PetModel/ScenePet→Drei→R3F `advance`，在实际`gl.render`调用前后取姿态。4项红测同时确认：LoopOnce在完成帧自动disabled，画面用默认姿势x=0而非hover末姿x=12；微任务/React cleanup/setup后、下一帧尚未推进时仍是x=0而非idle x=2或working x=4。这不是素材首尾跳变或帧率猜测。
+
+最小共享修复：once用`clampWhenFinished`保留末姿供完成帧绘制，继续在mixer完成后的微任务交接；stop/play后仅`mixer.update(0)`立即采样新动作，不加逐帧推进、不在正在执行的mixer.update内重绑定。缺映射/无idle仍恢复静态，reduced仍暂停，unmount仍释放；latest-wins、拖动优先、连接低优先、业务cue延后消费/去重和最新rest保持。没有混合/过渡引擎或作者控制参数；消除默认姿势插帧，不承诺不同clip姿态天然平滑衔接。
+
+新增共享播放器22项两入口回归，覆盖开始/中间/完成帧、React延迟释放时末姿保持、交接后立即姿态、idle/working恢复、最新/已消费业务cue、重复hover、无idle静态、pointer退出/取消/丢捕获/失焦/隐藏/disabled/reduced及unmount。聚焦7文件114 passed；最终typecheck、desktop build、全量134文件 **1555 passed / 1 skipped**通过。首次扩大jsdom生命周期fixture时import.meta URL变为非file，改用既有根目录资产路径后一次复验通过；首次typecheck发现once为可选boolean，显式判断requested存在后一次复验通过。日志`/tmp/hover-finish-flash-{red,green,lifecycle,lifecycle-retest,focused,typecheck,typecheck-retest,build,full}.log`保留原失败与通过证据；原Three多实例警告/既有skip保留。
+
+这是实际Three/Drei/R3F顺序与送绘制姿态自动化，不是原生桌面/GPU/用户模型视觉验收。未重启/操纵运行中dev，未安装依赖/访问网络/发起模型请求或改原包；独立审查与用户hover视觉复验由Main继续，不提前宣称通过。
+
+### 格温跑步修订：Idle与两移动clip已由用户验收
+
+用户确认上一版空闲“丝滑”，只记Idle主观验收通过；另授权先修跑步/移动，不处理其他长尾，后续片段合并仅在离线Blender制作、不提供项目能力。本轮从既有Idle工程独立复制，只编辑`Run_Haste`（dragging/retrying）和`Run01`（searching/disconnected），原映射/15clip/所有guard/fallback不变。已验收Idle及另12非目标clip的时长、轨道时间/值/插值精确保持。
+
+首个100ms Bezier候选虽恢复尾速，但Run_Haste左脚/角速度接缝退化，整体拒绝。经Main批准唯一有界修复，先证实原生细差分与60Hz导出首末采样弦斜率不一致，再仅为两目标边界相邻1frame制作对称旋转切线并衔接Bezier；非强制全采样、extras=False导出。复验首尾骨骼/蒙皮/角速度差明显改善，7手脚剪刀关键点全部改善，边界加速度峰值下降、正文节奏/低脚位相保持；没有继续调参、静态作弊或修改已验收Idle。数值不是动态流畅验收。
+
+最终排他创建`/Users/gan/Downloads/小小格温-AgentPet-空闲与移动修订`，ID `chibi-gwen-idle-move-revised`、版本1.1.2，只有4个必要文件，原许可/归属保留。GLB8,519,172字节，10214accessors/10217views、累计view6,220,734、输出874576均原预算内，无本轮源码/guard改动。实际目录正式inspect成功并取消预览；15clip/213joint/几何/skin/材质/PNG完全保留，7组动画切换与fresh目标一致，原包22文件和空闲修订包4文件hash不变。可继续编辑的打包纹理.blend、制作脚本与两段6秒30fps对比预览存于相邻`小小格温-AgentPet-空闲与移动修订-制作`，无临时图片依赖，未提交/上传资产或自动安装/重绑。
+
+交付时Main只独立查看4张接缝接触表，未见明显模型/肢体/贴图异常且未动态播放；用户随后反馈“验收动画正常”，确认本包两跑步修订可用。该主观反馈不扩展为所有动画/完整触发矩阵通过；hover结束闪烁单独按上节修复。staging与实际目录probe各1通过、真实GLTFLoader/数值保真断言通过、既有导入相关97项通过；本轮仅文档与外部素材，无永久测试/生产变化，未重跑全量/typecheck/build，未重启运行中dev或安装工具。详细失败/修复数据、稳定产物与证据见[两跑步交付](GWEN-LOOP-DIAGNOSIS.md#当前交付保留已验收-idle仅修订两段跑步)。其他长尾和离线合并均暂停，等用户确认后再定范围。
+
+### 格温空闲修订包：独立交付，后续仅Idle已由用户验收
 
 在结构扩容阶段`ad05b70`后，用现有Blender从原Idle修订工程按原非强制采样设置导出，仅关闭非渲染extras；没有使用时长/轨迹失败的全采样清理候选。新建`/Users/gan/Downloads/小小格温-AgentPet-空闲修订`，ID `chibi-gwen-idle-revised`、版本1.1.1，保留15clip与22映射（仅删除废弃sleeping:null）、原头像/许可/归属；4文件8,699,877字节，没有覆盖原包或已安装宠物。
 
 最终GLB8,393,696字节，10212 accessors/10215 views、累计源切片6,095,774字节。实际Downloads目录正式inspect成功并取消预览；真实GLTFLoader加载验证全部动画轨道/几何/skin/变换与旧Idle预览候选一致，材质仅去extras，3PNG字节及213joint保持。14非目标时长/轨迹与未编辑原生往返一致，原往返相对源的最大骨骼RMS误差0.0162%模型对角线仍披露；4组切换无残留，原包22文件hash未变。源码全量1533 passed/1 skipped/typecheck/build属前阶段，本包临时staging与实际目录各1通过、数值/元数据保真检查通过，不重复宣称全量含用户模型。
 
-只修订Idle；Cast_Cycle/Run_Haste等未修。既有三圈Blender预览与最终包解码后的运动相同，可供用户比较；动态顺滑和应用内/GPU验收未通过。需要新版源码预算（旧版会拒绝），没有自动安装/重绑/重启dev、依赖或Agent操作。完整哈希、步骤、文件路径与剩余工作见[当前格温交付](GWEN-LOOP-DIAGNOSIS.md#当前交付空闲动画修订包与结构预算)。
+本节交付只修订Idle，随后用户确认Idle流畅；两跑步的后续修订见上节。既有三圈Blender预览与空闲包运动相同，不能扩展为所有动画或GPU性能验收。需要新版源码预算（旧版会拒绝），没有自动安装/重绑/重启dev、依赖或Agent操作。完整哈希、步骤、文件路径与剩余工作见[当前格温交付](GWEN-LOOP-DIAGNOSIS.md#既有交付空闲动画修订包与结构预算)。
 
 ### GLB 原生导出布局：有界结构扩容与切片复制保护
 
@@ -212,6 +264,8 @@ hover/selected 与 connected 已按下节完成工程接线，原生视觉待验
 
 ### 本地 hover / selected 接线
 
+> 历史接线阶段；桌面hover输入已按上文用户新要求改为宠物视口DOM边沿，首页仍保留模型命中。以下原阶段数字与模型命中描述只作为当时证据。
+
 桌面和首页通过真实 R3F 模型进入边沿播放 `hover`，跨同一模型子 mesh 不重播；工具栏容器进入仍只管理工具栏。首页模型点击和在线宠物选择按钮的点击/Enter/Space 经同一显式计数触发 `selected`；初始焦点、重渲染、重挂和收藏缩略图不冒充场景选择，桌面未新增选择交互。复用现有播放器和目录，增加实例内最小 latest-wins 反馈，不加业务 IPC/队列/骨骼处理。
 
 本地反馈播放一次即释放，悬停退出、取消选择、窗口失焦/隐藏、pointercancel/lostcapture、页面离开和卸载有界清理；拖动优先且不恢复被覆盖的旧 hover。交互期间业务 cue 不被消费，结束恢复最新业务请求/rest，已消费 once 不重播。缺交互 clip 不重置工作，reduced 不启动局部反馈，无动画仍静态；既有 fallback、一次语义、按配置隔离、在线绑定过滤及离线立即移除不变。
@@ -247,6 +301,8 @@ hover/selected 与 connected 已按下节完成工程接线，原生视觉待验
 未重启 dev、访问用户资产/已安装宠物/Agent 配置、调用模型/外网、安装依赖、打包或推送。未做原生窗口/GPU/用户模型视觉验收；格温源循环接缝保持独立未解决，不加工 clip/骨骼或新增作者控制。
 
 ### Claude output_limited 细类：证据阻塞，未实施
+
+> 历史首次停点。`37ac506` 后的本轮核验已成功取得官方 Hooks/Errors 和 pi 固定版代码；新增证据仍不足以接 Claude 细类，pi 则明确为当前 ExtensionAPI 不转发重试事件。最新依据及恢复条件见[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)，不再把此项描述成抓取失败或只差一条 pi.on 接线。
 
 本轮从干净 `3a170d1` 开始；此前 hover/selected `4852c7b`、connected `3a170d1` 已分别提交，其测试证据保持上节范围，不作为本细类实现证据。
 

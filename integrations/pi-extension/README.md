@@ -104,6 +104,12 @@ one-shot occurrences are never included in hello. Shutdown cancels retries. This
 behavior is covered using real sockets and synthetic pi callbacks, not a live TUI.
 Only TUI mode enables observation.
 
+The receiver distinguishes hello admission from unread-preserving `baseline` observations.
+Delayed name/companion frames and closure from a superseded peer cannot replace or
+disconnect its current owner. Socket-to-Configurations/Application/Home regressions
+cover both delayed frame kinds and two isolated configurations; this is not native
+overlap timing acceptance and introduces no new extension capability.
+
 Still pending: real `/reload` identity continuity, multiple real pi processes,
 retry-period cancellation, native acceptance of the new connection health UI and Windows pipe security checks.
 

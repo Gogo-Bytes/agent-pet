@@ -7,6 +7,7 @@ import { useThree, type RootState } from '@react-three/fiber';
 import { Box3, Mesh, Raycaster, Vector2, Vector3, type Group, type AnimationClip } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PetModel } from './PetModel.js';
+import { usePetInteraction } from '../../shared/usePetInteraction.js';
 import { bundledAnimationBounds } from './bundled-animation-bounds.js';
 import type { DragDirection } from '../../shared/use-window-gesture.js';
 import type { PetMotion, PetAnimations } from '@agent-pet/pet-runtime';
@@ -34,14 +35,19 @@ async function mount(motion: PetMotion = 'idle', size = 140, clips = asset.anima
   function Probe() { state = useThree(); return null; }
   let presentation: { connectionCue?: string; replay?: string; restAction?: PetMotion; animations?: PetAnimations; modelUrl?: string; dragDirection?: DragDirection | null; interactionActive?: boolean } = {};
   const ready = vi.fn();
-  const hover = vi.fn();
+  let interaction!: ReturnType<typeof usePetInteraction>;
+  // PetCanvas owns input/lifecycle; this harness tests the player's feedback contract.
+  function Model({ value }: { value: PetMotion }) {
+    interaction = usePetInteraction(presentation.interactionActive !== false && !presentation.dragDirection && !reduced);
+    return <PetModel {...presentation} motion={value} reduced={reduced} onReady={ready} interaction={interaction.feedback} onInteractionFinished={interaction.finish} />;
+  }
   const tree = (value: PetMotion, visible = true) => <StrictMode><Activity mode={visible ? 'visible' : 'hidden'}><Probe /><Bounds margin={1.2} maxDuration={0}>
-    <PetModel {...presentation} motion={value} reduced={reduced} onReady={ready} onHover={hover} />
+    <Model value={value} />
   </Bounds></Activity></StrictMode>;
   const view = await create(tree(motion), { width: size, height: size, camera: { fov: 35, position: [0, 0, 5] } });
   mounted.push(view);
   const root = state.scene.getObjectByName('Pet')!;
-  return { view, root, state, ready, hover, present: (value: typeof presentation) => { presentation = value; return view.update(tree(motion)); }, switchMotion: (value: PetMotion) => { motion = value; return view.update(tree(value)); }, show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
+  return { view, root, state, ready, enter: () => act(async () => interaction.hover(true)), leave: () => act(async () => interaction.hover(false)), present: (value: typeof presentation) => { presentation = value; return view.update(tree(motion)); }, switchMotion: (value: PetMotion) => { motion = value; return view.update(tree(value)); }, show: (visible: boolean) => view.update(tree(motion, visible)), reduce: (value: boolean) => { reduced = value; return view.update(tree(motion)); } };
 }
 
 describe('PetModel bundled animation behavior', () => {
@@ -97,12 +103,11 @@ describe('PetModel bundled animation behavior', () => {
     await f.present({ animations, replay: 'connected:business-result', connectionCue: 'connected:busy:consumed-result' });
     await f.view.advanceFrames(1, .1); expect(f.root.position.y).toBeLessThan(.05);
     await f.switchMotion('idle');
-    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.enter();
     await f.view.advanceFrames(2, .1);
     await f.present({ animations, connectionCue: 'connected:busy:hover' });
     await f.view.advanceFrames(1, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
-    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.leave();
     await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.01, 4);
   });
 
@@ -134,27 +139,25 @@ describe('PetModel bundled animation behavior', () => {
     await still.view.advanceFrames(3, .1); expect(still.root.position.toArray()).toEqual([0, 0, 0]);
   });
 
-  it('plays hover only on model entry, once per edge, then resumes work without requiring pointer exit', async () => {
+  it('plays supplied hover once per edge, then resumes work without requiring pointer exit', async () => {
     const f = await mount('working');
     const animations = { hover: 'Success', working: 'Work' };
     await f.present({ animations, restAction: 'working' });
-    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.enter();
     await f.view.advanceFrames(2, .1);
     expect(f.root.position.y).toBeCloseTo(.15, 4);
-    // R3F emits out/over when crossing child meshes of the same model.
-    await f.view.fireEvent(target, 'pointerOut', { eventObject: target.instance, intersections: [{ eventObject: target.instance }] });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    // Repeated viewport entry signals do not restart active feedback.
+    await f.enter();
     await f.present({ animations, restAction: 'working' });
     await f.view.advanceFrames(1, .1);
     expect(f.root.position.y).toBeCloseTo(.225, 4);
     await act(async () => { await f.view.advanceFrames(10, .1); }); await f.view.advanceFrames(3, .1);
     expect(f.root.position.x).toBeCloseTo(.06, 4);
-    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.leave();
+    await f.enter();
     await f.view.advanceFrames(2, .1);
     expect(f.root.position.y).toBeCloseTo(.15, 4);
-    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.leave();
     await f.view.advanceFrames(3, .1);
     expect(f.root.position.x).toBeCloseTo(.06, 4);
   });
@@ -162,8 +165,7 @@ describe('PetModel bundled animation behavior', () => {
     const f = await mount('working');
     const animations = { hover: 'Work', success: 'Success', tool_error: 'Success', working: 'Work', idle: 'Idle' };
     await f.present({ animations, restAction: 'working' });
-    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.enter();
     await f.view.advanceFrames(3, .1);
     await f.switchMotion('success');
     await f.present({ animations, replay: 'hover-old-result', restAction: 'idle' });
@@ -173,10 +175,10 @@ describe('PetModel bundled animation behavior', () => {
     expect(f.root.position.x).not.toBe(0); // Still local Work, not business Success.
     await act(async () => { await f.view.advanceFrames(15, .1); });
     await f.view.advanceFrames(3, .1); expect(f.root.position.y).toBeCloseTo(.225, 4);
-    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.leave();
+    await f.enter();
     await f.view.advanceFrames(3, .1);
-    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.leave();
     await f.view.advanceFrames(3, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
   });
 
@@ -184,24 +186,23 @@ describe('PetModel bundled animation behavior', () => {
     const f = await mount('working');
     const animations = { working: 'Work', hover: 'missing', idle: 'Idle' };
     await f.present({ animations }); await f.view.advanceFrames(2, .1);
-    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.enter();
     await f.view.advanceFrames(1, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
-    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
+    await f.leave();
     const mapped = { ...animations, hover: 'Success' };
     await f.present({ animations: mapped });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.enter();
     await f.view.advanceFrames(2, .1); expect(f.root.position.y).toBeCloseTo(.15, 4);
     await f.present({ animations: mapped, interactionActive: false });
     await f.view.advanceFrames(3, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
     await f.present({ animations: mapped }); await f.reduce(true);
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.enter();
     await f.view.advanceFrames(3, .1); expect(f.root.position.y).not.toBeCloseTo(.225, 4);
     await f.reduce(false); await f.view.advanceFrames(3, .1);
     expect(f.root.position.x).toBeCloseTo(.06, 4);
     const still = await mount('working', 140, []);
     await still.present({ animations: mapped });
-    await still.view.fireEvent(still.view.scene.findByProps({ name: 'pet-pointer-target' }), 'pointerOver', { stopPropagation() {} });
+    await still.enter();
     await still.view.advanceFrames(3, .1); expect(still.root.position.toArray()).toEqual([0, 0, 0]);
   });
 
@@ -209,12 +210,11 @@ describe('PetModel bundled animation behavior', () => {
     const f = await mount('working');
     const animations = { working: 'Work', dragging: 'Work', hover: 'Success', success: 'Success' };
     await f.present({ animations });
-    const target = f.view.scene.findByProps({ name: 'pet-pointer-target' });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.enter();
     await f.view.advanceFrames(2, .1); expect(f.root.position.y).toBeCloseTo(.15, 4);
     await f.present({ animations, dragDirection: 'right' });
-    await f.view.fireEvent(target, 'pointerOut', { intersections: [] });
-    await f.view.fireEvent(target, 'pointerOver', { stopPropagation() {} });
+    await f.leave();
+    await f.enter();
     await f.switchMotion('success');
     await f.present({ animations, dragDirection: 'left', replay: 'hover-drag-result' });
     await f.view.advanceFrames(3, .1); expect(f.root.position.x).toBeCloseTo(.06, 4);
@@ -284,8 +284,8 @@ describe('PetModel bundled animation behavior', () => {
     expect(staticPet.root.position.toArray()).toEqual([0, 0, 0]);
     expect(staticPet.state.scene.getObjectByName('pet-pointer-target')!.rotation.y).toBeCloseTo(-Math.PI / 18);
   });
-  it('raycasts the real GLB instead of its transparent canvas corners and clears hover on teardown', async () => {
-    const { view, state, hover } = await mount();
+  it('keeps actual model geometry without a duplicate desktop raycast hover path', async () => {
+    const { view, state } = await mount();
     await view.advanceFrames(2, .016);
     state.scene.updateMatrixWorld(true); state.camera.updateMatrixWorld();
     const ray = new Raycaster();
@@ -294,12 +294,8 @@ describe('PetModel bundled animation behavior', () => {
     ray.setFromCamera(new Vector2(.99, .99), state.camera);
     expect(ray.intersectObjects(state.scene.children, true)).toHaveLength(0);
     const target = view.scene.findByProps({ name: 'pet-pointer-target' });
-    await view.fireEvent(target, 'pointerOver', { stopPropagation: vi.fn() });
-    expect(hover).toHaveBeenLastCalledWith(true);
-    await view.fireEvent(target, 'pointerOut', { intersections: [] });
-    expect(hover).toHaveBeenLastCalledWith(false);
-    await view.unmount(); mounted.splice(mounted.indexOf(view), 1);
-    expect(hover).toHaveBeenLastCalledWith(false);
+    expect(target.props.onPointerOver).toBeUndefined();
+    expect(target.props.onPointerOut).toBeUndefined();
   });
 
   it.each([

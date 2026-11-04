@@ -8,7 +8,7 @@ export async function inspectCodexInstallation(entryPath: string, budget = new R
   const executable = await resolveScannedExecutable(entryPath, budget);
   if (!executable) return null;
   const candidate: Omit<CodexInstallation, 'id'> = { entryPath, executable, kind: 'unknown', version: null, compatibility: 'unverified' };
-  // Same layout guard as explicit selection; do not confuse the daemon with the CLI.
+  // Same layout guard as connection preparation; do not confuse the daemon with the CLI.
   if (codexExecutableLayout(executable) === 'standalone') return { ...candidate, kind: 'standalone', compatibility: 'verified' };
   if (/\/packages\/standalone\/releases\//.test(executable)) candidate.kind = 'standalone';
   if (/^\/(?:opt\/homebrew|usr\/local)\/(?:Cellar|Caskroom)\/codex\//.test(executable)) candidate.kind = 'homebrew';

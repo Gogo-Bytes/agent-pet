@@ -5,6 +5,7 @@ import type { Rect } from '../../../shared/overlay-layout.js';
 import type { PetStore } from '../../app/bridge/pet-store.js';
 import { rectStyle } from '../../shared/rect-style.js';
 import { useWindowGesture } from '../../shared/use-window-gesture.js';
+import { usePetInteraction } from '../../shared/usePetInteraction.js';
 import { projectPetPresentation, type PetAnimations } from '@agent-pet/pet-runtime';
 import styles from './PetCanvas.module.css';
 import { PreferenceRenderLoop } from '../../shared/PreferenceRenderLoop.js';
@@ -22,8 +23,8 @@ class PetErrorBoundary extends Component<{ children: ReactNode; onNotice: (messa
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
-  visible: boolean; store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void; onHover?: (hovered: boolean) => void;
+export function PetCanvas({ store, rect, onNotice, visible }: {
+  visible: boolean; store: PetStore; rect: Rect | undefined; onNotice: (message: string) => void;
 }) {
   const { sessions, preferences, preferencesReady } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const presentation = projectPetPresentation(sessions);
@@ -43,10 +44,14 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
     return () => { active = false; setAsset(current => { if (current) URL.revokeObjectURL(current.url); return null; }); };
   }, [assetId, store.bridge]);
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
+  const interaction = usePetInteraction(visible && !drag.direction && !preferences.reduced);
+  // A replacement model must not inherit feedback started on the previous instance.
+  useEffect(() => interaction.finish(), [asset?.url, interaction.finish]);
   // Canvas adds its own sizing divs. Keep Main's absolute pixel region and the
   // native pointer handlers on this outer surface, never on a Three mesh.
   return <div className={`pet-canvas ${styles.surface}${drag.active ? ` pet-canvas--dragging ${styles.dragging}` : ''}`}
-    style={rectStyle(rect)} {...drag.handlers}>
+    style={rectStyle(rect)} {...drag.handlers}
+    onPointerEnter={() => interaction.hover(true)} onPointerLeave={() => interaction.hover(false)}>
     <PetErrorBoundary onNotice={onNotice}>
       <Canvas flat dpr={preferences.resolution / 100} gl={{ alpha: true, antialias: true }}
         camera={{ fov: 35, position: [0, 0, 5] }}
@@ -56,7 +61,7 @@ export function PetCanvas({ store, rect, onNotice, onHover, visible }: {
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel connectionCue={preferencesReady && (!assetId || assetId === 'starter' || asset?.id === assetId) ? sessions.connectionCue : undefined} key={asset?.url ?? 'starter'} interactionActive={visible} dragDirection={drag.direction} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} {...(onHover ? { onHover } : {})} />
+            <PetModel connectionCue={preferencesReady && (!assetId || assetId === 'starter' || asset?.id === assetId) ? sessions.connectionCue : undefined} key={asset?.url ?? 'starter'} interaction={interaction.feedback} onInteractionFinished={interaction.finish} dragDirection={drag.direction} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} />
           </Bounds>
         </Suspense>
       </Canvas>

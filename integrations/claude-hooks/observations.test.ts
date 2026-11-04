@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { applyObservation, createSessionState, acknowledgeBubble, type SessionObservation } from '../../packages/domain/src/index.js';
 import { projectPetPresentation } from '../../packages/pet-runtime/src/presentation.js';
 import { createClaudeObservations, CLAUDE_FEEDBACK_MS } from './observations.js';
-import type { ClaudeHookFact } from './normalize.js';
+import { normalizeClaudeHook, type ClaudeHookFact } from './normalize.js';
+import { createApplication } from '../../packages/application/src/index.js';
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
@@ -107,4 +108,92 @@ it('bounds prompt and tool tombstones without evicting old identities and accept
   for (let i = 0; i < 1025; i++) g.tool('tool-succeeded', 'reading', 'private-prompt', `tool-${i}`);
   const count = g.observations.length; g.tool('tool-succeeded', 'reading', 'private-prompt', 'tool-0');
   expect(g.observations).toHaveLength(count); expect(g.presentation().action).toBe('idle');
+});
+
+function lifecycleFixture() {
+  const app = createApplication([]), observations: SessionObservation[] = [];
+  const mapper = createClaudeObservations({ name: () => 'Claude fixture', publish: observation => {
+    observations.push(observation); app.observe(observation);
+  } });
+  const send = (hook_event_name: string, runId = 'run', session_id = 'private-session') => {
+    const result = normalizeClaudeHook(JSON.stringify({ hook_event_name, session_id, source: 'startup',
+      prompt_id: 'private-prompt', tool_use_id: 'private-tool', tool_name: 'Read', prompt: 'discarded body' }));
+    if (result.status !== 'accepted') throw Error('invalid test hook');
+    mapper.accept({ runId, fact: result.fact });
+  };
+  const start = (runId = 'run') => { send('SessionStart', runId); send('UserPromptSubmit', runId); };
+  return { app, mapper, observations, send, start, presentation: () => projectPetPresentation(app.snapshot()) };
+}
+
+it.each(['stop', 'retire'] as const)('owns the feedback timer before an Application subscriber reenters %s', operation => {
+  const f = lifecycleFixture(); f.start();
+  f.app.subscribe(state => {
+    if (Object.values(state.sessions).some(session => session.facts?.recentActivity)) f.mapper[operation]('run');
+  });
+  f.send('PostToolUse');
+  expect(vi.getTimerCount()).toBe(0);
+  expect(f.observations.at(-1)).toMatchObject({ connected: false, facts: { activities: [], waitingForInput: false } });
+  expect(f.presentation().action).toBe('idle'); expect(f.app.snapshot().bubbles).toEqual([]);
+  const count = f.observations.length; vi.advanceTimersByTime(CLAUDE_FEEDBACK_MS);
+  expect(f.observations).toHaveLength(count); f.mapper.stop();
+});
+
+it.each(['stop', 'retire'] as const)('does not publish a replacement after its disconnect subscriber reenters %s', operation => {
+  const f = lifecycleFixture(); f.start(); f.send('PostToolUse');
+  f.app.subscribe(state => {
+    if (Object.values(state.sessions).every(session => !session.connected)) f.mapper[operation]('run');
+  });
+  f.send('SessionStart', 'run', 'replacement');
+  expect(Object.values(f.app.snapshot().sessions).map(session => session.connected)).toEqual([false]);
+  expect(f.observations.at(-1)?.connected).toBe(false);
+  expect(vi.getTimerCount()).toBe(0); expect(f.presentation().action).toBe('idle'); f.mapper.stop();
+});
+
+it('does not overwrite a replacement admitted by a reentrant subscriber', () => {
+  const f = lifecycleFixture(); f.start();
+  let reentered = false;
+  f.app.subscribe(state => {
+    if (!reentered && Object.values(state.sessions).every(session => !session.connected)) {
+      reentered = true; f.send('SessionStart', 'run', 'reentrant-session');
+    }
+  });
+  f.send('SessionStart', 'run', 'outer-session');
+  expect(Object.values(f.app.snapshot().sessions).map(session => session.connected)).toEqual([false, true]);
+  f.send('UserPromptSubmit', 'run', 'reentrant-session'); f.send('PostToolUse', 'run', 'reentrant-session');
+  expect(f.presentation().action).toBe('reading'); f.mapper.stop(); expect(vi.getTimerCount()).toBe(0);
+});
+
+it('cleans every live run even when an Application subscriber throws during stop', () => {
+  const f = lifecycleFixture();
+  for (const run of ['first', 'second']) { f.start(run); f.send('PostToolUse', run); }
+  expect(vi.getTimerCount()).toBe(2);
+  f.app.subscribe(() => { throw Error('private subscriber detail'); });
+  expect(() => f.mapper.stop()).not.toThrow();
+  expect(f.observations.filter(observation => observation.connected === false)).toHaveLength(2);
+  expect(Object.values(f.app.snapshot().sessions).every(session => !session.connected)).toBe(true);
+  expect(vi.getTimerCount()).toBe(0); expect(f.presentation().action).toBe('idle');
+  const count = f.observations.length; f.mapper.stop(); f.send('SessionStart', 'late');
+  expect(f.observations).toHaveLength(count);
+});
+
+it('isolates a throwing feedback-expiry subscriber and still clears recent presentation', () => {
+  const f = lifecycleFixture(); f.start(); f.send('PostToolUse');
+  f.app.subscribe(() => { throw Error('private subscriber detail'); });
+  expect(() => vi.advanceTimersByTime(CLAUDE_FEEDBACK_MS)).not.toThrow();
+  expect(vi.getTimerCount()).toBe(0); expect(f.presentation().action).toBe('idle');
+  expect(f.app.snapshot().bubbles).toEqual([]); expect(() => f.mapper.retire('run')).not.toThrow();
+  expect(f.observations.at(-1)?.connected).toBe(false);
+});
+
+it('consumes rejected publication promises without retaining cleanup timers', async () => {
+  const published: SessionObservation[] = [];
+  const mapper = createClaudeObservations({ name: () => 'Claude fixture', publish: async observation => {
+    published.push(observation); throw Error('private async consumer detail');
+  } });
+  mapper.accept({ runId: 'run', fact: { kind: 'session-started', providerSessionId: 'native', source: 'startup' } });
+  mapper.accept({ runId: 'run', fact: { kind: 'turn-submitted', providerSessionId: 'native', promptId: 'prompt' } });
+  mapper.accept({ runId: 'run', fact: { kind: 'tool-succeeded', providerSessionId: 'native', promptId: 'prompt', toolCallId: 'tool', activity: 'reading' } });
+  mapper.stop(); await vi.advanceTimersByTimeAsync(CLAUDE_FEEDBACK_MS);
+  expect(published).toHaveLength(4); expect(published.at(-1)?.connected).toBe(false);
+  expect(vi.getTimerCount()).toBe(0);
 });

@@ -64,6 +64,13 @@ describe('management preload capability boundary', () => {
       ['management:location-authorize', '/tmp/owned'], ['management:location-inspect', '/tmp/owned', 'pi'],
     ]);
     native.invoke.mockClear();
+    await api.configurations.prepareDetectedCodex('scan-id', 'request-id');
+    await api.configurations.prepareDetectedCodex('scan-id', 'request-id', 'configuration-id');
+    expect(native.invoke.mock.calls).toEqual([
+      ['management:configurations-prepare-detected-codex', 'scan-id', 'request-id'],
+      ['management:configurations-prepare-detected-codex', 'scan-id', 'request-id', 'configuration-id'],
+    ]);
+    native.invoke.mockClear();
     await api.windowAction('minimize'); await api.windowAction('toggle-maximize'); await api.windowAction('close');
     expect(native.invoke.mock.calls).toEqual([
       ['management:window-action', 'minimize'], ['management:window-action', 'toggle-maximize'], ['management:window-action', 'close'],

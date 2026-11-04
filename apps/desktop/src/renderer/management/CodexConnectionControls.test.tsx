@@ -78,3 +78,50 @@ it('does not send stale cancellation for a configured record after successful re
   expect(test.bridge.configurations.remove).toHaveBeenCalledExactlyOnceWith('codex-one');
   expect(test.bridge.configurations.cancel).not.toHaveBeenCalled();
 });
+it('prepares an existing unconfigured Codex record from the scan rather than discarding its installation', async () => {
+  const test = await mount();
+  test.bridge.configurations.detectCodex.mockResolvedValueOnce({
+    installations: [{ id: 'codex-found', entryPath: '/synthetic/codex', executable: '/synthetic/codex', kind: 'standalone', version: null, compatibility: 'verified' }],
+    targetPath: test.configs().records[0]!.targetPath, scan: 'complete', notice: 'none',
+  });
+  await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+  await test.user.click(within(screen.getByRole('article', { name: 'Codex CLI 默认配置' })).getByRole('button', { name: /一键配置/ }));
+  await test.user.click(screen.getByRole('button', { name: /检查并预览/ }));
+  expect(test.bridge.configurations.prepareDetectedCodex).toHaveBeenCalledExactlyOnceWith('codex-found', expect.any(String), 'codex-one');
+  expect(test.bridge.configurations.preview).not.toHaveBeenCalled();
+});
+it('rescans for the original custom record, shows its exact read scope and reaches waiting after confirmation', async () => {
+  const test = await mount({ notice: 'rescan-required' });
+  const target = test.configs().records[0]!.targetPath;
+  test.bridge.configurations.detectCodex.mockResolvedValueOnce({
+    installations: [{ id: 'codex-custom', entryPath: '/synthetic/codex', executable: '/synthetic/codex', kind: 'standalone', version: null, compatibility: 'verified' }],
+    targetPath: '/different-default/.codex', scan: 'complete', notice: 'none',
+  });
+  test.bridge.configurations.prepareDetectedCodex.mockImplementationOnce(async () => ({
+    state: test.update({ preview: { ...preview, path: `${target}/hooks.json` }, notice: 'none' }), configurationId: 'codex-one',
+  }));
+  await test.user.click(screen.getByRole('button', { name: '重新扫描' }));
+  const result = screen.getByRole('article', { name: 'Codex CLI 默认配置' });
+  expect(result.textContent).toContain(target); expect(result.textContent).not.toContain('/different-default');
+  await test.user.click(within(result).getByRole('button', { name: /一键配置/ }));
+  expect(screen.getByRole('dialog', { name: '连接 Codex CLI' }).textContent).toContain(target);
+  await test.user.click(screen.getByRole('button', { name: /检查并预览/ }));
+  expect(test.bridge.configurations.prepareDetectedCodex).toHaveBeenCalledExactlyOnceWith('codex-custom', expect.any(String), 'codex-one');
+  expect(test.bridge.configurations.preview).not.toHaveBeenCalled();
+  expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
+  expect(screen.getByRole('dialog').textContent).toContain(`${target}/hooks.json`);
+  await test.user.click(screen.getByRole('button', { name: '确认并设置连接' }));
+  expect(screen.getByRole('heading', { name: '等待活动' })).toBeTruthy();
+  expect(screen.getByText(/\/hooks/)).toBeTruthy();
+});
+it('keeps already configured Codex scan results as view-only without a second preparation', async () => {
+  const test = await mount({ configured: true, canConfigure: false, status: 'waiting' });
+  test.bridge.configurations.detectCodex.mockResolvedValueOnce({
+    installations: [{ id: 'codex-found', entryPath: '/synthetic/codex', executable: '/synthetic/codex', kind: 'standalone', version: null, compatibility: 'verified' }],
+    targetPath: test.configs().records[0]!.targetPath, scan: 'complete', notice: 'none',
+  });
+  await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
+  await test.user.click(within(screen.getByRole('article', { name: 'Codex CLI 默认配置' })).getByRole('button', { name: /查看配置/ }));
+  expect(screen.getByRole('heading', { name: '等待活动' })).toBeTruthy();
+  expect(test.bridge.configurations.prepareDetectedCodex).not.toHaveBeenCalled();
+});

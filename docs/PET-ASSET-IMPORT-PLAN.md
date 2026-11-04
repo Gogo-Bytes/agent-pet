@@ -1,8 +1,21 @@
 # 宠物资产导入实施计划与进度
 
-**状态：P1 资产注册表实施中；导入 UI 尚未接入。**
-**范围：单用户、本机 macOS、Electron/Chromium；暂不依赖 Agent 新接入或真实任务验收。**
-**当前执行入口：[MVP 执行计划](MVP-EXECUTION-PLAN.md)。**
+本文保留导入契约与早期实施记录；当前任务和验收统一见 [MVP 执行计划](MVP-EXECUTION-PLAN.md)，作者交付格式唯一入口为[作者指南](PET-ARTIST-GUIDE.md)。导入 UI、注册表、动态加载、收藏与绑定均已实现，不再按下方旧 checklist 重建。
+
+## 当前导入契约
+
+- 当前文件夹根目录固定 `pet.json` + `pet.glb`，头像可选。应用使用 manifest.id（受 `PET_ASSET_ID` 校验）作为资产身份，不随机改写作者 ID；重复身份拒绝，不自动覆盖或升级。starter 保留内置身份。所有22项映射可省略/null，无动画有效。
+- Main 原生选择文件夹后有界读取 manifest/model/声明头像，仅最近一次私有快照持有精确字节。Renderer 得到脱敏预览与一次性 token，没有源路径或任意文件读取权限。取消、新选择、窗口生命周期和迟到结果使旧预览失效；确认消费该快照，不重新信任源文件。
+- 安装排他创建私有目录与 wx/0600 文件，成功保存 registry 才发布资产；已有目录（含空目录）、未知文件、部分写入或不确定残留均保留，不递归删除或自动接管。该保护不是任意祖先竞争/同UID攻击的完整隔离保证。
+- 文件/JSON/图像/图结构/几何/动画及累计切片预算分别生效；GLTFLoader 解释模型与动画，不自写完整 glTF 语义引擎。模型预算通过不等于解码、GPU或运动质量全部安全。
+- 注册表与绑定分别持久化。预览选择不创建 Agent 绑定；每个在线已绑定配置用受控 IPC 的已注册字节建立 Blob URL 和实例，失败保留控制界面及已有回退。删除要求先解绑，失败保留记录/数据，不静默重绑。
+- 当前共享类型是 metadata-only `PetAsset` 和 `PetImportPreview`，不是下方早期带路径提案。恢复/导出/自动清理并未因导入实现而得到完整承诺。长期 GPU/缓存/多窗口仍按 MVP 验收，不重复维护本页活跃表。
+
+实现与验证入口：[shared types](../apps/desktop/src/shared/pet-assets.ts)、[snapshot importer](../apps/desktop/src/main/pet-assets-import.ts)、[import regressions](../apps/desktop/src/main/pet-assets-import.test.ts)、[registry](../apps/desktop/src/main/pet-assets-store.ts)、[GLB guard](../apps/desktop/src/main/pet-glb.ts)、[import dialog](../apps/desktop/src/renderer/management/PetImportControl.tsx)。
+
+## 历史实施计划
+
+以下第1–8节保留最初阶段快照、提案字段/IPC名和当时复验缺口，**不是当前数据格式、第二进度入口或新增功能承诺**。旧23项包含后来已删除的sleeping，目录/类型以源码为准；旧“无registry／仅starter／导入未接UI”已被上述实现覆盖。未经真实证据确认的历史未测项不自动勾选。
 
 ## 1. 目标
 
@@ -230,4 +243,4 @@ pet-assets:subscribe
 | 2026-10-20 | P2 | 已接入 Main IPC、目录选择、导入预览、确认安装和宠物收藏 UI；动态模型切换仍待完成 |
 | 2026-10-20 | P3 | 管理页预览已接入导入 GLB Blob URL、manifest 动作映射和头像 Blob URL；首页多 Agent 资产绑定仍待接入 |
 
-每完成一个可以独立验证、独立回滚的阶段，更新本表、运行该阶段验证，并创建单一目的 Git commit。未完成阶段不提前标记为通过。
+本表冻结为历史记录；后续阶段只更新 MVP 或已获授权采用的 Issue，不再在本页复制动态状态。原失败和未验范围保留，未完成项不得仅因文档整理标为通过。

@@ -2,7 +2,7 @@
 
 > 用户已确认删除无事件来源、无行为实现的 `sleeping`，仅保留 `idle` 空闲。公共类型、目录和模板同步移除；旧包该字段按未知可选映射忽略。下文原23项取样中的休眠行仅为删除依据，不再是待决策或待实施项。
 
-> 当前更新：拖动 `84edb31`、hover/selected `4852c7b`、connected `3a170d1` 已提交；connected 聚焦126项、全量1523 passed/1 skipped/133 files、typecheck/build通过。本轮 Claude output_limited 核对因精确原生语义证据不足停止，未实施，generic error 保持。详见下节；仍非原生/GPU视觉验收，格温接缝及其他未接项保持。
+> 当前能力参考：22项目录与 Provider 来源分开；动态任务统一见 [MVP计划](MVP-EXECUTION-PLAN.md)。桌面外框hover修复 `9078075` 已获用户确认并由 `37ac506` 记录；Idle/Run_Haste/Run01 修订已获对应素材验收，其他素材制作暂停。连接/首页完整矩阵及长期GPU不由这些确认代替。细类仍按[来源证据](PROVIDER-ANIMATION-EVIDENCE.md)阻塞；[in/loop/out](PET-ANIMATION-TRANSITIONS.md)是已确认待实施设计，当前映射仍为string/null。
 
 ## 结论
 
@@ -42,7 +42,7 @@
 
 以下简写均是仓库相对路径；表格引用这些精确入口，避免重复长路径。
 
-- **A** `packages/pet-runtime/src/actions.ts:3-27`：23 项公开 label/key；`:43-55` 按请求→有序 fallback 查真实 clip；`:62-64` 只将直接有映射且有 clip 的 trigger 列为可试播。
+- **A** `packages/pet-runtime/src/actions.ts` 的 `petActionCatalog`：22 项公开 label/key；`:43-55` 按请求→有序 fallback 查真实 clip；`:62-64` 只将直接有映射且有 clip 的 trigger 列为可试播。
 - **P** `integrations/pi-extension/index.ts:38-50,57-62,90-104,168-271`：原生事件白名单、能力按实际事件确认、活动和 occurrence；网络重连 retry 不代表业务 retry。
 - **M** `packages/adapter-pi/src/session-mapper.ts:29-65,75-94`：seq 去重、hello 去历史 occurrence、断开清活动。
 - **C** `integrations/claude-hooks/normalize.ts:27-31,77-125`；`integrations/claude-hooks/observations.ts:26-43,70-102`：prompt/tool 身份、2 秒 recent feedback、StopFailure 错误。
@@ -88,7 +88,7 @@
 |需要关注 `attention`|无独立生产事件；waiting_input/error/success/tool_error/output_limited 的资产 fallback|**部分：回退已接，独立自动 trigger 未接** A:13-20,48-51；Q 从不直接产 attention。配置 availability='attention' 不进宠物动画|A/TL；有 attention clip、无主 clip 的 fallback，业务 once 回退 attention 应只播一次；不要无请求增加提醒轮询|
 |Agent 已连接 `connected`|P/C/X认证配置聚合离线→在线；不是单条hello/每Session|**已接** Main运行时connectionCue→每窗口snapshot/Home→共享播放器；业务/局部反馈优先，不排队，Q业务投影不改|本节双Session/部分退出/重连/重挂/恢复身份测试；缓存限当前Renderer，原生视觉待验|
 |Agent 已断开 `disconnected`|P transport disconnect、C/X 运行退出/retire；事实存在|**缺动画且产品冲突**：Q:14 过滤离线，W:96-101 立即 destroy，H:7 移除；当前没有可见载体播放 disconnected loop|TW/TP/TC/TX 验离线清理；须用户先决策可见范围，不暗加 grace period|
-|鼠标悬停时 `hover`|桌面宠物视口DOM边沿；首页每模型射线，与Provider无关|**已接并修订桌面输入** PetCanvas / 首页ScenePet → usePetInteraction → L；工具栏/resize不触发，桌面模型自移出不取消；真实热区离开仍取消|真实DOM/Fiber/GLTF/Drei回归通过；最新原生输入/用户资产视觉仍待复验|
+|鼠标悬停时 `hover`|桌面宠物视口DOM边沿；首页每模型射线，与Provider无关|**已接并修订桌面输入** PetCanvas / 首页ScenePet → usePetInteraction → L；工具栏/resize不触发，桌面模型自移出不取消；真实热区离开仍取消|真实DOM/Fiber/GLTF/Drei回归通过；用户已确认本次桌面hover正常（37ac506），不外推首页/全部输入矩阵|
 |选中宠物时 `selected`|首页模型 click / 在线宠物选择按钮，与 Provider 无关|**已接** CompanionScene 显式 selection counter → HomeScene / ScenePet → L；点击、Enter/Space同源，初始focus/缩略图不触发，桌面无选择操作|本轮DOM与R3F覆盖重复点击/取消、配置隔离、最新业务恢复；原生键盘/动画视觉待验|
 |被拖动 `dragging`|本地窗口 gesture，不是 Provider 事件|**已交付** `84edb31`，同一 dragging 映射；本轮保留拖动优先|原capture/cancel/blur/unmount及方向/业务回归保留，本轮补hover→drag→业务恢复；原生方向手感待验|
 |进入休眠时 `sleeping`|未定义是用户空闲、Agent 空闲、系统睡眠还是手动|**已删除**：原目录预留但无事件来源/实现；hidden 停绘制不等于 Agent 休眠|回归验证目录/模板无此项、旧包字段忽略、直接请求不回退到idle；不新增计时器|
@@ -101,11 +101,11 @@
 4. **fallback 已实现且应保留。** 可选全部 clip，包括 idle；未知请求/无匹配最终静态。细活动→working→idle；waiting→attention→idle；业务 once 回退 attention 仍一次；缺 transient 且当前有活动时不切 idle。结束后使用最新 restAction。不会自动生成或猜 clip 名，也不把导入资产当 starter 映射。
 5. **试播与自动触发完全分开。** `PetsView.tsx:45,78-82` 展示可用映射；`ManagementApp.tsx:131` 每次手动增加数字 replay。即使 connected/hover 可在这里播放，也不证明真实监听已接。首页显式选择和桌面视口进入现已接动画，但收藏选择仍不代表场景命中。
 6. **在线/任务状态不应混淆。** Claude/Codex unknown 渲染 idle 是视觉默认，不是观测到任务闲置；旧 Claude presence-only 首页静态与桌面 idle 可统一为明确的未知状态策略，但不能引入假工作事件。waiting 状态必须有受支持 facts 配对清除。
-7. **Gwen 循环卡顿独立未解决。** 既有“尾部闭合约0.25秒、首尾端点不连续”仅是待处理线索，本审计没有读取用户模型或证明根因/修复；触发接通不解决 clip 自身接缝。另开现有 clip 播放验证，不做骨骼、IK、retargeting、生成动画或新框架。
+7. **素材验收与触发接通分开。** Gwen 的 Idle、Run_Haste、Run01 已通过独立离线 Blender 修订交付并获用户确认，失败候选及许可边界保留在[诊断记录](GWEN-LOOP-DIAGNOSIS.md)。其他片段和离线拼接暂停；不将这三个片段的验收扩展成全部动画/自动触发通过，也不把制作能力放入应用。
 
 ## 最小分阶段实施顺序
 
-实施按下列独立阶段推进；拖拽阶段已由 Main 审查交付，第2项上一阶段已完成工程接线（原生视觉待验），第3项connected本轮已完成工程接线（见上节），细分业务事实核对本轮已到上述证据停点，不自动进入后续产品决策项。以下保留原顺序与验收要求。
+以下保留首次审计的分阶段顺序与验收要求，不再作为独立任务清单。拖动、hover/selected、connected已接线；桌面hover后续修复获用户确认，其他范围仍单列。细分类保持来源阻塞；当前优先级以MVP及后续真实迁移的Issue为准。
 
 1. **先收口拖拽独立阶段。** 审查最终 diff，只复用当前 gesture 和 L；跑 writer 聚焦测试/typecheck/build，再做原生拖动。关注完成/工具错误在拖拽中到达、松手恢复最新 activity、无 dragging clip、reduced。方向变化不应不断 reset clip。不把中间红/绿测试误报为完成。
 2. **补 UI 有真实来源的 hover / selected。** 范围：App/PetCanvas/PetModel、HomeScene/CompanionScene/ScenePet、L 的既有 request/replay/rest 参数及对应测试。用真实命中入边沿、明确 selection 边沿驱动局部 cue；键盘与鼠标一致，退出/blur/卸载清理。不把工具栏容器进入算命中模型；不影响业务 state/未读/IPC。先明确和拖拽、业务 once 的覆盖规则，优先最小 latest-wins，而非新框架。
@@ -114,7 +114,7 @@
 5. **sleeping 已删除；disconnected / 独立 attention 保持当前边界。** 不为空闲增加休眠计时器。disconnected 要在“保持离线立即移除”与“特定可见处展示断开”中明确产品范围；前者意味着桌面 disconnected 只能手动预览，不应宣称自动可见。**不默认为延迟销毁窗口。** attention 若仅保留 fallback，直接记录无需独立事件；若要未读持续关注，需用户确认其与 success/error once、确认和多 Session 的关系。
 6. **集中真实验收，与 Gwen 接缝分开。** 各 Provider 用允许的已有原生事件、绑定已有 clips：事件事实→每配置投影→桌面/Home实际播放→退出/下一轮/重连；包括无映射/无idle/静态资产、切页隐藏、reduced、快速连续事件及长clip。先复用授权范围，新增 Agent/模型/用户文件操作另取精确授权。每阶段测试+typecheck+desktop build 通过仅是工程证据，不等于原生桌面动画验收。
 
-需产品决定的真正阻塞：disconnected 可见性与立即移除规则；是否要求每个短事件完整播完（当前 latest-wins），以及独立 attention 是否确实需要。其余清晰接线/回归无需人为增加审批仪式。
+当前保持离线立即移除、latest-wins、attention仅回退，均不是等待新增功能的隐含承诺；只有用户要求改变这些边界时才重新决策。明确接线/回归无需人为增加审批仪式。
 
 未做：日常配置/用户模型读取、原生/GPU视觉验收、dev 重启、打包或推送。
-风险：23 项不能宣称全自动支持；latest-wins不保证快速事件完整播放，Gwen 循环接缝仍未解决。
+风险：22 项不能宣称全自动支持；latest-wins不保证快速事件完整播放，未验收素材/首页交互/长期GPU仍不可外推通过。

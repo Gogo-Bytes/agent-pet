@@ -1,19 +1,19 @@
 # Agent Pet Architecture Design
 
-> Agent 接入章节的早期 App Server / JSON-RPC 选型已被 [已运行 Session 接入计划](AGENT-INTEGRATION-PLAN.md) 修正。当前实现以被动观测为边界，不启动或恢复 Agent 来冒充监听已有会话。本文其余部分仍为架构设计，不能作为实现完成证明。
+> 当前边界与实现入口；进度和验收统一见 [MVP 计划](MVP-EXECUTION-PLAN.md)。早期 App Server / pi RPC 宿主方案未采用，保留在[接入历史](AGENT-INTEGRATION-PLAN.md)。不得启动或恢复 Agent 来冒充监听已有会话。
 
 ## 1. Architectural intent and product boundaries
 
-Agent Pet is a local, read-only desktop projection of configured coding-agent sessions. The business invariant is **one Pet, many independent Sessions, at most one visible bubble per Session**. A restarted agent run is a new Session; sessions are neither aggregated nor deduplicated. The product surfaces only `working`, `completed-unread`, and `error-unread`.
+Agent Pet is a local, read-only desktop projection of configured coding-agent sessions. The business invariant is **one Pet per online, explicitly bound configuration, many independent Sessions per configuration, at most one visible bubble per Session**. A restarted agent run is a new Session; sessions are neither aggregated nor deduplicated. The product surfaces only `working`, `completed-unread`, and `error-unread`.
 
 The architecture therefore separates:
 
 - **Domain:** session identity, lifecycle, unread/acknowledgement rules, display-name fallback, bubble projection, Pet/asset capabilities, and explicit Open Session outcomes.
 - **Application orchestration:** consuming adapter facts, applying domain transitions, coordinating acknowledgement and open requests, and publishing renderer-safe snapshots.
 - **Infrastructure:** Electron process/window management, adapter process protocols, filesystem/config persistence, OS activation, GLB parsing/validation, and logging.
-- **Presentation:** one 3D Pet, independently visible bubbles, drag behavior, controls, and user-facing capability/error states.
+- **Presentation:** configuration-scoped 3D Pets, independently visible bubbles, drag behavior, controls, and user-facing capability/error states.
 
-Excluded from every layer: agent approval/control/send/pause/steer actions, multiple Pets, cloud sync, arbitrary process discovery, token progress, remote model downloads, VRM/FBX, and a store/community marketplace.
+Excluded from every layer: agent approval/control/send/pause/steer actions, cloud sync, arbitrary process discovery, token progress, remote model downloads, VRM/FBX, and a store/community marketplace.
 
 ## 2. Bounded contexts and domain model
 
@@ -35,13 +35,15 @@ The display name is calculated only from Agent-provided name, then project name,
 
 ### Pet and Asset context
 
-There is exactly one Pet instance. It owns a selected Pet asset and a collection of bubble projections; it does not own Sessions. Pet and bubble visibility are separate preferences. Pet movement is a presentation/window concern, but the invariant that bubbles move with the Pet is enforced by rendering one scene/window coordinate system rather than separate windows.
+Each online, explicitly bound configuration has its own Pet on the desktop and management home, including configurations of the same Provider. No binding means no implicit starter Pet; offline/unbinding immediately removes the instance. `desktop-pets.ts` owns one native overlay per configuration and scopes snapshots, assets and commands to its sender; `home-projection.ts` uses the same visibility predicate. Each Pet shares its window coordinate system with its own bubbles. Pet and bubble visibility remain separate preferences; collection audition is not an online desktop instance.
 
-A Pet asset is a validated local GLB plus optional animation mappings. The confirmed 2026-10-15 contract makes every action optional, including `idle`; a valid model with no animation must render its default static pose. A missing mapping or missing referenced clip disables that action, never the Pet. Semantic fallbacks are deterministic, must not invent a contradictory outcome, and terminate at the default static pose. Implemented in pet-runtime’s versioned action catalog/resolver and the shared R3F player: manifest mappings and Idle are optional, missing clips restore the default pose, and one-shot actions return to Idle/static. The local pi fine-event integration and shared presentation policy are implemented and isolated-tested; real pi loading of the updated extension is not accepted yet. Artist templates are generated from the catalog; see PET-ARTIST-GUIDE.md.
+A Pet asset is a validated local GLB plus optional animation mappings. The confirmed 2026-10-15 contract makes every action optional, including `idle`; a valid model with no animation must render its default static pose. A missing mapping or missing referenced clip disables that action, never the Pet. Semantic fallbacks are deterministic, must not invent a contradictory outcome, and terminate at the default static pose. Implemented in pet-runtime’s versioned action catalog/resolver and the shared R3F player: manifest mappings and Idle are optional, missing clips follow the shared fallback policy, and one-shot actions restore the latest applicable base state/Idle/static. Fine-event support and real acceptance vary by Provider; the current implementation/evidence boundary is recorded in the MVP plan, not inferred from catalog membership. Artist templates are generated from the catalog; see [PET-ARTIST-GUIDE.md](PET-ARTIST-GUIDE.md).
 
 Agent observation capabilities, the product's versioned Pet action catalog, and an asset's actual animation mappings are separate. Each Adapter translates native events into bounded normalized facts and reports only observation capabilities verified for its active version/mode/connection (pi currently starts unknown and confirms each fine capability from its observed native hook, without guessing a runtime version); unsupported or unknown is distinct from an observed idle state. Application owns fact ordering, Session/work identity, current state and occurrence identity. A shared presentation policy selects an action intent; a shared asset resolver selects an existing clip or a static pose. Neither scene players nor artist files branch on Provider types. The full artist template is generated from the action catalog; optional entries may be absent or null, and GLB clip names may differ from semantic action IDs. Catalog inclusion does not imply an implemented Provider signal. Expanded metadata remains bounded and excludes raw messages, arguments, outputs, credentials and thinking text. The local receiver clears only current activities on loss; reconnect baselines preserve unread results already held in the Application without restoring historical notifications into a fresh process. The shared player deduplicates bounded business cue IDs across scene remounts; numeric explicit audition remains replayable. See PET-ACTIONS-ACCEPTANCE.md for exact coverage and managed limitations.
 
 The author-facing animation contract is only trigger → exact existing GLB clip name (`PetAnimations`); the catalog determines loop/once playback. No author/UI/API trim, blend-duration, speed, loop-range or per-bone controls are exposed. Artists supply naturally looping clips with continuous seam pose and motion velocity/direction, without artificial hold/slow closure tails. Import and playback do not repair source motion. Resource validation is not aesthetic validation; unchanged fallback/static/one-shot restoration rules still apply. Author delivery checks are in [PET-ARTIST-GUIDE.md](PET-ARTIST-GUIDE.md#循环动画交付要求).
+
+The confirmed [in/loop/out design](PET-ANIMATION-TRANSITIONS.md) will extend only idle/working/dragging mappings. It is not implemented: current `PetAnimations` still accepts only exact clip strings or null. Do not publish the future staged mapping as an accepted manifest or change fallback on the strength of the design alone.
 
 ### Open Session capability context
 
@@ -49,32 +51,30 @@ An Adapter may offer an Open Session capability, but opening is not a domain gua
 
 ## 3. Monorepo boundaries
 
-A proposed package layout is:
+Current source boundaries (not a proposed package migration):
 
 ```text
-apps/desktop/
-  electron-main/       # privileged main process and window lifecycle
-  preload/              # narrow, typed renderer bridge
-  renderer/             # React/UI + Three.js scene
-packages/domain/        # Session, Bubble, Pet and command/reducer rules
-packages/contracts/     # versioned adapter event and IPC schemas
-packages/application/   # observation orchestration and projection snapshots
-packages/adapter-core/  # adapter lifecycle, reconnect, redaction, supervision ports
-packages/adapter-codex/ # Codex App Server stdio/JSONL adapter
-packages/adapter-pi/    # pi JSON/RPC adapter
-packages/adapter-claude/ # Claude Hooks receiver/authorized observation adapter
-packages/pet-runtime/    # GLB loader, validator integration, animation mapping
-packages/config/        # validated local preferences and migration
-packages/test-fixtures/ # recorded/sanitized protocol fixtures and asset fixtures
+apps/desktop/src/main/     # windows, configuration controllers, private files/import
+apps/desktop/src/preload/  # narrow typed bridges
+apps/desktop/src/renderer/ # React/R3F scenes and shared player
+apps/desktop/src/shared/   # desktop IPC/configuration/asset types
+packages/domain/          # Session facts, unread lifecycle and projection rules
+packages/application/     # observations, acknowledgement and open orchestration
+packages/adapter-core/    # Adapter ports and identity
+packages/adapter-pi/      # passive local bridge; managed factory remains gated
+packages/pet-runtime/     # manifest, trigger catalog, fallback and presentation
+integrations/pi-extension/ # passive native extension
+integrations/claude-hooks/ # normalized hooks and OS-bound observation
+integrations/codex-hooks/  # normalized hooks and OS-bound observation
 ```
 
-Package dependency direction is inward: provider adapters depend on adapter-core/contracts; application depends on domain/contracts and ports; Electron shell depends on application/config and owns infrastructure implementations; renderer depends on application client contracts and pet-runtime, never on Node, filesystem, subprocess, or provider packages. Domain has no Electron, Three.js, OS, or file-system dependency. Contracts are versioned and schemas are runtime-validated at every untrusted boundary.
+Dependency direction is inward: provider integrations publish adapter-core/domain facts; application owns domain orchestration; Electron Main composes integrations and filesystem/window infrastructure; renderer consumes safe shared types and pet-runtime, never Node, filesystem or subprocess APIs. Domain has no Electron, Three.js, OS, or file-system dependency. Contracts are versioned and schemas are runtime-validated at every untrusted boundary.
 
 ## 4. Electron process architecture
 
 ### Main process
 
-Electron main is privileged infrastructure and composition root. It creates the single frameless/transparent, always-on-top window where supported; owns lifecycle, tray/menu, display/DPI handling, renderer restart, and platform capability detection. It starts and stops only explicitly enabled adapter processes using absolute executable paths and argument arrays (never shell concatenation), supervises reconnect/backoff, and routes normalized observations to the application service.
+Electron Main is privileged infrastructure and composition root. It creates the management window and per-configuration transparent overlays, owns tray/menu, display/DPI handling, bounded renderer recovery and platform capabilities. It starts/stops authorized receivers and owned observation helpers, never Agent processes, and routes normalized observations to Application. Helper subprocesses use validated executable paths and argument arrays.
 
 Main implements ports for local config/asset directories, OS window activation, adapter transport/process spawning, and safe diagnostics. It validates IPC sender/frame origin, rejects unexpected navigation, and never forwards raw agent payloads or secrets to renderer. Main does not contain Session lifecycle rules; it invokes domain/application commands.
 
@@ -103,26 +103,26 @@ Three.js is selected because GLB/glTF and animation tooling are mature and it ca
 The application depends on ports, not provider implementations:
 
 ```ts
+// Public port definitions: packages/adapter-core/src/index.ts
 interface SessionObservationAdapter {
-  provider: 'codex' | 'pi' | 'claude';
-  start(config: AdapterConfig, sink: ObservationSink): Promise<StopHandle>;
-  capability(session: SessionRef, name: 'open-session'): Capability;
-  openSession(session: SessionRef): Promise<OpenSessionResult>;
+  provider: Provider;
+  start(config: AdapterConfig, sink: ObservationSink): Promise<AdapterHandle>;
+  openSession?(session: SessionRef): Promise<OpenSessionResult>;
 }
 
 interface ObservationSink {
-  publish(event: NormalizedObservationEvent): void;
+  publish(observation: SessionObservation): void;
   connectionChanged(state: 'connected' | 'degraded' | 'disconnected'): void;
 }
 ```
 
 The event contract is internal and versioned; it is not claimed to be any vendor's schema. Each adapter translates its official/local surface:
 
-- **Codex:** controlled App Server stdio/JSONL where available; version-pinned fixtures and graceful degraded connection behavior.
-- **pi:** documented JSON or RPC line protocol, with backpressure and reconnect handling.
-- **Claude Code:** Hooks receiver and only explicitly authorized local observation/transcript reading; no assumption that Platform sessions/events API is the local CLI API. Open Session may commonly be unsupported or not found.
+- **Codex CLI:** native hooks → bounded metadata normalizer → authenticated loopback delivery with independently verified host identity → private mapper. Stop/tool return/approval are not task completion/waiting; see [module contract](../integrations/codex-hooks/README.md).
+- **pi:** native ExtensionAPI → optional local bridge; only reliable events produce work/activity facts. No RPC-host substitution; see [extension contract](../integrations/pi-extension/README.md).
+- **Claude Code CLI:** normal-start hooks and OS-bound presence, private task facts and shared projection. No transcript reading or Platform-session API substitution; see [module contract](../integrations/claude-hooks/README.md).
 
-Adapters are configured, not a machine-wide process scanner. They may emit a stable opaque session reference, provider/project/name facts, and coarse lifecycle facts. Logs and retained diagnostics are redacted by adapter-core. Unknown events are ignored or recorded as sanitized diagnostics, never treated as control commands. Adapter failure is a connection state and must leave the Pet operable.
+Adapters are configured, not a machine-wide process scanner. They may emit a stable opaque session reference, provider/project/name facts, and coarse lifecycle facts. Each integration whitelists facts before publication; adapter-core defines ports, not a general raw-payload redactor. Unknown events are ignored or recorded as sanitized diagnostics, never treated as control commands. Adapter failure is a connection state and must leave the Pet operable.
 
 ## 6. Projection, acknowledgement, and Open Session flow
 
@@ -140,7 +140,7 @@ Working bubbles remain visible. A working-to-completed/error transition changes 
 
 Current Main checks (`pet-glb.ts`, executable boundaries in `pet-glb.test.ts`) separate exporter layout from decoded work: accessors and bufferViews each allow at most 16384 entries; total bufferView source lengths are limited to 64MiB, counting overlaps separately because GLTFLoader copies each slice. This conservative slice budget is not a total loader/GPU memory bound. File/JSON/traversal, accessor elements, animation inputs/outputs, graph, geometry, image and skin budgets remain independent. The folder importer reads only manifest/model/declared avatar, not neighboring authoring files. Acceptance does not certify motion fidelity or loop quality.
 
-Asset import is a main-side pipeline: choose local file -> check extension/MIME and byte-size limit -> parse GLB container without executing content -> validate scene graph, texture count/dimensions/encoded size, geometry complexity, node/material count, skin/bone count, animation count/duration, and optional action mappings -> copy into an application-owned asset directory -> persist only validated metadata and a content hash -> notify renderer of a safe local handle. Missing action mappings or clips are nonfatal capability gaps; an empty animation collection is valid. External texture references, remote URLs, malformed files, and over-limit assets are rejected. The current valid asset remains selected on failure.
+Asset import is a Main-side pipeline: native folder selection → bounded reads of root pet.json/pet.glb/declared avatar → container, references and resource-budget checks → private byte snapshot and redacted one-use preview → exclusive installation of those exact bytes → asset registry publication. Renderer gets registered asset bytes through trusted IPC and creates Blob URLs, never an arbitrary filesystem path. Unknown/partial destinations are retained, not overwritten or recursively removed on failure. Animation interpretation belongs to GLTFLoader/Three, not a custom glTF engine; [import contract](PET-ASSET-IMPORT-PLAN.md) owns the details. Missing action mappings or clips are nonfatal capability gaps; an empty animation collection is valid. External texture references, remote URLs, malformed files, and over-limit assets are rejected. The current valid asset remains selected on failure.
 
 The renderer still treats validated assets as untrusted data: bounded decoder options, no network fetches, no arbitrary path traversal, disposal of prior GPU resources, and render budgets (DPR/frame-rate/visibility throttling). Animation mapping is data-driven and deterministic. GLB-only is enforced; no conversion pathway silently broadens format support. License/attribution metadata should accompany bundled assets and user metadata but is not a marketplace.
 
@@ -162,15 +162,15 @@ The shared player presents connected only over idle/neutral presence, once; curr
 
 ## 8. Persistence boundaries
 
-Persist only local preferences and durable configuration needed to reconnect: enabled adapters, explicitly configured executable paths/working-directory allowlists, window/visibility preferences, selected validated asset id/hash and asset metadata, schema version, and migration data. Use an Electron main-owned OS-appropriate application data directory with atomic writes and restrictive permissions.
+Persist only local preferences, registered asset metadata/bindings and durable connection evidence needed to reconnect: configured targets, validated installation identity, owned deployment records and window/visibility preferences. Protected activation records are separate from Renderer-safe metadata. Use an Electron main-owned OS-appropriate application data directory with atomic writes and restrictive permissions.
 
-Do not persist completed/error unread state in release one. Do not persist prompts, message text, transcript contents, tokens, or raw provider payloads. Runtime session state, bubbles, adapter connection state, and acknowledgements live in memory. Asset bytes are local user-selected data, not cloud-synced data. Config migrations are versioned and fail closed to safe defaults.
+Do not persist completed/error unread state in release one. Do not collect or persist prompts, message text, transcript contents or raw provider payloads. Connection tokens/activation material are different: they stay in protected Main-private records and authorized generated hooks, never ordinary preferences, Renderer snapshots, logs or public artifacts. Runtime session state, bubbles, adapter connection state, and acknowledgements live in memory. Asset bytes are local user-selected data, not cloud-synced data. Config migrations are versioned and fail closed to safe defaults.
 
 ## 9. Privacy and security
 
-Default collection is minimum necessary: coarse lifecycle status, opaque session identity, and fallback naming facts. CWD, identifiers, and transcript access should be opt-in and redacted/hashed where practical. Secrets never enter renderer snapshots, logs, crash reports, or event `raw` fields. No cloud endpoint or remote asset fetch exists.
+Default collection is minimum necessary: coarse lifecycle status, opaque session identity, and fallback naming facts. Native identifiers remain Main-private where required; public identities are bounded/scoped. A provider's permitted local project-name fallback does not authorize transcript, argv or environment collection. Secrets never enter renderer snapshots, logs, crash reports, or event `raw` fields. No cloud endpoint or remote asset fetch exists.
 
-Electron baseline: context isolation, sandbox, disabled Node integration, strict CSP, no arbitrary navigation or unsanitized external links, sender validation for every IPC call, and signed installers/updates over HTTPS. Only main may spawn configured agents; use executable allowlists and argument arrays. Hooks/receivers must authenticate local connection origin as appropriate and enforce size/time limits. Asset validation is a resource-exhaustion and path-traversal boundary. Read-only product scope means no adapter API for approval, pause, steering, message sending, or other control actions.
+Electron baseline: context isolation, sandbox, disabled Node integration, strict CSP, no arbitrary navigation or unsanitized external links, and sender validation for IPC. Signing/notarization/update distribution and full D6 isolation are deferred, not passed. Main may spawn owned observation helpers, never configured Agents; use executable allowlists and argument arrays. Hooks/receivers must authenticate local connection origin as appropriate and enforce size/time limits. Asset validation is a resource-exhaustion and path-traversal boundary. Read-only product scope means no adapter API for approval, pause, steering, message sending, or other control actions.
 
 ## 10. Test seams and acceptance evidence
 
@@ -185,6 +185,8 @@ Ports and fake clocks make application tests independent of real agents and OS w
 
 ## 11. Initial implementation sequence
 
+Historical sequencing only; current order and partial acceptance live in the [MVP plan](MVP-EXECUTION-PLAN.md). This list neither reopens completed features nor authorizes provider/OS expansion.
+
 1. Freeze contracts and domain reducer, including statuses, session identity, name fallback, acknowledgement, and Open Session result taxonomy; add domain/contract tests.
 2. Create monorepo package boundaries and application ports; implement in-memory observation store and renderer-safe snapshots.
 3. Build Electron security shell (main/preload/renderer isolation, CSP, IPC allowlist), one window, drag and separate visibility controls.
@@ -196,12 +198,12 @@ Ports and fake clocks make application tests independent of real agents and OS w
 
 ## 12. Unresolved decisions and explicit risks
 
-- Exact target versions and event fixtures for Codex, pi, and Claude Code must be selected; provider schemas may drift.
-- Claude Code's reliable local observation granularity and open-window behavior need product confirmation; unsupported is a valid first-release result.
-- Exact GLB limits (bytes, texture dimensions, triangles, bones, animation duration) require performance and memory measurements on minimum supported hardware.
-- The team must choose whether Claude transcript reading is in scope for a configured opt-in; it must not be assumed by the adapter.
+- Supported layouts/versions and event fixtures are recorded in the three integration READMEs; other versions remain unverified and upstream schemas may drift.
+- Provider observation granularity and Open Session outcomes remain bounded by the actual version/host evidence; unsupported is valid, not a reason to start a replacement Agent.
+- Current GLB limits are implemented, not proof of minimum-hardware memory/GPU performance; wider performance claims require real measurements.
+- Missing Provider facts remain unknown or use existing coarse facts; transcript reading and new SDK/RPC hosts are outside current scope.
 - macOS/Windows transparency, click hit-testing, always-on-top, DPI, and multi-monitor behavior need real-device validation; Linux is not a supported release target despite possible best-effort behavior.
 - Electron's memory/package overhead versus Tauri's smaller footprint remains a release-quality trade-off, but must not widen product scope or leak privileges into renderer.
-- Asset license metadata format and user-facing attribution wording remain to be defined.
+- Imported license/author/attribution metadata does not establish redistribution rights; do not publish user models without permission.
 
-No unresolved decision permits adding agent control, cloud sync, extra model formats, multiple Pets, session aggregation, token progress, or remote asset downloads.
+No unresolved decision permits adding agent control, cloud sync, extra model formats, session aggregation, token progress, or remote asset downloads.

@@ -2,15 +2,15 @@
 
 **当前执行入口：[MVP 执行计划](MVP-EXECUTION-PLAN.md)。** 首个pi切片的实施和验收以该计划及其链接为准；下文I0–I3保留历史拆分和候选研究，不再作为“下一步M1”或禁止新Provider的当前结论。
 
-2026-10-16用户新增Claude Code、Codex桌面端/CLI与Antigravity桌面端/CLI接入需求，覆盖历史“Claude/Codex不进入MVP”和先完成全部pi矩阵的排期限制；不表示新Provider已验收。最新顺序为Claude Code CLI→Codex CLI→Antigravity CLI，桌面端全部最后做。当前完成安装metadata检查、Claude独立输入白名单、隔离回调传输与调用脚本；本轮授权的CLI程序升级和Claude原生manifest校验已通过，真实运行绑定、hook加载、部署和Main接线尚未实现。新事实与后续依赖见 [MVP新增检查点](MVP-EXECUTION-PLAN.md#新-agent-接入准备与-claude-输入边界2026-10-16) 和 [模块边界](../integrations/claude-hooks/README.md)。历史I0当时全文不可访问，不代表本轮官方全文仍不可访问；真实目标仍需分别精确授权，现有managed guard与数据保留契约不变。
+当前 pi、Claude Code、Codex CLI 已有被动运行绑定、受保护配置与 Main/Renderer 接线，分别具备有界真实基础接入证据，不再属于仅输入模块阶段。精确字段、版本和否定语义以三个模块 README 为准：[pi](../integrations/pi-extension/README.md)、[Claude](../integrations/claude-hooks/README.md)、[Codex](../integrations/codex-hooks/README.md)。当前先完善这三种 CLI；Antigravity 与桌面宿主不自动恢复排期。来源阻塞见[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)：官方原文已取得，不能继续归因于历史抓取失败。真实目标仍需精确授权，managed guard 与数据保留契约不变。
 
 ## 1. 已确认边界
 
 - 只观察用户已安装、明确配置观测组件的 Session，不由宠物启动、恢复、接管或控制 Agent。
-- 一只宠物显示多个独立 Session；气泡仅显示名称和状态。
+- 每个在线且显式绑定的配置对应独立宠物及所属 Session；同 Provider 多配置不合并，离线/解绑立即移除。气泡仅显示名称和状态。
 - 正在工作、完成未读、错误未读可见。工作中点击不隐藏；完成/错误点击立即确认，同时尝试打开原窗口。
 - 不跨应用重启恢复历史未读；不同运行不合并。
-- 当前仅单用户本机 macOS/pi；Windows 后续。真实目标读写/部署需精确范围与预览授权，不自动改动用户 Agent 配置。
+- 当前单用户本机 macOS，pi／Claude Code／Codex CLI 按版本和能力接入；Windows 后续。真实目标读写/部署需精确范围与预览授权，不自动改动用户 Agent 配置。
 
 ## 2. 对旧方案的修正
 
@@ -19,6 +19,8 @@
 “支持 Codex”也不等于同时支持 Codex CLI、Desktop、所有 IDE。监控与定位窗口分别建立能力矩阵，不用打开一个新终端冒充激活原会话。
 
 ## 3. 串行交付阶段
+
+> 以下 I0–I3 是早期拆分，不是当前未完成清单。保留原阶段结论与候选，不执行旧“验收后才进入下一 Provider”门槛；已交付事实和后续顺序只在 MVP 维护。
 
 ### I0：观测入口核实与契约设计（历史）
 
@@ -73,7 +75,7 @@ I0 时列出的代码问题如下（状态模型及 legacy 接线已在 I1 中�
 - 真实手动验证：用户授权加载扩展/hook 后，从自己正常运行的 Agent 发起任务，检查气泡和动画；每个 Agent 验收后才进入下一个。
 - 窗口定位：独立能力；仅确实激活原目标才返回成功。unsupported 与失败提示不影响已读逻辑。
 
-具体接收传输与安装配置在 I1b 前确定，不提前修改用户环境。
+当前接收传输与安装契约已在各 Provider 模块和专项设计中确定；本节不重新打开选型，也不授权修改用户环境。
 
 ## 5. 已核实证据与映射约束
 
@@ -109,6 +111,8 @@ I0 时列出的代码问题如下（状态模型及 legacy 接线已在 I1 中�
 首版打开原终端返回 `unsupported`，不运行 `pi --session` 代替原窗口定位。
 
 ### Claude Code / Codex：候选机制，尚非已核实契约
+
+> 保留 I0 的标题和失败来源；后续已取得版本化依据并接入，最新细类缺口见[Provider证据](PROVIDER-ANIMATION-EVIDENCE.md)。以下网络阻塞不是当前结论，App Server 也未被采用为生产观察宿主。
 
 官方全文抓取被工具 fake-IP/SSRF 检查阻断。搜索索引仅用于找入口，不冻结事件字段或最低版本：
 

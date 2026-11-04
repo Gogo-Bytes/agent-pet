@@ -1,5 +1,7 @@
 # 管理窗口：统一 Radix Themes 组件
 
+> 历史组件迁移记录，基线为下述阶段；“3页面”、PiPreflightPanel及管理入口“不引用glass”等不再是当前四页界面的全量结构。当前源码入口仍为 ManagementApp，窗口/产品边界见[架构](ARCHITECTURE-DESIGN.md)，待验范围见[MVP计划](MVP-EXECUTION-PLAN.md)。不从本页旧验收重启或重做迁移。
+
 基线 `35de4b4`。管理窗口整体迁移至固定直接依赖 `@radix-ui/themes@3.3.0`，不是仅替换滑块，也不是给旧自绘控件套外观。自动化验证、独立审查及主会话有限浏览器检查完成；macOS 原生验收尚未完成。验证后创建本地阶段提交，不推送。
 
 ## 所有权与入口

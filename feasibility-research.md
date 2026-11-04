@@ -1,5 +1,7 @@
 # 跨 Agent 3D Desktop Pet 可行性研究
 
+> 历史选型研究，不是当前实现/范围。实际采用 Electron + React/R3F 与被动观察；Tauri/Rust sidecar、受管 App Server/pi RPC 宿主、原始 payload/transcript 采集、Agent 控制及自写 glTF 解释器均未被本文授权采用。现行边界见[架构](docs/ARCHITECTURE-DESIGN.md)，任务与验收见[MVP计划](docs/MVP-EXECUTION-PLAN.md)。保留以下原建议用于解释决策，不作为开发入口或支持版本证据。
+
 ## 结论摘要
 项目技术上可行。推荐 **Tauri 2 + Three.js + Rust sidecar/adapter host**：Tauri 体积和权限边界优于 Electron，Three.js/glTF 适合可定制宠物；但透明、点击穿透、全局置顶在不同桌面环境（尤其 Linux Wayland）存在平台差异，应把“窗口能力”定义为可降级能力而非绝对承诺。
 

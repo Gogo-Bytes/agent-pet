@@ -1,8 +1,8 @@
 # pi 迭代验收与当前范围
 
-当前范围：单用户本机 macOS/pi MVP，执行与进度统一见 [MVP 执行计划](MVP-EXECUTION-PLAN.md)；下一步 M1 路线选择。用户明确确认体验满意前，不推进 Claude Code、Codex 或其它 Agent 接入。
+本文保留 pi 局部验收及当时未测范围；当前执行与进度统一见 [MVP 执行计划](MVP-EXECUTION-PLAN.md)。旧“下一步M1／pi全验后才推进其他Provider”排序已被后续用户决定替代，不重新阻塞已接入的Claude/Codex。后续限定真实任务反馈见[扩展实测](PI-EXTENSION-LIVE-ACCEPTANCE.md)。
 
-**完整真实端到端验收仍 NOT DONE。** 下列是既有局部用户反馈，不是当前 M2 真实目标部署、M3 全状态/重启、M4 停用卸载或 M5 独立应用包的完成证据。合成测试、D6.1 harness 与 B4.4a staged-resource 均不能代替这些验收；旧完整生产安全 gate 不再阻塞本地 MVP 排期。
+**完整真实端到端验收仍 NOT DONE。** 下列是既有局部用户反馈，不是 M2–M5 整体矩阵完成证据；后续已确认的子项按各自记录认可，不将历史“未部署”等扩大为当前事实。合成测试、D6.1 harness 与 B4.4a staged-resource 均不能代替这些验收；旧完整生产安全 gate 不再阻塞本地 MVP 排期。
 
 历史用户实测已反馈：
 - 工作与完成气泡正常，点击完成气泡消失，新一轮任务再次显示。

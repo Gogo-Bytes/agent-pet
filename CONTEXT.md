@@ -9,7 +9,7 @@ Current scope and acceptance: [MVP execution plan](docs/MVP-EXECUTION-PLAN.md).
 ## Canonical terms
 
 ### Agent
-A coding tool or runtime that produces observable session activity. The product is intended to support multiple Agents; pi is the first supported adapter and other providers are future scope until their own compatibility evidence exists.
+A coding tool or runtime that produces observable session activity. pi, Claude Code and Codex CLI have bounded passive integrations; each host/version exposes different verified facts. Other providers and desktop hosts require their own compatibility evidence, not just a saved configuration.
 
 ### Adapter
 The integration boundary for one Agent. An Adapter converts that Agent's native observation surface into the product's Session facts and optionally provides a way to open the originating Agent window.
@@ -30,7 +30,7 @@ A compact visual representation of one Session. It follows the Pet, shows the Se
 A 3D avatar explicitly bound to one Configured Agent. An online, bound Configured Agent has its own Pet in management and on the desktop, with its independent Session bubbles; a Pet is not created per Session.
 
 ### Pet asset
-A 3D GLB model with optional animations and descriptive metadata. A Pet asset with no animations is a valid static Pet; the current MVP uses the bundled asset.
+A 3D GLB model with optional animations and descriptive metadata. A Pet asset with no animations is a valid static Pet. Bundled and validated local imported assets use the same binding and playback paths.
 
 ### Observation capability
 
@@ -40,7 +40,7 @@ Implementation vocabulary: `ObservationCapabilities` is supported/unsupported/un
 
 ### Pet action
 
-A named presentation intent, such as working, waiting for input or celebrating, independent of any Agent's native event names and any artist's animation names. Every Pet action is optional for an individual Pet asset.
+A trigger state or event, such as working, waiting for input or task completion, independent of any Agent's native event names and any artist's clip names. `PetAnimationTrigger` is the public type; `PetAction` is its compatibility alias. Every trigger mapping is optional for an individual Pet asset.
 
 ### Pet action catalog
 
@@ -48,7 +48,7 @@ The product's versioned vocabulary of Pet actions available to artists. Inclusio
 
 ### Animation mapping
 
-An asset's optional association between a Pet action and an animation supplied by its artist. No association means the asset does not implement that action; it does not make the Pet invalid.
+An asset's optional association between a trigger and an exact GLB clip name (`string | null`). No association means the asset does not implement that trigger; it does not make the Pet invalid. The confirmed [in/loop/out design](docs/PET-ANIMATION-TRANSITIONS.md) is a future bounded extension, not a currently supported mapping format.
 
 ### Open Session
 The user-visible action of bringing the originating Agent window or session to the foreground. It is Adapter-specific and may report unsupported or not-found rather than guaranteeing success.

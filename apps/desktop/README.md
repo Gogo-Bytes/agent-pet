@@ -1,5 +1,28 @@
 # Desktop development
 
+## Current development entry
+
+Run from the repository root with existing dependencies:
+
+```sh
+pnpm --filter @agent-pet/desktop dev
+pnpm typecheck
+pnpm test --maxWorkers=1
+pnpm --filter @agent-pet/desktop build
+```
+
+Development uses Electron Main/preload and the formal React/R3F Renderer. pi, Claude Code and Codex CLI have passive integrations with different supported facts; [pi](../../integrations/pi-extension/README.md), [Claude](../../integrations/claude-hooks/README.md) and [Codex](../../integrations/codex-hooks/README.md) own their current contracts. Main never starts an Agent or reads conversation bodies. Dependency installation, real-target setup and model requests are separate authorized operations.
+
+Desktop and Home display one Pet per online, explicitly bound configuration, not a global fallback or a Pet per Session. Bundled and imported GLBs share playback; all animations are optional. Use the [artist guide](../../docs/PET-ARTIST-GUIDE.md) for current package rules. Desktop hover uses the fixed pet viewport, not animated mesh hits; the toolbar visibility envelope is separate, and Home retains per-model hits.
+
+Codex setup reuses a Main-validated scan through read consent, exact hooks preview and separate confirmation. It never asks for a program file: missing/stale scan evidence requires rescan. Existing unconfigured records continue setup; custom targets retain their opaque configuration identity and authorized location, never silently use the default. Configured records resume from their protected saved evidence. Codex's native `/hooks` review is still required. The `2575b81` increment has automated evidence, not native acceptance; see [connection contract](../../docs/CODEX-CLI-CONNECTION.md).
+
+Current task status lives only in the [MVP plan](../../docs/MVP-EXECUTION-PLAN.md) until an authorized Issue migration. The confirmed [in/loop/out design](../../docs/PET-ANIMATION-TRANSITIONS.md) is not implemented. Build/DOM tests are not native/GPU or release acceptance; managed production entry and D6 remain gated.
+
+## Historical development evidence
+
+The dated notes below retain original tests, failures and operating scopes. Earlier “only pi”, “not yet imported/connected” and wrapper instructions describe their stage, not current onboarding; use the module contracts and current plan above. Old commands/previews do not authorize new target reads, installation, trust changes or a dev restart.
+
 Claude 任务反馈（2026-10-19）：近期工具动作、回答出错和旧连接显式升级已实现，恢复旧连接不会自动改 hooks。本轮全量1121通过/1跳过、类型检查和源码构建通过，待真实任务验收；此前冷启动超时仍作为已知风险保留。继续 dev、不打包。见 [实现与验证](../../docs/CLAUDE-TASK-OBSERVATION.md)。
 
 CLI 自动扫描（2026-10-20）：Codex 与 Claude 共用有界 metadata-only 扫描入口；Codex 仅将已核对的 standalone 0.163.0 布局标为可接入，其他版本/安装方式只显示待验证。多安装可选、已有配置直接查看；不改 shell/PATH，不读取配置、凭据、会话或对话。源码与隔离回归通过，真实日常扫描与桌面端仍分开验收。见 [Codex 接线与证据](../../docs/CODEX-CLI-CONNECTION.md)。
@@ -70,10 +93,7 @@ Canvas, and feature CSS Modules with shared tokens. The former imperative
 `index.ts`, scene wrapper and `style.css` have been removed. Main remains the
 window-layout and hit-policy authority; Application owns Session/unread state.
 
-The renderer loads the bundled project-authored `starter.glb` robot with embedded
-animations. The opt-in pi Adapter is wired to Main; without valid configuration, the initial Session snapshot is empty. No other Agent
-is connected. Tests exercise the actual pi extension over isolated local sockets,
-not a running pi TUI.
+The renderer loads bundled `starter.glb` or a registered imported GLB. Main composes pi, Claude and Codex observations; without an authorized connection, no Agent is presumed online. Tests exercise actual adapters/normalizers with self-owned fixtures and isolated sockets, not a running daily Agent.
 
 See `../../docs/RENDERER-R4-ACCEPTANCE.md` for current automated checks, historical
 user/native evidence and pending acceptance. Windows, hardware GPU/power and the
@@ -142,8 +162,7 @@ modality through exit, reduced-motion closure and opener focus restoration.
 See [revision evidence](../../docs/PET-SCENE-REVISION-ACCEPTANCE.md) for real screenshots,
 final package and limits.
 
-Home projection preserves configuration identities and only includes online pi
-connections. HTML keyboard focus and model clicks use the same projection.
+Home projection preserves configuration identities and includes only online, explicitly bound configurations from supported Providers. HTML keyboard focus and model clicks use the same projection.
 
 Main's `Configurations` + bounded non-secret `ConfigurationsStore` hold independent
 named configurations; pi uses separate existing PiConnection/PiConnectionStore
@@ -188,8 +207,7 @@ That entry imports actual formal components/CSS/GLB but injects a test-only in-m
 bridge; it cannot deploy or start a receiver and is excluded from Electron rollup.
 See [formal migration evidence](../../docs/MANAGEMENT-MIGRATION-ACCEPTANCE.md) for
 screenshots, commands, native interaction limitations and remaining capabilities.
-Only pi and one bundled pet are truly implemented; imports/new Providers and
-automatic project-configuration discovery remain gaps, accurately shown in UI.
+Imports and pi/Claude/Codex integrations are implemented with bounded support; automatic discovery of arbitrary project configurations, other Providers and complete native acceptance are not implied by the demo.
 
 The scan result now keeps configuration identity/actions above a separate native
 installation disclosure. Two installations sharing a default target produce one
@@ -262,8 +280,7 @@ The connection page now offers a bounded local opt-in flow:
    settings/ignore/trust, launch pi, reload it, or control Agent work.
 
 Status distinguishes not configured, configured/waiting, connected, disconnected and
-failed. Connected means the latest token-validated legacy hello; it is not managed
-ack/auth, aggregate health of all peers, or real business-state acceptance. Observations
+failed. Connected uses the current authenticated peer aggregate for that configuration; partial peer exit does not remove a still-online configuration. It is not managed ack/auth or real business-state acceptance. Observations
 feed the existing Application/pet, with Open Session still unsupported.
 
 The listener uses an exclusive 0700 short random directory under `/tmp`, not a long
@@ -290,9 +307,7 @@ publication allow selecting/previewing a new setup in the same process. A failed
 blocks reconfiguration instead of pretending the record was cleared. Stopping/removing does
 **not** unload an already running pi extension; safely close/reload pi yourself.
 
-This is clean-restart usability, **not crash recovery or reboot resilience**. `/tmp` loss,
-system reboot, a changed/missing runtime directory or an existing stale/unknown socket makes
-resume fail visibly. It never reconstructs the runtime or steals/unlinks an endpoint to resume.
+This is bounded restart usability, **not general crash recovery or reboot resilience**. Current explicit pi restore can exclusively recreate a missing owned runtime directory only after verifying the original deployment evidence; it never steals/unlinks an existing unknown endpoint. Changed or uncertain state fails visibly. [Restart recovery](../../docs/CONNECTION-RESTART-RECOVERY.md) supersedes the earlier blanket missing-runtime rejection.
 Corrupt, foreign, symlinked, permissive or unknown-version records and incomplete saves fail
 closed without wiping, resetting or adopting old artifacts. Uncertain writes retain pending
 metadata and usable in-memory ownership; a preserved pending record prevents a new startup
@@ -428,6 +443,8 @@ and product Provider integration remain unverified. No application package was b
 
 ## Claude CLI connection and home presence (2026-10-16)
 
+> Historical wrapper-mode slice, superseded by ordinary startup and task hooks below. Do not use the copied launch command as current setup guidance.
+
 Run `pnpm --filter @agent-pet/desktop dev` (no packaging). Add a Claude Code record
 in Connections, then choose **设置连接** and explicitly select the Claude executable.
 The initial supported layout is npm Claude Code2.1.301, resolving to `bin/claude.exe`;
@@ -461,8 +478,7 @@ and [formal/real acceptance boundaries](../../docs/CLAUDE-CLI-ACCEPTANCE.md).
 
 The confirmed current flow is **configure once, then run `claude` normally**.
 Use `~/.claude` for your usual user-wide configuration (or a project's `.claude`
-for that project). Setup previews the selected `settings.json` and adds only one
-SessionStart hook. It does not change existing hooks, shell, HOME or Agent args.
+for that project). Setup previews the selected `settings.json` and adds only owned hooks. Current task mode uses 12 groups; legacy presence-only records keep their single SessionStart until a separately confirmed upgrade. It does not change existing hooks, shell, HOME or Agent args.
 The supported selected executable remains npm2.1.301/bin/claude.exe; install or
 normal-start verification against a daily target requires its precise preview/consent.
 
@@ -475,9 +491,7 @@ second. The helper uses libproc and must be verified per supported macOS/version
 Dev/build compile it with the existing clang; no dependency installation or packaging.
 
 Normal mode never displays a special launch command. App restart resumes unpaused
-observation; explicit pause stays paused. Already-running processes without a startup
-callback to the new receiver are not adopted: open a new Claude session. Task actions
-and completion/error notifications remain unavailable, with a static Home pet only.
+observation; explicit pause stays paused. Already-running processes without a startup callback to the new receiver are not adopted: open a new Claude session. Current task mode publishes bounded recent tool feedback and generic task errors; old presence-only records remain task-unknown. Completion/cancellation/waiting are not inferred from unsupported facts.
 
 Private files are in `userData/claude-normal-<UUID>`: observer.cjs, activation.json,
 hook.json, settings-before.json and receipt.json (0700 directory/0600 files).
@@ -508,7 +522,7 @@ dev/源码build会编译`out/codex-runtime/native-hook.cjs`。首轮本机模拟
 
 最新结果：日常CLI基础接入已通过。用户正常运行codex、审核本产品10条通知并发送一次任务后确认连接页已连接/首页有宠物；实际普通dev首页AX和真实GLB截图确认。原配置/token及pi/Claude记录保留，临时记录已关闭，不打包。完整动作矩阵、桌面端与发布未验收。[日常验收](../../docs/CODEX-DAILY-CONNECTION-PREVIEW.md#最终结果2026-10-19)。下文为分阶段记录，旧“未部署/未注册”不覆盖本条。
 
-已接入Main/Configurations/既有类型化IPC与共享会话/Home：手动选择实际CODEX_HOME、程序、只追加10条通知的确认预览；暂停/恢复/选择性移除保留其他hooks、config.toml和登录。Codex的原生/hooks审核另由用户完成，首任务后才有在线宠物；默认后台不以终端关闭或PID活着推断会话状态。standalone0.163.0的前台隔离真实验证已通过；默认后台已准备独立宿主入口核对和真实隔离验证，尚未执行，不宣称日常已接通。Codex自动扫描/桌面端尚未支持。继续dev、不打包；[实现与测试/截图](../../docs/CODEX-CLI-CONNECTION.md)、[待授权默认实测](../../docs/CODEX-DEFAULT-START-PREVIEW.md)。
+已接入Main/Configurations/既有类型化IPC与共享会话/Home：扫描确认程序候选、精确CODEX_HOME读取授权、只追加10条通知的独立确认预览；暂停/恢复/选择性移除保留其他hooks、config.toml和登录。Codex的原生/hooks审核另由用户完成，首任务后才有在线宠物；默认后台不以终端关闭或PID活着推断会话状态。standalone0.163.0的前台隔离真实验证已通过；默认后台已准备独立宿主入口核对和真实隔离验证，尚未执行，不宣称日常已接通。Codex 有界自动扫描已实现，桌面端不在本次CLI兼容范围。继续dev、不打包；[实现与测试/截图](../../docs/CODEX-CLI-CONNECTION.md)、[待授权默认实测](../../docs/CODEX-DEFAULT-START-PREVIEW.md)。
 
 Codex默认模式补充（2026-10-19）：0.163.0隔离副本两轮默认TUI、原生通知审核、正式Configurations接收器重建和清理已实测通过；日常配置未部署，当前dev未重启，真实模型/桌面端未验收。详见[默认实测与覆盖边界](../../docs/CODEX-DEFAULT-START-PREVIEW.md#本次执行结果2026-10-19)。
 

@@ -1,8 +1,8 @@
 # Agent Pet 项目实施计划
 
-> **当前优先级已变更：先完成单用户本机 macOS/pi MVP。唯一当前执行计划是 [MVP-EXECUTION-PLAN](docs/MVP-EXECUTION-PLAN.md)，下一步为 M1 最小路线选择与纵向切片。** 下文为历史初始规划，不是当前待办或实现清单；多平台/多 Agent、签名更新及“前六项完成前不接真实 Agent”等旧限制不再作为本地 MVP gate。安全延期是未验证，不授权绕过生产 guard；真实配置读写/部署仍需精确预览授权。
+> **历史初始规划；当前优先级和未迁移任务以 [MVP-EXECUTION-PLAN](docs/MVP-EXECUTION-PLAN.md) 为准，文档入口见[导航](docs/README.md)。** 下文为历史初始规划，不是当前待办或实现清单；多平台/多 Agent、签名更新及“前六项完成前不接真实 Agent”等旧限制不再作为本地 MVP gate。安全延期是未验证，不授权绕过生产 guard；真实配置读写/部署仍需精确预览授权。
 >
-> 历史初始规划，包含尚未实现的目标目录/能力，不是当前实现清单。产品术语与只读范围以 [CONTEXT.md](CONTEXT.md) 为准；Renderer 后续决策见 [迁移计划](docs/RENDERER-MIGRATION-PLAN.md)，当前验收边界见 [R4 库存](docs/RENDERER-R4-ACCEPTANCE.md)。已落地的是 React + R3F/Drei Renderer 与显式 opt-in pi 扩展/Adapter；本文旧的 UI、loader、Agent 接入顺序描述不应覆盖后续已批准决策。
+> 历史初始规划，包含尚未实现的目标目录/能力，不是当前实现清单。产品术语与只读范围以 [CONTEXT.md](CONTEXT.md) 为准；Renderer 后续决策见 [迁移计划](docs/RENDERER-MIGRATION-PLAN.md)，当前验收边界见 [R4 库存](docs/RENDERER-R4-ACCEPTANCE.md)。本文关于 UI、loader、Provider 和目标包结构的旧方案不覆盖后续已批准设计；不要用这份初始盘点推断导入或 Claude/Codex 尚未实现。
 
 ## 1. 项目目标
 

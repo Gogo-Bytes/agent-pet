@@ -64,3 +64,7 @@
 - 研究的自动 `source_check` 返回 unclear / 0.30，命中非指定版本，不能作通过依据；pi 结论来自直接核对上述固定版本声明和发送链。第三方指南、插件、搜索摘要及不匹配版本的源码不补关键证据。
 - 仓库 Claude README 的旧“daily hooks have not been upgraded”不是最新部署状态；版本和实测范围以[MVP执行计划](MVP-EXECUTION-PLAN.md#claude-任务反馈2026-10-19常用反馈真实验证完成)为准，既有常用反馈验收不证明本次细类。
 - 本轮只有证据文档与进度/审计更新，检查本地引用和 diff；无生产代码/测试变更，不重跑或冒称测试、typecheck、build、GUI/原生验收。未读写用户配置、部署、启动Agent/请求模型、安装升级、重启dev、改资产或推送。
+
+## 后续生命周期覆盖（不解除上述细类阻塞）
+
+基于 `95dd667` 的适配修复第一阶段：pi mapper把hello发布与未读baseline语义分开，阻止旧peer的迟到名称/companion夺回当前Session及随后丢失完成。新增4项真实隔离socket回归，包含PiConnection→Configurations/Application→Home和双配置相同原生身份；聚焦111项、全量1571 passed/1 skipped、typecheck/desktop build通过。未读保留/no replay、认证、旧扩展兼容、22项cue/fallback不变。不是新增retry/output-limit支持或真实Agent/UI验收；无日常部署/模型调用/dev重启。

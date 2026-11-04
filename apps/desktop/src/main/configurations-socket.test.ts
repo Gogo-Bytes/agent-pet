@@ -109,3 +109,59 @@ it('keeps home pets online for remaining peers and isolates configuration depart
     vi.restoreAllMocks();
   }
 });
+
+it.each(['session_info_changed', 'companion'] as const)('keeps current pi work and per-configuration Home state after superseded %s', async type => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'pet-config-owner-')));
+  const directory = join(root, 'data'); await mkdir(directory, { mode: 0o700 });
+  const adapter = new PiBridgeAdapter(), start = vi.spyOn(adapter, 'start');
+  const app = createApplication([adapter]);
+  const collection = new Configurations({ directory, adapter: () => adapter, publish: app.observe });
+  const peers: net.Socket[] = [], ids: string[] = [], configs: PiBridgeConfig[] = [];
+  const pets = () => projectHomePets(collection.snapshot(), app.snapshot(), '小伙伴');
+  async function peer(config: PiBridgeConfig) {
+    const socket = net.connect(config.endpoint); peers.push(socket); socket.on('error', () => {});
+    await once(socket, 'connect');
+    return { socket, send(seq: number, fields: object) { socket.write(JSON.stringify({
+      schemaVersion: 1, token: config.token, processInstanceId: 'same-process', providerSessionId: 'same-session',
+      sentAt: '2026-10-22T00:00:00Z', seq, ...fields,
+    }) + '\n'); } };
+  }
+  try {
+    for (const name of ['first', 'second']) {
+      const target = join(root, name); await mkdir(target, { mode: 0o700 });
+      const id = (await collection.create({ name, provider: 'pi', targetPath: target })).records.at(-1)!.id;
+      ids.push(id); await collection.bindPet(id, { assetId: 'starter', name: '小伙伴' });
+      const plan = (await collection.preview(id)).records.find(record => record.id === id)!.connection!.preview!;
+      expect(plan.action).toBe('create'); await collection.confirm(id, plan.id);
+      configs.push(start.mock.calls.at(-1)![0] as PiBridgeConfig);
+    }
+    const old = await peer(configs[0]!), other = await peer(configs[1]!);
+    old.send(1, { type: 'hello', status: 'idle' }); other.send(1, { type: 'hello', status: 'idle' });
+    other.send(2, { type: 'lifecycle', status: 'working', workId: 'other-work' });
+    await vi.waitFor(() => expect(pets().map(pet => pet.action)).toEqual(['idle', 'working']));
+    const otherId = `${ids[1]}:pi:same-process:same-session`, currentId = `${ids[0]}:pi:same-process:same-session`;
+    const otherState = app.snapshot().sessions[otherId];
+    const cues = collection.snapshot().records.map(record => record.connectionCue);
+    const current = await peer(configs[0]!);
+    current.send(3, { type: 'hello', status: 'idle' });
+    current.send(4, { type: 'lifecycle', status: 'working', workId: 'current-work' });
+    await vi.waitFor(() => expect(app.snapshot().sessions[currentId]?.revision).toBe(8));
+    old.send(2, type === 'session_info_changed' ? { type, sessionName: 'stale' } :
+      { type, facts: { activities: ['reading'], waitingForInput: false }, capabilities: { reading: 'supported' } });
+    const closed = once(old.socket, 'close'); old.socket.end(); await closed;
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(app.snapshot().sessions[currentId]).toMatchObject({ revision: 8, status: 'working', connected: true });
+    expect(pets().map(pet => [pet.id, pet.action])).toEqual(ids.map(id => [id, 'working']));
+    expect(app.snapshot().bubbles).toHaveLength(2);
+    current.send(5, { type: 'lifecycle', status: 'completed', workId: 'current-work' });
+    await vi.waitFor(() => expect(pets().map(pet => pet.action)).toEqual(['success', 'working']));
+    expect(app.snapshot().bubbles.find(bubble => bubble.sessionId === currentId)?.status).toBe('completed-unread');
+    expect(app.snapshot().sessions[otherId]).toEqual(otherState);
+    expect(collection.snapshot().records.map(record => record.connectionCue)).toEqual(cues);
+  } finally {
+    for (const socket of peers) socket.destroy();
+    await collection.stop();
+    for (const config of configs) await rm(dirname(config.endpoint), { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true }); vi.restoreAllMocks();
+  }
+});

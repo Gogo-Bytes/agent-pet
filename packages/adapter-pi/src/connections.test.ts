@@ -195,3 +195,26 @@ it('releases every peer when a disconnect observer throws and reports a bounded 
   expect(r.states).toEqual(['connected', 'disconnected']);
   await expect(r.stop()).rejects.toThrow('pi observer cleanup failed');
 });
+
+it.each(['session_info_changed', 'companion'] as const)('ignores delayed %s from a superseded peer without losing its replacement', async type => {
+  const r = await receiver();
+  const old = await r.peer('overlap');
+  const current = await r.peer('overlap', false);
+  const send = (socket: net.Socket, seq: number, fields: object) => socket.write(JSON.stringify({
+    schemaVersion: 1, token, processInstanceId: 'overlap', providerSessionId: 'session',
+    sentAt: '2026-10-22T00:00:00Z', seq, ...fields,
+  }) + '\n');
+  send(current.socket, 3, { type: 'hello', status: 'idle' });
+  send(current.socket, 4, { type: 'lifecycle', status: 'working', workId: 'work' });
+  await vi.waitFor(() => expect(r.observations.at(-1)).toMatchObject({ status: 'working', revision: 8 }));
+  send(old.socket, 2, type === 'session_info_changed' ? { type, sessionName: 'stale' } :
+    { type, facts: { activities: ['reading'], waitingForInput: false }, capabilities: { reading: 'supported' } });
+  await disconnect(old.socket);
+  expect(r.observations.at(-1)).toMatchObject({ status: 'working', revision: 8, connected: true });
+  expect(r.observations).toHaveLength(3);
+  expect(r.states).toEqual(['connected']);
+  send(current.socket, 5, { type: 'lifecycle', status: 'completed', workId: 'work' });
+  await vi.waitFor(() => expect(r.observations.at(-1)).toMatchObject({ status: 'completed', revision: 10 }));
+  await disconnect(current.socket);
+  await vi.waitFor(() => expect(r.states).toEqual(['connected', 'disconnected']));
+});

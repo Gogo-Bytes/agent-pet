@@ -26,9 +26,13 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## 下一轮待办实施顺序
 
-**当前用户指定顺序：动画拼接与其他尾段暂缓，先核对 Claude 输出限制/业务重试。** 本轮从干净 `37ac506` 恢复第3项，官方原文已取得，结果仍无当前被动接入范围内可实施的新映射：pi 0.85.1 重试属于 AgentSession/SDK 订阅，未转发到 ExtensionAPI；Claude 尚缺 `StopFailure.error=max_output_tokens` 与输出截断的精确版本化关联。不是网络失败，也不表示上游没有重试功能。保留 Claude 通用错误未读、pi retrying unknown；22触发/fallback与已验收素材不动。
+**当前用户指定顺序：先完善 pi / Claude Code / Codex 适配，动画制作与拼接暂停。** 本轮从干净 `95dd667` 核对审计，仅实施可复现的生命周期/归属缺陷，不新增 SDK/RPC 宿主或猜测业务事件。Claude 输出限制与业务重试的来源阻塞继续保留：[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)；22项触发/fallback与已验收素材不动。
 
-完整来源、当前本地入口与恢复条件见[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)。继续需要上游正式扩展重试生命周期契约，或 Claude 已支持版本的精确 Hook 分类依据；更换SDK/RPC宿主、升级或新增信任来源须另行确认，本轮不做。仅完成证据/进度文档校准并检查本地链接及diff，未修改生产/测试、未运行测试/typecheck/build或原生验收；不引用旧绿测冒充本次实现通过。未改配置、部署、运行Agent/模型、安装升级、重启dev或推送。
+### Provider 修复第一阶段：pi 重叠连接归属
+
+4项永久红测复现旧peer的迟到名称/companion继承baseline并夺回Session，旧peer关闭后把当前working改为idle/disconnected。现mapper单独标记本次发布是否来自有效hello，只有hello可更换接收器owner；baseline仍负责保留已有未读，metadata不再取得传输归属。未扩展协议、认证或能力。
+
+真实自有socket→PiConnection→Configurations/Application→Home投影覆盖两种迟到数据、旧peer退出、当前完成未读、同原生身份的两配置隔离及connectionCue稳定；旧同socket切Session、重复hello、无heartbeat旧扩展、未读重连/no replay守卫保留。聚焦14文件111 passed；typecheck、desktop源码build、全量135文件 **1571 passed / 1 skipped**及diff检查通过。红/绿日志 `/tmp/provider-pi-{red,focused,typecheck,build,full}.log`。没有真实Agent/模型调用、日常配置读写/部署、依赖升级、dev重启、资产修改、打包或推送。原生重叠时序、睡眠/唤醒与长时间运行仍待独立授权验收；自动化不等于native/UI视觉通过。
 
 以下保留既定主线与历史阶段顺序，当前动画细类以本段及上述证据为准。
 

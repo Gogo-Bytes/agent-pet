@@ -23,6 +23,8 @@ The **Session Observation** context owns the normalized facts emitted by an enab
 
 An internal adapter event may include `working`, `completed`, `error`, `unknown`, connection state, timestamp, and correlation metadata. Provider payloads are infrastructure input, not domain entities. The reducer tolerates duplicates, out-of-order events, reconnects, and unknown future values. It does not infer completion from an arbitrary process disappearing.
 
+The legacy pi receiver admits Session transport ownership only on a validated hello publication, not on the observation’s `baseline` flag. Metadata/companion updates may retain that flag to preserve unread results, but cannot reclaim ownership from a replacement peer; superseded close events likewise cannot clear the current owner. Configuration namespaces and managed admission remain unchanged.
+
 ### Session Presentation context
 
 This context maps each observed Session to at most one Bubble projection. A working Session has a visible working bubble. A transition from working to completed/error updates the same bubble and marks it unread. Acknowledgement is an explicit domain command: it removes the completed/error bubble from the visible set and clears transient unread state. Unread state is intentionally in-memory and is not restored after restart.

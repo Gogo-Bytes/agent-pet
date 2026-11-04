@@ -3,7 +3,7 @@ import type { SessionObservation, CompanionFacts, ObservationCapabilities } from
 import type { PiSessionMessage } from './protocol.js';
 
 export type SessionMapperOptions = {
-  publish(observation: SessionObservation): void;
+  publish(observation: SessionObservation, isHello?: boolean): void;
   publishDisconnected?(observation: SessionObservation): void;
   connectionChanged?(state: 'connected' | 'degraded' | 'disconnected'): void;
   /** Server-bound managed namespace; legacy callers omit it. */
@@ -71,7 +71,7 @@ export class PiSessionMapper {
     this.options.connectionChanged?.('disconnected');
     if (this.options.publishDisconnected) this.publish(this.context!.status, new Date().toISOString(), this.context!.workId);
   }
-  private publish(status: SessionObservation['status'], sentAt: string, workId?: string, baseline = false, connected = this.connected): void {
+  private publish(status: SessionObservation['status'], sentAt: string, workId?: string, isHello = false, connected = this.connected): void {
     if (!this.context) return;
     const legacyId = createSessionId({ provider: 'pi', processInstanceId: this.context.processInstanceId, providerSessionId: this.context.providerSessionId });
     const publish = !connected && this.options.publishDisconnected ? this.options.publishDisconnected : this.options.publish;
@@ -85,11 +85,11 @@ export class PiSessionMapper {
       // activity on loss. A newer hello always supersedes an old peer's close.
       revision: this.options.publishDisconnected ? this.lastSeq * 2 + (connected ? 0 : 1) : this.lastSeq,
       connected,
-      ...(baseline || this.context.baseline ? { baseline: true } : {}),
+      ...(isHello || this.context.baseline ? { baseline: true } : {}),
       ...(this.context.capabilities ? { capabilities: this.context.capabilities } : {}),
       facts: connected ? (this.context.facts ?? { activities: [], waitingForInput: false }) : { activities: [], waitingForInput: false },
       providerSessionId: this.context.providerSessionId,
       processInstanceId: this.context.processInstanceId,
-    });
+    }, isHello);
   }
 }

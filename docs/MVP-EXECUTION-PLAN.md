@@ -34,6 +34,14 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 真实自有socket→PiConnection→Configurations/Application→Home投影覆盖两种迟到数据、旧peer退出、当前完成未读、同原生身份的两配置隔离及connectionCue稳定；旧同socket切Session、重复hello、无heartbeat旧扩展、未读重连/no replay守卫保留。聚焦14文件111 passed；typecheck、desktop源码build、全量135文件 **1571 passed / 1 skipped**及diff检查通过。红/绿日志 `/tmp/provider-pi-{red,focused,typecheck,build,full}.log`。没有真实Agent/模型调用、日常配置读写/部署、依赖升级、dev重启、资产修改、打包或推送。原生重叠时序、睡眠/唤醒与长时间运行仍待独立授权验收；自动化不等于native/UI视觉通过。
 
+### Provider 修复第二阶段：Claude 发布重入与清理
+
+第一阶段本地提交 `0e4e74d` 后独立实施。7项红测经真实normalize→mapper→Application同步订阅→共享宠物投影复现：反馈发布时stop/retire遗留timer，替换Session的断开回调中stop/retire后仍发布新连接，重入替换产生两个在线Session，抛错订阅中断多run停止和timer过期。复用Codex既有局部模式：先持有timer再发布，隔离消费者抛错/拒绝Promise，回调后重新核对closed/run/current身份；没有共享新框架、重试/ACK或hook安装变更。
+
+新增8项回归（7项红绿及1项拒绝Promise清理），原generic错误未读、tool-error区分、旧/缺prompt与child拒绝、Stop/approval/precursor负语义保持。聚焦8文件134 passed；typecheck、desktop源码build、全量135文件 **1579 passed / 1 skipped**及diff检查通过，日志 `/tmp/provider-claude-{red,focused,typecheck,build,full}.log`。现有Three重复实例警告/skip保留；无非预期失败或基础设施回退。源码独立审查由Main接续，不提前宣称通过。
+
+本轮只交付这两项可复现修复，没有凭空扩展第三项Codex能力。发布是best-effort，不能修复消费者已部分提交/未通知其余订阅者，也不承诺重送。真实pi重叠、Claude退出/重入时序、其他未验动作与GPU视觉仍需精确授权验收；没有Agent/模型调用、日常配置/部署、升级、dev重启、资产操作、打包或推送。
+
 以下保留既定主线与历史阶段顺序，当前动画细类以本段及上述证据为准。
 
 用户要求先处理现有问题，再规划并推进功能；生产签名、公证、自动更新放到最后。以下是执行顺序，不将历史未测项改为通过。

@@ -25,6 +25,8 @@ An internal adapter event may include `working`, `completed`, `error`, `unknown`
 
 The legacy pi receiver admits Session transport ownership only on a validated hello publication, not on the observation’s `baseline` flag. Metadata/companion updates may retain that flag to preserve unread results, but cannot reclaim ownership from a replacement peer; superseded close events likewise cannot clear the current owner. Configuration namespaces and managed admission remain unchanged.
 
+Claude’s private observation mapper owns feedback timers before invoking consumers. Publication failures are isolated (including rejected callback promises), so stop/retire can finish clearing every live run. Session replacement rechecks closed/run/current ownership after disconnect callbacks; reentry cannot revive a stopped mapper or overwrite a newly admitted Session. Publication remains best-effort, not transactional delivery or automatic retry.
+
 ### Session Presentation context
 
 This context maps each observed Session to at most one Bubble projection. A working Session has a visible working bubble. A transition from working to completed/error updates the same bubble and marks it unread. Acknowledgement is an explicit domain command: it removes the completed/error bubble from the visible set and clears transient unread state. Unread state is intentionally in-memory and is not restored after restart.

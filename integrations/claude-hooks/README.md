@@ -2,14 +2,24 @@
 
 **Current production path: normal-start hooks → OS-bound `native-presence.ts` →
 Main-private `observations.ts` → Configurations/Application → shared pet presentation.**
-Normal startup/Home presence has real-user acceptance. Task feedback and explicit
-schema1→2 owned-hook upgrade pass the latest isolated suite (1121 passed, 1 skipped),
-including the real own-process schema2 chain; independent code review found no
-new concrete defects. A prior cold
-helper startup exceeded its three-second readiness budget and remains a known
-availability risk. Daily task hooks have not been upgraded or accepted. Legacy launcher/plugin helpers below are retained
-compatibility/test building blocks, not the current onboarding flow. See
-[task semantics, limits and validation](../../docs/CLAUDE-TASK-OBSERVATION.md).
+Normal startup/Home presence and common task feedback (read/write/Bash and generic
+model error) have the scoped real-user acceptance recorded in the
+[MVP plan](../../docs/MVP-EXECUTION-PLAN.md#claude-任务反馈2026-10-19常用反馈真实验证完成).
+Daily owned task hooks were upgraded under precise authorization; search and the
+remaining native matrix are not thereby accepted. A prior cold helper startup exceeded
+its three-second readiness budget and remains a known availability risk. Legacy
+launcher/plugin helpers below are historical compatibility/test building blocks, not
+the current onboarding flow. See [task semantics and limits](../../docs/CLAUDE-TASK-OBSERVATION.md).
+
+Observation cleanup now installs feedback timers before publication, isolates throwing
+or rejected consumer callbacks, and rechecks run/current ownership after replacement
+callbacks. Reentrant stop/retire cannot leave a new timer or connected replacement;
+a reentrant Session admission cannot be overwritten by the outer frame. Eight new
+regressions cover cleanup, including normalize → real Application subscribers → shared
+presentation; focused134 and full1579 passed/1 skipped, typecheck/source build passed.
+This is best-effort observation, not retry/ACK or recovery of partially delivered
+Application notifications. Native shutdown/overlap and animation visuals were not run;
+no hook/configuration deployment or new observation capability is included.
 
 `normalizeClaudeHook()` accepts one JSON payload capped at 64 KiB (UTF-8 bytes),
 then returns a new object containing only bounded IDs, fixed categories and booleans. Explicit native

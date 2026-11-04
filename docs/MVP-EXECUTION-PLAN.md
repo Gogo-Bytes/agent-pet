@@ -26,6 +26,12 @@ MVP 复用现有 Electron Main、管理窗口、React/R3F 宠物、Application �
 
 ## 下一轮待办实施顺序
 
+**当前用户指定顺序：动画拼接与其他尾段暂缓，先核对 Claude 输出限制/业务重试。** 本轮从干净 `37ac506` 恢复第3项，官方原文已取得，结果仍无当前被动接入范围内可实施的新映射：pi 0.85.1 重试属于 AgentSession/SDK 订阅，未转发到 ExtensionAPI；Claude 尚缺 `StopFailure.error=max_output_tokens` 与输出截断的精确版本化关联。不是网络失败，也不表示上游没有重试功能。保留 Claude 通用错误未读、pi retrying unknown；22触发/fallback与已验收素材不动。
+
+完整来源、当前本地入口与恢复条件见[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)。继续需要上游正式扩展重试生命周期契约，或 Claude 已支持版本的精确 Hook 分类依据；更换SDK/RPC宿主、升级或新增信任来源须另行确认，本轮不做。仅完成证据/进度文档校准并检查本地链接及diff，未修改生产/测试、未运行测试/typecheck/build或原生验收；不引用旧绿测冒充本次实现通过。未改配置、部署、运行Agent/模型、安装升级、重启dev或推送。
+
+以下保留既定主线与历史阶段顺序，当前动画细类以本段及上述证据为准。
+
 用户要求先处理现有问题，再规划并推进功能；生产签名、公证、自动更新放到最后。以下是执行顺序，不将历史未测项改为通过。
 
 1. **稳定性收尾（先行门槛）**：缓存遗漏清理已由 `adad08e` 修复。继续核对 Pi 单 socket 切换 Session 时旧归属是否释放、认证超时是否真正销毁失活连接、heartbeat 与旧扩展兼容性、消费者发布失败后的重试，以及 renderer 崩溃恢复是否有循环风险。逐项用现有公开边界回归确认；仅修复能复现的问题，不增加新框架。完成后运行全量测试、typecheck、desktop build，记录未覆盖的睡眠/唤醒与长时间实机场景。
@@ -283,6 +289,8 @@ hover/selected 与 connected 已按下节完成工程接线，原生视觉待验
 未重启 dev、访问用户资产/已安装宠物/Agent 配置、调用模型/外网、安装依赖、打包或推送。未做原生窗口/GPU/用户模型视觉验收；格温源循环接缝保持独立未解决，不加工 clip/骨骼或新增作者控制。
 
 ### Claude output_limited 细类：证据阻塞，未实施
+
+> 历史首次停点。`37ac506` 后的本轮核验已成功取得官方 Hooks/Errors 和 pi 固定版代码；新增证据仍不足以接 Claude 细类，pi 则明确为当前 ExtensionAPI 不转发重试事件。最新依据及恢复条件见[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)，不再把此项描述成抓取失败或只差一条 pi.on 接线。
 
 本轮从干净 `3a170d1` 开始；此前 hover/selected `4852c7b`、connected `3a170d1` 已分别提交，其测试证据保持上节范围，不作为本细类实现证据。
 

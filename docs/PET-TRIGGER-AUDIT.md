@@ -6,7 +6,9 @@
 
 ## 结论
 
-**目录有 23 项 ≠ 23 项都有自动事件。** 当前 pi 的工作/细分活动/结果链路已接；Claude/Codex 有意只发布可靠事实，工具结果是短反馈，不是持续工作或整个任务完成。`hover`、`selected` 已接真实本地交互，`connected` 已接配置边沿动画，`sleeping` 已删除，`attention` 仅作回退；`retrying` 没有可靠已接业务源。`disconnected` 与“离线立即销毁宠物窗口/移除首页实例”直接冲突。
+**第3项最新证据（基线 `37ac506`）：** 官方抓取本轮成功；pi 0.85.1 的 retry start/end 只在 AgentSession 订阅流，当前 ExtensionAPI 声明/转发链不可直接接收；Claude 官方分别定义了输出截断和 Hook 类别，但精确分类关联及版本化依据仍缺失。保留 pi retrying unknown、Claude通用错误未读，未实施新映射。来源与恢复条件集中在[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)。仅检查本地文档/源码引用及diff，未改生产/测试或运行测试/typecheck/build；动画拼接/其他尾段继续暂缓。
+
+**目录有 22 项 ≠ 22 项都有自动事件。** 当前 pi 的工作/细分活动/结果链路已接；Claude/Codex 有意只发布可靠事实，工具结果是短反馈，不是持续工作或整个任务完成。`hover`、`selected` 已接真实本地交互，`connected` 已接配置边沿动画，`sleeping` 已删除，`attention` 仅作回退；`retrying` 没有可靠已接业务源。`disconnected` 与“离线立即销毁宠物窗口/移除首页实例”直接冲突。
 
 原只读审计时拖动尚在实施，以下未更新的行号仍是当时快照，原1491测试数字仅属历史基线；当前拖动状态由页首覆盖。本轮新增下面 connected 范围，hover/selected 为上一阶段，没有运行真实应用/Agent/模型、外网、安装或用户资产操作（仅隔离测试socket）。
 
@@ -28,6 +30,8 @@
 - 回归：`configurations-socket.test.ts` 真实隔离认证、双Session/部分与全部断开/重连/未读/非持久化；Claude/Codex配置测试验证聚合身份；`desktop-pets.test.ts`窗口恢复/替换/late-ready；preload、App/PetStore、management-store、HomeScene/ScenePet/PetModel覆盖实际投递、迟到快照、重挂、业务优先、missing/reduced/static和延迟模型加载。先红后绿新增10项，聚焦126、全量1523 passed/1 skipped/133 files、typecheck/desktop源码build通过；详见[执行计划](MVP-EXECUTION-PLAN.md#配置-connected-边沿接线)。未做原生/GPU视觉验收。
 
 ## Claude output_limited 核对停点
+
+> 下列为首次核对；本轮官方 Errors 新证据区分输出截断与上下文容量，但仍未关联到 `StopFailure.error` 的精确版本化分类。完整证据与当前处理见[细类核验](PROVIDER-ANIMATION-EVIDENCE.md)，不把更多错误说明当作可以接线的证明。
 
 - 干净基线 `3a170d1`；仓库有界检索仅证实 normalize 对 `StopFailure.error=max_output_tokens` 的精确白名单及合成测试，未找到证明其触发条件的版本化原生字段定义/实现。observations 仍统一发布 error，不暴露正文，不制造 success。
 - Main 一次核对[官方 StopFailure input](https://code.claude.com/docs/en/hooks#stopfailure-input)：类别表确有 `max_output_tokens`，与 `rate_limit`、`unknown` 并列，但没有解释其精确触发语义，未提 `model_context_window_exceeded`。类别存在不等于已证明它只表示输出上限，而非上下文容量等限制。README 的 2.1.78 release 引用也只证明 StopFailure 事件新增。
@@ -78,8 +82,8 @@
 |任务完成 `success`|P message stop/toolUse 仅记候选，agent_settled 且 idle 才发 completed；C/X Stop 可继续|P 已接 P:38-50,192-214→D→Q:18-26；C/X 源不足。tool_execution_end/PostToolUse 都不是任务成功|TP:36,89、TL；真实整批完成/下一轮/未读确认/重连|
 |发生错误 `error`|P settled 原生 error（length亦是错误终态）；C StopFailure；X 无可靠统一失败事实|P/C 已接 P:202-214、C normalize:117-120 / observations:92-93→D/Q；X 源不足，exit7不可猜 error|TP:63,105、TC:58、TX 负例；P 整轮真实错误仍需补；C 历史错误事实不证明对应 clip|
 |工具执行失败 `tool_error`|P tool end isError 且非 aborted；C PostToolUseFailure 且 is_interrupt===false；X 无可靠失败字段|P/C 已接 P:239-244、C observations:83-87→Q:21-25；不改整个任务为失败|TP/TC/TL；真实失败后继续、重复 tool ID、并发短事件|
-|正在重试 `retrying`|三者没有已接可靠业务重试事件|源不足；P:61 保持 unknown，Q:4 可消费受能力约束事实但无生产者。socket reconnect 不可替代|TP:39 负例、TQ；暂不安排伪造实机事件|
-|输出达到限制 `output_limited`|P stopReason length→settled；C StopFailure max_output_tokens 类别已归一化但 observations 丢失细类；X 无源|P 已接 P:198,210-213；**C 类别存在，但精确语义证据不足，细分阻塞**（C normalize:4,117-120；observations:92），目前只 error；官方类别列举未证明其与输出上限而非上下文容量的对应关系，不能猜测接 occurrence|TP:63、TC normalize；P/C 真实长度限制与非限制错误，禁止解析正文|
+|正在重试 `retrying`|P 0.85.1 AgentSession 有真实auto_retry_start/end，但现用ExtensionAPI不转发；C/X无本轮已证实可接源|当前观察面不足而非抓取失败；P:61保持unknown，Q:4有消费能力但不能制造事实。SDK订阅、压缩willRetry和socket reconnect均不可替代|TP:39既有负例、TQ；本轮只读核对未运行。固定版声明/发送链见[证据](PROVIDER-ANIMATION-EVIDENCE.md)|
+|输出达到限制 `output_limited`|P stopReason length→settled；C StopFailure max_output_tokens 类别已归一化但 observations 丢失细类；X 无源|P 已接 P:198,210-213；**C 类别存在，但精确分类关联/版本证据不足，细分阻塞**（C normalize:4,117-120；observations:92），目前只 error；官方Errors虽分别定义输出截断/上下文超限，仍未连接到Hook分类，不能猜测接occurrence|TP:63、TC normalize；P/C 真实长度限制与非限制错误，禁止解析正文|
 |任务已取消 `cancelled`|P aborted / 本轮 AbortSignal；X Interrupt；C 工具中止不证明整轮取消|P/X 已接 P:202-213、X observations:82-85；C 源不足|TP:105-135、TX:33；P/X 有历史事实实测，仍验动画及下一轮不受旧取消污染|
 |需要关注 `attention`|无独立生产事件；waiting_input/error/success/tool_error/output_limited 的资产 fallback|**部分：回退已接，独立自动 trigger 未接** A:13-20,48-51；Q 从不直接产 attention。配置 availability='attention' 不进宠物动画|A/TL；有 attention clip、无主 clip 的 fallback，业务 once 回退 attention 应只播一次；不要无请求增加提醒轮询|
 |Agent 已连接 `connected`|P/C/X认证配置聚合离线→在线；不是单条hello/每Session|**已接** Main运行时connectionCue→每窗口snapshot/Home→共享播放器；业务/局部反馈优先，不排队，Q业务投影不改|本节双Session/部分退出/重连/重挂/恢复身份测试；缓存限当前Renderer，原生视觉待验|
@@ -106,7 +110,7 @@
 1. **先收口拖拽独立阶段。** 审查最终 diff，只复用当前 gesture 和 L；跑 writer 聚焦测试/typecheck/build，再做原生拖动。关注完成/工具错误在拖拽中到达、松手恢复最新 activity、无 dragging clip、reduced。方向变化不应不断 reset clip。不把中间红/绿测试误报为完成。
 2. **补 UI 有真实来源的 hover / selected。** 范围：App/PetCanvas/PetModel、HomeScene/CompanionScene/ScenePet、L 的既有 request/replay/rest 参数及对应测试。用真实命中入边沿、明确 selection 边沿驱动局部 cue；键盘与鼠标一致，退出/blur/卸载清理。不把工具栏容器进入算命中模型；不影响业务 state/未读/IPC。先明确和拖拽、业务 once 的覆盖规则，优先最小 latest-wins，而非新框架。
 3. **补 connected 并核对幂等（本轮已完成工程范围，原生待验）。** 复用已认证配置在线事实；按“配置从离线→在线”而非每条 hello/每个 Session/每次场景挂载生成展示身份。范围：Configurations/Main 每配置投递 seam、desktop/home presentation、必要 shared/preload 类型和 tests。保持 per-config 隔离与迟到窗口 ready 守卫。本轮已红绿验证重连未读/renderer重建边界，身份仅放Main Entry；复用Renderer模块缓存、不加持久回执，不改Provider业务事实。
-4. **补明确已有细分事实，其他能力保持未知（Claude本轮证据阻塞）。** Claude `max_output_tokens` 只有类别列举，精确触发语义尚未证实，当前不实施；取得可靠原生依据后才沿现有 occurrence/capability 加 output_limited，保留 error 未读、不制造 success，并先做 normalize→observations→Application/Q 及重复/旧prompt/retire/新work/fallback回归。其余 C/X thinking/responding/working/success/wait/retry 等无可靠源的不强补；不解析 transcript、shell 或错误正文。
+4. **补明确已有细分事实，其他能力保持未知（本轮未实施新映射）。** Claude `max_output_tokens` 的Hook分类与官方输出错误说明尚无精确关联/版本依据；pi 0.85.1 已查清重试不转发给当前扩展，不通过伪注册或更换宿主补齐。当前不实施；取得可靠原生依据后才沿现有 occurrence/capability 加 output_limited，保留 error 未读、不制造 success，并先做 normalize→observations→Application/Q 及重复/旧prompt/retire/新work/fallback回归。其余 C/X thinking/responding/working/success/wait/retry 等无可靠源的不强补；不解析 transcript、shell 或错误正文。
 5. **sleeping 已删除；disconnected / 独立 attention 保持当前边界。** 不为空闲增加休眠计时器。disconnected 要在“保持离线立即移除”与“特定可见处展示断开”中明确产品范围；前者意味着桌面 disconnected 只能手动预览，不应宣称自动可见。**不默认为延迟销毁窗口。** attention 若仅保留 fallback，直接记录无需独立事件；若要未读持续关注，需用户确认其与 success/error once、确认和多 Session 的关系。
 6. **集中真实验收，与 Gwen 接缝分开。** 各 Provider 用允许的已有原生事件、绑定已有 clips：事件事实→每配置投影→桌面/Home实际播放→退出/下一轮/重连；包括无映射/无idle/静态资产、切页隐藏、reduced、快速连续事件及长clip。先复用授权范围，新增 Agent/模型/用户文件操作另取精确授权。每阶段测试+typecheck+desktop build 通过仅是工程证据，不等于原生桌面动画验收。
 

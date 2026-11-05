@@ -16,7 +16,7 @@
 | 迁移包装/旧渲染路径 | 源码确认 R1 scene effect 包装、旧 loader/mixer、手工 DOM 入口、旧 style.css 已在 R1–R3 删除；不重复重构活跃的 React/bridge/手势薄层 | 单 React root、单 R3F Canvas/loop、Drei loader/mixer；保留真实资产数据规则 |
 | 依赖 | 检查 manifests、源 import、构建/类型/测试用途；未确认可删除的无用依赖，故不改 manifest/lockfile | React/Fiber 版本组合、显式 peer/type/CLI 依赖、Fiber 9.7.0 初始化补丁及 lock hash |
 | 活跃 README | desktop 改正“没有真实 Adapter/没有扩展”、补齐 `index.html → main.tsx`、Modules/tokens、真实 pi opt-in 边界；adapter README 改正“未接 Main” | 明确 openSession unsupported、无自动安装/重启；不是新增 Agent |
-| 历史文档 | R0–R3 加历史说明但不改写原测量；迁移计划标明旧 index.ts/style.css 是迁移前基线；PROJECT_PLAN 标明初始规划非当前实现清单 | 保留历史失败、旧 CSS hash、旧截图、当时未完成项；不删审计或原生风险 |
+| 历史文档 | R0–R3 加历史说明但不改写原测量；当时的迁移计划标明旧 index.ts/style.css 是迁移前基线；初始项目计划标明规划非实现清单（两份重复计划现已删除，R0–R4 原始证据仍保留） | 保留历史失败、旧 CSS hash、旧截图、当时未完成项；不删审计或原生风险 |
 
 未发现其它足以证明应删除的迁移代码，不以清理为名重写业务或样式。发现的 reload 缺陷单独升级给父会话，不由 worker 猜测修改 Main 导航安全策略。
 

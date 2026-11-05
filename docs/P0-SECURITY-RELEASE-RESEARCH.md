@@ -10,7 +10,7 @@ macOS 上 Electron 与外部 pi Node 通过用户私有发现文件和 Unix doma
 ## Findings
 
 ### 1. 已读代码的实际基线
-**Claim:** 当前连接不是产品版自动发现或双向认证实现。**Sources:** 本地 `docs/DESKTOP-PRODUCT-DESIGN.md`、`apps/desktop/package.json`、`packages/adapter-pi/src/index.ts`、`integrations/pi-extension/index.ts`。**Support:** direct evidence。**Confidence:** high。
+**Claim:** 当前连接不是产品版自动发现或双向认证实现。**Sources:** 当时产品设计原稿（`git show d43e17d:docs/DESKTOP-PRODUCT-DESIGN.md`）、`apps/desktop/package.json`、`packages/adapter-pi/src/index.ts`、`integrations/pi-extension/index.ts`。**Support:** direct evidence。**Confidence:** high。
 
 - 扩展加载时读取并固定 `AGENT_PET_PI_ENDPOINT` / `AGENT_PET_PI_TOKEN`；每次消息携带 token，连上即发送含名称/项目名的 hello，没有读取服务端数据/ack 的处理。
 - adapter 对 token 做字符串相等检查，收到 hello 即报告 connected；全 server 共用配置 token，没有按目标授权表、服务端身份验证、认证超时或定向撤销接口。已有连接跟随启动时凭证，不会因删文件自动失效。

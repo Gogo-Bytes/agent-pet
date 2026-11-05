@@ -14,7 +14,7 @@
 
 ## 2. 对旧方案的修正
 
-`feasibility-research.md`、`PROJECT_PLAN.md` 和 `ARCHITECTURE-DESIGN.md` 中直接选择 Codex App Server、pi JSON/RPC 的建议不能用作旁路监控的实施依据：启动一个新的协议进程，不等于订阅另一个已经运行的交互式进程。必须逐入口验证 attach/事件订阅范围。
+早期选型曾建议直接选择 Codex App Server、pi JSON/RPC；该宿主方案未采用，现行[架构](ARCHITECTURE-DESIGN.md#5-adapter-ports-and-session-observation)采用被动观察。启动一个新的协议进程，不等于订阅另一个已经运行的交互式进程。必须逐入口验证 attach/事件订阅范围，不能用旧选型建议作为旁路监控的实施依据。
 
 “支持 Codex”也不等于同时支持 Codex CLI、Desktop、所有 IDE。监控与定位窗口分别建立能力矩阵，不用打开一个新终端冒充激活原会话。
 

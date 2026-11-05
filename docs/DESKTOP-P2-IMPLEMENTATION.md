@@ -4,7 +4,7 @@
 
 本文 managed 范围已有 P2a、内部 Core/AuthStore、native FilesPort 与 Worker 集成；B4.3 Electron Worker、B4.4a staged-resource 的证据只覆盖各自测试范围，不是最终应用包或生产接入。旧 `a9a3be3` 基线的“原生写入与核心集成尚未实现”已过时；公开工厂与 productionPolicy 仍关闭，pi 产品接入走独立 legacy opt-in bridge；这不是“只存在 pi、其他 Provider 未实现”的全库盘点。
 
-依据：[产品设计](DESKTOP-PRODUCT-DESIGN.md)、[P0 契约](P0-INTEGRATION-CONTRACT.md)、[本机安全边界](P0-LOCAL-SECURITY-DECISION.md)、[安装与撤销契约](P0-MANAGED-INSTALLATION.md)。初始兼容研究只有 pi 0.85.1 标准发行版，版本范围不得随意放宽；当时的 Windows/Codex/Claude 延期按历史解读，后两者现行边界见各模块 README。
+依据：[P0 契约及当时已确认的产品决定](P0-INTEGRATION-CONTRACT.md)、[本机安全边界](P0-LOCAL-SECURITY-DECISION.md)、[安装与撤销契约](P0-MANAGED-INSTALLATION.md)。初始兼容研究只有 pi 0.85.1 标准发行版，版本范围不得随意放宽；当时的 Windows/Codex/Claude 延期按历史解读，后两者现行边界见各模块 README。
 
 ## P2a：检测与只读预检（已完成）
 

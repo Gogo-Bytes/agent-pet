@@ -32,7 +32,9 @@
 
 - [MVP 人工验收](MVP-MANUAL-CHECKLIST.md)、[重启清单](MVP-RESTART-CHECKLIST.md)、[剩余行为验收](MVP-REMAINING-ACCEPTANCE.md)。
 - [正式管理界面迁移](MANAGEMENT-MIGRATION-ACCEPTANCE.md)、[pi 真实扩展反馈](PI-EXTENSION-LIVE-ACCEPTANCE.md)、[Claude 验收记录](CLAUDE-CLI-ACCEPTANCE.md)、[Codex 日常操作记录](CODEX-DAILY-CONNECTION-PREVIEW.md)。
-- [早期项目计划](../PROJECT_PLAN.md)、[技术可行性研究](../feasibility-research.md)、[旧桌面产品设计](DESKTOP-PRODUCT-DESIGN.md)、[原型组件说明](MANAGEMENT-UI-COMPONENTS.md)。
+- [旧管理组件迁移实测](MANAGEMENT-UI-COMPONENTS.md)、[原型配置交互验收](CONFIGURATION-UI-REVIEW.md)、[首页原型验收](HOME-SCENE-REVIEW.md)、[Renderer 迁移验收](RENDERER-R4-ACCEPTANCE.md)。
 - [P2 实施证据](DESKTOP-P2-IMPLEMENTATION.md)、[本机安全决策](P0-LOCAL-SECURITY-DECISION.md)、[文件系统与 D6 边界](DESKTOP-P2B2-FILESYSTEM-POLICY.md)：历史排期不决定本机 MVP，安全约束与未通过结论继续有效。
+
+已被当前需求、架构和阶段结果取代的早期选型、旧实施计划及弃用的视觉建议已删除，不再作为开发入口。必要的原稿依据在引用处给出固定 Git 版本；实测结果、失败记录、授权范围与尚未关闭的安全约束仍保留。
 
 `*-PREVIEW.md` 是特定操作范围；`*-ACCEPTANCE.md`、`evidence/` 和 `screenshots/` 是分层证据，不代表所有后续版本或真实环境均已通过。恢复工作前回到当前执行计划，再读取所需专项材料。

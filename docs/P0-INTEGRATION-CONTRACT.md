@@ -6,7 +6,7 @@
 
 ## 依据
 
-- [产品设计与用户决定](DESKTOP-PRODUCT-DESIGN.md)
+- 产品决定见上方历史状态摘要；最初设计原稿可通过 `git show d43e17d:docs/DESKTOP-PRODUCT-DESIGN.md` 查阅。现行产品契约以[产品需求](../PRODUCT-REQUIREMENTS.md)为准，不以旧方案重开已完成能力。
 - [pi 0.85.1 官方安装包静态研究](P0-PI-INTEGRATION-RESEARCH.md)：版本固定的文档与分发源码证据。
 - [macOS 安全与发布研究](P0-SECURITY-RELEASE-RESEARCH.md)：Node/Electron/Apple 官方资料及尚未验证的边界。
 - [pi 动态发现验证](P0-PI-DISCOVERY-VALIDATION.md)：实际 0.85.1 DefaultPackageManager.resolve，11 项临时目录检查，不执行扩展。

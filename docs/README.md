@@ -1,6 +1,6 @@
 # 文档导航
 
-当前优先级与尚未迁入 Issue 的任务统一从 [MVP 执行计划](MVP-EXECUTION-PLAN.md) 进入。文档维护长期契约和可追溯证据，不另建进度表。经授权创建并核查 Issue 后，仅对应任务的动态状态转到 Issue／已有 Projects，计划保留优先级与链接；本次整理不表示迁移已经发生。
+当前优先级与尚未迁入 Issue 的任务统一从 [MVP 执行计划](MVP-EXECUTION-PLAN.md) 进入。文档维护长期契约和可追溯证据，不另建进度表。首批迁移已核查：[Provider 收尾 #15](https://github.com/Gogo-Bytes/agent-pet/issues/15)、[细类来源 #16](https://github.com/Gogo-Bytes/agent-pet/issues/16)、[持续状态动画 #17](https://github.com/Gogo-Bytes/agent-pet/issues/17)。这三项的动态状态只维护在 Issue，计划保留优先级与链接；其他任务仍未迁移。
 
 ## 产品与架构
 

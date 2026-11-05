@@ -4,7 +4,7 @@
 
 ## 优先级与范围
 
-**当前目标：完善单用户、本机 macOS 的 pi／Claude Code／Codex CLI 接入，再补后续功能与正式分发。** 未迁移任务仍以本文为进度入口；只有经授权实际创建并核查 Issue 后，对应任务的动态状态才转到 Issue／已有 Projects，本文仅保留优先级和链接。本次文档整理未创建 Issue，不切换状态权威。旧 P0/P2/B/D 文档保留技术契约和历史证据，不再决定本地 MVP 排期。产品语义见[需求](../PRODUCT-REQUIREMENTS.md)与[领域术语](../CONTEXT.md)，不另建任务数据库或完成百分比。
+**当前目标：完善单用户、本机 macOS 的 pi／Claude Code／Codex CLI 接入，再补后续功能与正式分发。** 未迁移任务仍以本文为进度入口；只有经授权实际创建并核查 Issue 后，对应任务的动态状态才转到 Issue／已有 Projects，本文仅保留优先级和链接。首批三项已按用户授权迁至下列 Issue 并读回核查；其动态状态以 Issue 正文为准，未迁移任务仍留本文。旧 P0/P2/B/D 文档保留技术契约和历史证据，不再决定本地 MVP 排期。产品语义见[需求](../PRODUCT-REQUIREMENTS.md)与[领域术语](../CONTEXT.md)，不另建任务数据库或完成百分比。
 
 复用 Electron Main、管理窗口、React/R3F、Application 及三种 Provider 的被动观察链路。桌面和首页仅为在线且显式绑定的每个配置展示一只宠物，同 Provider 多配置不合并；内置及已导入资产均可绑定，全部动画可选。只观察有限状态，不启动、接管、审批或控制 Agent，不读取对话正文。Windows、其他 Provider、桌面宿主和新核心框架不因本轮整理自动进入实施。
 
@@ -26,26 +26,28 @@
 
 ## 已确认待实施：持续状态动画 in / loop / out
 
-用户已确认仅为部分持续映射增加可选入场/退场，首批为 idle、working、dragging；完整规则、兼容边界与验收见 [持续状态动画实施设计](PET-ANIMATION-TRANSITIONS.md)。正常切换按旧状态 out → 新状态 in → loop；即时反馈可打断，临时 hover 不造成底层重新入场，离线/解绑仍立即移除。此设计有界扩展旧单 clip 映射契约，不表示已实现，也不授权修改或自动安装用户模型。本次仅记录文档，后续按该设计独立实施。
+用户已确认 idle、working、dragging 的可选阶段设计，详细契约保留在[持续状态动画实施设计](PET-ANIMATION-TRANSITIONS.md)，实施与验收进度统一维护于 [#17](https://github.com/Gogo-Bytes/agent-pet/issues/17)。设计本身不表示功能已实现，也不授权修改或自动安装用户模型。
 
 ## 下一轮待办实施顺序
 
-**当前用户指定顺序：先完善 pi / Claude Code / Codex 适配，动画制作与拼接暂停。** 本轮从干净 `95dd667` 核对审计，仅实施可复现的生命周期/归属缺陷，不新增 SDK/RPC 宿主或猜测业务事件。Claude 输出限制与业务重试的来源阻塞继续保留：[Provider细类证据](PROVIDER-ANIMATION-EVIDENCE.md)；22项触发/fallback与已验收素材不动。
+**当前用户指定顺序：先完善 pi / Claude Code / Codex 适配，动画制作与拼接暂停。** 首批只迁移以下三项，不批量迁移历史完成项或生产安全待办；不新增 SDK/RPC 宿主或猜测业务事件，既有素材和安全边界保持。
 
 当前收尾与后续优先级：
 
-1. **三 Provider 最近增量的独立审查与原生验收**：pi 归属修复 `0e4e74d`、Claude 发布清理 `8fd557c`、Codex 扫描复用 `2575b81` 分别核对，不用旧 PR 合并或旧基础接入验收替代。三者未因此获得新的业务信号。
-2. **来源阻塞**：pi 0.85.1 的 retry 在 Session/SDK 而非当前扩展观察面；Claude 输出限制缺精确分类关联。保持 unknown/generic error，恢复条件见 [Provider 证据](PROVIDER-ANIMATION-EVIDENCE.md)，不启动新 SDK/RPC 宿主或解析正文补齐。
-3. **已确认后续播放器设计**：上节 in/loop/out 待实施，先不把其对象格式发布为可导入契约。
+1. [三 Provider 最近增量：独立审查与有界原生验收 #15](https://github.com/Gogo-Bytes/agent-pet/issues/15)。最高优先级，范围、证据、授权与验收结果在 Issue 维护。
+2. [Provider 细类来源：业务重试与输出限制 #16](https://github.com/Gogo-Bytes/agent-pet/issues/16)。依据与负语义保留在 [Provider 证据](PROVIDER-ANIMATION-EVIDENCE.md)，恢复条件及动态状态在 Issue 维护。
+3. [持续状态 in / loop / out 实施 #17](https://github.com/Gogo-Bytes/agent-pet/issues/17)。顺序在 Provider 收尾之后，详细设计见上节。
 4. **离线素材制作暂停**：Idle、Run_Haste、Run01 及桌面 hover 的用户确认仅覆盖对应交付；其他尾段和 Blender 拼接不继续。长期 GPU、多窗口、系统重启与正式发布仍分别待验，不自动开启真实操作。
 
-Codex `2575b81` 已删除程序文件选择器：Main 复核扫描候选并复用到取消后的预览重试，失效引导重新扫描；已有未配置记录继续读取授权，自定义目标按 opaque 配置 ID 保留，不误改默认目录。已配置记录恢复不重复安装。原写入确认、原生 `/hooks` 审核与失败保留边界不变。原实施记录为聚焦164项、全量1603 passed/1 skipped、typecheck及源码build通过；这是既有证据，不是本次文档整理重跑。准确契约与回归入口见 [Codex 模块](../integrations/codex-hooks/README.md#connection-setup-scan-once-never-pick-a-program-file)；新原生流程尚待验收。
-
-上述 SHA 是本地实现定位，不等于已推送或合并。线上 Issue/PR 操作须在范围、身份和权限确认后进行；迁移预览不是线上任务。
+迁移时已读回三项 Issue 的编号、正文及 OPEN 状态。`0e4e74d`、`8fd557c`、`2575b81` 已核查远端可达，不代表已合并或人工验收通过；本地整理提交 `1bc29c3`、`a393f14` 尚未推送，#17 已说明设计文档链接待发布后补齐。本轮未创建 PR、推送、合并或关闭任务。
 
 ## 历史实施与验收记录
 
 以下保留原阶段的实现、失败、复验和授权证据，以及原标题链接。阶段中的旧限制/待办按上方当前顺序及后续明确覆盖记录解释，不重新排期已完成能力；历史命令和授权不自动允许再次操作真实目标。安全 guard、数据保留测试与未通过状态不因归入历史而失效。
+
+### Codex 自动扫描连接：实现阶段证据
+
+`2575b81` 删除程序文件选择器：Main 复核扫描候选并复用到取消后的预览重试，失效引导重新扫描；已有未配置记录继续读取授权，自定义目标按 opaque 配置 ID 保留，不误改默认目录。已配置记录恢复不重复安装。写入确认、原生 `/hooks` 审核与失败保留边界不变。实施时聚焦164项、全量1603 passed/1 skipped、typecheck及源码build通过；本次迁移未重跑。准确契约与回归入口见 [Codex 模块](../integrations/codex-hooks/README.md#connection-setup-scan-once-never-pick-a-program-file)。后续审查和验收状态只维护于 [#15](https://github.com/Gogo-Bytes/agent-pet/issues/15)。
 
 ### Provider 修复第一阶段：pi 重叠连接归属
 

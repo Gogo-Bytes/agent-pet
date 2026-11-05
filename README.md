@@ -6,7 +6,7 @@
 
 - [开发、运行与验证](apps/desktop/README.md)
 - [文档导航](docs/README.md)
-- [当前优先级、实施与验收记录](docs/MVP-EXECUTION-PLAN.md)
+- [当前优先级与任务入口](docs/MVP-EXECUTION-PLAN.md)
 - [产品需求](PRODUCT-REQUIREMENTS.md) · [领域术语](CONTEXT.md)
 - [宠物作者指南](docs/PET-ARTIST-GUIDE.md)
 - [工程规则](AGENTS.md) · [GitHub 工作流](.agents/skills/github-workflow/SKILL.md)

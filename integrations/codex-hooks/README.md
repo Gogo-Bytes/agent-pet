@@ -1,105 +1,134 @@
-> Current status (2026-10-20): formal Main/connection UI/Home and daily CLI basic presence are enabled and verified. Native execution/apply_patch/cancellation were driven by Main in a dedicated daily test session and reached shared action requests. Independent error/read/search/waiting feedback remains unsupported or unverified; no animation-visual acceptance this round. [Current scope/evidence](../../docs/CODEX-TASK-LIVE-VERIFY-PREVIEW.md#最终实测结果2026-10-20) supersedes historical “not connected/unregistered” statements below. Daily hooks/configuration preserved; ordinary dev remains running, no package.
+# Codex CLI passive observation
 
-# Codex CLI hook input boundary
+Current path: native command hooks → protected activation → independently verified
+macOS host identity → private mapper → Configurations/Application/Home/desktop.
+Compatibility is limited to the checked **standalone0.163.0 layout**, not all install
+methods/versions or Codex Desktop. Task priorities are in the [MVP entry](../../docs/MVP-EXECUTION-PLAN.md).
 
 ## Connection setup: scan once, never pick a program file
 
-Codex setup uses Main-owned, currently valid installation discovery evidence, not a native executable picker or a Renderer-supplied path. The approved resolver is retained for preview retries and rechecks the scan identity, entry/standalone layout and target; confirmation also rechecks the CLI and resolved host before any installation writes. Canceling a preview does not discard a still-valid scan; a replaced/removed installation, invalidated scan/window or changed target requires an explicit rescan. Layout compatibility remains limited to the existing 0.163.0 standalone checks, not binary attestation.
+Main owns revalidatable installation discovery evidence, not an executable picker or
+Renderer-supplied program path. The resolver survives preview cancellation while its
+scan identity, entry/standalone layout and target remain valid. Preview and confirmation
+recheck CLI/host/target before writes. A removed/replaced installation, stale scan/window
+or changed target requires rescan; metadata verification is not binary attestation.
 
-An existing **unconfigured** record now continues through the same read-consent and exact hooks preview as a new record; merely adding a record does not mean hooks are installed. For a custom target, the existing preparation API accepts only its opaque configuration ID. Main binds it to the target captured with the scan and rejects unknown IDs, wrong providers, changed/removed targets and arbitrary paths. It never silently configures the default target instead. Already configured records retain view/resume and validated persisted-executable restoration, with no new scan or duplicate installation on restart.
+An existing unconfigured record continues read consent and exact hook preview, not just
+“view configuration”. Custom-target preparation accepts only the opaque configuration ID;
+Main binds it to the scan's captured target and rejects wrong-provider/removed/changed IDs.
+It never substitutes the default target. Configured records restore validated saved
+executable evidence without mandatory rescan or duplicate installation.
 
-No hook writes occur until the separate confirmation. Existing content/ownership, cancellation generations, one-use plans and native `/hooks` review remain required. Claude and pet/configuration-folder pickers are unchanged. Regression coverage lives in `configuration-ipc.test.ts`, `codex-connection.test.ts`, `CodexConnectionControls.test.tsx` and the management preload test; fixtures use self-owned files and a stub observation bridge, not a real Codex process. Focused checks: 164 passed; full suite: 1603 passed / 1 skipped (135 files); typecheck and desktop source build passed. Native UI/real Codex acceptance remains pending.
+The selected target is actual CODEX_HOME (normally `~/.codex`, not a project's `.codex`).
+Read consent permits only bounded target hooks.json (64KiB) and ancestor/program metadata;
+separate confirmation appends10 owned command hooks. Existing JSON values/unrelated bytes,
+config.toml, login and shell remain unchanged. Codex's native `/hooks` trust review is
+independent: Agent Pet does not write trust, run Codex or approve tasks.
 
-`normalize.ts` accepts bounded JSON and emits metadata facts. Transport, standalone hook command and shared-state projection are now implemented and tested with isolated self-owned processes. Main/Renderer registration and daily configuration installation are not yet enabled; the current dev does not connect to Codex.
+`protected-json-file.ts` and `codex-user-hook.ts` reject duplicate keys, unsafe links/
+permissions, pending writes, ambiguous or modified own references. Only complete unchanged
+owned groups are withdrawn. `codex-registration-store.ts` keeps0700/0600 private state,
+receipt and original-hook backup; writes compare the first receipt-validated bytes, never
+adopt a concurrent edit as a new overwrite baseline. No full backup restore over user edits.
+Unknown/partial files remain; shared-file rename is not external-editor CAS.
 
-Latest: [native first-turn mock passed](../../docs/CODEX-FIRST-TURN-MOCK-PREVIEW.md); [normal-start private discovery/OS-bound bridge modules](../../docs/CODEX-NORMAL-START-IMPLEMENTATION.md) are implemented with isolated verification. A Main private-runtime controller exists, but Configurations/IPC/Renderer registration and daily hook installation remain disabled. Native review of the new file-based command is a separate pending step, not inherited from the previously trusted environment-based command.
+`codex-connection.ts` owns explicit confirm/cancel/resume/pause/removal. Resume validates
+original hooks, program and private materials; paused state persists. Exit stops observation,
+not Agent. Removal preserves runtime material that already-loaded hooks may still use.
+Main owns one-use plans/generations; Renderer gets no execution API or private activation.
+Common preservation and authorization rules: [security boundaries](../../docs/SECURITY-BOUNDARIES.md).
 
-The 2026-10-19 [official hook contract](https://learn.chatgpt.com/docs/hooks) supplies native session/turn/tool identities. These are Main-private, not UI IDs. Input projection drops prompts, paths, tool arguments/results, message text and model names. Unknown events are ignored; malformed known events are rejected. No input is logged.
+## Startup and host identity
 
-Design decisions:
+`native-hook-entry.ts` rereads the fixed private activation on every invocation; normal
+startup needs no connection environment variables. `hook-runtime/private-activation.ts`
+checks schema/provider/address,700/600/current owner, complete bounded ancestor metadata,
+no-follow/nonblock, one link, size and before/after identity. Observer failure silently
+exits0 without emitting hook decisions or interfering with Agent output.
 
-- A returned tool result is not success. Classify canonical Bash/apply_patch only; unknown tools remain `other`, without inspecting command text.
-- Submission, approval checks, compaction requests and Stop are candidates, not definitive working/waiting/completed states. Other hooks may affect execution.
-- Preserve the explicit interruption fact and turn identity. Never treat session exit as cancellation or completion.
-- Preserve any supplied child identity. Subagent lifecycle is deferred; a parent session ID alone cannot prove root-thread attribution.
-- Never infer process lifetime from a short-lived hook. Future transport must verify the actual host, bind a run, anonymize IDs, and handle ordering/deduplication before Application receives observations.
+`native-host.ts` validates the hook executable and exact host through at most16 ancestors,
+UID/PID/birth time/full executable path and a second full-chain check. No process-list,
+argv/env/cwd/transcript read or name-based match. Default daemon executable can differ
+from the CLI: Main's `codex-executable.ts` resolves the fixed version's packages/app-server-daemon
+entry and bounded legacy layout metadata, never background log bodies. Upgrade/path
+mismatch requires revalidation, not accepting an arbitrary “codex” process.
 
-Tests use synthetic inputs. The earlier installed CLI version check (0.163.0) does not prove this current documented contract is supported there. Native compatibility, hook trust, passive process binding, private authenticated delivery, preserving existing hook configuration, UI and real actions remain separate stages. Do not bypass hook trust or use a new app-server process to claim observation of an existing CLI. Desktop stays out of this stage.
+`native-receiver.ts` authenticates loopback route/headers/authority and bounded input,
+with16 peers/queued checks and a1500ms absolute deadline; stop fences late validation.
+`native-presence.ts` holds random host-run IDs, independent sessions,32 runs/32 sessions/
+1024 recent events, and retired identities. Saturation retires the run rather than
+throwing away tombstones. Every event is independently host-verified. Host death/PID reuse
+clears it; daemon liveness alone does not prove any CLI window or Session is online.
 
-Validation: `pnpm test integrations/codex-hooks/normalize.test.ts integrations/claude-hooks/normalize.test.ts --maxWorkers=1` (58 passed), `pnpm typecheck`, `pnpm --filter @agent-pet/desktop build` (source build only). No dependencies, daily configuration reads/writes, Agent execution, model requests or packaging.
+A first verified non-startup fact may establish an unknown baseline, not a fabricated
+SessionStart or success. An empty CLI does not promise an immediate Pet. For0.163.0,
+SessionStart is [queued at session creation](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/session.rs#L1954)
+and [drained in the first turn](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/turn.rs#L333),
+with a [first-turn ordering test](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/tests/suite/hooks.rs#L1580).
+Waiting longer at an empty thread is not a valid startup-hook test. SessionEnd can follow
+archival/deletion or idle-session cleanup, not necessarily terminal closure; see
+[official lifecycle](https://learn.chatgpt.com/docs/hooks#sessionend). Shared-daemon sessions
+and host lifetimes are distinct.
 
-## Bounded installed-CLI check harness
+## Facts and privacy
 
-`test-support/cli-check.mjs` prepares only fixed version/help commands in an exclusive temporary profile. It never executes on import; its explicit entry requires authorization under the [precise preview](../../docs/CODEX-CLI-COMPATIBILITY-CHECK-PREVIEW.md). Seven self-owned process/filesystem tests cover output limits, deadlines, secret-free summaries and bounded installation links. Together with input tests: 40 passed; typecheck and desktop source build passed. After precise authorization, the installed CLI returned version 0.163.0 and help successfully; help mentions hooks. No hook was loaded or interactive session started. See the preview for measured output sizes and remaining limits.
+`normalize.ts` accepts bounded JSON and returns only native identity and enum facts.
+Prompts, paths, tool arguments/results, message text and model names are discarded;
+unknown events are ignored, malformed known events rejected, input never logged.
+`observations.ts` keeps native session/turn/tool IDs private and publishes random aliases
+in the configuration namespace. Each session retains at most256 turns/1024 tool tombstones;
+saturation refuses new facts rather than permitting replay. Old/unseen/child facts never
+attach to a guessed current turn. SessionEnd/retire/stop clear timers; throwing/rejected
+consumers cannot interrupt remaining cleanup. Publication is best-effort, not a transaction.
 
-## End-to-end isolated implementation (2026-10-19)
+- Canonical Bash and apply_patch results give2-second recent executing/writing feedback,
+  not proof the tool is still running. Unknown tools stay other, without command parsing.
+- Explicit root Interrupt produces a cancellation occurrence; session exit does not.
+- Submission, PreToolUse, approval checks, compaction requests and Stop do not establish
+  sustained working/waiting/compacting or completed-unread. Tool return is not task success.
+- No reliable general command/model error, read/search, thinking/responding or retry fact
+  is synthesized. Missing result/timeout is not an error signal. See [versioned error
+  boundary](../../docs/CODEX-ERROR-FEEDBACK-LIMIT.md) and [fine capability limits](../../docs/PROVIDER-ANIMATION-EVIDENCE.md).
+- Missing animations follow the shared optional catalog; a fact does not prove a clip exists.
 
-- `transport.ts`: separate Codex route and strict provider codec over the shared authenticated loopback runtime. Unknown/retired runs are refused by the externally supplied host binding gate. Socket closure never invents Agent exit.
-- `command.ts` / `command-entry.ts`: bounded stdin, metadata projection before sending, silent exit0 on observer failure, no filesystem or Agent control. `hook-source.ts` produces additive inert documents; it never installs or trusts hooks.
-- `observations.ts`: native session/turn/tool IDs stay private; Application gets random aliases and the existing provider-neutral facts. Canonical tool results give two-second recent activity, explicit root interruption gives a cancellation occurrence; neither creates success/error bubbles. Pre-hooks/approval/Stop do not establish working/waiting/completed. Child/old/unseen events are ignored. Native compatibility and child attribution still require real evidence.
-- Up to32 host runs,32 native sessions/run,256 turns/session and1024 tool tombstones/session; saturation refuses new task facts rather than accepting evicted replay. Retired host/session identities stay retired. SessionEnd, run retirement and stop clear timers. Multiple distinct native sessions are not type-deduplicated.
-- `bridge.ts` composes receiver→mapper→existing SessionObservation; Main must supply independently verified host ownership/liveness. This interface cannot grant itself permission to observe arbitrary existing Codex processes.
-- `test-support/native-start-check.mjs`: prepared native empty-thread/hook loading check with network confined to loopback, no task, no trust bypass. Requires the separate [precise preview](../../docs/CODEX-NATIVE-START-CHECK-PREVIEW.md) authorization. It tests only the new isolated host, not CLI/desktop attachment.
+Transport reuses the authenticated hook runtime with a separate provider codec/route and
+external trusted run gate. Sender narrows before sending, receiver validates again;
+short-lived hook closure is not Agent exit. Legacy environment-based command/hook generators
+remain library/test seams, not the ordinary-start connection path.
 
-Self-owned subprocess tests prove command→authenticated callback→shared pet presentation, cancellation, path quoting and quiet failure. Synthetic mapper tests cover independent identities, deduplication, old/child facts, resource bounds and cleanup/reentrant stop. These are not real Codex acceptance or proof that a pet asset has every animation.
+## Unsupported observation alternatives
 
-Validation for this slice: final full `pnpm test --maxWorkers=1` 1226 passed /1 skipped /102 files; `pnpm typecheck` and `pnpm --filter @agent-pet/desktop build` passed. The retained skip and existing Three.js duplicate-import warnings are unchanged. A final Claude invalid-run compatibility assertion is also covered by the focused transport rerun. No application package or daily native activation was performed.
+Do not start a new App Server/SDK to claim attachment to an existing CLI. Connecting to
+an existing daemon is also not the current production observation protocol: a client
+`includeTurns=false` can still receive Thread.preview; model sandbox=read-only is not a
+read-only protocol permission. Merely dropping body fields after IPC receipt does not mean
+“never read content”. [Status broadcast](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server/src/thread_status.rs#L223)
+and [message scope](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/app-server/src/outgoing_message.rs#L747)
+require independent privacy/authentication review before any new observer.
 
-Independent review reproduced two cleanup defects before commit: a closed group leader could cancel descendant escalation, and a throwing consumer could interrupt remaining session cleanup. The probe now retains its owned-group termination promise; the mapper isolates consumer failures. Added descendant heartbeat and multi-session failing-subscriber regressions. The initial immediate PID-removal assertion was invalid for asynchronous process reaping; the replacement asserts that the known-live descendant stops executing, without removing the failing scenario. Independent focused recheck:17 passed.
+[legacy notify](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/hooks/src/legacy_notify.rs#L13)
+contains input/assistant bodies, while [tool telemetry](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/otel/src/events/session_telemetry.rs#L1256)
+can contain arguments/output despite disabling prompt logging. Neither, nor rollout/SQLite
+or process scans, is a substitute for the current bounded hook surface.
 
-Native attempt: the original sandbox profile was rejected before initialization; no hook facts arrived. A bounded system-true reproduction identified invalid literal host syntax. The corrected IPv4 `localhost:*` profile passes an actual macOS test: loopback connects, external TEST-NET-1 is denied with EPERM.13 harness tests, typecheck and source build pass. No Codex retry yet; the initial result remains in the original directory, and the separate r1 attempt awaits precise authorization.
+## Development checks
 
-The authorized r1 attempt initialized successfully but thread/start was rejected; no hook facts arrived. The old probe intentionally retained no error message/code, so the rejection cause is still unknown. The prepared r2 harness first exports the installed version's protocol schema, accepts only an explicit read-only enum, and records fixed RPC categories/codes. See the new [precise schema-check preview](../../docs/CODEX-SCHEMA-VERIFY-PREVIEW.md); r2 has not run.
+Official [hooks](https://learn.chatgpt.com/docs/hooks) are rolling documentation; fixed
+source links above use0.163.0 commit83086188ae0614bd882818ff1aa23f3194962012, not proof
+of installed binary identity. Canonical Bash naming is backed by the
+[unified_exec adapter](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/handlers/unified_exec.rs#L81).
 
-本次准备代码验证：20项检查程序测试、pnpm typecheck、desktop源码build通过；未执行r2、未打包。
+```sh
+pnpm exec vitest run integrations/codex-hooks --maxWorkers=1
+```
 
-Authorized r2: generated schema selects `read-only`; initialization and an empty thread succeeded, explaining the old `readOnly` parameter rejection. No hook callback arrived, so native activation still has not passed. The prepared `hook-status-check.mjs` reuses the r2 configuration and checks exact observer/document identity before a read-only hooks/list. It records only counts and fixed trust categories, never changes trust or creates a thread.25 harness tests, typecheck and source build pass; see [precise status-check scope](../../docs/CODEX-HOOK-STATUS-CHECK-PREVIEW.md).
+Tests cover synthetic normalization, real self-owned subprocess/loopback delivery,
+host fixtures, tombstones, concurrency and shared presentation. Main-side setup regressions
+are source-named `codex-connection`, `codex-executable`, `configuration-ipc` and preload tests.
+These do not certify real Codex/native UI/GPU or every install mode.
 
-Authorized hooks/list result: all10 exact own hooks enabled and untrusted; foreign/errors/warnings0. Initialization succeeded, stdout7178bytes/stderr0; no thread, callback or trust change. The current native activation blocker is pending trust review, not failure to discover the hook document. `trust-review.mjs` prepares user-driven `/hooks` in the same isolated profile, then queries counts and conditionally checks one read-only empty thread; it never grants trust itself or launches a model turn. The [review preview](../../docs/CODEX-HOOK-TRUST-REVIEW-PREVIEW.md) requires a separate decision. Interactive review and login-free access remain unverified; stop if login is required. No daily configuration or dev change.
-
-准备代码验证：`pnpm test integrations/codex-hooks/test-support --maxWorkers=1` 29项通过、`pnpm typecheck`、`pnpm --filter @agent-pet/desktop build`通过，仅源码构建。新增入口拒绝测试首次因用例参数展开和URL编码路径失败，修正测试后一次有界复验全通过；没有为此执行真实Codex。真实交互审核、登录要求和审核后回调仍未验证。
-
-User-run trust review failed before `/hooks`: pid-managed background startup could not invoke ps (EPERM). A self-only macOS sandbox reproduction confirms ps spawn EPERM without reading other processes. The interactive launcher now uses the documented `--no-daemon` option and a separately authorized `--run-authorized-review-r1` helper prefix, retaining the first attempt. Network/trust controls stay unchanged. Real foreground review and callbacks remain unverified; one bounded user retry is pending under the updated preview.
-
-The authorized user r1 stopped during preparation, before Codex launched: only its document helper exists, its checker and both review result files do not. Read-only validation found the original config plus exactly `[tui] screen_reader_detection_done = true`, saved during the previous interactive attempt. Strict whole-file equality rejected this legitimate UI addition. Preparation now accepts only those two exact config shapes, and can resume a byte-identical protected r1 helper without overwriting; other operation prefixes remain exclusive. Errors expose fixed categories only.33 harness tests, typecheck and source build passed; two focused helper regressions passed after limiting reuse to r1. No further real execution; the bounded native attempt is stopped under AGENTS. Trust review, foreground startup and callbacks remain unverified.
-
-The user resumed verification; preparation passed and the interactive CLI reached login. The completed review-status query still reports10 enabled/untrusted own hooks, no foreign entries/errors/warnings. The user then explicitly requested existing local login reuse. `temporary-auth.mjs` provides a test-only bounded readonly source lease into an exclusive600 isolated auth file, removes it on normal/error cleanup, never logs/returns credential bytes, and never changes the source. The explicit `--run-authorized-review-local-auth` entry overrides file auth only for the isolated interactive child, retains network denial, and removes credentials before status/empty-thread checks. New helper/result names preserve earlier evidence.37 harness tests, typecheck and source build passed; real local-auth review remains pending. See [scope and limitations](../../docs/CODEX-LOCAL-AUTH-REVIEW-PREVIEW.md).
-
-Actual local-auth review reached account/read but failed workspace routing discovery (-32603); temporary isolated credentials were confirmed absent afterward. No auth-review results were produced. Network denial is a leading explanation, not a verified sole cause. A separately gated `--run-authorized-account-network` entry prepares an authenticated loopback CONNECT gateway outside the unchanged native sandbox, permitting only chatgpt.com:443 during the interactive child. It preserves native TLS, does not log payloads, and closes tunnels before later offline checks.40 harness tests/typecheck/source build pass; two focused tunnel tests rechecked. No real outbound/account retry has run; see the [precise network exception preview](../../docs/CODEX-ACCOUNT-NETWORK-REVIEW-PREVIEW.md).
-
-Main reproduced the user-reported network-review EEXIST with a real PTY, then fixed preparation to reuse only byte-identical protected own network helpers. One real authorized PTY retest passed preparation but still failed account/read workspace routing discovery (-32603) during TUI loading. No task/trust approval or subsequent status/empty-thread check ran. Temporary credentials were confirmed removed; expected isolated config retained. The network exception has not proven successful routing; proxy use/upstream/account cause remain unresolved without request-stage evidence.7 focused and40 harness tests, typecheck and source build passed. The bounded native run is stopped under AGENTS; do not repeat the old command or widen network automatically.
-
-Latest isolated native result: fixed gateway startup concurrency (32 bounded clients,8 upstream,queued; aggregate2MiB) and strict same-host default-port authority handling.12 concurrent fixture tunnels pass. Native TUI now completes account initialization and reaches hook review. After explicit user delegation, Main reviewed and trusted the10 own definitions through Native UI, then quit without a task. Native persisted10 hooks.state SHA256 records; config validation accepts only that exact own-source/event/index format within4KiB, never writes trust. Offline hooks/list confirms10 enabled/trusted, all other/error counts0; offline empty-thread probes receive real SessionEnd. Temporary auth is removed.
-
-SessionStart remains unverified. A regression reproduced the probe killing a callback arriving after thread ACK; an explicit bounded authenticated-event wait fixes that fixture. The actual offline wait retest still returns hook-not-observed after2500ms, with only SessionEnd (stdout3140/stderr241bytes), so do not claim native startup is fixed or infer online. network-review-status.json, network-review-start.json and wait-review-start.json retain distinct outcomes; no raw stderr/credentials/native IDs are saved.45 harness tests/typecheck/source build passed. The native startup-event attempt stops here under AGENTS; next work requires evidence of its actual event contract. Main/Renderer activation remains disabled.
-
-独立只读subagent复查未发现本轮diff的确定缺陷；自有fixture 3文件/17项通过，未访问真实Codex或凭据、未联网。其结论同样明确：真实SessionStart缺失尚未解决，不能宣称正式接通。
-
-## Latest startup isolation (2026-10-19)
-
-A bounded stdin-shape probe now distinguishes an uninvoked script from rejected input without recording prompts, paths, IDs, credentials or unknown strings. The actual offline empty-thread probe and one corrected real interactive CLI check both recorded only accepted SessionEnd. The interactive CLI entered its main UI and quit normally (exit0), authenticated SessionEnd arrived, temporary credentials were removed, but no SessionStart script invocation/callback was observed. The first CLI comparison timed out and remains separate failed evidence. This narrows the symptom but does not prove first-turn deferral or eliminate restricted-startup effects; the account gateway exhausted its aggregate2MiB budget and other destinations remain blocked.
-
-See [precise scope, results and safe stop](../../docs/CODEX-STARTUP-SHAPE-CHECK.md). No model turn, daily configuration change, dev restart, package or production activation. The bounded native retest is stopped under AGENTS. Diagnostic helper refactoring after the native run is fixture-verified only; the original runtime artifact remains intact. Main/Renderer Codex registration remains disabled.
-
-Validation for startup diagnostics:53 test-support fixtures pass; typecheck and desktop source build pass (no package). Independent review found and verified a FIFO blocking fix in test-only record opening; final5 shape fixtures pass independently. These checks do not change the unsuccessful native SessionStart verdict.
-
-## Research correction: startup acceptance (2026-10-19)
-
-[Same-version source research](../../docs/CODEX-CONNECTION-RESEARCH.md) confirms that SessionStart is queued at session creation and drained in the first-turn path. An empty thread/CLI with no turn is therefore the wrong acceptance trigger; do not keep retrying the empty-start probe or treating its missing callback as transport failure. Ordinary-start activation and host identity are also still missing from the environment-only prototype seam. Research recommends an isolated first-turn mock/stop check with zero real model requests, then a persistent activation bridge and independently verified presence. Existing daemon observation remains a candidate with privacy/permission limits, not a completed implementation. No production code or native configuration was changed for this research.
-
-## Native first turn with local mock: passed
-
-[Exact scope and evidence](../../docs/CODEX-FIRST-TURN-MOCK-PREVIEW.md): the installed Codex completed one isolated first turn against a fixed loopback Responses fixture. Authenticated event order was session-started → turn-submitted → stop-requested → session-ended; one local model request, no credentials/external access, unchanged reviewed hooks/config.56 harness fixtures/typecheck/source build pass. This replaces the empty-start probe as the successful trigger check, not ordinary-start or real-model acceptance.
-
-
-## Native private activation and receiver restart: passed in isolation
-
-[Authorized normal bridge verification](../../docs/CODEX-NORMAL-START-MOCK-PREVIEW.md): the new10 commands were reviewed/trusted through native UI. The first test stopped on an incorrect single-HTTP-request assumption and did not save connection counts, so its connection verdict remains unknown. After separating the same-version native title schema from the fixed task, one explicitly authorized retry passed both TUI launches: each made1 task +1 title request, published an independently verified connection and exited0. Restoring the private receiver rotated activation without editing reviewed hook commands or supplying connection environment variables. All responses stayed loopback-only, no credentials/real model/daily config/dev change.63 test-support checks/typecheck/source build pass; independent18 own fixtures found no confirmed defect. Default shared daemon, empty-CLI presence, daily installation and Configurations/IPC/Renderer remain unverified or unwired.
-
-
-## Formal configuration and Home wiring
-
-The new Main `CodexConnection` is registered through Configurations and existing typed operations; native verified observations use configuration-scoped anonymous identity and the same Application/Home store. Additive hooks.json registration preserves unrelated content, backs up privately and withdraws only unchanged owned groups. Private-state source bytes remain tied to the first receipt-validated read to prevent a concurrent edit becoming an overwrite baseline. Default daemon fixed host entry metadata is resolved separately from CLI selection; no process-name matching or transcript reads. Formal React controls and Home are fixture/visually checked, but default daemon and daily registration remain unverified; [current implementation/evidence](../../docs/CODEX-CLI-CONNECTION.md) supersedes earlier unregistered-code snapshots, without upgrading their native acceptance claims. [Default-mode preview](../../docs/CODEX-DEFAULT-START-PREVIEW.md) needs explicit authorization for a protected isolated program copy and normal native initialization without the old OS network filter; it has not run.
-
-
-2026-10-20 出错反馈契约已核对：当前0.163.0 hooks不能可靠区分普通命令失败/模型失败；不读取正文猜测。新增8项跨模块回归，相关61项/typecheck/源码build通过，运行代码与日常配置保持。[证据与后续条件](../../docs/CODEX-ERROR-FEEDBACK-LIMIT.md)。
+`test-support/` contains explicit native probes, mock model, trust/account/network helpers.
+Their old fixed profiles/commands are not reusable approval: inspect exact target and
+credential/network scope and obtain authorization before execution; never install a
+blocking test hook into daily use or bypass native trust. A local mock or continue:false
+does not itself guarantee zero external traffic during native initialization/prewarm.

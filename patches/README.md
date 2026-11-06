@@ -19,5 +19,7 @@ pnpm exec vitest run apps/desktop/src/renderer/features/pet/PetCanvas.webgl.test
 
 The test mounts actual Fiber Canvas with measured dimensions and unavailable
 WebGL2, rather than mocking Canvas or throwing from model children. Unhandled
-rejections must remain test failures. Browser evidence and known dev-cache restart
-requirements are recorded in `docs/RENDERER-R2-R3F.md`.
+rejections must remain test failures. Vite's prebundled dependency cache can retain
+pre-patch behavior: verify with a fresh isolated cache, or restart the affected dev
+server only with authorization. A handled React error may still be reported in the
+dev console; assert the fallback and absence of unhandled rejection, not zero console output.

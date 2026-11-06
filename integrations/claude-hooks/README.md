@@ -1,213 +1,148 @@
 # Claude Code passive observation
 
-**Current production path: normal-start hooks → OS-bound `native-presence.ts` →
-Main-private `observations.ts` → Configurations/Application → shared pet presentation.**
-Normal startup/Home presence and common task feedback (read/write/Bash and generic
-model error) have the scoped real-user acceptance recorded in the
-[MVP plan](../../docs/MVP-EXECUTION-PLAN.md#claude-任务反馈2026-10-19常用反馈真实验证完成).
-Daily owned task hooks were upgraded under precise authorization; search and the
-remaining native matrix are not thereby accepted. A prior cold helper startup exceeded
-its three-second readiness budget and remains a known availability risk. Legacy
-launcher/plugin helpers below are historical compatibility/test building blocks, not
-the current onboarding flow. See [task semantics and limits](../../docs/CLAUDE-TASK-OBSERVATION.md).
+Current path: normal-start hooks → OS-bound `native-presence.ts` → Main-private
+`observations.ts` → Configurations/Application → shared pet presentation. Supported
+installation scope is **macOS, npm Claude Code 2.1.301, native bin/claude.exe layout**.
+Other versions, official-install/Homebrew layouts and desktop/remote/background hosts
+are unverified, not enabled merely because discovery finds a path. Task priorities
+and native checks are tracked through the [MVP entry](../../docs/MVP-EXECUTION-PLAN.md).
 
-Observation cleanup now installs feedback timers before publication, isolates throwing
-or rejected consumer callbacks, and rechecks run/current ownership after replacement
-callbacks. Reentrant stop/retire cannot leave a new timer or connected replacement;
-a reentrant Session admission cannot be overwritten by the outer frame. Eight new
-regressions cover cleanup, including normalize → real Application subscribers → shared
-presentation; focused134 and full1579 passed/1 skipped, typecheck/source build passed.
-This is best-effort observation, not retry/ACK or recovery of partially delivered
-Application notifications. Native shutdown/overlap and animation visuals were not run;
-no hook/configuration deployment or new observation capability is included.
+## Setup, discovery and restart
 
-`normalizeClaudeHook()` accepts one JSON payload capped at 64 KiB (UTF-8 bytes),
-then returns a new object containing only bounded IDs, fixed categories and booleans. Explicit native
-`prompt_id` and child `agent_id` are retained as `promptId`/`childId` when present;
-missing identity stays absent. Root `agent_type` is not child identity.
-It returns enum-only rejection reasons and does not log its input. Unknown event and
-notification names are ignored. No prompt, path, tool arguments/results, assistant
-text, free-form tool error or permission decision reaches its output. It does not
-open `transcript_path`, discover files, contact a receiver, or write to Agent stdout.
+Configure once, then run `claude` normally. The selected configuration is normally
+`~/.claude`, or a project's `.claude` for that project; setup does not change HOME,
+CLAUDE_CONFIG_DIR, shell/PATH, cwd or Agent arguments. Main never launches/reloads Claude.
+Automatic discovery supplies a revalidated Main-owned installation candidate; multiple
+entries for the same native program are deduplicated. Custom targets retain a manual
+flow. Discovery reads bounded metadata, not configuration, credentials or sessions,
+and does not execute candidates. GUI discovery does not fix a terminal's PATH.
 
-The approved isolated version/help check returned Claude Code 2.1.143 and advertised
-`--plugin-dir`. The candidate first host is its interactive CLI. This is version/help
-evidence, not by itself a hook-loading test. A separately approved Claude2.1.301 isolated
-`--init-only` run has now delivered native startup/end facts, with no prompt or model task;
-see [native scope and evidence](../../docs/CLAUDE-NATIVE-START-PREVIEW.md). This does
-not prove normal task/work identity or product integration. The current [official hook reference](https://code.claude.com/docs/en/hooks)
-contains newer-version fields too; absent optional fields remain unknown.
-[Official release notes](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md#2178)
-record the addition of `StopFailure` in 2.1.78; this is supporting release evidence,
-not proof that the user's active process is this installation or loaded our code.
+Setup separately requests target-read consent, previews `settings.json` changes, then
+confirms only owned hooks. Current task mode registers12 groups. Legacy presence-only
+records retain one SessionStart until an explicit upgrade; resume never silently
+updates observer source or adds task hooks. New setup/upgrade requires a new Claude
+session. An already-running process without a startup callback to the new receiver
+is not automatically adopted.
 
-## Facts and their limits
+App restart validates materials/hooks and resumes unpaused observation, rotating
+private receiver information. Explicit pause stays paused. Pause/app exit stops
+observation, not Claude. Removal withdraws only exact unchanged owned hooks and product
+metadata; runtime files stay available to already-loaded hook snapshots. Changed or
+ambiguous references preserve both hook and product record for review.
 
-| Native event | Safe fact | Prohibited inference |
-| --- | --- | --- |
-| SessionStart | Session id and startup/resume/clear/compact source | `compact` does not prove a new process run |
-| UserPromptSubmit | Submission attempted | Other hooks can still reject it; model execution is unproven |
-| PreToolUse | Tool requested, ID and activity category | Permission may still be pending; execution is unproven |
-| PermissionRequest | Approval check and activity category | No tool_use_id exists here; do not invent one or auto-approve |
-| Notification.permission_prompt | Native permission reminder | Other notifications, including idle_prompt, do not prove waiting_input |
-| PostToolUse | Tool succeeded | Does not complete the whole turn |
-| PostToolUseFailure | Tool failed, optional interrupt boolean | Tool failure/abort is not whole-turn failure/cancellation |
-| StopFailure | Turn failure category; unrecognized value becomes unknown | Never parse the displayed error string or emit Agent instructions |
-| Stop | Response stopped candidate; prior hook continuation, optional background-work facts | Another Stop hook may continue work; no completed-unread emitted |
-| SessionEnd | Session ended | Not task success, failure, or cancellation |
-| PreCompact / PostCompact | Native compaction boundary | Not proof of turn completion or capabilities before observation |
+## File ownership and shared settings
 
-Unknown tools become `other`; their names and content are discarded. Only explicit
-Read, Write, Edit, MultiEdit, NotebookEdit, Grep, Glob and Bash names are classified.
-SubagentStop and TaskCompleted are ignored; they cannot complete a parent Session.
-This module does not publish SessionObservation, grant capabilities or pick animation
-clips. It cannot add online pets to the home scene.
+`claude-user-hook.ts` parses at most64KiB UTF-8 JSON and splices owned entries without
+rewriting unrelated bytes, ordering, large numbers or existing hook semantics. Duplicate
+keys, disableAllHooks, unsafe identity/permissions/links, changed targets and pending
+writes fail closed. Target/ancestor evidence is rechecked around exclusive pending,
+fsync and checked rename; original shared-file permissions are retained. Comparison
+and rename are not atomic CAS against an external editor: do not concurrently save
+settings during installation. Never restore an entire backup over later edits.
 
-## Authenticated local delivery
+Private `userData/claude-normal-<configurationUUID>` is0700 with0600 observer.cjs,
+activation.json, hook.json, settings-before.json and receipt.json. Original settings
+bytes (literal null for an absent file) may contain secrets: never send them to
+Renderer/logs/Git. Upgrade preserves SessionStart and adds11 owned groups only after
+saving `upgrade-before.json`, prospective ownership and replacement observer/activation/
+receipt; uncertain failure preserves materials. Withdrawal requires all owned groups
+unambiguous and unchanged, not partial removal reported as success.
 
-`transport.ts` exposes `startClaudeHookReceiver()` and `deliverClaudeHook()`. The sender
-normalizes raw input before sending; the receiver independently validates a strict,
-flat metadata schema. It listens only on an ephemeral 127.0.0.1 HTTP port, requires a
-private token and rejects browser Origin headers, alternate routes/authorities and raw
-payload fields. The sender refuses external destinations, redirects and response-body
-instructions; it has a bounded wait and performs no automatic retry or Agent output.
-This new callback transport does not replace or weaken pi's socket/managed paths.
+Shared rules: [security boundaries](../../docs/SECURITY-BOUNDARIES.md).
+Durable identity/migration: [architecture](../../docs/ARCHITECTURE-DESIGN.md#durable-connection-identity-and-restart).
 
-A trusted invocation binding must already exist outside this module. `acceptRun` must
-return exactly true for the supplied per-invocation UUID; the request cannot register
-itself. Native conversation IDs, hook-process PIDs and whichever SessionStart arrived
-last are not run identity. Retired bindings are checked even for duplicate events.
-Per-run event IDs are deduplicated within a bounded recent window, not an exactly-once
-or causal-ordering guarantee. It cannot attach delayed data to a guessed latest work.
+## Native presence and private identities
 
-`onFact` must commit synchronously and return undefined; both its type and runtime
-reject async results. Rejected promises are consumed without logging their contents,
-and failed commits are not acknowledged or cached. It must not partially commit and
-then throw: the sender has no transaction over external effects. Shutdown invalidates
-processing before external validation/callback reentry and closes partial peers.
-Individual hook client closure never declares Agent offline or completed. Callback
-facts do not grant observation capabilities or publish SessionObservation.
+`native-hook-entry.ts` reads its protected activation and at most64KiB stdin,
+normalizes before sending and silently exits0 on observation failure. Main verifies
+the reported hook PID's complete bounded ancestor chain using `native-process-probe.c`:
+UID, exact executable, PID/PPID and microsecond birth identity, followed by a full
+chain recheck. It then polls only confirmed Claude identities each second, at most32
+runs. No process-list, argv/env/cwd/transcript access, process-name guess or ps fallback.
+PID reuse, disappearance or failed identity queries clear observation; hook exit,
+SessionEnd and Stop do not prove native-process exit. Multiple runs remain independent.
 
-Resource bounds and rejection behavior live in the executable constants/schema and
-`transport.test.ts`. This is token-authenticated loopback metadata delivery, not proof
-of cross-user isolation, peer process identity, trusted hook activation or production
-security acceptance. No credential persistence/installer is implemented yet.
+The macOS libproc helper is version-sensitive. Before listening it performs one bounded
+3-second self-identity readiness check; actual ancestry checks retain250ms and peer
+limits. Cold startup can exceed readiness and must fail closed, not relax Agent checks.
+Dev/build compile the helper with existing clang; this is not cross-platform certification.
 
-## Standalone command and plugin documents
+Schema1 supplies presence only. Schema2 pins current native session identity and rejects
+retired sessions; up to32 session IDs/run,16 pending verification tasks,1024 recent event
+IDs. Full-body arrival ordering is not native causal ordering. `observations.ts` privately
+correlates session/prompt/tool IDs and gives Application random aliases scoped by
+configuration/run. Each session retains at most256 prompts/1024 resolved-tool tombstones;
+saturation stops new task facts rather than evicting replay protection. Missing/old/child
+identities never attach to a guessed latest prompt.
 
-`command-entry.ts` is a dedicated, compiled Node hook process. It reads only the three
-`AGENT_PET_CLAUDE_URL`, `AGENT_PET_CLAUDE_TOKEN` and `AGENT_PET_CLAUDE_RUN_ID`
-environment values plus one bounded stdin message. It does not read files, enumerate
-environment variables or persist credentials. Missing binding data, malformed/oversized
-input, stdin failure/deadline and receiver failures remain silent and exit0. An inherited
-run UUID is not authority: the receiver still requires its independent trusted binding.
-The command does not emit decisions, context, prompts, logs or retry instructions.
+## Facts and prohibited inferences
 
-`runClaudeHook` takes exclusive ownership of an input stream when configuration is
-present. The supported input is native stdin with close events enabled; custom streams
-that suppress close while destroying asynchronously are not supported and may retain
-guard listeners. The dedicated command exits immediately after settlement.
-Settlement pauses/destroys that stream. A queued I/O error can outlive the
-stream's `closed` flag, so a silent error guard remains through close-event delivery,
-with deferred cleanup for an already-closed input. The library function never exits
-the process; only the dedicated entry does. Do not import that entry in Main.
+`normalize.ts` returns only bounded IDs, enum categories and booleans, never input logs,
+paths, prompt/assistant text, tool parameters/results, raw errors or permission decisions.
+Unknown event/notification names are ignored. Optional fields absent in the native version
+remain unknown. Root agent_type is not child identity; SubagentStop/TaskCompleted cannot
+complete the parent.
 
-`createClaudePluginDocuments` is a pure document generator: the standard
-`.claude-plugin/plugin.json` and `hooks/hooks.json` contain passive command hooks, a
-quoted absolute Node executable and a runtime path under `${CLAUDE_PLUGIN_ROOT}`.
-No credential, run identity, setting overwrite, permission decision or Agent launch is
-embedded. Synthetic shell tests cover literal spaces/quotes/metacharacters; Claude2.1.301 loaded these documents and invoked startup/end in the approved isolated
-check; other event support and daily activation still require native acceptance.
+| Native input | Current projection / constraint |
+| --- | --- |
+| SessionStart | Bind root Session; compact/resume/clear are not new OS processes |
+| UserPromptSubmit | Associate prompt, not proven execution |
+| PreToolUse / PermissionRequest | Requested tool / approval check; no fabricated tool ID or running state |
+| Notification.permission_prompt | Reminder, not paired sustained waiting; idle_prompt does not prove waiting |
+| PostToolUse | Matching current prompt/tool: Read, Write/Edit/MultiEdit/NotebookEdit, Grep/Glob or Bash give2-second recent feedback, not sustained work or turn completion |
+| PostToolUseFailure | tool_error only with is_interrupt explicitly false; missing/true does not imply whole-turn cancellation |
+| StopFailure | Matching known prompt gives generic error/unread; unknown category stays unknown, no body parsing |
+| Stop / PreCompact / PostCompact | Clear/associate facts as supported, not whole-task success or ongoing compaction |
+| SessionEnd / OS exit / pause | Clear feedback/observation at the appropriate identity layer, not success/failure/cancellation |
 
-Tests compile the entry with the existing Vite toolchain and run it in fresh Node
-children against test-owned loopback receivers. This proves the command behavior,
-not Claude plugin validation/loading or config/run/work correlation. No production
-plugin builder, installer, runnable terminal entry or Provider controller exists yet.
+No supported completion, whole-turn cancellation, thinking/responding, sustained waiting
+or business retry is inferred from these precursors. `max_output_tokens` is accepted by
+the normalizer but not classified as output_limited; [version/source boundary](../../docs/PROVIDER-ANIMATION-EVIDENCE.md).
+Unknown task state is not known idle; same-work unknown updates retain already-held
+error unread, while new work does not inherit it. Old presence-only records stay task-unknown.
 
-## Explicit invocation owner (library only)
+Feedback timers are owned before callbacks; stop/retire clears all runs even if a consumer
+throws/rejects. Replacement rechecks closed/run/current after disconnect callbacks so
+reentry cannot revive a stopped mapper or overwrite a newer Session. Publication is
+best-effort, not transactions, ACK/retry or repair of partially delivered notifications.
 
-`observeClaudeInvocation()` in `launcher.ts` is for a future user-run terminal
-entry, never Main/UI. It holds its direct ChildProcess privately, creates a new
-run UUID/token/receiver per invocation, and only reports root SessionStart presence
-while that child is live. SessionEnd, Stop and hook-client closure do not end the
-process. An actual child exit or failed spawn ends the invocation; no task result
-is inferred. `stopObserving()` closes observation without signalling or waiting
-for Claude, and `completed` follows the actual child lifetime.
+## Transport and compatibility helpers
 
-The child inherits terminal stdio and caller arguments through argv (observer
-options are inserted before an existing `--`). Ordinary user environment survives;
-all inherited `AGENT_PET_*` keys are stripped before adding only the three hook
-values. The future Main-control credential cannot be inherited by the child.
-Synchronous enum-only report failures retire observation while leaving the child
-running; rejected JS callback promises are consumed without diagnostic content.
+`transport.ts` / shared hook runtime use ephemeral127.0.0.1, a private token, strict
+route/authority/headers/body bounds, no browser Origin, redirects or response instructions.
+The receiver independently validates narrowed metadata and requires an external trusted
+run binding (`acceptRun === true`); requests cannot register themselves. Retired bindings
+are checked before deduplication. `onFact` commits synchronously and returns undefined;
+failed/async commits are not acknowledged/cached. Bounded event deduplication is not
+exactly-once delivery. Hook-client closure is not Agent exit.
 
-This is not a runnable launcher command or a product connection. A separate
-authenticated launcher-to-Main channel, app-private activation materials, controller
-and Renderer projection still need implementation. Terminal signal/process-group
-handling and detached/re-exec descendants are not supported by this library. Do not
-ship a terminal wrapper until its signal/stdio behavior is verified. Receiver setup
-failure occurs before any child exists and returns a fixed error; no automatic retry.
-See [presence slice boundary](../../docs/CLAUDE-CLI-PRESENCE-DESIGN.md).
+Legacy `command-entry.ts` uses only its three explicit AGENT_PET_CLAUDE connection
+variables and bounded stdin; normal production uses private activation instead.
+`runClaudeHook` exclusively owns its input, pauses/destroys it after settlement and keeps
+an error guard through queued close delivery; custom emitClose:false asynchronous streams
+are unsupported. Only dedicated entry modules exit the process; never import them in Main.
+`plugin-source.ts` generates inert plugin documents, not installation or trust.
 
-## Next independently verifiable stage
+`launcher.ts` / `launcher-entry.ts` / `presence-channel.ts` are retained user-terminal
+compatibility helpers, not current onboarding or Main Agent-launch authority. They bind
+a direct child with per-invocation UUID/token, strip inherited AGENT_PET_* credentials,
+retain stdio/argv and stop observation without killing Claude. Detached/re-exec descendants
+and background mode are unsupported; do not turn them into an automatic fallback.
 
-Before enabling the product flow, validate/load the native plugin and bind
-configuration/run/work identity at the transport interface. Short-lived hook clients closing must not mark the Agent offline.
-Validate duplicate/late events, multiple concurrent sessions, pending permission
-resolution, Stop-hook continuation and true terminal evidence. If final success or
-cancellation cannot be proven from the permitted native surface, report the limit;
-do not use a timer, parse conversation content, or start a replacement Agent.
+## Sources and development checks
 
-Then add the Provider controller behind Configurations with preview, explicit consent,
-safe install/withdrawal ownership and existing-hook preservation. It must retain pi's
-deployment, restart, managed guard and data-preservation behavior. Actual files,
-activation/reload requirements and rollback must be reviewable before requesting
-authorization for real configuration changes. Codex and Antigravity remain separate
-future adapters and host/version acceptance matrices.
+[Official hooks](https://code.claude.com/docs/en/hooks), [plugins](https://code.claude.com/docs/en/plugins)
+and [setup](https://code.claude.com/docs/en/setup) are rolling references, not proof that
+all fields/install modes work in2.1.301. [Release notes](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md#2178)
+record StopFailure introduction, not the exact native classification contract.
 
-## Verification
+Source-named tests cover normalization, transport, native binding, observations and
+Main registration/upgrade/withdrawal. For isolated module regression:
 
-`pnpm exec vitest run integrations/claude-hooks/normalize.test.ts integrations/claude-hooks/transport.test.ts integrations/claude-hooks/command.test.ts` tests official-shape
-synthetic payloads, never real Agent input. Coverage includes permission events without
-tool IDs, local error vs turn failure, missing optional fields, Stop continuation,
-unknown and oversized/malformed inputs, UTF-8 limits, special JSON keys and private
-content stripping. Actual loopback tests cover authentication, unknown/retired runs,
-strict schema, duplicate events, sink failure/reentry, peer/body bounds, deadlines,
-client failure and idempotent stop. They cannot prove native Agent loading, invocation
-binding, work correlation or runtime event support.
+```sh
+pnpm exec vitest run integrations/claude-hooks --maxWorkers=1
+```
 
-No dependencies, installation, running Agent, configuration access, model request,
-UI changes, dev restart or application package is required for this stage.
-
-
-## Current formal presence integration (supersedes the earlier stage limits)
-
-`launcher-entry.ts` is now the explicit user-terminal executable. A separate authenticated
-`presence-channel.ts` binds each live invocation to Main; only enum/run identity crosses
-that channel. Native exit metadata returns to the terminal only. Isolated PTY tests verify
-Ctrl-C is delivered once to the foreground child and observation loss leaves it running.
-Detached/re-exec descendants and background mode are unsupported.
-
-Main uses dedicated private materials/controller behind Configurations, never imports the
-executable entry or starts an Agent. Formal Connections and Home consume Claude-specific
-presence state, without publishing task observations or displaying task actions/reminders.
-Dev/build compile standalone CJS hook/launcher assets. Exact files, persistence, failure
-preservation and real acceptance limits are documented in [the current slice](../../docs/CLAUDE-CLI-PRESENCE-DESIGN.md).
-Earlier “not yet runnable/Main/UI” paragraphs describe their historical stage only.
-
-
-## Ordinary CLI startup (current production mode)
-
-The user explicitly replaced recurring launcher usage with one-time persistent setup.
-`native-hook-entry.ts` reads only its private activation and root startup stdin, reports
-its own hook PID and narrowed source, and silently exits0 on failure. Main's
-`native-presence.ts` independently verifies the complete bounded ancestor chain through
-`native-process-probe.c`, then watches only exact known native Claude PIDs and their
-microsecond birth/UID/executable identity. No Agent launch/control, process listing,
-argv/env/cwd/transcript read, Session/task inference, background daemon or ps fallback.
-
-The command hook and private settings installer replace the wrapper in the formal flow;
-legacy launcher code remains an isolated implementation boundary, not a user requirement.
-Native helper compatibility is macOS-specific. All daily settings changes and actual
-native Claude checks require the [precise preview](../../docs/CLAUDE-NORMAL-START-PREVIEW.md);
-self-created native/C fixtures do not prove daily acceptance. See [current design](../../docs/CLAUDE-NORMAL-START-DESIGN.md).
+Synthetic inputs/self-owned processes do not establish real hook loading, native timing,
+GPU animation or full deployment acceptance. Real targets and test-support launchers
+require a fresh exact preview and authorization; no old command grants that permission.

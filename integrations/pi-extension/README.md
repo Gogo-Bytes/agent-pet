@@ -1,84 +1,95 @@
 # Agent Pet pi extension
 
-当前部署路线与验收见 [本地 macOS/pi MVP 执行计划](../../docs/MVP-EXECUTION-PLAN.md)。本页说明已存在的 legacy opt-in 扩展，不是 managed 客户端或自动安装器；真实目标加载/配置操作须另获精确范围授权，完整端到端尚未验收。
+Self-contained, opt-in passive extension for the local legacy bridge. The supported
+surface is **pi0.85.1 TUI**, not SDK/RPC or all forks/versions. Main and this extension
+never start/resume/control pi, read Session JSONL, register production tools/commands or
+modify Agent messages. Current priorities: [MVP](../../docs/MVP-EXECUTION-PLAN.md).
 
-This is an opt-in, read-only pi extension for the local bridge. It is intentionally
-self-contained and does not depend on the Agent Pet npm workspace.
+## Event contract
 
-## What it does
+The extension sends bounded process/Session identity, name/project fallback, status,
+workId, sequence/timestamp and enum companion facts/capabilities. It discards prompt,
+response/thinking text, tool input/output, transcript paths, environment and provider
+credentials. The bridge capability token is present in each legacy frame; this is not
+managed auth/ack or cryptographic server authentication.
 
-- Sends only Session/process identity, a display-name/project fallback, coarse
-  lifecycle status, work id, sequence number, timestamp, enum-only companion facts
-  and observation capabilities. Fine capabilities start unknown and become supported
-  only when their native hook is actually observed; runtime version is not guessed.
-- Observes `session_start`, `agent_start`, `message_end`, `agent_settled`,
-  `session_info_changed` and `session_shutdown`, plus stream phase, tool, extension
-  UI-prompt and compaction start/end/abort hooks verified against pi 0.85.1.
-  Tool failures remain transient; the current run AbortSignal plus terminal stop reason
-  distinguishes cancellation without parsing error/tool text. Signal references are
-  replaced on continuation and released on settled/shutdown/reload. Automatic retry
-  is unknown (not an Extension API event here). See the [event matrix and evidence](../../docs/PET-ACTIONS-ACCEPTANCE.md).
-- Treats `agent_settled` plus `ctx.isIdle()` as the point at which a work cycle
-  may become completed/error.
-- Sends no prompt, response, thinking, tool input/output, transcript path,
-  environment, provider credential or raw event payload. The legacy bridge's
-  configured capability token is included in every protocol frame; it is not
-  managed auth/ack or cryptographic server authentication.
-- Does not register tools or commands, modify messages, control the agent, or
-  block pi on bridge availability.
+- `session_start` rereads current Session ID/name and initializes working/idle, never
+  historical completion. Native Session UUID, extension processInstanceId, connection
+  and work identity are different; `/reload` can preserve UUID while rebuilding runtime.
+- `agent_start` establishes working. `message_end` extracts only assistant stopReason;
+  agent_end/turn_end/tool completion are not whole-work completion. `agent_settled` plus
+  ctx.isIdle and current-work/terminal guards determine completed/error.
+- Stream phase, classified tool start/end, extension UI prompt and compaction hooks
+  supply fine facts only after observed; initial capabilities are unknown, not guessed
+  from runtime registration/version. Tool failure is transient, not task error.
+- Current-run native AbortSignal plus stop reason distinguish cancellation; continuation
+  replaces the reference, settled/shutdown/reload releases it. No control API is called.
+- Name updates do not revive acknowledged results; fallback may use cwd basename, not
+  a first prompt. `session_shutdown` cleans runtime, never invents task completion.
+- Business retry remains unknown:0.85.1 SDK retry is not forwarded to ExtensionAPI.
+  Socket retry and compaction willRetry are not replacements; [fixed-source explanation](../../docs/PROVIDER-ANIMATION-EVIDENCE.md).
 
-## Explicit configuration supply (M1/M2)
+[Trigger capabilities](../../docs/PET-TRIGGER-AUDIT.md) describe which facts can reach
+animations. Fixed-version [extension types](https://github.com/earendil-works/pi/blob/d981de1229ef899957bbe968bc8dcda02a21f477/packages/coding-agent/src/core/extensions/types.ts)
+and [AgentSession](https://github.com/earendil-works/pi/blob/d981de1229ef899957bbe968bc8dcda02a21f477/packages/coding-agent/src/core/agent-session.ts)
+are the upstream contract, not the RPC event schema. Only ctx.mode==='tui' enables observation;
+hasUI alone cannot distinguish RPC.
 
-`renderConfiguredPiExtension({ endpoint, token })` in `configured-source.ts` returns
-self-contained TypeScript source from this directory's fixed `index.ts`. It embeds
-validated, JSON-serialized configuration in one data slot; the event state machine
-and builtin-only imports are unchanged. It accepts no executable code/source path
-and performs no target writes. The generated extension needs no workspace imports,
-manual environment exports, or generation helper at runtime. Vite/Vitest load the
-canonical `index.ts` through `?raw`, bundling inert source in desktop Main with no
-user credentials. Generation no longer reads the live workspace. The helper's source
-entry now expects that Vite raw-import mechanism (not direct Node source execution).
-An isolated built-module test and an inert actual-Main-bundle check verify rendering
-without workspace source reads; this is not a standalone `.app` acceptance.
+## Configured source and deployment
 
-The M2 explicit-target `PiTemporaryDeployment` helper in
-`apps/desktop/src/main/pi-temp-deployment.ts` consumes that text once per preview.
-An explicitly injected configuration root maps to `extensions/agent-pet.ts`
-(pi 0.85.1's installed `docs/extensions.md`, read in full, documents this layout).
-Read-only bounded preview and cancellation, host-held single-use confirmation,
-revalidation, exclusive 0600 creation and identity/content-matched withdrawal are
-tested on disposable roots. Conflicts, loading obstacles and uncertain write/close
-failures are preserved, not adopted or overwritten; only unchanged, empty directories
-created by that apply may be removed. Failure can leave residual files/directories.
-Ownership is in memory only: losing the host means residuals are unknown, not
-permission to delete them. Main now uses it only after native target selection,
-explicit read/preview and confirm consent, with a host-held opaque plan id. No HOME
-discovery, settings/trust changes, real pi launch or runtime unloading is implemented.
-Main supplies the same generated config to its existing Adapter and the deployed
-artifact, offers process-local receipt withdrawal, and discloses restart limitations.
-This is local no-clobber behavior,
-not same-UID attacker isolation or a production installer. A configuration target is
-not a pi installation, and placement proves neither loading nor connection.
-Generated text contains a capability token: treat it as a private target credential,
-not a log, diagnostic, Renderer payload, snapshot, committed file or public bundle.
+`renderConfiguredPiExtension({endpoint, token})` uses the fixed canonical index.ts
+through Vite `?raw`, serializing validated data into one slot. It accepts no code/source
+path and writes no target. Main bundles inert source without credentials; the generated
+file contains the private target capability and uses only Node builtins, not workspace,
+Electron, runtime npm install or an ASAR path interpreted by external Node.
 
-`configured-source.test.ts` loads the generated extension in a Node child with an
-empty environment, using synthetic hooks and a real isolated PiBridgeAdapter socket
-and Application, including loading the actual M2-applied `agent-pet.ts` file.
-It verifies working/completed/error/ack, serialized data safety,
-no overwrite, and bounded natural exit with absent/detached bridges. Existing env,
-reconnect and no-replay tests remain. The desktop controller also has a real fixture
-artifact/socket/Application integration. This is not actual pi TUI acceptance. Main
-preserves the separate explicit environment opt-in without silent fallback/replacement.
-Real deployment, daily credential/ownership persistence, visual/native acceptance and
-source-independent application packaging remain M2–M5 work.
+`PiTemporaryDeployment` previews `<agentDir>/extensions/agent-pet.ts`, snapshots exact
+source/target evidence privately and consumes a one-use confirmation. Apply revalidates,
+creates exclusive0600 files and records ownership; conflicts/uncertain writes remain,
+never overwritten or recursively removed. Controller-owned private persistence provides
+explicit clean-restart resume; the temporary helper alone has only in-memory receipts.
+Old artifacts without durable ownership are never adopted.
 
-## Explicit local development test
+Default `~/.pi/agent` is only a candidate. `PI_CODING_AGENT_DIR` selects the actual
+config root; session/package directories are not equivalent. GUI environment/installation
+metadata cannot prove the user's active root. Multiple installations can share one target;
+multiple targets remain independent configurations.
 
-The desktop Adapter must already be running with the same endpoint and token.
-The user must explicitly load this file in an existing idle pi TUI, for example
-with pi's documented `-e`/extension mechanism or by placing a trusted copy in
-pi's extension directory, then use `/reload` when pi permits it.
+0.85.1 automatically discovers user extensions, but a root extensions/index or manifest
+entry can suppress sibling discovery; ignore/exclusion rules, --no-extensions and project
+trust may prevent loading. Fixed [package-manager source](https://github.com/earendil-works/pi/blob/d981de1229ef899957bbe968bc8dcda02a21f477/packages/coding-agent/src/core/package-manager.ts)
+and [extension guide](https://github.com/earendil-works/pi/blob/d981de1229ef899957bbe968bc8dcda02a21f477/packages/coding-agent/docs/extensions.md)
+explain this scope. Bounded string package sources can coexist with user auto-discovery;
+unknown shapes/nonempty extension filters remain blockers. Do not execute package resolution,
+rewrite settings/trust/ignore, rename around a collision or leave discoverable backup .ts/.js
+copies to force loading. Extensions have full host permissions, not a sandbox.
+
+Only the user opens/reloads pi at a safe time; TUI rejects reload during streaming/compaction.
+Deployment proves neither loading nor online/business activity. Updates/backups and
+selective withdrawal require exact ownership and separate consent; deleting the file does
+not unload a running extension. See [security](../../docs/SECURITY-BOUNDARIES.md) and
+[restart identity](../../docs/ARCHITECTURE-DESIGN.md#durable-connection-identity-and-restart).
+
+## Reconnection and ownership
+
+Every connection sends a fresh hello with current working/idle and work identity, never
+historical occurrences. Failures back off from250ms to5s; timers/sockets unref, writes
+bounded, no offline event queue. Work finished disconnected is not replayed as unread.
+Application-held unread survives baseline/metadata; transport loss clears current activity.
+Shutdown stops retries without keeping pi alive. Optional heartbeat is not a required lease
+for old extensions; authenticated silence is not itself failure.
+
+Only valid hello admits Session transport ownership. Superseded peer name/companion frames
+and close cannot reclaim or disconnect its replacement. A same-socket Session change clears
+the old identity before the new baseline without flashing configuration offline; repeated
+same-identity hello is not a new configuration edge. Separate configuration namespaces remain
+isolated. `openSession` stays unsupported until the original terminal can be reliably located;
+starting a new terminal/session is not an implementation.
+
+## Explicit development loading
+
+The separately authorized dev Adapter must already use the same endpoint/token. Example
+only; never execute or deploy it automatically or copy a real token into logs/Git:
 
 ```sh
 AGENT_PET_PI_ENDPOINT=/tmp/agent-pet-pi.sock \
@@ -86,42 +97,21 @@ AGENT_PET_PI_TOKEN=replace-with-the-same-random-token \
 pi -e ./integrations/pi-extension/index.ts
 ```
 
-Do not run this command automatically. Loading an extension grants it the full
-permissions of pi; inspect and trust this source before loading it. Busy
-streaming/compaction sessions may reject `/reload`, and events before loading
-are intentionally not reconstructed.
+Trust the source and use pi's documented loading mechanism; events before loading are not
+reconstructed. Production setup uses the exact selected target and its preview, not this
+illustrative shared pathname. A supplied dev environment reserves its route even if invalid;
+Main does not silently fall back or start a second bridge.
 
-## Reconnection
+## Development checks
 
-Each socket connection starts with a fresh `hello` containing the current working
-or idle baseline and work identity. Connection failures retry from 250 ms up to
-5 seconds; retries and sockets do not keep pi alive. Pending socket writes are
-bounded; there is no historical event queue. Work that finishes while disconnected
-is not replayed as a new unread notification. Existing unread results held by the
-same Application survive a reconnect baseline and metadata updates. Current
-activities clear on transport loss and restore only from a new baseline; historical
-one-shot occurrences are never included in hello. Shutdown cancels retries. This
-behavior is covered using real sockets and synthetic pi callbacks, not a live TUI.
-Only TUI mode enables observation.
+```sh
+pnpm exec vitest run integrations/pi-extension --maxWorkers=1
+```
 
-The receiver distinguishes hello admission from unread-preserving `baseline` observations.
-Delayed name/companion frames and closure from a superseded peer cannot replace or
-disconnect its current owner. Socket-to-Configurations/Application/Home regressions
-cover both delayed frame kinds and two isolated configurations; this is not native
-overlap timing acceptance and introduces no new extension capability.
-
-Still pending: real `/reload` identity continuity, multiple real pi processes,
-retry-period cancellation, native acceptance of the new connection health UI and Windows pipe security checks.
-
-`session_shutdown` is connection cleanup, not task completion. The desktop side
-keeps `openSession` unsupported until the original terminal window can be
-reliably located.
-
-## Explicit live-check fixture
-
-`test-support/live-check.ts` is never imported by the product or configured observer.
-It registers a user-invoked native confirmation and a distinct zero-cost local provider
-that throws before any network operation. It never selects a model, sends a prompt,
-controls cancellation or emits observation frames. Loading into a real pi is a separate
-precisely authorized test operation, not part of normal deployment. See
-[the cancellation/waiting/error preview](../../docs/PI-CANCEL-WAIT-CHECK-PREVIEW.md).
+Source-named tests load generated source in self-owned Node processes with synthetic hooks,
+real isolated sockets and Application, including actual applied artifacts. These prove
+mapping/cleanup/no-replay and source independence, not real TUI/reload/Windows or GPU quality.
+`test-support/live-check.ts` is never imported/deployed by the product: it supplies a
+user-invoked native confirmation and zero-cost throwing local provider, but never selects
+a model, sends prompts, cancels work or emits fake observations. Loading it into real pi
+still requires exact current authorization, not an old test command.

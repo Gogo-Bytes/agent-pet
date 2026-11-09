@@ -21,7 +21,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const initial: CodexConnectionState = { revision: 0, status: 'not-configured', configured: false, busy: false,
   observedSessions: 0, canConfigure: true, canResume: false, preview: null, notice: 'none' };
-const preview = { id: 'codex-plan', executable: '/synthetic/codex', path: '/synthetic/.codex/hooks.json', canApply: true, exists: true, events: ['SessionStart','Stop'] };
+const preview = { id: 'codex-plan', executable: '/synthetic/codex', path: '/synthetic/.codex/hooks.json', canApply: true, exists: true, events: ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Stop', 'Interrupt', 'PreCompact', 'PostCompact'], addition: { hooks: [{ type: 'command' as const, command: '[Agent Pet 私有观察程序与参数（已隐藏）]', timeout: 2 }] } };
 async function mount(patch: Partial<CodexConnectionState> = {}) {
   const record: AgentConfiguration = { ...configuration('codex-one'), provider: 'codex', name: '我的 Codex', codex: { ...initial, ...patch } };
   const test = managementBridge([record]); const user = userEvent.setup();
@@ -39,6 +39,10 @@ it('uses an exact additive preview, cancels and confirms without inventing an on
   await test.user.click(screen.getByRole('button', { name: '设置连接' }));
   let dialog = screen.getByRole('dialog', { name: '连接 Codex CLI' });
   expect(dialog.textContent).toContain('/synthetic/.codex/hooks.json'); expect(dialog.textContent).toContain('只追加 10 条通知');
+  for (const event of preview.events) expect(within(dialog).getByText(event).textContent).toBe(event);
+  expect(dialog.textContent).toContain(JSON.stringify(preview.addition, null, 2));
+  expect(dialog.textContent).toContain('不是完整可执行命令');
+  expect(dialog.textContent).not.toMatch(/activation|token|observer\.cjs/);
   expect(test.bridge.configurations.confirm).not.toHaveBeenCalled();
   await test.user.click(within(dialog).getByRole('button', { name: '取消' }));
   expect(screen.queryByRole('dialog')).toBeNull();

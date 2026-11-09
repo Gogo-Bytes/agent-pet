@@ -1,6 +1,6 @@
 import './test-support/mock-volume-queries.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BrowserWindow } from 'electron';
@@ -378,6 +378,8 @@ it('prepares Codex without a program picker, preserves existing hooks/config, re
   const first = await prepare('first');
   expect(first.state.records[0]).toMatchObject({ provider: 'codex', targetPath: f.target,
     codex: { configured: false, status: 'not-configured', preview: { executable: f.executable, path: f.hooks, canApply: true } } });
+  expect(first.state.records[0]!.codex!.preview!.addition).toEqual({ hooks: [{ type: 'command', command: '[Agent Pet 私有观察程序与参数（已隐藏）]', timeout: 2 }] });
+  expect(JSON.stringify(first.state)).not.toMatch(/PRIVATE|activation|token|observer\.cjs|codex-normal-/);
   expect(chooseClaude).not.toHaveBeenCalled(); expect(native.pick).not.toHaveBeenCalled();
   expect(existsSync(join(directory, 'profile', 'codex-normal-' + first.configurationId))).toBe(false);
   const second = await prepare('second');
@@ -550,5 +552,24 @@ it.each(['change', 'remove'] as const)('cancels a custom-target prepare after a 
   expect(await pending).toMatchObject({ configurationId: null, reason: 'cancelled' });
   expect(reads).not.toHaveBeenCalled();
   expect(registry.snapshot().records.some(record => record.targetPath === f.target)).toBe(false);
+  expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
+});
+
+it('requires rescan after real custom-target replacement without private setup or default-target fallback', async () => {
+  const target = join(directory, 'custom-target'); mkdirSync(target, { mode: 0o700 });
+  const hooks = join(target, 'hooks.json'), original = '{"private":"CUSTOM_ONLY"}\n';
+  writeFileSync(hooks, original, { mode: 0o600 });
+  const created = await registry.create({ provider: 'codex', name: 'Custom', targetPath: target });
+  const id = created.records[0]!.id, f = await codexFixture();
+  await invoke('configurations-prepare-detected-codex', f.id, 'custom', id);
+  const plan = registry.snapshot().records[0]!.codex!.preview!;
+  const privateBefore = readdirSync(join(directory, 'profile')).sort();
+  renameSync(target, join(directory, 'original-custom')); mkdirSync(target, { mode: 0o700 });
+  writeFileSync(hooks, original, { mode: 0o600 });
+  const result = await invoke('configurations-confirm', id, plan.id) as ReturnType<Configurations['snapshot']>;
+  expect(result.records[0]!.codex).toMatchObject({ notice: 'rescan-required', preview: null, configured: false, canConfigure: true });
+  expect(readdirSync(join(directory, 'profile')).sort()).toEqual(privateBefore);
+  expect(readFileSync(hooks, 'utf8')).toBe(original);
+  expect(readFileSync(join(directory, 'original-custom/hooks.json'), 'utf8')).toBe(original);
   expect(readFileSync(f.hooks, 'utf8')).toBe(f.original);
 });

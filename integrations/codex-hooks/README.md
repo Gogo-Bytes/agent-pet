@@ -10,8 +10,12 @@ methods/versions or Codex Desktop. Task priorities are in the [MVP entry](../../
 Main owns revalidatable installation discovery evidence, not an executable picker or
 Renderer-supplied program path. The resolver survives preview cancellation while its
 scan identity, entry/standalone layout and target remain valid. Preview and confirmation
-recheck CLI/host/target before writes. A removed/replaced installation, stale scan/window
-or changed target requires rescan; metadata verification is not binary attestation.
+recheck CLI/host paths and layout; this does not bind program inode identity or detect a
+replacement at the same accepted path/layout, and is not binary attestation. A stale
+scan/window, changed resolved program path/layout or proven target/hooks change requires
+rescan. Hook-plan directory/file identity and bytes are checked before private setup and
+again after asynchronous observer initialization; unreadable/uncertain failures are not
+reported as proven stale evidence.
 
 An existing unconfigured record continues read consent and exact hook preview, not just
 “view configuration”. Custom-target preparation accepts only the opaque configuration ID;
@@ -21,7 +25,10 @@ executable evidence without mandatory rescan or duplicate installation.
 
 The selected target is actual CODEX_HOME (normally `~/.codex`, not a project's `.codex`).
 Read consent permits only bounded target hooks.json (64KiB) and ancestor/program metadata;
-separate confirmation appends10 owned command hooks. Existing JSON values/unrelated bytes,
+separate confirmation appends10 owned command hooks. The read-only preview lists the exact
+target and events plus the actual append-group shape (command type, timeout2), with only
+the private command replaced by an explicitly non-executable redaction. Neither existing
+private hooks nor activation/token paths are sent to Renderer. Existing JSON values/unrelated bytes,
 config.toml, login and shell remain unchanged. Codex's native `/hooks` trust review is
 independent: Agent Pet does not write trust, run Codex or approve tasks.
 
@@ -30,7 +37,10 @@ permissions, pending writes, ambiguous or modified own references. Only complete
 owned groups are withdrawn. `codex-registration-store.ts` keeps0700/0600 private state,
 receipt and original-hook backup; writes compare the first receipt-validated bytes, never
 adopt a concurrent edit as a new overwrite baseline. No full backup restore over user edits.
-Unknown/partial files remain; shared-file rename is not external-editor CAS.
+Unknown/partial files remain; shared-file rename is not external-editor CAS. A change found
+before private setup creates no registration/runtime material. If evidence changes or setup
+fails after initialization, observation stops but disabled registration/runtime evidence is
+retained; rescan does not authorize cleanup or adoption of those residues.
 
 `codex-connection.ts` owns explicit confirm/cancel/resume/pause/removal. Resume validates
 original hooks, program and private materials; paused state persists. Exit stops observation,

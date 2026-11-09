@@ -16,7 +16,7 @@ export const identity = (stat: fs.Stats): Identity => ({ dev: stat.dev, ino: sta
   uid: stat.uid, gid: stat.gid, mode: stat.mode });
 export const sameIdentity = (a: Identity, b: Identity) => a.dev === b.dev && a.ino === b.ino &&
   a.birthtimeMs === b.birthtimeMs && a.mode === b.mode && a.uid === b.uid && a.gid === b.gid;
-const sameFile = (a: fs.Stats, b: fs.Stats) => sameIdentity(identity(a), identity(b)) && a.size === b.size &&
+export const sameFile = (a: fs.Stats, b: fs.Stats) => sameIdentity(identity(a), identity(b)) && a.size === b.size &&
   a.nlink === b.nlink && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs;
 export const commandValid = (value: unknown): value is string => typeof value === 'string' && value.trim() === value && value.length > 0 &&
   Buffer.byteLength(value) <= 8192 && !/[\u0000-\u001f\u007f-\u009f]/u.test(value);

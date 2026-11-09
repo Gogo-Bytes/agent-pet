@@ -9,6 +9,7 @@ import { CodexConnection, type CodexConnectionOptions } from './codex-connection
 import { Configurations } from './configurations.js';
 import { projectHomePets } from '../renderer/management/home-projection.js';
 import * as native from '../../../../integrations/codex-hooks/native-presence.js';
+import * as protectedJson from './protected-json-file.js';
 vi.mock('../../../../integrations/codex-hooks/native-presence.js', async original => ({ ...await original<typeof import('../../../../integrations/codex-hooks/native-presence.js')>() }));
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => { for (const fn of cleanups.splice(0).reverse()) await fn(); vi.restoreAllMocks(); });
@@ -30,12 +31,19 @@ function fixture() {
 }
 it('previews without writes, confirms additively, persists pause, restores with rotation and selectively withdraws', async () => {
   const f = fixture(); let connection = new CodexConnection(f.options); cleanups.push(() => connection.stop());
+  fs.writeFileSync(join(f.target, 'hooks.json'), '{"existing":true,"hooks":{"Stop":[{"hooks":[{"type":"command","command":"PRIVATE_EXISTING_COMMAND"}]}]}}');
   const before = fs.readFileSync(join(f.target, 'hooks.json'), 'utf8');
   const preview = (await connection.preview(f.discover)).preview!;
+  expect(preview.addition).toEqual({ hooks: [{ type: 'command', command: '[Agent Pet 私有观察程序与参数（已隐藏）]', timeout: 2 }] });
+  expect(JSON.stringify(preview)).not.toMatch(/PRIVATE|activation|token|observer\.cjs|codex-normal-/);
+  expect(fs.readdirSync(f.data)).toEqual([]);
   expect(preview.canApply).toBe(true); expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe(before);
   expect((await connection.confirm(preview.id)).status).toBe('waiting'); expect(f.servers).toHaveLength(1);
   expect(fs.readFileSync(join(f.target, 'config.toml'), 'utf8')).toBe('token = "PRIVATE"\n');
   const installed = fs.readFileSync(join(f.target, 'hooks.json'), 'utf8');
+  const hooks = JSON.parse(installed).hooks;
+  expect(Object.keys(hooks).sort()).toEqual([...preview.events].sort());
+  for (const event of preview.events) expect({ ...hooks[event].at(-1).hooks[0], command: preview.addition!.hooks[0]!.command }).toEqual(preview.addition!.hooks[0]);
   await connection.disable(); await connection.stop(); connection = new CodexConnection(f.options); await connection.restore();
   expect(connection.snapshot().status).toBe('disabled'); expect(f.servers).toHaveLength(1);
   await connection.resume(); expect(connection.snapshot().status).toBe('waiting'); expect(f.servers).toHaveLength(2);
@@ -43,7 +51,7 @@ it('previews without writes, confirms additively, persists pause, restores with 
   expect(JSON.stringify(connection.snapshot())).not.toMatch(/PRIVATE|activation|token|owned-host/);
   fs.writeFileSync(join(f.target, 'hooks.json'), installed.replace('"existing":true', '"existing":"LATER"'));
   expect(await connection.remove()).toBe(true);
-  expect(JSON.parse(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8'))).toEqual({ existing: 'LATER' });
+  expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe(before.replace('"existing":true', '"existing":"LATER"'));
 });
 it('feeds independent configuration identities through shared sessions/Home and clears them on pause', async () => {
   const f = fixture(); let sessions = createSessionState();
@@ -126,4 +134,87 @@ it('rejects unsupported discovered executables and changed host selection withou
   expect(await connection.confirm(plan.id)).toMatchObject({ notice: 'rescan-required', configured: false, preview: null });
   expect(fs.existsSync(join(f.data, `codex-registration-${f.options.configurationId}`))).toBe(false);
   expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe('{"existing":true}');
+});
+
+it.each(['target', 'hooks', 'same-bytes', 'during-read'] as const)('requires rescan before private writes when preview %s evidence changes', async change => {
+  const f = fixture(), connection = new CodexConnection(f.options); cleanups.push(() => connection.stop());
+  const path = join(f.target, 'hooks.json'), original = fs.readFileSync(path, 'utf8');
+  const plan = (await connection.preview(f.discover)).preview!;
+  if (change === 'target') {
+    fs.renameSync(f.target, join(f.root, 'original-target')); fs.mkdirSync(f.target, { mode: 0o700 });
+    fs.writeFileSync(path, original, { mode: 0o600 });
+  } else if (change === 'hooks') fs.writeFileSync(path, '{"concurrent":"PRIVATE"}');
+  else if (change === 'during-read') {
+    const read = protectedJson.readSource;
+    vi.spyOn(protectedJson, 'readSource').mockImplementationOnce(context => {
+      fs.renameSync(path, join(f.target, 'original-hooks')); fs.writeFileSync(path, original, { mode: 0o600 });
+      return read(context);
+    });
+  } else { fs.renameSync(path, join(f.target, 'original-hooks')); fs.writeFileSync(path, original, { mode: 0o600 }); }
+  const before = fs.readFileSync(path, 'utf8');
+  expect(await connection.confirm(plan.id)).toMatchObject({ notice: 'rescan-required', configured: false, preview: null, canConfigure: true });
+  expect(fs.readFileSync(path, 'utf8')).toBe(before);
+  expect(fs.readdirSync(f.data)).toEqual([]); expect(f.servers).toHaveLength(0);
+  if (change === 'target') expect(fs.readFileSync(join(f.root, 'original-target/hooks.json'), 'utf8')).toBe(original);
+  expect(await connection.preview()).toMatchObject({ notice: 'rescan-required', preview: null });
+  expect((await connection.preview(f.discover)).preview?.canApply).toBe(true);
+  expect(fs.readdirSync(f.data)).toEqual([]);
+});
+
+it('rejects target changes during asynchronous preview without writing private material', async () => {
+  const f = fixture();
+  f.options.runtimeAssets = async () => {
+    fs.renameSync(f.target, join(f.root, 'original-target')); fs.mkdirSync(f.target, { mode: 0o700 });
+    fs.writeFileSync(join(f.target, 'hooks.json'), '{"new":true}', { mode: 0o600 });
+    return { nativeHook: '// fixture only' };
+  };
+  const connection = new CodexConnection(f.options); cleanups.push(() => connection.stop());
+  expect(await connection.preview(f.discover)).toMatchObject({ notice: 'rescan-required', preview: null, configured: false });
+  expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe('{"new":true}');
+  expect(fs.readdirSync(f.data)).toEqual([]);
+});
+
+it('preserves private material and concurrent hooks when evidence changes during observer initialization', async () => {
+  const f = fixture(), stopped = vi.fn(async () => {});
+  f.options.startBridge = async () => {
+    fs.renameSync(f.target, join(f.root, 'original-target')); fs.mkdirSync(f.target, { mode: 0o700 });
+    fs.writeFileSync(join(f.target, 'hooks.json'), '{"concurrent":true}', { mode: 0o600 });
+    return { activation: '{"synthetic":"PRIVATE"}', stop: stopped };
+  };
+  const connection = new CodexConnection(f.options); cleanups.push(() => connection.stop());
+  const plan = (await connection.preview(f.discover)).preview!;
+  expect(await connection.confirm(plan.id)).toMatchObject({ notice: 'rescan-required', configured: true, status: 'failed', preview: null });
+  expect(stopped).toHaveBeenCalled();
+  expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe('{"concurrent":true}');
+  expect(fs.readFileSync(join(f.root, 'original-target/hooks.json'), 'utf8')).toBe('{"existing":true}');
+  const registration = join(f.data, `codex-registration-${f.options.configurationId}`);
+  expect(JSON.parse(fs.readFileSync(join(registration, 'state.json'), 'utf8')).disabled).toBe(true);
+  expect(fs.readdirSync(join(f.data, `codex-normal-${f.options.configurationId}`)).sort()).toEqual(['activation.json', 'hook.json', 'observer.cjs', 'receipt.json']);
+  expect(JSON.stringify(connection.snapshot())).not.toMatch(/PRIVATE|activation|token|observer\.cjs/);
+});
+
+it.each(['pending', 'io'] as const)('does not label an uncertain %s failure stale or write private materials', async failure => {
+  const f = fixture(), connection = new CodexConnection(f.options); cleanups.push(() => connection.stop());
+  const plan = (await connection.preview(f.discover)).preview!;
+  const pending = join(f.target, 'hooks.agent-pet.pending.json');
+  if (failure === 'pending') fs.writeFileSync(pending, 'UNKNOWN_PENDING', { mode: 0o600 });
+  else vi.spyOn(protectedJson, 'readSource').mockImplementationOnce(() => { throw Object.assign(new Error(), { code: 'EIO' }); });
+  expect(await connection.confirm(plan.id)).toMatchObject({ notice: 'save-failed', configured: false, preview: null });
+  expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe('{"existing":true}');
+  expect(fs.readdirSync(f.data)).toEqual([]); expect(f.servers).toHaveLength(0);
+  if (failure === 'pending') expect(fs.readFileSync(pending, 'utf8')).toBe('UNKNOWN_PENDING');
+});
+
+it('retains unknown runtime files and disabled registration on an initialization failure, not a rescan', async () => {
+  const f = fixture(), connection = new CodexConnection(f.options); cleanups.push(() => connection.stop());
+  const plan = (await connection.preview(f.discover)).preview!;
+  const runtime = join(f.data, `codex-normal-${f.options.configurationId}`);
+  fs.mkdirSync(runtime, { mode: 0o700 }); fs.writeFileSync(join(runtime, 'unknown'), 'UNKNOWN_PRIVATE', { mode: 0o600 });
+  expect(await connection.confirm(plan.id)).toMatchObject({ notice: 'save-failed', configured: true, status: 'failed' });
+  expect(fs.readdirSync(runtime)).toEqual(['unknown']);
+  expect(fs.readFileSync(join(runtime, 'unknown'), 'utf8')).toBe('UNKNOWN_PRIVATE');
+  const registration = join(f.data, `codex-registration-${f.options.configurationId}`);
+  expect(JSON.parse(fs.readFileSync(join(registration, 'state.json'), 'utf8')).disabled).toBe(true);
+  expect(fs.readFileSync(join(f.target, 'hooks.json'), 'utf8')).toBe('{"existing":true}');
+  expect(f.servers).toHaveLength(0);
 });

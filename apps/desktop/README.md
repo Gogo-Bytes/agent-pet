@@ -162,3 +162,30 @@ to a pre-created0700 directory. Exclusive0600 output is capped128KiB and records
 intents with salted aliases, not bodies or a rendered-clip proof. Unset means no recording;
 packaged apps ignore it. Existing test-support scripts, retained fixtures and attachments
 are not automatically executable/cleanable just because historical reports were removed.
+
+## macOS native acceptance with @电脑
+
+For a local acceptance build, give its .app a unique bundle ID and select that app
+by its full path in @电脑. Launch its executable with
+`--disable-backgrounding-occluded-windows` and the approved isolated environment.
+On macOS 26.1 with Electron 36.9.5 this combination allowed two cold starts to
+complete page navigation, text entry, readback and cancellation. With the stock
+Electron bundle, the tool could show Electron’s default page after product exit.
+With only the new bundle ID, the accessibility tree could still show the previous page.
+
+1. Verify the build manifest, live process identity, isolated home, Electron data
+   paths and CODEX_HOME before interacting. The retained Issue 19 launcher is
+   `/private/tmp/agent-pet-issue19-2d4de76/run-02/cua-identity-01/start.command`.
+   If the temporary copy has expired, prepare a fresh isolated copy from the
+   specified commit and verify its paths before launch.
+2. Check the management window title and management.html URL. Click “连接” and
+   verify the “我的连接” heading. On a synthetic record, open “重命名”, type a
+   marker, read it back, and cancel. Verify the original name. Refresh the
+   accessibility tree after each transition. Clicking the tab uses its ordinary
+   interaction; setting its AX value crashed this Electron version.
+3. Capture the consent and action preview separately. Verify saved image files
+   and inspect their visible content; scroll for details that fall below the fold.
+   If capture reports an error after a click, re-read the UI before retrying.
+4. The current “重新扫描” flow also probes pi installation paths. Include the
+   actual discovery scope in the acceptance preview. For shutdown, inventory
+   the process tree, request graceful exit and check the recorded identities.

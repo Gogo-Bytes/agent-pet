@@ -50,10 +50,11 @@
 - `node_modules/.bin/tsc --noEmit`：通过。
 - `cd apps/desktop && ../../node_modules/.bin/electron-vite build`：通过。
 - 本轮未重跑全量；`2d4de76` 的历史全量结果为 1613 passed / 1 skipped，不能写成标注修复后的重跑结果。
-- **标注修复后的原生可访问名称与截图仍待复验**，旧截图保留其原始版本，不能替代新版本验收。
+- **标注修复已原生复验通过**：[2026-11-11 run-03 记录](https://github.com/Gogo-Bytes/agent-pet/issues/19#issuecomment-6793139682)绑定 `b522448b9b1e93529807f7b9e8b23e9457a21bd6`。macOS 辅助功能树读到“Codex CLI 扫描结果”，旧“默认配置”名称消失；卡片及截图显示所选自定义目录。此轮止于扫描卡片，目标为空，退出码 0，记录的 5 个进程身份及隔离应用路径复查无残留。以上为验收执行者线上报告，本归档没有重跑。
+- run-03 截图/辅助功能树未复制到本目录。本次检查 `/private/tmp/agent-pet-issue19-2d4de76/run-03` 不存在，无法独立复核其本地原件，不推断原件已删除或不存在于其他目录。已归档的 run-02 截图仍对应旧版本，不能代替 run-03 证据。
 
 ## 未测与既有限制
 
-一般 I/O 故障分类、初始化后并发变化时停止观察及禁用材料保留，没有确定的原生复现；自动化覆盖不能冒充原生通过。未启动 Codex、模型或真实会话，未验收 pi、Claude。
+一般 I/O 故障分类、初始化后并发变化时停止观察及禁用材料保留，没有确定的原生复现；自动化覆盖不能冒充原生通过。本 Codex 验收未启动 Codex、模型或真实会话，也不覆盖 pi、Claude；其后两者的分版本验收见 [Issue #15 汇总](../provider-issue15-f9e4ce5/README.md)。
 
 程序仍只有路径/layout 重验，不绑定同路径替换的 inode；路径检查不是原子 CAS。此前 `darwin-files-port.test.ts:455` 的间歇 `path-changed` 未取得修复证据。归档和代码提交均不构成关闭 Issue、推送或发布授权。

@@ -110,7 +110,11 @@ it('keeps home pets online for remaining peers and isolates configuration depart
   }
 });
 
-it.each(['session_info_changed', 'companion'] as const)('keeps current pi work and per-configuration Home state after superseded %s', async type => {
+it.each([
+  ['session_info_changed', 'working'], ['companion', 'working'],
+  ['session_info_changed', 'completed'], ['companion', 'completed'],
+  ['session_info_changed', 'error'], ['companion', 'error'],
+] as const)('keeps pi Session, bubbles and per-configuration Home state after superseded %s while %s', async (type, status) => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'pet-config-owner-')));
   const directory = join(root, 'data'); await mkdir(directory, { mode: 0o700 });
   const adapter = new PiBridgeAdapter(), start = vi.spyOn(adapter, 'start');
@@ -146,16 +150,27 @@ it.each(['session_info_changed', 'companion'] as const)('keeps current pi work a
     current.send(3, { type: 'hello', status: 'idle' });
     current.send(4, { type: 'lifecycle', status: 'working', workId: 'current-work' });
     await vi.waitFor(() => expect(app.snapshot().sessions[currentId]?.revision).toBe(8));
+    if (status !== 'working') {
+      current.send(5, { type: 'lifecycle', status, workId: 'current-work' });
+      await vi.waitFor(() => expect(app.snapshot().bubbles.find(bubble => bubble.sessionId === currentId)?.status)
+        .toBe(status === 'completed' ? 'completed-unread' : 'error-unread'));
+    }
+    const before = structuredClone(app.snapshot());
+    const homeBefore = structuredClone(pets());
     old.send(2, type === 'session_info_changed' ? { type, sessionName: 'stale' } :
       { type, facts: { activities: ['reading'], waitingForInput: false }, capabilities: { reading: 'supported' } });
     const closed = once(old.socket, 'close'); old.socket.end(); await closed;
     await new Promise<void>(resolve => setImmediate(resolve));
-    expect(app.snapshot().sessions[currentId]).toMatchObject({ revision: 8, status: 'working', connected: true });
-    expect(pets().map(pet => [pet.id, pet.action])).toEqual(ids.map(id => [id, 'working']));
+    expect(app.snapshot().sessions).toEqual(before.sessions);
+    expect(app.snapshot().bubbles).toEqual(before.bubbles);
+    expect(app.snapshot().sessions[currentId]).toMatchObject({ status, connected: true });
+    expect(pets()).toEqual(homeBefore);
     expect(app.snapshot().bubbles).toHaveLength(2);
-    current.send(5, { type: 'lifecycle', status: 'completed', workId: 'current-work' });
-    await vi.waitFor(() => expect(pets().map(pet => pet.action)).toEqual(['success', 'working']));
-    expect(app.snapshot().bubbles.find(bubble => bubble.sessionId === currentId)?.status).toBe('completed-unread');
+    if (status === 'working') {
+      current.send(5, { type: 'lifecycle', status: 'completed', workId: 'current-work' });
+      await vi.waitFor(() => expect(pets().map(pet => pet.action)).toEqual(['success', 'working']));
+      expect(app.snapshot().bubbles.find(bubble => bubble.sessionId === currentId)?.status).toBe('completed-unread');
+    }
     expect(app.snapshot().sessions[otherId]).toEqual(otherState);
     expect(collection.snapshot().records.map(record => record.connectionCue)).toEqual(cues);
   } finally {

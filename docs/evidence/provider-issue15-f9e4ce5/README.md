@@ -36,8 +36,8 @@
 本地日志核对结果：
 
 - `regression.log`：7 个仓库测试文件，138/138 passed。
-- `pi-unread.log`：4/4 passed，运行于隔离 `pi-check`，不是新增到本仓库的永久回归用例。
-- 本归档没有重跑全量、类型检查或构建；文档检查不能当作功能测试。
+- `pi-unread.log`：当时 4/4 passed，运行于隔离 `pi-check`。后续已将这四个场景并入仓库 `apps/desktop/src/main/configurations-socket.test.ts`，复用真实 socket、双配置和 Application/Home 链路；先建立成功/错误未读，再发送旧 peer 的 metadata/companion 并关闭旧连接，比较 Session、气泡、Home 和配置连接提示，避免覆盖随临时目录消失。
+- 后续测试归档阶段实际执行 `node_modules/.bin/vitest run apps/desktop/src/main/configurations-socket.test.ts packages/adapter-pi/src/connections.test.ts integrations/claude-hooks/observations.test.ts apps/desktop/src/main/codex-connection.test.ts apps/desktop/src/main/configuration-ipc.test.ts apps/desktop/src/renderer/management/CodexConnectionControls.test.tsx --maxWorkers=1`：6 文件、107/107 passed；`node_modules/.bin/tsc --noEmit` 和桌面 `electron-vite build` 通过。未重跑全量或原生验收，没有改变产品运行代码，不能将新增集成覆盖写成 TUI 原生通过。
 
 ## 权限与收尾边界
 

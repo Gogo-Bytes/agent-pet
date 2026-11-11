@@ -89,7 +89,7 @@ it('prepares an existing unconfigured Codex record from the scan rather than dis
     targetPath: test.configs().records[0]!.targetPath, scan: 'complete', notice: 'none',
   });
   await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
-  await test.user.click(within(screen.getByRole('article', { name: 'Codex CLI 默认配置' })).getByRole('button', { name: /一键配置/ }));
+  await test.user.click(within(screen.getByRole('article', { name: 'Codex CLI 扫描结果' })).getByRole('button', { name: /一键配置/ }));
   await test.user.click(screen.getByRole('button', { name: /检查并预览/ }));
   expect(test.bridge.configurations.prepareDetectedCodex).toHaveBeenCalledExactlyOnceWith('codex-found', expect.any(String), 'codex-one');
   expect(test.bridge.configurations.preview).not.toHaveBeenCalled();
@@ -105,7 +105,8 @@ it('rescans for the original custom record, shows its exact read scope and reach
     state: test.update({ preview: { ...preview, path: `${target}/hooks.json` }, notice: 'none' }), configurationId: 'codex-one',
   }));
   await test.user.click(screen.getByRole('button', { name: '重新扫描' }));
-  const result = screen.getByRole('article', { name: 'Codex CLI 默认配置' });
+  const result = screen.getByRole('article', { name: 'Codex CLI 扫描结果' });
+  expect(screen.queryByRole('article', { name: /Codex CLI 默认配置/ })).toBeNull();
   expect(result.textContent).toContain(target); expect(result.textContent).not.toContain('/different-default');
   await test.user.click(within(result).getByRole('button', { name: /一键配置/ }));
   expect(screen.getByRole('dialog', { name: '连接 Codex CLI' }).textContent).toContain(target);
@@ -125,7 +126,7 @@ it('keeps already configured Codex scan results as view-only without a second pr
     targetPath: test.configs().records[0]!.targetPath, scan: 'complete', notice: 'none',
   });
   await test.user.click(screen.getByRole('button', { name: '自动扫描' }));
-  await test.user.click(within(screen.getByRole('article', { name: 'Codex CLI 默认配置' })).getByRole('button', { name: /查看配置/ }));
+  await test.user.click(within(screen.getByRole('article', { name: 'Codex CLI 扫描结果' })).getByRole('button', { name: /查看配置/ }));
   expect(screen.getByRole('heading', { name: '等待活动' })).toBeTruthy();
   expect(test.bridge.configurations.prepareDetectedCodex).not.toHaveBeenCalled();
 });

@@ -45,7 +45,7 @@ export function DeploymentControls({ record, api, run, busy, visible = true, sta
     </div>
     {state && !routineNotice && <div className="cfg-connection-notice" role={summary.tone === 'error' ? 'alert' : 'status'}><p>{connectionNoticeText[state.notice]}</p><details><summary>查看详细原因</summary><p>{noticeText[state.notice]}</p></details></div>}
     {state?.canConfigure && !state.preview && <>
-      <details className="cfg-operation-help"><summary>会读取或改动哪些内容？</summary><p>会检查所选文件夹及上级文件夹的安全性，读取 settings.json、extensions/package.json，并检查扩展入口和忽略规则。不读取登录信息、会话或对话。确认后只新建 extensions/agent-pet.ts，不更改你原有的 pi 设置，不会自动启动或重新加载 pi。</p><p>连接所需的信息保存在本应用的专用文件夹。退出后会保留，下次打开需要你点击重新连接。</p></details>
+      <details className="cfg-operation-help"><summary>会读取或改动哪些内容？</summary><p>会检查所选文件夹及上级文件夹的安全性，读取 settings.json、extensions/package.json，并检查扩展入口和忽略规则。不读取登录信息、会话或对话。确认后只新建 extensions/agent-pet.ts，不更改你原有的 pi 设置，不会自动启动或重新加载 pi。</p></details>
     </>}
     {state?.preview && <section className={`cfg-preview ${state.preview.action === 'blocked' ? 'is-blocked' : ''}`} aria-label="连接设置预览">
       <h3 ref={previewHeading} tabIndex={-1}>{state.preview.action === 'create' ? '确认连接设置' : state.preview.findings[0] ? previewProblems[state.preview.findings[0]] : '暂时无法连接'}</h3>
@@ -56,8 +56,8 @@ export function DeploymentControls({ record, api, run, busy, visible = true, sta
       <details className="cfg-operation-help"><summary>{state.preview.action === 'blocked' ? '查看原因与处理方式' : '文件与权限说明'}</summary>
         {state.preview.findings.map(finding => <div key={finding}><p>{findingSummary[finding]}</p><p>{findingText[finding]}</p></div>)}
         {record.installation && state.preview.action === 'blocked' && state.preview.findings.some(value => ['unsafe', 'missing-target', 'unreadable'].includes(value)) && <p>首次使用 pi，请先打开一次。否则请检查文件夹权限，或返回后选择其他文件夹。</p>}
-        <p>只会新建上述连接文件（权限 0600），连接信息保存在本应用专用目录（目录 0700、文件 0600）。退出后保留，下次打开不会自动连接。如果原临时目录丢失，或连接地址被占用，会停止连接并提示你，不会自动删除或重建。</p>
-        <p>连接后，请在方便时打开 pi；已经运行的 pi 需要在空闲时输入 /reload。pi 需要允许加载扩展，并信任你使用的配置文件夹和项目。Agent Pet 不会替你更改这些设置，也不会自动启动或重新加载 pi。</p>
+        <p>连接文件会保留，下次打开应用后需要重新连接。</p>
+        <p>请允许 pi 加载扩展，并信任配置文件夹和项目。</p>
       </details>
       <div className="cfg-form-actions"><button className="cfg-secondary" disabled={disabled} onClick={() => void run(() => api.cancel(record.id))}>{state.preview.action === 'create' ? '取消' : '返回详情'}</button>
         {state.preview.action === 'create' && <button className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.confirm(record.id, state.preview!.id))}>确认并连接</button>}</div>

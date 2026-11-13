@@ -4,11 +4,11 @@ import { Icon, type IconName } from './components/icons.js';
 import './settings.css';
 
 const sections = [
-  { id: 'render', label: '渲染', title: '场景渲染', copy: '选择画质档位，或单独调整帧率与清晰度。', detail: '画质与性能', icon: 'monitor' },
-  { id: 'app', label: '软件', title: '软件行为', copy: '设置应用入口、启动与退出方式。', detail: '入口与启动', icon: 'software' },
-  { id: 'pet', label: '宠物', title: '桌面宠物', copy: '调整宠物大小、显示方式和动画。', detail: '显示与动作', icon: 'pet' },
-  { id: 'reminders', label: '提醒', title: '任务提醒', copy: '选择需要显示的任务提醒。', detail: '完成与出错', icon: 'bell' },
-  { id: 'about', label: '关于', title: '关于 Agent Pet', copy: '', detail: '项目与使用说明', icon: 'info' },
+  { id: 'render', label: '渲染', title: '场景渲染', icon: 'monitor' },
+  { id: 'app', label: '软件', title: '软件行为', icon: 'software' },
+  { id: 'pet', label: '宠物', title: '桌面宠物', icon: 'pet' },
+  { id: 'reminders', label: '提醒', title: '任务提醒', icon: 'bell' },
+  { id: 'about', label: '关于', title: '关于 Agent Pet', icon: 'info' },
 ] as const;
 type Section = typeof sections[number]['id'];
 type BooleanKey = { [K in keyof Preferences]: Preferences[K] extends boolean ? K : never }[keyof Preferences];
@@ -132,7 +132,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
         {sections.map(item => <button key={item.id} aria-pressed={section === item.id}
           onClick={event => chooseSection(item.id, event.currentTarget)}>
           <Icon name={item.icon} size={19} />
-          <span><strong>{item.label}</strong><small>{item.detail}</small></span>
+          <span><strong>{item.label}</strong></span>
           <Icon name="right" size={14} className="preferences-nav-arrow" />
         </button>)}
       </nav>
@@ -143,7 +143,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
       </button>
     </aside>
     <div ref={scrollArea} className="preferences-content">
-      {section !== 'about' && <header className="preferences-heading"><h1>{selected.title}</h1><p>{selected.copy}</p></header>}
+      {section !== 'about' && <header className="preferences-heading"><h1>{selected.title}</h1></header>}
       {section === 'about' ? <AboutDocument onOpenProject={onOpenProject} /> : <div className="preferences-controls">
         {section === 'render' && <>
           <div className="render-presets" role="group" aria-label="画质档位">
@@ -161,7 +161,6 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
               onChange={value => update({ fps: value as Preferences['fps'] })} />
             <MenuChoice label="渲染清晰度" values={[75, 100, 150]} value={values.resolution} suffix="%" disabled={disabled}
               onChange={value => update({ resolution: value as Preferences['resolution'] })} />
-            <p>更高的帧率和清晰度会增加耗电与发热。清晰度不改变视角或窗口大小。</p>
           </div></details>
           <MenuGroup title="资源使用" icon="leaf">
             {toggle('pauseHidden', '隐藏时暂停渲染', '宠物隐藏或场景不可见时减少资源占用')}
@@ -182,7 +181,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
         </>}
         {section === 'pet' && <>
           <div className="preference-size">
-            <div><label htmlFor="preference-size">宠物大小</label><p>调整桌面上宠物的显示比例</p></div>
+            <div><label htmlFor="preference-size">宠物大小</label></div>
             <output htmlFor="preference-size">{sizePercent}<small>%</small></output>
             <input id="preference-size" type="range" min="60" max="140" step="5" value={sizePercent} disabled={disabled}
               style={{ '--range-progress': `${Math.max(0, Math.min(100, (sizePercent - 60) / 80 * 100))}%` } as CSSProperties}
@@ -203,7 +202,6 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
         {section === 'reminders' && <>
           <div className={`preference-bubble-note ${!values.bubbles ? 'is-muted' : ''}`}>
             <Icon name="bell" size={21} /><div><strong>{values.bubbles ? '通过宠物气泡提醒' : '气泡已关闭'}</strong>
-              <p>{values.bubbles ? '提醒显示在宠物旁，不会打断你的操作。' : '下面的提醒暂不显示，选择会保留。'}</p>
             </div>
             {!values.bubbles && <button disabled={disabled} onClick={() => {
               update({ bubbles: true });
@@ -238,25 +236,11 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
 function AboutDocument({ onOpenProject }: { onOpenProject: (() => void) | undefined }) {
   return <article className="preferences-about" aria-label="关于 Agent Pet">
     <header className="about-document-header"><h1>Agent Pet</h1>
-      <p className="about-document-meta"><span className="about-version">版本 0.1.0</span><span aria-hidden="true">·</span>桌面宠物项目</p>
+      <p className="about-document-meta"><span className="about-version">版本 0.1.0</span></p>
       <p className="about-document-lead">通过 3D 宠物的动作，观察 AI Agent 的工作状态。</p>
     </header>
-    <section><h2>项目简介</h2><p>Agent Pet 是一个运行在本机的桌面宠物项目。当 Agent 工作、完成任务或遇到错误时，宠物会用不同的状态作出反馈。</p>
-      <p>它的目标是让桌面多一个有趣的小伙伴，也让你更容易知道 Agent 是否需要关注。</p></section>
-    <section><h2>当前进展</h2><p>目前以 <strong>macOS</strong> 和 <strong>pi</strong> 的本机接入为起点。其他 Agent 的支持正在规划中，项目不会只围绕 pi 设计。</p>
-      <ul><li>连接配置：管理本机 Agent 的配置位置与名称；真实部署需要预览与授权。</li>
-        <li>宠物展示：用现有 3D 形象与动画表达任务状态。</li>
-        <li>后续方向：更多 Agent、可导入的宠物，以及更完整的场景交互。</li></ul>
-      <p>正式界面与真实 pi 全链路验收分别记录；当前版本仍是本机 MVP，尚未完成正式分发验收。</p>
-    </section>
-    <section><h2>使用方式</h2><ol><li><strong>配置连接。</strong> 在连接页添加 Agent，检查配置是否可用。</li>
-      <li><strong>选择宠物。</strong> 查看已有形象和动作；尚未实现的收藏与导入会明确说明。</li>
-      <li><strong>调整偏好。</strong> 在设置中选择显示、提醒和运行方式。</li></ol>
-      <p>设计上尽量减少专业操作，让没有技术背景的人也能轻松使用。</p></section>
-    <section><h2>数据与隐私</h2><p>项目观察 Agent 的名称与状态，不读取对话正文，也不代替你启动、审批或控制 Agent。</p></section>
     <section className="about-document-links"><h2>项目链接</h2>
       <button className="about-project-link" disabled={!onOpenProject} onClick={onOpenProject}>Gogo-Bytes / agent-pet<Icon name="right" /></button>
-      <p>源码、项目文档与问题反馈都在 GitHub 仓库中。</p>
     </section>
   </article>;
 }

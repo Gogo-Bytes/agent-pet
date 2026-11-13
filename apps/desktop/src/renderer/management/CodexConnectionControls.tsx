@@ -58,13 +58,13 @@ export function CodexConnectionControls({ record, api, run, busy, visible, error
       {state?.canResume && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{state.status === 'disabled' ? '继续连接' : '重新连接'}</button>}
     </div>
     {state && state.notice !== 'none' && <p role="alert">{notices[state.notice]}</p>}
-    <details className="cfg-operation-help"><summary>连接说明</summary><p>首次设置后，在 Codex 的 <code>/hooks</code> 中审核 Agent Pet 通知，再发送任务。只报告会话和支持的动作，不读取对话或替你执行任务。</p><p>不会改动原有设置；暂停停止接收，移除只撤回本应用条目。</p></details>
+    <details className="cfg-operation-help"><summary>连接说明</summary><p>首次设置后，在 Codex 的 <code>/hooks</code> 中审核 Agent Pet 通知，再发送任务。只报告会话和支持的动作，不读取对话或替你执行任务。</p></details>
     {visible && preview && <Dialog label="连接 Codex CLI" className="cfg-page cfg-dialog" initialFocusRef={cancelButton} onClose={() => { if (!disabled) void run(() => api.cancel(record.id)); }}>
       <div className="cfg-dialog-shell"><header className="cfg-dialog-header"><div className="cfg-dialog-title"><span className="cfg-dialog-emblem"><Icon name="command" /></span><h2>连接 Codex CLI</h2></div><button className="cfg-dialog-close" aria-label="关闭连接预览" disabled={disabled} onClick={() => void run(() => api.cancel(record.id))}><Icon name="close" /></button></header>
         <section className="cfg-dialog-body"><h3>{preview.canApply ? '添加 Agent Pet 通知' : '暂时无法添加'}</h3><code className="cfg-file-path" title={preview.path}>{preview.path}</code><p>{preview.canApply ? `只追加 ${preview.events.length} 条通知，保留原有内容。` : '请检查文件格式、权限、禁用设置或已有条目。原文件会保留。'}</p>
           {preview.canApply && preview.addition && <>
             <ul>{preview.events.map(event => <li key={event}><code>{event}</code></li>)}</ul>
-            <p>每个事件追加以下一组条目。命令已脱敏，不是完整可执行命令；仅调用 Agent Pet 私有观察程序，不启动或控制 Codex。</p>
+            <p>每个事件追加以下条目。命令已隐藏，不能直接执行。</p>
             <pre className="cfg-hook-addition">{JSON.stringify(preview.addition, null, 2)}</pre>
           </>}
           <p>首次设置后，在 Codex 的 <code>/hooks</code> 中独立审核通知，再发送任务；此确认不会授予原生信任。</p>

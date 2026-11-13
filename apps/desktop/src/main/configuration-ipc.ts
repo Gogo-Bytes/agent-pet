@@ -50,7 +50,7 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     assert(event); const valid = configurationPath(value); if (!valid) throw new TypeError('请输入完整绝对路径。');
     const current = window()!;
     const result = await dialog.showMessageBox(current, { type: 'question', title: '允许检查这个配置位置？',
-      message: valid, detail: '只读检查此目录及祖先的安全 metadata、settings.json、hooks.json、extensions/package.json 和固定入口/ignore 的存在；连接预览还会核对所选 Agent 程序及本配置目录中的固定后台程序入口 metadata。不会读取会话、凭据或对话，也不会写入、启动或控制 Agent。',
+      message: valid, detail: '检查此文件夹、上级文件夹和 Agent 程序信息，读取 settings.json、hooks.json、extensions/package.json 并检查扩展入口及忽略规则。不会读取凭据、会话或对话，也不会修改文件或启动 Agent。',
       buttons: ['取消', '允许检查'], defaultId: 0, cancelId: 0 });
     if (quitting() || window() !== current || result.response !== 1) return null;
     const canonical = await canonicalLocation(valid); chosen.add(canonical); return canonical;
@@ -99,7 +99,7 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
     try {
       const consent = await dialog.showMessageBox(current, { type: 'question', title: `查找 ${label}`,
         message: `允许检查本机的 ${label} 安装？`,
-        detail: `只读 GUI PATH（最多 32 项）、~/.local/bin/${provider}、/opt/homebrew/bin/${provider}、/usr/local/bin/${provider}，以及 ~/.nvm/versions/node 一层（最多 64 项、16 个版本）。${provider === 'codex' ? `还会核对 ${discovery.targetPath}/packages/standalone/current 下的 bin/codex 和 codex 入口。` : ''}仅检查程序链接、安全 metadata 和对应 package.json（每个最多 64 KiB）；不执行 Agent，不读取配置、凭据或对话，不安装或修改文件。`,
+        detail: `检查 PATH、~/.local/bin/${provider}、/opt/homebrew/bin/${provider}、/usr/local/bin/${provider} 和 ~/.nvm/versions/node 中的安装。${provider === 'codex' ? `还会检查 ${discovery.targetPath}/packages/standalone/current 下的 Codex 入口。` : ''}只读取程序链接和安装信息，不启动 Agent，不读取配置、凭据或对话，也不修改文件。`,
         buttons: ['取消', '允许扫描'], defaultId: 0, cancelId: 0 });
       if (job.cancelled || consent.response !== 1 || revision !== generation || quitting() || window() !== current || current.isDestroyed() || !current.isVisible()) {
         return { installations: [], targetPath: discovery.targetPath, scan: 'complete', notice: 'cancelled' };

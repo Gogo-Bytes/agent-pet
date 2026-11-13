@@ -87,7 +87,7 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
       <label className="collection-search glass-inset"><Icon name="search" /><input autoFocus aria-label="搜索宠物" placeholder="搜索宠物" value={query} onChange={event => setQuery(event.target.value)} /></label>
       <div className="pet-avatar-grid">{assets.records.filter(asset => asset.manifest.id === 'starter' ? name.includes(query) : asset.manifest.id.includes(query)).map(asset =>
         <div className="pet-card" key={asset.id}>
-          <button type="button" className="pet-card-select" aria-pressed={asset.id === selectedAssetId} onClick={() => { onSelectAsset(asset.id); setNotice(asset.id === 'starter' ? '正在使用内置 starter.glb。' : '已切换到导入宠物。'); }}><span className="pet-card-icon">{avatarUrls[asset.id] ? <img src={avatarUrls[asset.id]} alt="" /> : <Icon name="pet" size={28} />}</span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span></button>
+          <button type="button" className="pet-card-select" aria-pressed={asset.id === selectedAssetId} onClick={() => { onSelectAsset(asset.id); setNotice('已切换宠物。'); }}><span className="pet-card-icon">{avatarUrls[asset.id] ? <img src={avatarUrls[asset.id]} alt="" /> : <Icon name="pet" size={28} />}</span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span></button>
           {asset.source === 'imported' && <button type="button" className="pet-card-delete" disabled={busy} aria-label={`删除 ${asset.manifest.id}`} onClick={() => { if (!busy && window.confirm(`删除宠物「${asset.manifest.id}」？`)) void onRemoveAsset(asset.id); }}><Icon name="close" size={16} /></button>}
         </div>)}
       </div>

@@ -7,10 +7,9 @@ import './claude-connection.css';
 
 export function claudeConnectionSummary(state: ClaudeConnectionState | undefined): { title: string; description: string; tone: 'online' | 'waiting' | 'quiet' | 'error' } {
   const normal = state?.mode === 'normal-start';
-  const tasks = state?.scope === 'task-events';
   switch (state?.status) {
-    case 'observing': return { title: normal ? '已连接' : '观察已连接', description: tasks ? '宠物会对工具操作和回答出错作出反应。' : normal ? 'Claude Code 已连接，宠物可以陪伴你。' : '已观察到新打开的 Claude Code。', tone: 'online' };
-    case 'waiting': return { title: '等待启动', description: tasks ? '设置已完成，请新开 Claude 会话。之后照常在终端运行 claude 即可。' : normal ? '配置已完成，照常在终端运行 claude 即可。首次设置后请新开 Claude 会话。' : '请在终端运行命令，打开新的 Claude Code。', tone: 'waiting' };
+    case 'observing': return { title: normal ? '已连接' : '观察已连接', description: normal ? '' : '已观察到新打开的 Claude Code。', tone: 'online' };
+    case 'waiting': return { title: '等待启动', description: normal ? '请新开 Claude 会话。' : '请在终端运行命令，打开新的 Claude Code。', tone: 'waiting' };
     case 'disabled': return { title: '已暂停', description: '观察已暂停，Claude Code 可以继续运行。', tone: 'quiet' };
     case 'disconnected': return { title: '已断开', description: 'Agent Pet 已断开，Claude Code 可继续运行。', tone: 'quiet' };
     case 'failed': return { title: '连接需要处理', description: '请查看提示，已有文件会保留。', tone: 'error' };
@@ -79,7 +78,7 @@ export function ClaudeConnectionControls({ record, api, run, busy, visible, stat
     if (await run(() => api.resume(record.id))) requestAnimationFrame(() => statusHeadingRef.current?.focus({ preventScroll: true }));
   }
   return <div className="cfg-deployment cfg-claude">
-    <div className={`cfg-connection-status cfg-connection-${summary.tone}`}><div><p>{summary.description}</p></div>
+    <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>{summary.description && <div><p>{summary.description}</p></div>}
       {state?.canResume && <button className="cfg-primary" disabled={disabled} onClick={() => void resume()}>{state.status === 'disabled' ? '继续连接' : '重新连接'}</button>}
       {state?.canConfigure && <button ref={configure} hidden={!!preview} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>设置连接</button>}
       {normal && state?.canUpgrade && <button ref={configure} hidden={!!preview} className="cfg-secondary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>启用任务反馈</button>}
@@ -95,11 +94,11 @@ export function ClaudeConnectionControls({ record, api, run, busy, visible, stat
       <div className="cfg-dialog-shell"><header className="cfg-dialog-header"><div className="cfg-dialog-title"><span className="cfg-dialog-emblem"><Icon name="flower" /></span><h2>{upgrading ? '启用任务反馈' : '连接 Claude Code'}</h2></div><button className="cfg-dialog-close" aria-label="取消连接设置" disabled={disabled} onClick={() => void run(() => api.cancel(record.id))}><Icon name="close" /></button></header>
         <section className="cfg-dialog-body"><p>{taskPreview ? upgrading ?
           '将添加任务观察设置，保留你的原有配置。启用后请新开 Claude 会话。' :
-          '将添加连接与任务观察设置，保留你的原有配置。设置后请新开 Claude 会话。' : normal ? '确认后，在以下配置文件中追加一条 Agent Pet 的 SessionStart hook。原有设置和 hooks 会保留。设置一次后，照常在终端运行 claude 即可。' : '只在 Agent Pet 专用文件夹保存连接材料。确认后，由你在终端运行命令，打开新的 Claude Code。'}</p>
+          '将添加连接与任务观察设置，保留你的原有配置。设置后请新开 Claude 会话。' : normal ? '将添加 Agent Pet 连接设置，保留原有配置。设置后请新开 Claude 会话。' : '只在 Agent Pet 专用文件夹保存连接材料。确认后，由你在终端运行命令，打开新的 Claude Code。'}</p>
           {normal && preview.settings && <><span className="cfg-section-label">{preview.settings.exists ? '将更新的配置文件' : '将新建的配置文件'}</span><code className="cfg-file-path" title={preview.settings.path}>{preview.settings.path}</code></>}
           <span className="cfg-section-label">Claude Code 程序</span><code className="cfg-file-path" title={preview.executable}>{preview.executable}</code>
-          <details className="cfg-operation-help"><summary>查看文件与权限</summary>{taskPreview && <p>{upgrading ? '保留 SessionStart，新增事件：' : '观察事件：'}{preview.events?.filter(event => !upgrading || event !== 'SessionStart').join('、')}</p>}<p>{upgrading ? '确认后更新以下私有观察材料，并保留升级前材料。最初的原配置备份保持不变，不会覆盖你的后续设置修改：' : normal ? '确认后仅追加本应用 hook，并在以下专用目录保存连接文件、私有信息及一份原配置备份。备份不会自动覆盖你的后续修改：' : '将在以下专用目录保存入口、插件和私有连接信息：'}</p><code className="cfg-file-path" title={preview.directory}>{preview.directory}</code><ul className="cfg-claude-files">{previewFiles.map(path => <li key={path}><code title={path}>{path}</code></li>)}</ul><p>{normal ? '下次打开时会自动恢复连接，暂停的连接除外。' : '下次打开时需要重新连接。'}</p></details>
-          <p>{normal ? '首次设置后请新开 Claude 会话。移除连接时，只撤回 Agent Pet 添加的 hook。' : '暂停或移除连接不影响正在运行的 Claude Code。'}</p>
+          <details className="cfg-operation-help"><summary>查看文件与权限</summary>{taskPreview && <p>{upgrading ? '保留 SessionStart，新增事件：' : '观察事件：'}{preview.events?.filter(event => !upgrading || event !== 'SessionStart').join('、')}</p>}<p>{upgrading ? '更新以下连接文件，保留升级前文件和原始备份：' : normal ? '仅追加 Agent Pet 的 hook，并在以下位置保存连接文件和原配置备份：' : '将在以下专用目录保存入口、插件和私有连接信息：'}</p><code className="cfg-file-path" title={preview.directory}>{preview.directory}</code><ul className="cfg-claude-files">{previewFiles.map(path => <li key={path}><code title={path}>{path}</code></li>)}</ul><p>{normal ? '下次打开时会自动恢复连接，暂停的连接除外。' : '下次打开时需要重新连接。'}</p></details>
+          <p>{normal ? '移除连接时，只撤回 Agent Pet 添加的 hook。' : '暂停或移除连接不影响正在运行的 Claude Code。'}</p>
           <p>{scopeText}</p>
           {blocked && <p role="alert">{preview.settings?.reason || '无法安全更新配置文件。请返回检查配置位置后重新预览。'}</p>}
           {(error || notice) && <p role="alert">{error || notice}</p>}

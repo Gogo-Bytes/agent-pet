@@ -80,12 +80,7 @@
   font-weight: 650;
   display: block;
 }
-.preferences-nav small {
-  font-size: 10px;
-  display: block;
-  margin-top: 5px;
-  color: var(--preferences-muted);
-}
+
 .preferences-nav .preferences-nav-arrow {
   display: none;
   flex: none;
@@ -102,9 +97,7 @@
 .preferences-nav button[aria-pressed=true]>svg:first-child {
   color: #e0d9ff;
 }
-.preferences-nav button[aria-pressed=true] small {
-  color: #ede9ff;
-}
+
 .preferences-nav button[aria-pressed=true] .preferences-nav-arrow {
   display: block;
 }
@@ -248,11 +241,7 @@
   font-weight: 650;
   letter-spacing: .02em;
 }
-.render-preset-copy {
-  font-size: 11px;
-  margin-top: 5px;
-  opacity: .9;
-}
+
 .render-preset-stats {
   display: block;
   font-size: 10px;
@@ -852,7 +841,7 @@
     gap: 5px;
     border-radius: 9px;
   }
-  .preferences-nav small,.preferences-nav .preferences-nav-arrow,.preferences-nav button[aria-pressed=true] .preferences-nav-arrow {
+  .preferences-nav .preferences-nav-arrow,.preferences-nav button[aria-pressed=true] .preferences-nav-arrow {
     display: none;
   }
   .preferences-nav strong {
@@ -910,9 +899,7 @@
   .render-presets strong {
     font-size: 15px;
   }
-  .render-preset-copy {
-    font-size: 10px;
-  }
+
   .render-preset-stats {
     font-size: 8px;
     margin-top: 12px;

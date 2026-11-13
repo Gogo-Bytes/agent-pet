@@ -13,9 +13,9 @@ const sections = [
 type Section = typeof sections[number]['id'];
 type BooleanKey = { [K in keyof Preferences]: Preferences[K] extends boolean ? K : never }[keyof Preferences];
 const presets = [
-  { name: '省电', fps: 30, resolution: 75, copy: '减少耗电', icon: 'leaf' },
-  { name: '均衡', fps: 60, resolution: 100, copy: '日常推荐', icon: 'gauge' },
-  { name: '清晰', fps: 60, resolution: 150, copy: '细节优先', icon: 'sparkles' },
+  { name: '省电', fps: 30, resolution: 75, icon: 'leaf' },
+  { name: '均衡', fps: 60, resolution: 100, icon: 'gauge' },
+  { name: '清晰', fps: 60, resolution: 150, icon: 'sparkles' },
 ] as const;
 
 type SettingsProps = {
@@ -107,7 +107,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
     setNotice('');
     onChange(patch);
   }
-  function toggle(key: BooleanKey, title: string, copy: string, unavailable = false) {
+  function toggle(key: BooleanKey, title: string, copy = '', unavailable = false) {
     return <PreferenceSwitch title={title} copy={copy} checked={values[key]} disabled={disabled || unavailable}
       onChange={() => update({ [key]: !values[key] })} />;
   }
@@ -152,7 +152,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
               <span className="render-preset-top"><Icon name={item.icon} size={23} />
                 <span className="render-preset-selected">{preset === item && <Icon name="check" size={14} />}</span>
               </span>
-              <strong>{item.name}</strong><span className="render-preset-copy">{item.copy}</span>
+              <strong>{item.name}</strong>
               <span className="render-preset-stats"><b>{item.fps}</b> FPS <span>· {item.resolution}%</span></span>
             </button>)}
           </div>
@@ -163,19 +163,19 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
               onChange={value => update({ resolution: value as Preferences['resolution'] })} />
           </div></details>
           <MenuGroup title="资源使用" icon="leaf">
-            {toggle('pauseHidden', '隐藏时暂停渲染', '宠物隐藏或场景不可见时减少资源占用')}
+            {toggle('pauseHidden', '隐藏时暂停渲染')}
           </MenuGroup>
         </>}
         {section === 'app' && <>
           <MenuGroup title="应用入口" copy="至少保留一个" icon="monitor"><div className="preference-entry-pair">
-            {toggle('tray', '菜单栏图标', !values.dock ? 'Dock 已隐藏，保留此入口' : '从 macOS 顶部菜单栏打开应用', !values.dock)}
-            {toggle('dock', 'Dock 图标', !values.tray ? '菜单栏已隐藏，保留此入口' : '从 Dock 打开控制台', !values.tray)}
+            {toggle('tray', '菜单栏图标', !values.dock ? 'Dock 已隐藏，保留此入口' : '', !values.dock)}
+            {toggle('dock', 'Dock 图标', !values.tray ? '菜单栏已隐藏，保留此入口' : '', !values.tray)}
           </div></MenuGroup>
           <MenuGroup title="启动与退出" icon="software">
             <PreferenceSwitch title="登录时启动" checked={state?.login.enabled ?? false}
-              copy={state?.login.supported ? '登录电脑后启动 Agent Pet' : '开发模式不会将 Electron 加入登录项；打包应用支持此设置'}
+              copy={state?.login.supported ? '' : '请使用打包版启用此设置'}
               disabled={disabled || !state?.login.supported} onChange={() => { setNotice(''); onLogin(!state?.login.enabled); }} />
-            {toggle('startConsole', '启动时打开控制台', '启动后显示管理界面')}
+            {toggle('startConsole', '启动时打开管理窗口')}
             {toggle('background', '关闭控制台后继续运行', values.background ? '关窗口保留宠物；退出应用会全部结束' : '关闭窗口时，应用和宠物一起退出')}
           </MenuGroup>
         </>}
@@ -192,7 +192,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
           </div>
           <MenuGroup title="桌面显示" icon="pet">
             {toggle('petVisible', '显示桌面宠物', '仅显示已连接且绑定宠物的 Agent')}
-            {toggle('topmost', '始终置顶', '显示在其他窗口上方')}
+            {toggle('topmost', '始终置顶')}
           </MenuGroup>
           <MenuGroup title="动作与气泡" icon="sparkles">
             {toggle('bubbles', '显示气泡', values.bubbles ? '提醒通过宠物气泡显示' : '任务提醒暂停显示，偏好仍会保留')}
@@ -209,8 +209,8 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
             }}>开启气泡<Icon name="right" size={15} /></button>}
           </div>
           <MenuGroup title="任务结果" icon="check">
-            {toggle('completed', '任务完成', '任务完成时，显示结果提醒')}
-            {toggle('error', '任务出错', '任务出错时，提醒你查看')}
+            {toggle('completed', '任务完成')}
+            {toggle('error', '任务出错')}
           </MenuGroup>
         </>}
       </div>}
@@ -250,8 +250,8 @@ function MenuGroup({ title, copy, icon, children }: { title: string; copy?: stri
 }
 function PreferenceSwitch({ title, copy, checked, disabled, onChange }: { title: string; copy: string; checked: boolean; disabled: boolean; onChange: () => void }) {
   const description = useId();
-  return <div className={`preference-row ${disabled ? 'is-disabled' : ''}`}><span><strong>{title}</strong><small id={description}>{copy}</small></span>
-    <button className="preference-switch" role="switch" aria-label={title} aria-describedby={description} aria-checked={checked} disabled={disabled} onClick={onChange}>
+  return <div className={`preference-row ${disabled ? 'is-disabled' : ''}`}><span><strong>{title}</strong>{copy && <small id={description}>{copy}</small>}</span>
+    <button className="preference-switch" role="switch" aria-label={title} aria-describedby={copy ? description : undefined} aria-checked={checked} disabled={disabled} onClick={onChange}>
       <span aria-hidden="true" />
     </button>
   </div>;

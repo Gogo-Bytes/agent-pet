@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import type { AgentConfiguration, ConfigurationsState, ConfigurationsApi } from '../../shared/configurations.js';
 import { type Finding, findingText } from '../../shared/pi-preflight.js';
-import { connectionNoticeText, connectionSummary, findingSummary, noticeText } from './connection-copy.js';
+import { connectionNoticeText, connectionSummary, findingSummary } from './connection-copy.js';
 
 const previewProblems: Record<Finding, string> = {
   unsafe: '文件权限需要处理', unreadable: '无法读取配置', 'missing-target': '配置文件夹不存在',
@@ -43,7 +43,7 @@ export function DeploymentControls({ record, api, run, busy, visible = true, sta
       {state?.canResume && <button className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{disabled ? '请稍候…' : resumeLabel}</button>}
       {state?.canConfigure && !state.preview && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>设置连接</button>}
     </div>
-    {state && !routineNotice && <div className="cfg-connection-notice" role={summary.tone === 'error' ? 'alert' : 'status'}><p>{connectionNoticeText[state.notice]}</p><details><summary>查看详细原因</summary><p>{noticeText[state.notice]}</p></details></div>}
+    {state && !routineNotice && <div className="cfg-connection-notice" role={summary.tone === 'error' ? 'alert' : 'status'}><p>{connectionNoticeText[state.notice]}</p></div>}
     {state?.canConfigure && !state.preview && <>
       <details className="cfg-operation-help"><summary>会读取或改动哪些内容？</summary><p>会检查所选文件夹及上级文件夹的安全性，读取 settings.json、extensions/package.json，并检查扩展入口和忽略规则。不读取登录信息、会话或对话。确认后只新建 extensions/agent-pet.ts，不更改你原有的 pi 设置，不会自动启动或重新加载 pi。</p></details>
     </>}

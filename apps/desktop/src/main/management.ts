@@ -46,7 +46,7 @@ export function createManagement(options: {
     async pick(kind) {
       if (!window || window.isDestroyed() || quitting) return null;
       const result = await dialog.showOpenDialog(window, {
-        title: kind === 'installation' ? '选择 pi 安装包目录（包含 package.json）' : '选择 pi 配置目录（agentDir，不是项目或 sessions 目录）',
+        title: kind === 'installation' ? '选择 pi 安装文件夹' : '选择 pi 配置文件夹',
         properties: ['openDirectory', 'dontAddToRecent'],
       });
       return result.canceled ? null : result.filePaths[0] ?? null;

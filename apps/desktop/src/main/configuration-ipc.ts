@@ -42,7 +42,7 @@ export function registerConfigurationIpc({ window, configurations, sessions, qui
   ipcMain.handle('management:project', event => { assert(event); return shell.openExternal('https://github.com/Gogo-Bytes/agent-pet'); });
   ipcMain.handle('management:location-choose', async event => {
     assert(event); const current = window()!;
-    const result = await dialog.showOpenDialog(current, { title: '选择 Agent 配置目录（不是程序或 sessions 目录）', properties: ['openDirectory', 'dontAddToRecent'] });
+    const result = await dialog.showOpenDialog(current, { title: '选择 Agent 配置文件夹', properties: ['openDirectory', 'dontAddToRecent'] });
     if (quitting() || window() !== current || result.canceled) return null;
     const selected = configurationPath(result.filePaths[0]); if (!selected) return null; const canonical = await canonicalLocation(selected); chosen.add(canonical); return canonical;
   });

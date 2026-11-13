@@ -208,6 +208,12 @@ or launch flags requires checking the current task's approved scope and integrit
   revealed the actual page in Issue 19; this does not establish a tool fix. Never
   repeat a consequential click until its outcome is known. Do not bypass access
   restrictions or infer a product failure from the tool error alone.
+- An error or unchanged snapshot after an action leaves the outcome unknown: the
+  action may already have taken effect. Give the page time to update, then compare a
+  fresh tree and screenshot with the expected result before deciding what to do.
+  Continue from the observed page when it has changed. If the result remains unclear,
+  make one bounded check of the window and focus before asking for manual help; do
+  not ask the user to repeat an action whose effect has not been established.
 - In a later local check, a fresh Electron copy with a unique `CFBundleIdentifier`,
   `CFBundleName` and `CFBundleDisplayName`, started with the backgrounding flag,
   let the tool select the app by full path and operate its accessibility controls.

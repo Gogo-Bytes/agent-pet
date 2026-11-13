@@ -5,6 +5,7 @@
 ## 产品与架构
 
 - [产品需求与交互原则](../PRODUCT-REQUIREMENTS.md) · [领域术语](../CONTEXT.md)
+- [界面内容设计规范](UI-CONTENT-DESIGN.md)：文案取舍、信息层级、授权与无障碍边界
 - [架构设计](ARCHITECTURE-DESIGN.md) · [Three.js 场景与 HTML 控件 ADR](adr/0001-threejs-scene-html-controls.md)
 - [安全与数据保护边界](SECURITY-BOUNDARIES.md)：权限、文件所有权、managed 生命周期、D6/发布限制
 - [桌面开发与本地构建](../apps/desktop/README.md)

@@ -167,7 +167,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
           </MenuGroup>
         </>}
         {section === 'app' && <>
-          <MenuGroup title="应用入口" copy="至少保留一个" icon="monitor"><div className="preference-entry-pair">
+          <MenuGroup title="应用入口" icon="monitor"><div className="preference-entry-pair">
             {toggle('tray', '菜单栏图标', !values.dock ? 'Dock 已隐藏，保留此入口' : '', !values.dock)}
             {toggle('dock', 'Dock 图标', !values.tray ? '菜单栏已隐藏，保留此入口' : '', !values.tray)}
           </div></MenuGroup>
@@ -176,7 +176,7 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
               copy={state?.login.supported ? '' : '请使用打包版启用此设置'}
               disabled={disabled || !state?.login.supported} onChange={() => { setNotice(''); onLogin(!state?.login.enabled); }} />
             {toggle('startConsole', '启动时打开管理窗口')}
-            {toggle('background', '关闭控制台后继续运行', values.background ? '关窗口保留宠物；退出应用会全部结束' : '关闭窗口时，应用和宠物一起退出')}
+            {toggle('background', '关闭窗口后继续运行', values.background ? '' : '关闭窗口将退出应用并隐藏宠物')}
           </MenuGroup>
         </>}
         {section === 'pet' && <>
@@ -195,19 +195,19 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
             {toggle('topmost', '始终置顶')}
           </MenuGroup>
           <MenuGroup title="动作与气泡" icon="sparkles">
-            {toggle('bubbles', '显示气泡', values.bubbles ? '提醒通过宠物气泡显示' : '任务提醒暂停显示，偏好仍会保留')}
+            {toggle('bubbles', '显示提醒气泡', values.bubbles ? '' : '任务提醒暂停显示，偏好仍会保留')}
             {toggle('reduced', '减少动画', '保留状态变化，减少持续动作')}
           </MenuGroup>
         </>}
         {section === 'reminders' && <>
-          <div className={`preference-bubble-note ${!values.bubbles ? 'is-muted' : ''}`}>
-            <Icon name="bell" size={21} /><div><strong>{values.bubbles ? '通过宠物气泡提醒' : '气泡已关闭'}</strong>
+          {!values.bubbles && <div className="preference-bubble-note is-muted">
+            <Icon name="bell" size={21} /><div><strong>气泡已关闭</strong>
             </div>
-            {!values.bubbles && <button disabled={disabled} onClick={() => {
+            <button disabled={disabled} onClick={() => {
               update({ bubbles: true });
               requestAnimationFrame(() => scrollArea.current?.querySelector<HTMLElement>('[role=switch]:not([disabled])')?.focus({ preventScroll: true }));
-            }}>开启气泡<Icon name="right" size={15} /></button>}
-          </div>
+            }}>开启气泡<Icon name="right" size={15} /></button>
+          </div>}
           <MenuGroup title="任务结果" icon="check">
             {toggle('completed', '任务完成')}
             {toggle('error', '任务出错')}
@@ -245,8 +245,8 @@ function AboutDocument({ onOpenProject }: { onOpenProject: (() => void) | undefi
   </article>;
 }
 
-function MenuGroup({ title, copy, icon, children }: { title: string; copy?: string; icon: IconName; children: ReactNode }) {
-  return <section className="preference-group" aria-label={title}><header><Icon name={icon} size={18} /><h2>{title}</h2>{copy && <p>{copy}</p>}</header><div>{children}</div></section>;
+function MenuGroup({ title, icon, children }: { title: string; icon: IconName; children: ReactNode }) {
+  return <section className="preference-group" aria-label={title}><header><Icon name={icon} size={18} /><h2>{title}</h2></header><div>{children}</div></section>;
 }
 function PreferenceSwitch({ title, copy, checked, disabled, onChange }: { title: string; copy: string; checked: boolean; disabled: boolean; onChange: () => void }) {
   const description = useId();

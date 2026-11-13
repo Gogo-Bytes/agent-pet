@@ -16,7 +16,7 @@ export function DetectedCliResult({ state, existing, busy, onSelect, provider }:
     <div className="cfg-detected-header">
       <span className={`menu-agent-mark agent-${provider}`} aria-hidden="true"><Icon name={provider === 'claude' ? 'flower' : 'command'} /></span>
       <div className="cfg-detected-identity"><h2>{label}</h2><code title={state.targetPath}>{state.targetPath}</code></div>
-      <button className="cfg-primary" disabled={busy || (!existing && !selected)} onClick={() => onSelect(selected?.id ?? '')}>{existing ? '查看配置' : '一键配置'}<Icon name={existing ? 'right' : 'plus'} /></button>
+      <button className="cfg-primary" disabled={busy || (!existing && !selected)} onClick={() => onSelect(selected?.id ?? '')}>{existing ? '查看连接' : '设置连接'}<Icon name={existing ? 'right' : 'plus'} /></button>
     </div>
     {!existing && verified.length > 1 && <label className="cfg-installation-choice">连接哪个安装？<select aria-label={`${provider === 'claude' ? 'Claude' : 'Codex'} 程序安装`} value={selected?.id} onChange={event => setSelectedId(event.target.value)}>{verified.map(value => <option key={value.id} value={value.id}>{kinds[value.kind]} {value.version} · {value.entryPath}</option>)}</select></label>}
     {!verified.length && !existing && <p className="cfg-discovery-note">已找到 {shortLabel}，当前安装的兼容性尚未确认。</p>}

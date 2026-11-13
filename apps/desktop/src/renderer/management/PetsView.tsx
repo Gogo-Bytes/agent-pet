@@ -47,7 +47,7 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
   const boundRecords = records.filter(record => record.pet?.assetId === selectedAssetId);
   const selectedIndex = Math.max(0, assets.records.findIndex(asset => asset.id === selectedAssetId));
   function cycleAsset(delta: number) {
-    if (assets.records.length < 2) { setNotice('当前收藏只有一只宠物。'); return; }
+    if (assets.records.length < 2) return;
     onSelectAsset(assets.records[(selectedIndex + delta + assets.records.length) % assets.records.length]!.id);
   }
   const providerIcon = (provider: AgentConfiguration['provider']): IconName => provider === 'codex' ? 'command' : provider === 'claude' ? 'flower' : provider === 'pi' ? 'pi' : 'code';
@@ -59,22 +59,22 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
   }, [motionsOpen]);
   function openPanel(value: 'pets' | 'agents') { setPanel(value); setMotionsOpen(false); setQuery(''); }
   return <>
-    <div className="pet-identity"><span className="identity-agent">我的宠物</span>
+    <div className="pet-identity">
       {editing ? <form className="pet-rename" onSubmit={event => { event.preventDefault(); if (!busy) void saveName(); }}>
         <input autoFocus aria-label="宠物名称" value={draft} disabled={busy} maxLength={40} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); endNameEdit(); } }} />
         <button disabled={busy || !draft.trim()}>保存</button><button type="button" onClick={endNameEdit}>取消</button>
       </form> : <h1 aria-label={name}><button ref={nameTrigger} className="pet-name-edit" aria-label="修改宠物名称" title={name + ' · 点击修改名称'} disabled={busy}
         onClick={() => { setDraft(name); setNotice(''); setEditing(true); }}>{name}</button></h1>}
       <div className={`pet-binding-tags${boundRecords.length > 5 ? ' is-collapsed' : ''}`} aria-label="使用这个宠物的 Agent">
-        {boundRecords.map(record => <GlassSurface as="span" className="pet-binding-tag" key={record.id} title={providerLabels[record.provider]}>
-          <i><Icon name={providerIcon(record.provider)} size={16} /></i><span>{providerLabels[record.provider]}</span><button disabled={busy} aria-label={`解除 ${providerLabels[record.provider]} 连接`} onClick={() => onBind(record.id, null)}><Icon name="close" /></button>
+        {boundRecords.map(record => <GlassSurface as="span" className="pet-binding-tag" key={record.id} title={`${record.name} · ${providerLabels[record.provider]}`}>
+          <i><Icon name={providerIcon(record.provider)} size={16} /></i><span>{record.name}</span><button disabled={busy} aria-label={`解除 ${record.name} 连接`} onClick={() => onBind(record.id, null)}><Icon name="close" /></button>
         </GlassSurface>)}
-        <button className="pet-tag-add flat-icon-button" aria-label="配置使用此宠物的 Agent" onClick={() => openPanel('agents')}><Icon name="plus" /></button>
+        <button className="pet-tag-add flat-icon-button" aria-label="选择使用此宠物的连接" onClick={() => openPanel('agents')}><Icon name="plus" /></button>
       </div>
     </div>
-    <GlassToolbar className="pet-cycle" aria-label="宠物切换"><GlassAction iconOnly aria-label="上一个宠物" onClick={() => cycleAsset(-1)}><Icon name="left" /></GlassAction>
+    <GlassToolbar className="pet-cycle" aria-label="宠物切换"><GlassAction iconOnly aria-label="上一个宠物" disabled={assets.records.length < 2} onClick={() => cycleAsset(-1)}><Icon name="left" /></GlassAction>
       <GlassAction className="pet-grid-open" aria-label="打开宠物收藏" onClick={() => openPanel('pets')}><Icon name="grid" /><small>{assets.records.length ? `${selectedIndex + 1} / ${assets.records.length}` : '0 / 0'}</small></GlassAction>
-      <GlassAction iconOnly aria-label="下一个宠物" onClick={() => cycleAsset(1)}><Icon name="right" /></GlassAction></GlassToolbar>
+      <GlassAction iconOnly aria-label="下一个宠物" disabled={assets.records.length < 2} onClick={() => cycleAsset(1)}><Icon name="right" /></GlassAction></GlassToolbar>
     <div className="pet-animation-picker"><GlassToolbar className="pet-animation-toolbar" aria-label="动画预览"><GlassAction iconOnly disabled={!motions.length} aria-label="重新播放当前动画" onClick={() => onAction(action)}><Icon name="replay" /></GlassAction>
       <button ref={motionTrigger} className="glass-action" disabled={!motions.length} aria-label="选择动画" aria-expanded={motionsOpen} aria-controls="motion-palette" onClick={() => setMotionsOpen(value => !value)}><Icon name="play" />{motions.find(value => value.id === normalizePetAction(action))?.label ?? (motions.length ? '选择动作' : '静态展示')}<Icon name={motionsOpen ? 'up' : 'down'} /></button></GlassToolbar>
       {motionsOpen && <GlassSurface material="panel" as="section" className="motion-palette" id="motion-palette" aria-label="选择动画"><header><strong>动作</strong><small>{motions.length}</small></header>
@@ -82,25 +82,25 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
         <div className="motion-list">{motions.filter(value => value.label.includes(query)).map(value => <button className="glass-choice" key={value.id} aria-pressed={normalizedAction === value.id} onClick={() => onAction(value.id)}><span>{value.label}</span><Icon name={normalizedAction === value.id ? 'check' : 'play'} /></button>)}</div>
       </GlassSurface>}
     </div>
-    {(notice || error) && <p className="pet-notice" role={error ? 'alert' : 'status'}>{error || notice}</p>}
+    {!panel && (notice || error) && <p className="pet-notice" role={error ? 'alert' : 'status'}>{error || notice}</p>}
     {panel === 'pets' && <GlassDrawer label="宠物收藏" reduced={reduced} onClose={() => { setPanel(null); setImportOpen(false); }}>
       <label className="collection-search glass-inset"><Icon name="search" /><input autoFocus aria-label="搜索宠物" placeholder="搜索宠物" value={query} onChange={event => setQuery(event.target.value)} /></label>
       <div className="pet-avatar-grid">{assets.records.filter(asset => asset.manifest.id === 'starter' ? name.includes(query) : asset.manifest.id.includes(query)).map(asset =>
         <div className="pet-card" key={asset.id}>
-          <button type="button" className="pet-card-select" aria-pressed={asset.id === selectedAssetId} onClick={() => { onSelectAsset(asset.id); setNotice('已切换宠物。'); }}><span className="pet-card-icon">{avatarUrls[asset.id] ? <img src={avatarUrls[asset.id]} alt="" /> : <Icon name="pet" size={28} />}</span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span></button>
+          <button type="button" className="pet-card-select" aria-pressed={asset.id === selectedAssetId} onClick={() => { onSelectAsset(asset.id); setNotice(''); }}><span className="pet-card-icon">{avatarUrls[asset.id] ? <img src={avatarUrls[asset.id]} alt="" /> : <Icon name="pet" size={28} />}</span><span className="avatar-name">{asset.id === 'starter' ? name : asset.manifest.id}</span></button>
           {asset.source === 'imported' && <button type="button" className="pet-card-delete" disabled={busy} aria-label={`删除 ${asset.manifest.id}`} onClick={() => { if (!busy && window.confirm(`删除宠物「${asset.manifest.id}」？`)) void onRemoveAsset(asset.id); }}><Icon name="close" size={16} /></button>}
         </div>)}
       </div>
       {!assets.records.some(asset => (asset.id === 'starter' ? name : asset.manifest.id).includes(query)) && <p className="collection-empty">没有找到宠物</p>}
       <GlassButton className="pet-import-open" disabled={busy} onClick={() => setImportOpen(true)}><Icon name="plus" />添加宠物</GlassButton>
-      <p role="status">{notice}</p>
+      {(error || notice) && <p role={error ? 'alert' : 'status'}>{error || notice}</p>}
     </GlassDrawer>}
     {visible && panel === 'pets' && importOpen && <PetImportControl api={importApi} disabled={busy} onClose={() => setImportOpen(false)}
       onImported={id => { onSelectAsset(id); setNotice('已加入收藏。'); }} />}
-    {panel === 'agents' && <Dialog label="配置 Agent" className="pet-dialog" onClose={() => setPanel(null)}>
-      <header><h2>配置给 Agent</h2><button type="button" aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>
-      <div className="pet-agent-options">{records.map(record => <button key={record.id} disabled={busy} aria-pressed={record.pet?.assetId === selectedAssetId} onClick={() => onBind(record.id, record.pet?.assetId === selectedAssetId ? null : { assetId: selectedAssetId, name })}><Icon name="link" /><span>{record.name}<br /><small>{providerLabels[record.provider]}</small></span><small>{record.pet?.assetId === selectedAssetId ? '已配置 ✓' : record.pet ? '已配置其他宠物' : '未配置'}</small></button>)}</div>
-      {!records.length && <p className="collection-empty">还没有配置。可以从底部「连接」添加。</p>}
+    {panel === 'agents' && <Dialog label="选择连接" className="pet-dialog" onClose={() => setPanel(null)}>
+      <header><h2>选择连接</h2><button type="button" aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>
+      <div className="pet-agent-options">{records.map(record => <button key={record.id} disabled={busy} aria-pressed={record.pet?.assetId === selectedAssetId} onClick={() => onBind(record.id, record.pet?.assetId === selectedAssetId ? null : { assetId: selectedAssetId, name })}><Icon name="link" /><span>{record.name}<br /><small>{providerLabels[record.provider]}</small></span>{record.pet && <small>{record.pet.assetId === selectedAssetId ? '使用中 ✓' : '使用其他宠物'}</small>}</button>)}</div>
+      {!records.length && <p className="collection-empty">还没有连接，请先在「连接」中添加。</p>}
       <button className="dialog-done" onClick={() => setPanel(null)}>完成</button>{error && <p role="alert">{error}</p>}
     </Dialog>}
   </>;

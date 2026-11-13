@@ -13,7 +13,6 @@
 .window-control-close:hover { background:#f8e3e9;color:#ac5167; }
 .game-logo { display:flex;align-items:center;gap:11px;color:#292536;font-size:18px;font-weight:750;letter-spacing:-.04em;background:transparent;padding:0; }
 .game-logo>span { display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:linear-gradient(145deg,#8980ed,#675ccd);color:#fff;box-shadow:0 5px 15px #7969d84a; }
-.feature-page-label { font-size:12px;color:#90829e; }
 .game-content { display:flex;flex:1;min-width:0;min-height:0;position:relative;overflow:hidden; }
 .game-content>section { flex:1;min-width:0;min-height:0; }
 .game-dock { flex:none;display:flex;align-items:center;min-height:70px;padding:12px 26px;background:#fffdfb;border-top:1px solid #e5e1ed; }

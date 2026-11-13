@@ -113,7 +113,6 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
     <header className="game-topbar">
       <button className="game-logo" onClick={() => setPage('home')}><span>✦</span>Agent Pet</button>
       <div className="game-titlebar-actions">
-        <span className="feature-page-label">{page === 'home' ? '' : pages.find(value => value[0] === page)?.[2]}</span>
         {!bridge.nativeWindowControls && <div className="window-controls" role="group" aria-label="窗口操作">
           {([['minimize', '最小化窗口', 'minus'], ['toggle-maximize', '最大化或还原窗口', 'maximize'], ['close', '关闭窗口', 'close']] as const).map(([action, label, icon]) =>
             <button key={action} className={`window-control window-control-${action}`} aria-label={label} title={label}

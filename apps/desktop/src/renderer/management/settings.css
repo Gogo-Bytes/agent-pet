@@ -362,12 +362,6 @@
   font-weight: 650;
   color: #7461b2;
 }
-.preference-group>header p {
-  font-size: 11px;
-  line-height: 1.6;
-  margin: 0 0 0 auto;
-  color: var(--preferences-muted);
-}
 .preference-group>div {
   min-width: 0;
   display: grid;
@@ -925,10 +919,6 @@
   .preference-group h2 {
     margin: 0;
     font-size: 12px;
-  }
-  .preference-group>header p {
-    margin-left: auto;
-    font-size: 10px;
   }
   .preference-group>header .ui-icon {
     width: 16px;

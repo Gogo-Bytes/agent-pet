@@ -151,6 +151,7 @@
 
 /* Short confirmations size to their contents; only the body scrolls when necessary. */
 .cfg-compact-dialog{width:min(480px,calc(100vw - 32px))}.cfg-compact-dialog .cfg-dialog-body{height:auto;flex:0 1 auto;padding:20px 26px 24px;font-size:13px}.cfg-compact-dialog .cfg-dialog-body>p:first-child{margin-top:0}.cfg-compact-dialog .cfg-dialog-body>details{margin-top:16px}.cfg-compact-dialog .cfg-dialog-title h2{font-size:20px}
+.cfg-hook-addition{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.6}
 .cfg-file-path{display:block;min-width:0;max-width:100%;padding:10px 12px;margin:12px 0;border:1px solid #e1daed;border-radius:8px;background:#f1edf8;color:#746780;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cfg-remove-target{min-width:0;margin-bottom:18px}.cfg-remove-target strong{display:block;font-size:16px;font-weight:650;overflow-wrap:anywhere}.cfg-remove-target>code{display:block;min-width:0;max-width:100%;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--menu-muted)}
 @media(max-width:540px){.cfg-compact-dialog .cfg-dialog-body{padding:18px 20px 22px}.cfg-preview{padding:16px}}

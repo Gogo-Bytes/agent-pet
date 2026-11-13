@@ -12,7 +12,7 @@ export function DetectedCliResult({ state, existing, busy, onSelect, provider }:
   const verified = state.installations.filter(value => value.compatibility === 'verified');
   const [selectedId, setSelectedId] = useState('');
   const selected = verified.find(value => value.id === selectedId) ?? verified[0];
-  return <article className="cfg-detected" aria-label={`${label} 默认配置`}>
+  return <article className="cfg-detected" aria-label={`${label} 扫描结果`}>
     <div className="cfg-detected-header">
       <span className={`menu-agent-mark agent-${provider}`} aria-hidden="true"><Icon name={provider === 'claude' ? 'flower' : 'command'} /></span>
       <div className="cfg-detected-identity"><h2>{label}</h2><code title={state.targetPath}>{state.targetPath}</code></div>

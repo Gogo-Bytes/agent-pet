@@ -33,6 +33,8 @@ Required capability missing: do not dispatch that specialist. Ask the user wheth
 - **Product Test**: user, business, compatibility, or stability behavior needs independent product judgement.
 - **Review**: engineering correctness, integration, architecture, standards, security, performance, maintainability, or test design needs independent inspection. When a material interface, cross-module, security, compatibility, migration, or architecture change warrants a focused audit of whether a fresh Agent can efficiently recover confirmed knowledge, read [review-agent-retrievability](references/review-agent-retrievability/SKILL.md) immediately before dispatch and include it as bundled professional guidance for Review. The audit remains read-only; Main routes accepted repairs to Development or explicitly write-enabled Architecture.
 
+Verification uses real end-to-end product flows for the requested business behavior. Do not create or run test cases. Implement only the requested scope without speculative defensive expansion.
+
 Roles are optional, not mandatory phases. Main decides sequencing and completion. Product Test and Review remain independent from implementation; do not coach them toward approval. Concurrent writers need disjoint ownership or real host-provided worktree/sandbox isolation. Otherwise serialize.
 
 Do not call bundled workflow scripts. Do not create task databases, lifecycle stages, leases, receipts, voting, or machine-managed quality gates.
@@ -56,7 +58,7 @@ When a brief is useful, instantiate [main-work-brief.md](assets/main-work-brief.
 
 To resume work, read the latest user requirements and repository/host instructions, then the brief if present; inspect the current workspace, branch, diff, and uncommitted changes; rediscover relevant code, tests, configuration, and documentation with available repository capabilities; rerun necessary validation; correct stale brief conclusions; and recompute the remaining work.
 
-Prefer durable implementation truth in this order: clear code and types, executable tests and configuration, necessary comments or JSDoc, cross-module project documentation, then Agent working material. Development maintains comments only for non-obvious rationale, local invariants, compatibility constraints, or public contract details types cannot express, and removes stale comments with implementation changes. Never write task history into code comments.
+Prefer durable implementation truth in this order: clear code and types, executable configuration, necessary comments or JSDoc, cross-module project documentation, then Agent working material. Development maintains comments only for non-obvious rationale, local invariants, compatibility constraints, or public contract details types cannot express, and removes stale comments with implementation changes. Never write task history into code comments.
 
 ## Route Architecture writing safely
 

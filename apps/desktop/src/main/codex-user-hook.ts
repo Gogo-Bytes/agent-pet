@@ -1,12 +1,14 @@
+import * as fs from 'node:fs';
 import { join } from 'node:path';
+import type { CodexHookAddition } from '../shared/codex-connection.js';
 import { samePersistedIdentity, withVolumeIdentity } from './durable-file-identity.js';
 import { codexHookEvents } from '../../../../integrations/codex-hooks/hook-source.js';
 import { exact, validDirectory, directoryPaths, identity, safeDirectory, readSource, scan, append, remove, write,
-  type Identity, type Node, type Context } from './protected-json-file.js';
+  sameIdentity, sameFile, type Identity, type Node, type Context } from './protected-json-file.js';
 export type CodexHookOwnership = { schemaVersion: 1; directory: string; command: string;
   createdHooks: boolean; createdEvents: string[]; directories: [string, Identity][] };
 /** Main-only. Original hooks may contain private commands; never expose ownership/backup through IPC. */
-export type CodexHookPlan = Readonly<{ path: string; exists: boolean; canApply: boolean;
+export type CodexHookPlan = Readonly<{ path: string; exists: boolean; canApply: boolean; addition: CodexHookAddition | null;
   original: string | null; ownership: CodexHookOwnership | null }>;
 const plans = new WeakMap<CodexHookPlan, { context: Context; source: ReturnType<typeof readSource>; text: string }>();
 const prop = (node: Node, key: string) => node.members.find(member => member.key === key)?.value;
@@ -77,13 +79,32 @@ export function prepareCodexUserHook(directory: string, document: string): Codex
     if (Buffer.byteLength(text) > 65536) throw new Error('Too large');
     const ownership: CodexHookOwnership = { schemaVersion: 1, directory, command, createdHooks: !hooks, createdEvents,
       directories: ctx.directories.map(([path, stat]) => [path, withVolumeIdentity(path, stat)]) };
-    const plan = Object.freeze(Object.defineProperties({ path: ctx.path, exists, canApply: true }, {
+    const planned = (parsed.hooks as Record<string, CodexHookAddition[]>).SessionStart![0]!;
+    const addition = { hooks: planned.hooks.map(hook => ({ ...hook, command: '[Agent Pet 私有观察程序与参数（已隐藏）]' })) };
+    const plan = Object.freeze(Object.defineProperties({ path: ctx.path, exists, canApply: true, addition }, {
       original: { value: original }, ownership: { value: ownership } })) as CodexHookPlan;
     plans.set(plan, { context: ctx, source, text }); return plan;
   } catch {
-    return Object.freeze(Object.defineProperties({ path: join(directory, 'hooks.json'), exists, canApply: false }, {
+    return Object.freeze(Object.defineProperties({ path: join(directory, 'hooks.json'), exists, canApply: false, addition: null }, {
       original: { value: null }, ownership: { value: null } })) as CodexHookPlan;
   }
+}
+/** No writes; only observed identity/content differences prove staleness. I/O failures remain uncertain. */
+export function revalidateCodexUserHook(plan: CodexHookPlan): 'current' | 'stale' | 'failed' {
+  const prepared = plans.get(plan);
+  if (!prepared) return 'failed';
+  try {
+    for (const [path, saved] of prepared.context.directories)
+      if (!sameIdentity(saved, identity(fs.lstatSync(path)))) return 'stale';
+    let stat: fs.Stats | null;
+    try { stat = fs.lstatSync(prepared.context.path); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; stat = null; }
+    if (prepared.source.stat ? !stat || !sameFile(prepared.source.stat, stat) : stat !== null) return 'stale';
+    const current = readSource(prepared.context);
+    if (current.text !== prepared.source.text ||
+        (prepared.source.stat ? !current.stat || !sameFile(prepared.source.stat, current.stat) : current.stat !== null)) return 'stale';
+    return 'current';
+  } catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'stale' : 'failed'; }
 }
 export function inspectCodexUserHook(own: CodexHookOwnership): boolean {
   try { if (!validCodexHookOwnership(own)) return false; const source = readSource(context(own.directory, own));

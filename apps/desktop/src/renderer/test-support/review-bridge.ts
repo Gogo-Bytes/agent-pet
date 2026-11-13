@@ -135,7 +135,7 @@ export function createReviewBridge(scenario: string): ManagementBridge {
       inspect: async id => { const current = record(id); current.inspection = { target: { path: current.targetPath, source: 'chosen' }, findings: [] }; current.availability = 'available'; return pushConfigs(); },
       preview: async id => { const current = record(id);
         if (current.codex) {
-          current.codex.preview = { id: 'codex-fixture-plan', executable: '/示例/Codex/bin/codex', path: current.targetPath + '/hooks.json', canApply: true, exists: true, events: ['SessionStart','SessionEnd','UserPromptSubmit','PreToolUse','PostToolUse','PermissionRequest','Stop','Interrupt','PreCompact','PostCompact'] };
+          current.codex.preview = { id: 'codex-fixture-plan', executable: '/示例/Codex/bin/codex', path: current.targetPath + '/hooks.json', canApply: true, exists: true, events: ['SessionStart','SessionEnd','UserPromptSubmit','PreToolUse','PostToolUse','PermissionRequest','Stop','Interrupt','PreCompact','PostCompact'], addition: { hooks: [{ type: 'command', command: '[Agent Pet 私有观察程序与参数（已隐藏）]', timeout: 2 }] } };
         } else if (current.claude) {
           const directory = '/示例/AgentPet/private/claude';
           current.claude.preview = { id: 'review-task-upgrade', operation: 'upgrade', directory, executable: '/示例/npm/bin/claude.exe',

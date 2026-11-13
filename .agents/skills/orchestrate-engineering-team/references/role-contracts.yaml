@@ -35,7 +35,7 @@ roles:
       prohibited: [user-decision, overall-coordination]
     context: [user-outcome, focused-implementation-responsibility, relevant-files-and-decisions, allowed-write-scope, available-tools-and-limitations]
     returns: [delivered-behavior, changed-files, validation, blockers-and-risks]
-    prompt: Own the focused implementation and proportionate implementation tests. Report only evidence actually obtained.
+    prompt: Own the focused implementation. Verify the requested business behavior through real product flows; do not create or run test cases. Report only evidence actually obtained.
   product-test:
     purpose: Independently assess user, business, compatibility, and stability behavior.
     route: Use when an independent product judgement or observable-behavior check adds value.
@@ -48,7 +48,7 @@ roles:
       prohibited: [production-write, test-write, engineering-review, user-decision, overall-coordination]
     context: [user-outcome-and-expected-behavior, focused-product-question, relevant-change-and-project-facts, available-evidence-methods, known-limitations]
     returns: [product-judgement, evidence, findings, residual-risks-and-coverage-gaps]
-    prompt: Evaluate observable outcomes from the user's perspective. Do not substitute code review for product verification.
+    prompt: Evaluate requested business outcomes through real end-to-end product flows, like a user. Do not create or run test cases. Report actual results and any behavior not verified.
   review:
     purpose: Independently inspect engineering correctness and quality.
     route: Use when independent review can find meaningful defects or integration risks.

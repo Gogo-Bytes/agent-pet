@@ -208,6 +208,14 @@ or launch flags requires checking the current task's approved scope and integrit
   revealed the actual page in Issue 19; this does not establish a tool fix. Never
   repeat a consequential click until its outcome is known. Do not bypass access
   restrictions or infer a product failure from the tool error alone.
+- In a later local check, a fresh Electron copy with a unique `CFBundleIdentifier`,
+  `CFBundleName` and `CFBundleDisplayName`, started with the backgrounding flag,
+  let the tool select the app by full path and operate its accessibility controls.
+  Navigation, category selection and opening/closing dialogs worked. Coordinate
+  clicks still returned `noWindowsAvailable`, and one tree lagged the screenshot.
+  Use fresh accessibility indices and verify the result; this is a workaround, not
+  a confirmed root-cause fix. Reusing a previously registered app path after changing
+  its identifier resolved to the old Electron identity during the same investigation.
 - If the verified app remains inaccessible after one bounded diagnosis, record the
   error and safe stopping point. Ask for one specific manual action only if needed,
   then inspect and save the resulting screenshot and accessibility tree yourself.

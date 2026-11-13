@@ -29,15 +29,15 @@ export function connectionSummary(state: PiConnectionState | null): { title: str
   if (state.receiving === 'unknown' || state.status === 'failed' || state.saved === 'invalid' || state.saved === 'uncertain') {
     return { title: '连接需要处理', description: '请查看下方提示。已有文件会保留，不会自动覆盖或删除。', tone: 'error' };
   }
-  if (state.status === 'connected' && state.receiving === 'active') return { title: '已连接', description: '宠物现在可以跟随 pi 的工作状态。', tone: 'online' };
+  if (state.status === 'connected' && state.receiving === 'active') return { title: '已连接', description: '', tone: 'online' };
   if (state.canResume) return state.saved === 'disabled'
     ? { title: '已暂停', description: '暂停不会关闭 pi，连接文件会保留。', tone: 'quiet' }
-    : { title: '等待重新连接', description: '点击「重新连接」，继续使用之前的设置。', tone: 'waiting' };
+    : { title: '等待重新连接', description: '', tone: 'waiting' };
   if (state.receiving === 'active') return {
     title: state.status === 'disconnected' ? '等待 pi 重新连接' : '等待 pi',
     description: '请打开 pi。如果它已经在运行，请在空闲时输入 /reload，让它加载连接组件。', tone: 'waiting',
   };
-  if (state.canConfigure) return { title: '还未连接', description: '完成连接设置后，宠物就能跟随 pi 的工作状态。', tone: 'quiet' };
+  if (state.canConfigure) return { title: '还未连接', description: '', tone: 'quiet' };
   return { title: '已暂停', description: '当前没有接收 pi 的状态，已有文件会保留。', tone: 'quiet' };
 }
 

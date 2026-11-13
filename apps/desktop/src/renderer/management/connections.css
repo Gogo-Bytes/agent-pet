@@ -125,6 +125,7 @@
 .cfg-deployment { margin:0;display:flex;flex-direction:column;align-items:flex-start;gap:16px;width:100%;font-size:12px;line-height:1.8; }.cfg-deployment p { margin:0; }.cfg-deployment summary { cursor:pointer;color:#7762de; }.cfg-preview{width:100%;padding:20px;border:1px solid #d9d1f6;border-radius:12px;background:#f8f7ff}.cfg-preview.is-blocked{border-color:#dfc9d4}.cfg-preview h3{font-size:17px;margin:0 0 10px;line-height:1.5}.cfg-preview.is-blocked h3{color:#94516b}.cfg-preview p{margin:8px 0}.cfg-preview .cfg-preview-hint{color:var(--menu-muted);font-size:11px}.cfg-preview .cfg-form-actions{margin-top:18px}.cfg-preview-directories{margin:14px 0;font-size:11px;color:var(--menu-muted)}.cfg-dialog-body>select { width:100%;min-height:40px;border:1px solid #cbbdd9;border-radius:9px;padding:8px;color:var(--menu-ink);background:#fff; }
 /* Identity and status lead; maintenance actions stay behind one disclosure. */
 .cfg-connection-status{display:flex;align-items:center;justify-content:space-between;gap:24px;width:100%}
+.cfg-connection-status:empty{display:none}
 .cfg-connection-status>div{min-width:0;flex:1}
 .cfg-type,.cfg-status-badge{display:inline-flex;align-items:center;gap:7px;margin:0;padding:4px 9px;border-radius:6px;font-size:12px;line-height:1.5;font-weight:600}
 .cfg-type{color:#6e57bd;background:#ece6fb}

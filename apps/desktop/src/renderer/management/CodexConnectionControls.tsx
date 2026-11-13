@@ -5,7 +5,7 @@ import { Dialog } from './components/Dialog.js';
 import { Icon } from './components/icons.js';
 export function codexConnectionSummary(state: CodexConnectionState | undefined): { title: string; description: string; tone: 'online' | 'waiting' | 'quiet' | 'error' } {
   switch (state?.status) {
-    case 'observing': return { title: '已连接', description: 'Codex 已连接。', tone: 'online' };
+    case 'observing': return { title: '已连接', description: '', tone: 'online' };
     case 'waiting': return { title: '等待活动', description: '打开 Codex 并发送任务后，连接会自动出现。', tone: 'waiting' };
     case 'disabled': return { title: '已暂停', description: '不影响 Codex 运行，连接文件会保留。', tone: 'quiet' };
     case 'failed': return { title: '连接需要处理', description: '请查看提示，已有文件会保留。', tone: 'error' };
@@ -53,7 +53,7 @@ export function CodexConnectionControls({ record, api, run, busy, visible, error
     void run(() => api.preview(record.id)).finally(() => { openingPreview.current = false; });
   };
   return <div className="cfg-deployment" data-quiet={state?.status === 'observing'}>
-    <div className={`cfg-connection-status cfg-connection-${summary.tone}`}><p className={state?.status === 'observing' ? 'cfg-sr-only' : undefined}>{summary.description}</p>
+    <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>{(!state || state.notice === 'none') && summary.description && <p>{summary.description}</p>}
       {state?.canConfigure && !preview && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={needsScan ? onScan : openPreview}>{needsScan ? '重新扫描' : '设置连接'}</button>}
       {state?.canResume && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{state.status === 'disabled' ? '继续连接' : '重新连接'}</button>}
     </div>

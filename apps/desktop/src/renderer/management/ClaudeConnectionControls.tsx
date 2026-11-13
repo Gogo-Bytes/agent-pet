@@ -78,12 +78,12 @@ export function ClaudeConnectionControls({ record, api, run, busy, visible, stat
     if (await run(() => api.resume(record.id))) requestAnimationFrame(() => statusHeadingRef.current?.focus({ preventScroll: true }));
   }
   return <div className="cfg-deployment cfg-claude">
-    <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>{summary.description && <div><p>{summary.description}</p></div>}
+    <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>{!notice && summary.description && <div><p>{summary.description}</p></div>}
       {state?.canResume && <button className="cfg-primary" disabled={disabled} onClick={() => void resume()}>{state.status === 'disabled' ? '继续连接' : '重新连接'}</button>}
       {state?.canConfigure && <button ref={configure} hidden={!!preview} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>设置连接</button>}
       {normal && state?.canUpgrade && <button ref={configure} hidden={!!preview} className="cfg-secondary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>启用任务反馈</button>}
     </div>
-    <p className="cfg-claude-scope">{scopeText}</p>
+    <details className="cfg-operation-help"><summary>支持哪些反馈？</summary><p>{scopeText}</p></details>
     {normal && state?.status === 'waiting' && <details className="cfg-operation-help"><summary>运行后还没连接？</summary><p>首次设置或重新打开 Agent Pet 后，请新开 Claude 会话，并确认当前目录已获信任、没有禁用 hooks。已有会话不会自动接入。</p></details>}
     {notice && <p className="cfg-connection-notice" role={summary.tone === 'error' ? 'alert' : 'status'}>{notice}</p>}
     {!normal && state?.configured && state.launchCommand && <div className="cfg-claude-launch">

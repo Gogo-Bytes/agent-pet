@@ -140,7 +140,7 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
                 <div className="cfg-option-row"><div><strong>更换位置</strong>{(current.connection?.deployedPath || current.claude?.configured || current.codex?.configured || current.id === 'legacy-pi') && <p>请先移除此连接，再重新添加新的文件夹。</p>}</div><button className="cfg-secondary" aria-label="更换位置" aria-describedby="config-target-path" disabled={busy || !!current.connection?.deployedPath || current.claude?.configured || current.codex?.configured || current.id === 'legacy-pi'} onClick={() => setManual(current)}>更换位置</button></div>
                 <div className="cfg-detail-end"><div><strong>移除此连接</strong><span>不会删除 Agent 程序或你的文件</span></div><button className="cfg-delete" disabled={busy} aria-label="移除连接" onClick={() => setRemovalId(current.id)}><Icon name="trash" />移除</button></div>
               </div>
-            </details></section> : <div className="cfg-empty"><Icon name="folder" /><h2 tabIndex={-1}>从第一个连接开始</h2><p>{state ? '自动扫描，或手动添加你的 Agent。' : '正在读取已保存的连接…'}</p></div>}
+            </details></section> : <div className="cfg-empty"><Icon name="folder" /><h2 tabIndex={-1}>{state ? '还没有连接' : '正在读取连接…'}</h2></div>}
             {(error || scanError) && <p className="cfg-notice" role="alert">{error || scanError}</p>}
           </div></div>
       </> : <>

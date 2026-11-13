@@ -39,7 +39,7 @@ export function DeploymentControls({ record, api, run, busy, visible = true, sta
   const quiet = summary.tone === 'online' && routineNotice && !state?.canResume && !state?.canConfigure && !state?.preview;
   return <div className="cfg-deployment" data-quiet={quiet}>
     <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>
-      <div><p className={summary.tone === 'online' || state?.preview ? 'cfg-sr-only' : undefined}>{summary.description}</p></div>
+      {routineNotice && !state?.preview && summary.description && <p>{summary.description}</p>}
       {state?.canResume && <button className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{disabled ? '请稍候…' : resumeLabel}</button>}
       {state?.canConfigure && !state.preview && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.preview(record.id))}>设置连接</button>}
     </div>

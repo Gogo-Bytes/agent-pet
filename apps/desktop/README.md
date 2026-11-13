@@ -165,27 +165,62 @@ are not automatically executable/cleanable just because historical reports were 
 
 ## macOS native acceptance with @电脑
 
-For a local acceptance build, give its .app a unique bundle ID and select that app
-by its full path in @电脑. Launch its executable with
-`--disable-backgrounding-occluded-windows` and the approved isolated environment.
-On macOS 26.1 with Electron 36.9.5 this combination allowed two cold starts to
-complete page navigation, text entry, readback and cancellation. With the stock
-Electron bundle, the tool could show Electron’s default page after product exit.
-With only the new bundle ID, the accessibility tree could still show the previous page.
+Select the acceptance .app by full path in @电脑 and verify the actual process and
+window before interacting. On macOS 26.1 with Electron 36.9.5, a unique bundle ID
+and `--disable-backgrounding-occluded-windows` allowed two cold starts to complete
+navigation, text entry, readback and cancellation. The stock Electron bundle was
+also used for later acceptance, but stale trees and click failures recurred. The
+underlying tool cause is unknown; neither setup guarantees a fix. Changing a bundle
+or launch flags requires checking the current task's approved scope and integrity.
 
 1. Verify the build manifest, live process identity, isolated home, Electron data
-   paths and CODEX_HOME before interacting. The retained Issue 19 launcher is
-   `/private/tmp/agent-pet-issue19-2d4de76/run-02/cua-identity-01/start.command`.
-   If the temporary copy has expired, prepare a fresh isolated copy from the
-   specified commit and verify its paths before launch.
+   paths and CODEX_HOME before interacting. Historical launchers and temporary
+   directories may have expired or contain retained evidence. Check them before
+   reuse and follow the current task's scope and authorization.
 2. Check the management window title and management.html URL. Click “连接” and
    verify the “我的连接” heading. On a synthetic record, open “重命名”, type a
-   marker, read it back, and cancel. Verify the original name. Refresh the
-   accessibility tree after each transition. Clicking the tab uses its ordinary
-   interaction; setting its AX value crashed this Electron version.
+   marker, read it back, and cancel when that check is in scope. Verify the original
+   name. Refresh the accessibility tree after each transition. Clicking the tab uses
+   its ordinary interaction; setting its AX value crashed this Electron version.
 3. Capture the consent and action preview separately. Verify saved image files
    and inspect their visible content; scroll for details that fall below the fold.
    If capture reports an error after a click, re-read the UI before retrying.
 4. The current “重新扫描” flow also probes pi installation paths. Include the
    actual discovery scope in the acceptance preview. For shutdown, inventory
    the process tree, request graceful exit and check the recorded identities.
+
+### Troubleshooting and preparation
+
+- Start with the current Issue, commit and relevant diff. Reuse version-matched
+  results when the change does not affect them. Identify the specific missing
+  observation and a deterministic native trigger before planning another run.
+  When the trigger requires a mock, fabricated socket message or guessed timing,
+  report integration coverage and the native gap separately.
+- Prepare one scoped preview covering the actual paths, fixture, discovery reads,
+  writes, startup, shutdown and evidence. Check that fixed installation candidates
+  exist and are within that scope before launch. Automatic discovery can probe pi
+  alongside Codex and show separate Claude and Codex consent sheets. Read each sheet
+  before acting. Prior approvals and retained fixtures do not grant a new scope.
+- A successful tool call can return the previous tree or screenshot while the UI
+  changes. On `noWindowsAvailable`, `elementHasNoFrame`, an invalid element ID or
+  unchanged output, check the app path, live PID, management URL and fresh full
+  tree, raise the verified window and inspect a screenshot. A later fresh observation
+  revealed the actual page in Issue 19; this does not establish a tool fix. Never
+  repeat a consequential click until its outcome is known. Do not bypass access
+  restrictions or infer a product failure from the tool error alone.
+- If the verified app remains inaccessible after one bounded diagnosis, record the
+  error and safe stopping point. Ask for one specific manual action only if needed,
+  then inspect and save the resulting screenshot and accessibility tree yourself.
+  A native file chooser previously needed a manual click even though the selected
+  file appeared in the tree; its cause was not established.
+- For a real Claude host, plan first-run pages, approved network and credential
+  scope, work-directory trust and temporary paths before launch. Claude 2.1.301
+  required `CLAUDE_CODE_TMPDIR` in addition to `TMPDIR`; theme selection changed
+  the isolated settings file. Record approved changes and recheck hooks rather than
+  assuming the whole file is immutable. A historical approval does not extend to
+  another directory, credential or network endpoint.
+- Save screenshots and their hashes in the authorized evidence location, verify
+  the actual images, and record process identities and listener endpoints before
+  shutdown. Check every recorded identity and socket after exit. Temporary paths
+  can disappear, and a hash alone cannot restore a screenshot; archive approved,
+  non-sensitive evidence when durable proof is needed. Preserve uncertain files.

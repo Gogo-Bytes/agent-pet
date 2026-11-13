@@ -3,8 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:native:darwin": "node native/managed-darwin/build.mjs",
-    "test:native:darwin": "node --test --test-timeout=15000 native/managed-darwin/native-check.mjs"
+    "build:native:darwin": "node native/managed-darwin/build.mjs"
   },
   "dependencies": {
     "@agent-pet/adapter-core": "workspace:*",

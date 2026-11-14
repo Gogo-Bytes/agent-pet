@@ -61,10 +61,6 @@ export function PiConnectionPanel({ api }: { api: PiConnectionApi }) {
     <Flex direction="column" gap="3">
       <Heading as="h3" size="4">授权部署与连接 · 本机试用</Heading>
       <Text as="p" role="status">连接状态：{state ? statusText[state.status] : '正在读取…'}</Text>
-      <Text as="p">此入口不扫描或启动 pi。先在上方选择现有配置目录，再明确同意读取预览；选择目录本身不是写入授权。</Text>
-      <Text as="p" size="2">预览读取范围：所选目录和祖先的安全 metadata，settings.json、extensions/package.json，固定入口 index.ts / index.js / agent-pet.ts 及两级 .gitignore / .ignore / .fdignore 的存在与 metadata。不读取会话或对话。取消预览不会写入文件或启动监听。</Text>
-      <Text as="p" size="2">连接依据是最近一次已验证 token 的 legacy hello / 断线通知，不是 managed auth/ack，也不是所有 Session 的在线汇总。在线不等于业务状态已验收。</Text>
-      <Callout.Root color="amber"><Callout.Text>确认部署会在应用 userData 的固定 pi-connection 目录（0700）内私有保存连接凭据与所有权（0600）。退出停止接收但保留记录与原运行目录。重启只读私有记录，不读目标、不自动监听；须明确点击“恢复已保存连接”。停用状态也会保存。旧版本未保存的文件不会自动认领。/tmp 丢失或系统重启可能使原端点不可恢复；不会重建或抢占端点。刷新页面只取消旧预览。</Callout.Text></Callout.Root>
       {state?.mode === 'development-env' && <Text as="p">检测到显式开发环境配置；本入口不会替换、回退或创建第二个桥接。请自行管理原开发配置。</Text>}
       {error && <Callout.Root role="alert" color="red"><Callout.Text>请求失败，未确认操作结果。请重新读取状态，不要假定部署或移除成功。</Callout.Text></Callout.Root>}
       {state?.notice !== undefined && state.notice !== 'none' && <Callout.Root role="status"><Callout.Text>{noticeText[state.notice]}</Callout.Text></Callout.Root>}
@@ -78,7 +74,6 @@ export function PiConnectionPanel({ api }: { api: PiConnectionApi }) {
         <Text as="p">{state.preview.action === 'create' ? '独占新建私有文件（0600），不覆盖：' : '阻止部署：'}{state.preview.path}</Text>
         <Text as="p">待创建目录：{state.preview.createDirectories.join('、') || '无'}</Text>
         {state.preview.findings.map(f => <Text as="p" key={f}>{findingText[f]}</Text>)}
-        <Text as="p" mt="2">确认将写入上述扩展并启动本次私有桥接，凭据只由 Main 持有，并按上方政策私有持久化；重启后必须明确恢复。不会更改 settings、ignore 或 trust。该目录须是 pi 活跃配置根，扩展须启用，项目须按需信任。请自行在安全时机打开 pi 或 /reload；本应用不会自动加载、重载或控制 Agent。</Text>
         <Flex gap="2" mt="3">
           <Button disabled={disabled || state.preview.action !== 'create'} onClick={() => { const id = state.preview!.id; void run(() => api.confirm(id)); }}>确认部署并开始接收</Button>
           <Button variant="soft" disabled={disabled} onClick={() => { void run(() => api.cancel()); }}>取消预览</Button>
@@ -91,7 +86,6 @@ export function PiConnectionPanel({ api }: { api: PiConnectionApi }) {
       {state?.canRemove && <>
         <Button color="red" variant="soft" disabled={disabled} onClick={() => setRemoving(true)}>停用接收并撤回本次文件…</Button>
         {removing && <Box>
-          <Text as="p">仅移除仍匹配本次凭证、身份与内容的文件；保留用户修改和未知对象。停止接收与删除文件都不表示运行中扩展已卸载，请自行安全重载或关闭 pi。</Text>
           <Flex gap="2" mt="2">
             <Button color="red" disabled={disabled} onClick={() => { setRemoving(false); void run(() => api.remove()); }}>确认停用并选择性移除</Button>
             <Button variant="soft" disabled={disabled} onClick={() => setRemoving(false)}>取消移除</Button>

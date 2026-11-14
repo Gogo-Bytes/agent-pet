@@ -24,8 +24,6 @@ export function PiPreflightPanel({ api }: { api: PiPreflightApi }) {
     <Flex direction="column" gap="3">
       <Heading as="h3" size="4">pi</Heading>
       <Box><Badge>P2a · 检测与只读预检</Badge></Box>
-      <Text as="p">仅检测安装候选与用户指定的配置目标，不执行 pi、shell 或扩展，不修改配置。</Text>
-      <Text as="p">本区仅提供预检，不表示已配置、在线或离线。部署授权与连接状态见下方独立区域。</Text>
       <Flex wrap="wrap" gap="2">
         <Button onClick={() => { void run(() => api.detect()); }}>检测 / 重新扫描</Button>
         <Button variant="soft" onClick={() => { void run(() => api.chooseInstallation()); }}>选择安装包目录</Button>
@@ -44,7 +42,6 @@ export function PiPreflightPanel({ api }: { api: PiPreflightApi }) {
         </RadioGroup.Root>
         <Heading as="h4" size="3">配置目标（agentDir）</Heading>
         <Text as="p" className="preflight-path">{state.target.path}</Text>
-        <Text as="p">{state.target.source === 'default' ? '默认候选' : '手动选择'}，不保证是活跃终端使用的目录。选择本身不读取配置；点击检查才读取必要配置。</Text>
         <Flex wrap="wrap" gap="2">
           <Button variant="soft" onClick={() => { void run(() => api.chooseTarget()); }}>选择配置目录</Button>
           <Button variant="soft" onClick={() => { void run(() => api.useDefaultTarget()); }}>使用默认候选</Button>
@@ -59,10 +56,8 @@ export function PiPreflightPanel({ api }: { api: PiPreflightApi }) {
             </ul></Box> : <Callout.Text>有限检查未发现上述冲突；不是安装或加载保证。</Callout.Text>}
           </Callout.Root>
           {selected?.compatibility !== 'verified-0.85.1' && <Text as="p" mt="3">尚未选定已核实的标准 pi 0.85.1 安装；兼容性待确认。</Text>}
-          <Text as="p" mt="3">ACL、网络文件系统、运行时 --no-extensions / -e、项目规则和活跃配置仍无法确认。存在冲突或未知规则时，不可据此进入写入。</Text>
         </section></Box>}
       </>}
-      <Text as="p" color="gray" size="2">GUI PATH 不代表终端环境；alias / wrapper 参数未知。不扫描会话或整个磁盘，不解析 shell 配置；不改变 ignore、settings 或 trust。打开原 Session 窗口目前不受支持。</Text>
     </Flex>
   </section></Card>;
 }

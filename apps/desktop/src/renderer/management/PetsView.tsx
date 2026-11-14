@@ -63,7 +63,7 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
       {editing ? <form className="pet-rename" onSubmit={event => { event.preventDefault(); if (!busy) void saveName(); }}>
         <input autoFocus aria-label="宠物名称" value={draft} disabled={busy} maxLength={40} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); endNameEdit(); } }} />
         <button disabled={busy || !draft.trim()}>保存</button><button type="button" onClick={endNameEdit}>取消</button>
-      </form> : <h1 aria-label={name}><button ref={nameTrigger} className="pet-name-edit" aria-label="修改宠物名称" title={name + ' · 点击修改名称'} disabled={busy}
+      </form> : <h1 aria-label={name}><button ref={nameTrigger} className="pet-name-edit" aria-label="修改宠物名称" disabled={busy}
         onClick={() => { setDraft(name); setNotice(''); setEditing(true); }}>{name}</button></h1>}
       <div className={`pet-binding-tags${boundRecords.length > 5 ? ' is-collapsed' : ''}`} aria-label="使用这个宠物的 Agent">
         {boundRecords.map(record => <GlassSurface as="span" className="pet-binding-tag" key={record.id} title={`${record.name} · ${providerLabels[record.provider]}`}>
@@ -77,7 +77,7 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
       <GlassAction iconOnly aria-label="下一个宠物" disabled={assets.records.length < 2} onClick={() => cycleAsset(1)}><Icon name="right" /></GlassAction></GlassToolbar>
     <div className="pet-animation-picker"><GlassToolbar className="pet-animation-toolbar" aria-label="动画预览"><GlassAction iconOnly disabled={!motions.length} aria-label="重新播放当前动画" onClick={() => onAction(action)}><Icon name="replay" /></GlassAction>
       <button ref={motionTrigger} className="glass-action" disabled={!motions.length} aria-label="选择动画" aria-expanded={motionsOpen} aria-controls="motion-palette" onClick={() => setMotionsOpen(value => !value)}><Icon name="play" />{motions.find(value => value.id === normalizePetAction(action))?.label ?? (motions.length ? '选择动作' : '静态展示')}<Icon name={motionsOpen ? 'up' : 'down'} /></button></GlassToolbar>
-      {motionsOpen && <GlassSurface material="panel" as="section" className="motion-palette" id="motion-palette" aria-label="选择动画"><header><strong>动作</strong><small>{motions.length}</small></header>
+      {motionsOpen && <GlassSurface material="panel" as="section" className="motion-palette" id="motion-palette" aria-label="选择动画">
         <label className="surface-search glass-inset"><Icon name="search" /><input aria-label="搜索动画" value={query} placeholder="搜索动作" onChange={event => setQuery(event.target.value)} /></label>
         <div className="motion-list">{motions.filter(value => value.label.includes(query)).map(value => <button className="glass-choice" key={value.id} aria-pressed={normalizedAction === value.id} onClick={() => onAction(value.id)}><span>{value.label}</span><Icon name={normalizedAction === value.id ? 'check' : 'play'} /></button>)}</div>
       </GlassSurface>}
@@ -96,11 +96,11 @@ export function PetsView({ visible, records, assets, importApi, avatarUrls, sele
       {(error || notice) && <p role={error ? 'alert' : 'status'}>{error || notice}</p>}
     </GlassDrawer>}
     {visible && panel === 'pets' && importOpen && <PetImportControl api={importApi} disabled={busy} onClose={() => setImportOpen(false)}
-      onImported={id => { onSelectAsset(id); setNotice('已加入收藏。'); }} />}
+      onImported={onSelectAsset} />}
     {panel === 'agents' && <Dialog label="选择连接" className="pet-dialog" onClose={() => setPanel(null)}>
       <header><h2>选择连接</h2><button type="button" aria-label="关闭弹窗" onClick={() => setPanel(null)}><Icon name="close" /></button></header>
       <div className="pet-agent-options">{records.map(record => <button key={record.id} disabled={busy} aria-pressed={record.pet?.assetId === selectedAssetId} onClick={() => onBind(record.id, record.pet?.assetId === selectedAssetId ? null : { assetId: selectedAssetId, name })}><Icon name="link" /><span>{record.name}<br /><small>{providerLabels[record.provider]}</small></span>{record.pet && <small>{record.pet.assetId === selectedAssetId ? '使用中 ✓' : '使用其他宠物'}</small>}</button>)}</div>
-      {!records.length && <p className="collection-empty">还没有连接，请先在「连接」中添加。</p>}
+      {!records.length && <p className="collection-empty">还没有连接</p>}
       <button className="dialog-done" onClick={() => setPanel(null)}>完成</button>{error && <p role="alert">{error}</p>}
     </Dialog>}
   </>;

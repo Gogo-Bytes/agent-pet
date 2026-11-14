@@ -49,10 +49,9 @@ export function DetectedSetupDialog({ installationId, targetPath, configurationI
   const label = provider === 'codex' ? 'Codex CLI' : provider === 'claude' ? 'Claude Code' : 'pi';
   return <Dialog label={`连接 ${label}`} className="cfg-page cfg-dialog cfg-compact-dialog" onClose={close}>
     <div className="cfg-dialog-shell"><header className="cfg-dialog-header"><div className="cfg-dialog-title"><span className="cfg-dialog-emblem"><Icon name={provider === 'codex' ? 'command' : provider === 'claude' ? 'flower' : 'pi'} /></span><h2>连接 {label}</h2></div><button className="cfg-dialog-close" aria-label="取消配置检查" onClick={close}><Icon name="close" /></button></header>
-      <section className="cfg-dialog-body"><p className="cfg-consent-intro">先检查配置文件夹，不会改动 {label} 文件。</p><code className="cfg-file-path" title={targetPath}>{targetPath}</code>
-        <details><summary>检查范围</summary><p>{provider === 'codex' ? '检查程序、配置文件夹及上级文件夹，并读取 hooks.json。下一步会展示预览，确认后才添加通知。' : provider === 'claude' ? '检查程序、配置文件夹及上级文件夹，并读取 settings.json。下一步会展示预览，确认后才添加连接。' : '检查配置文件夹及上级文件夹，读取 settings.json、extensions/package.json，并检查扩展入口和忽略规则。'}</p></details>
-        {checking && <p role="status">正在检查，可随时取消。</p>}{error && <p role="alert">{error}</p>}
-      </section><footer className="cfg-dialog-footer"><div><button className="co-secondary" onClick={close}>{checking ? '取消检查' : '取消'}</button><button className="co-primary" disabled={checking} onClick={() => void prepare()}>检查并预览<Icon name="right" /></button></div></footer>
+      <section className="cfg-dialog-body"><code className="cfg-file-path" title={targetPath}>{targetPath}</code>
+        {checking && <p role="status">正在检查…</p>}{error && <p role="alert">{error}</p>}
+      </section><footer className="cfg-dialog-footer"><div><button className="co-secondary" onClick={close}>{checking ? '取消检查' : '取消'}</button><button className="co-primary" disabled={checking} onClick={() => void prepare()}>读取并预览<Icon name="right" /></button></div></footer>
     </div>
   </Dialog>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { defaultPreferences, type ManagementState, type PreferencePatch, type Preferences } from '../../shared/preferences.js';
 import { Icon, type IconName } from './components/icons.js';
 import './settings.css';
@@ -39,7 +39,6 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
   const [resetting, setResetting] = useState(false);
   const [resetPending, setResetPending] = useState(false);
   const [resetError, setResetError] = useState('');
-  const [notice, setNotice] = useState('');
   const values = state?.preferences ?? defaultPreferences;
   const disabled = busy || !state;
   const selected = sections.find(item => item.id === section)!;
@@ -95,7 +94,6 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
     try {
       await onReset();
       if (!mounted.current) return;
-      setNotice('所有偏好已恢复默认。');
       endReset();
     } catch {
       if (mounted.current) setResetError('恢复默认失败，未确认更改。请重试。');
@@ -104,16 +102,14 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
     }
   }
   function update(patch: PreferencePatch) {
-    setNotice('');
     onChange(patch);
   }
-  function toggle(key: BooleanKey, title: string, copy = '', unavailable = false) {
-    return <PreferenceSwitch title={title} copy={copy} checked={values[key]} disabled={disabled || unavailable}
+  function toggle(key: BooleanKey, title: string, unavailable = false) {
+    return <PreferenceSwitch title={title} checked={values[key]} disabled={disabled || unavailable}
       onChange={() => update({ [key]: !values[key] })} />;
   }
   function chooseSection(value: Section, button: HTMLButtonElement) {
     setSection(value);
-    setNotice('');
     scrollArea.current?.scrollTo({ top: 0 });
     const nav = button.parentElement;
     if (!nav) return;
@@ -168,15 +164,14 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
         </>}
         {section === 'app' && <>
           <MenuGroup title="应用入口" icon="monitor"><div className="preference-entry-pair">
-            {toggle('tray', '菜单栏图标', !values.dock ? 'Dock 已隐藏，保留此入口' : '', !values.dock)}
-            {toggle('dock', 'Dock 图标', !values.tray ? '菜单栏已隐藏，保留此入口' : '', !values.tray)}
+            {toggle('tray', '菜单栏图标', !values.dock)}
+            {toggle('dock', 'Dock 图标', !values.tray)}
           </div></MenuGroup>
           <MenuGroup title="启动与退出" icon="software">
             <PreferenceSwitch title="登录时启动" checked={state?.login.enabled ?? false}
-              copy={state?.login.supported ? '' : '请使用打包版启用此设置'}
-              disabled={disabled || !state?.login.supported} onChange={() => { setNotice(''); onLogin(!state?.login.enabled); }} />
+              disabled={disabled || !state?.login.supported} onChange={() => { onLogin(!state?.login.enabled); }} />
             {toggle('startConsole', '启动时打开管理窗口')}
-            {toggle('background', '关闭窗口后继续运行', values.background ? '' : '关闭窗口将退出应用并隐藏宠物')}
+            {toggle('background', '关闭窗口后继续运行')}
           </MenuGroup>
         </>}
         {section === 'pet' && <>
@@ -191,12 +186,12 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
             <div className="preference-scale"><span>60% · 小</span><span>100%</span><span>140% · 大</span></div>
           </div>
           <MenuGroup title="桌面显示" icon="pet">
-            {toggle('petVisible', '显示桌面宠物', '仅显示已连接且绑定宠物的 Agent')}
+            {toggle('petVisible', '显示桌面宠物')}
             {toggle('topmost', '始终置顶')}
           </MenuGroup>
           <MenuGroup title="动作与气泡" icon="sparkles">
-            {toggle('bubbles', '显示提醒气泡', values.bubbles ? '' : '任务提醒暂停显示，偏好仍会保留')}
-            {toggle('reduced', '减少动画', '保留状态变化，减少持续动作')}
+            {toggle('bubbles', '显示提醒气泡')}
+            {toggle('reduced', '减少动画')}
           </MenuGroup>
         </>}
         {section === 'reminders' && <>
@@ -216,13 +211,11 @@ export function SettingsView({ visible, state, busy, onChange, onLogin, onReset,
       </div>}
       {busy && <p className="preferences-notice" role="status">正在保存偏好…</p>}
       {failure && <p className="preferences-notice is-error" role="alert">{failure} 请重试。</p>}
-      {notice && !failure && <p className="preferences-notice" role="status"><Icon name="check" size={15} />{notice}</p>}
     </div>
     {resetting && <dialog ref={dialog} className="preferences-reset-dialog" aria-labelledby="preferences-reset-title"
       onKeyDown={trapDialogFocus} onCancel={event => { event.preventDefault(); endReset(); }}>
       <div className="preferences-reset-art"><Icon name="replay" size={24} /></div>
       <h2 id="preferences-reset-title">恢复默认偏好？</h2>
-      <p>渲染、软件、宠物与提醒设置将恢复默认。已添加的连接和宠物配置会保留。</p>
       {resetError && <p className="is-error" role="alert">{resetError}</p>}
       <div><button autoFocus onClick={endReset}>取消</button>
         <button className="preferences-reset-confirm" disabled={resetPending} onClick={() => { void confirmReset(); }}>
@@ -237,9 +230,8 @@ function AboutDocument({ onOpenProject }: { onOpenProject: (() => void) | undefi
   return <article className="preferences-about" aria-label="关于 Agent Pet">
     <header className="about-document-header"><h1>Agent Pet</h1>
       <p className="about-document-meta"><span className="about-version">版本 0.1.0</span></p>
-      <p className="about-document-lead">通过 3D 宠物的动作，观察 AI Agent 的工作状态。</p>
     </header>
-    <section className="about-document-links"><h2>项目链接</h2>
+    <section className="about-document-links">
       <button className="about-project-link" disabled={!onOpenProject} onClick={onOpenProject}>Gogo-Bytes / agent-pet<Icon name="right" /></button>
     </section>
   </article>;
@@ -248,10 +240,9 @@ function AboutDocument({ onOpenProject }: { onOpenProject: (() => void) | undefi
 function MenuGroup({ title, icon, children }: { title: string; icon: IconName; children: ReactNode }) {
   return <section className="preference-group" aria-label={title}><header><Icon name={icon} size={18} /><h2>{title}</h2></header><div>{children}</div></section>;
 }
-function PreferenceSwitch({ title, copy, checked, disabled, onChange }: { title: string; copy: string; checked: boolean; disabled: boolean; onChange: () => void }) {
-  const description = useId();
-  return <div className={`preference-row ${disabled ? 'is-disabled' : ''}`}><span><strong>{title}</strong>{copy && <small id={description}>{copy}</small>}</span>
-    <button className="preference-switch" role="switch" aria-label={title} aria-describedby={copy ? description : undefined} aria-checked={checked} disabled={disabled} onClick={onChange}>
+function PreferenceSwitch({ title, checked, disabled, onChange }: { title: string; checked: boolean; disabled: boolean; onChange: () => void }) {
+  return <div className={`preference-row ${disabled ? 'is-disabled' : ''}`}><span><strong>{title}</strong></span>
+    <button className="preference-switch" role="switch" aria-label={title} aria-checked={checked} disabled={disabled} onClick={onChange}>
       <span aria-hidden="true" />
     </button>
   </div>;

@@ -3,21 +3,21 @@ import type { AgentConfiguration, ConfigurationsApi, ConfigurationsState } from 
 import type { CodexConnectionState } from '../../shared/codex-connection.js';
 import { Dialog } from './components/Dialog.js';
 import { Icon } from './components/icons.js';
-export function codexConnectionSummary(state: CodexConnectionState | undefined): { title: string; description: string; tone: 'online' | 'waiting' | 'quiet' | 'error' } {
+export function codexConnectionSummary(state: CodexConnectionState | undefined): { title: string; tone: 'online' | 'waiting' | 'quiet' | 'error' } {
   switch (state?.status) {
-    case 'observing': return { title: '已连接', description: '', tone: 'online' };
-    case 'waiting': return { title: '等待活动', description: '打开 Codex 并发送任务后，连接会自动出现。', tone: 'waiting' };
-    case 'disabled': return { title: '已暂停', description: '不影响 Codex 运行，连接文件会保留。', tone: 'quiet' };
-    case 'failed': return { title: '连接需要处理', description: '请查看提示，已有文件会保留。', tone: 'error' };
-    default: return { title: '还未连接', description: '', tone: 'quiet' };
+    case 'observing': return { title: '已连接', tone: 'online' };
+    case 'waiting': return { title: '等待活动', tone: 'waiting' };
+    case 'disabled': return { title: '已暂停', tone: 'quiet' };
+    case 'failed': return { title: '连接需要处理', tone: 'error' };
+    default: return { title: '还未连接', tone: 'quiet' };
   }
 }
 const notices: Record<CodexConnectionState['notice'], string> = {
-  none: '', 'rescan-required': '请重新扫描 Codex 安装，然后继续连接。', 'unsupported-installation': '当前仅支持已验证的 Codex standalone 0.163.0 安装。请重新扫描。',
-  'preview-failed': '无法检查连接设置。请检查文件夹权限后重试。', 'stale-preview': '预览已失效，请重新查看设置。',
-  'save-failed': '未能确认保存成功。已有文件会保留，请重新打开应用后检查。',
-  'saved-invalid': '原连接文件发生变化或无法读取。请检查原文件，本应用不会覆盖。',
-  retained: '未能完整移除连接。原文件和记录已保留，请检查是否修改过通知条目。',
+  none: '', 'rescan-required': '请重新扫描 Codex 安装，然后继续连接。', 'unsupported-installation': '当前仅支持已验证的 Codex standalone 0.163.0 安装。',
+  'preview-failed': '无法检查连接设置。', 'stale-preview': '预览已失效，请重新查看设置。',
+  'save-failed': '未能确认保存成功。',
+  'saved-invalid': '',
+  retained: '未能完整移除连接。',
 };
 export function CodexConnectionControls({ record, api, run, busy, visible, error, statusHeadingRef, onScan }: {
   record: AgentConfiguration; api: ConfigurationsApi; run(action: () => Promise<ConfigurationsState>): Promise<boolean>;
@@ -53,22 +53,20 @@ export function CodexConnectionControls({ record, api, run, busy, visible, error
     void run(() => api.preview(record.id)).finally(() => { openingPreview.current = false; });
   };
   return <div className="cfg-deployment" data-quiet={state?.status === 'observing'}>
-    <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>{(!state || state.notice === 'none') && summary.description && <p>{summary.description}</p>}
+    <div className={`cfg-connection-status cfg-connection-${summary.tone}`}>
       {state?.canConfigure && !preview && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={needsScan ? onScan : openPreview}>{needsScan ? '重新扫描' : '设置连接'}</button>}
       {state?.canResume && <button ref={configureButton} className="cfg-primary" disabled={disabled} onClick={() => void run(() => api.resume(record.id))}>{state.status === 'disabled' ? '继续连接' : '重新连接'}</button>}
     </div>
-    {state && state.notice !== 'none' && <p role="alert">{notices[state.notice]}</p>}
-    <details className="cfg-operation-help"><summary>连接说明</summary><p>首次设置后，在 Codex 的 <code>/hooks</code> 中审核 Agent Pet 通知，再发送任务。只报告会话和支持的动作，不读取对话或替你执行任务。</p></details>
+    {state && notices[state.notice] && <p role="alert">{notices[state.notice]}</p>}
+    {state?.status === 'waiting' && <p>在 Codex 中审核 <code>/hooks</code></p>}
     {visible && preview && <Dialog label={`连接 ${record.name}`} className="cfg-page cfg-dialog cfg-compact-dialog" initialFocusRef={cancelButton} onClose={() => { if (!disabled) void run(() => api.cancel(record.id)); }}>
       <div className="cfg-dialog-shell"><header className="cfg-dialog-header"><div className="cfg-dialog-title"><span className="cfg-dialog-emblem"><Icon name="command" /></span><h2>连接「{record.name}」</h2></div><button className="cfg-dialog-close" aria-label="关闭连接预览" disabled={disabled} onClick={() => void run(() => api.cancel(record.id))}><Icon name="close" /></button></header>
-        <section className="cfg-dialog-body"><code className="cfg-file-path" title={preview.path}>{preview.path}</code><p>{preview.canApply ? `只追加 ${preview.events.length} 条通知，保留原有内容。` : '请检查文件格式、权限、禁用设置或已有条目。原文件会保留。'}</p>
+        <section className="cfg-dialog-body"><code className="cfg-file-path" title={preview.path}>{preview.path}</code><p>{preview.canApply ? `追加 ${preview.events.length} 条通知` : '请检查文件格式、权限、禁用设置或已有条目。'}</p>
           {preview.canApply && preview.addition && <>
             <details className="cfg-operation-help"><summary>通知内容</summary><p>{preview.events.join('、')}</p>
-              <p>每个事件追加以下条目。命令已脱敏，不能直接执行。</p><pre className="cfg-hook-addition">{JSON.stringify(preview.addition, null, 2)}</pre>
+              <p>命令已脱敏，不能直接执行。</p><pre className="cfg-hook-addition">{JSON.stringify(preview.addition, null, 2)}</pre>
             </details>
           </>}
-          <p>连接后，需在 Codex 的 <code>/hooks</code> 中另行审核通知，再发送任务。</p>
-          <details className="cfg-operation-help"><summary>程序与隐私</summary><p>使用以下 Codex 程序；连接文件保存在应用私有目录，不读取登录信息或对话。</p><code className="cfg-file-path" title={preview.executable}>{preview.executable}</code><p>移除只撤回本产品条目，不覆盖后续修改。</p></details>
           {error && <p role="alert">{error}</p>}
         </section><footer className="cfg-dialog-footer"><div><button ref={cancelButton} className="cfg-secondary" disabled={disabled} onClick={() => void run(() => api.cancel(record.id))}>取消</button><button className="cfg-primary" disabled={disabled || !preview.canApply} onClick={() => void run(() => api.confirm(record.id, preview.id))}>{disabled ? '正在保存…' : '连接'}</button></div></footer>
       </div>

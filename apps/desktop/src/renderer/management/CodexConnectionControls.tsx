@@ -64,7 +64,7 @@ export function CodexConnectionControls({ record, api, run, busy, visible, error
         <section className="cfg-dialog-body"><code className="cfg-file-path" title={preview.path}>{preview.path}</code><p>{preview.canApply ? `只追加 ${preview.events.length} 条通知，保留原有内容。` : '请检查文件格式、权限、禁用设置或已有条目。原文件会保留。'}</p>
           {preview.canApply && preview.addition && <>
             <details className="cfg-operation-help"><summary>通知内容</summary><p>{preview.events.join('、')}</p>
-              <p>每个事件追加以下条目，命令已隐藏。</p><pre className="cfg-hook-addition">{JSON.stringify(preview.addition, null, 2)}</pre>
+              <p>每个事件追加以下条目。命令已脱敏，不能直接执行。</p><pre className="cfg-hook-addition">{JSON.stringify(preview.addition, null, 2)}</pre>
             </details>
           </>}
           <p>连接后，需在 Codex 的 <code>/hooks</code> 中另行审核通知，再发送任务。</p>

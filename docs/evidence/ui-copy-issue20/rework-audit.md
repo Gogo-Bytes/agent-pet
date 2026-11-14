@@ -70,3 +70,17 @@
 本轮没有确认扩展/hooks 写入、删除连接、导入模型、运行 Agent、重做原生权限弹窗及 Provider 生命周期，也没有做完整屏幕阅读器语音检查。pi/Claude 的真实目录创建与故障反馈只核对代码和展示面，不能称为原生端到端通过。
 
 未替换用户先前打开的旧应用包；新源码构建与旧运行进程是不同版本。视觉改动不等于用户已认可设计，#20 不自动关闭。未推送或更新线上 Issue。
+
+## Codex 脱敏声明回归复验
+
+依据 [#20 对 17470de 的验收反馈](https://github.com/Gogo-Bytes/agent-pet/issues/20#issuecomment-6875707771)，恢复 #19 C2 要求的不可直接执行声明。仅改 `CodexConnectionControls.tsx` 的一处文字为“每个事件追加以下条目。命令已脱敏，不能直接执行。”，保留在“通知内容”内，不增加默认页面文案。
+
+在已有 `management-review.html?case=codex-preview` 展示入口操作正式组件：
+
+- 修改前展开明细，复现只有“命令已隐藏”、缺少不可执行声明。
+- 修改后展开明细，完整显示新声明、10 个事件及脱敏 JSON；[截图](codex-redaction-notice.png)已保存并核对。
+- 收起后新声明和 JSON 均不占默认界面；`/hooks` 独立审核提示仍可见；取消返回“设置连接”。
+
+`node_modules/.bin/tsc --noEmit`、`(cd apps/desktop && ../../node_modules/.bin/electron-vite build)`、`git diff --check` 通过。构建首次从仓库根目录调用时未找到应用入口，改用应用目录后通过；未改构建配置。
+
+这是显示层复验，没有运行测试用例、重做原生宿主验收、写入真实 hooks 或替换应用包。已关闭本轮浏览器和展示服务；未推送、更新或关闭线上 Issue。

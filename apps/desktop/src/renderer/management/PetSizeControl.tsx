@@ -84,7 +84,6 @@ export function PetSizeControl({ confirmedSize, preferenceError, disabled, visib
   useLayoutEffect(() => {
     thumb.current = sliderRoot.current?.querySelector<HTMLElement>('[role="slider"]') ?? null;
     thumb.current?.setAttribute('aria-labelledby', 'pet-size-label');
-    thumb.current?.setAttribute('aria-describedby', 'pet-size-help');
     thumb.current?.setAttribute('aria-valuetext', `预览 ${value} DIP`);
   }, [value, reset]);
   return <Box mt="5">
@@ -115,6 +114,5 @@ export function PetSizeControl({ confirmedSize, preferenceError, disabled, visib
       {failure || (saving ? '正在保存尺寸…' : draft !== null ? '预览中，松开后应用。' : '')}
     </Text>
     <Text as="p" color="gray" size="2" mt="3">已确认尺寸：{confirmedSize} DIP</Text>
-    <Text as="p" color="gray" size="2" mt="3" id="pet-size-help">拖动仅预览数值，松开后应用到桌宠并保存；方向键直接应用。与宠物工具栏同步，较小屏幕会限制实际尺寸。</Text>
   </Box>;
 }

@@ -15,7 +15,7 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
     });
   }
   async function click(label: string) {
-    const button = await find(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(value =>
+    const button = await find(() => [...(document.querySelector('dialog[open]') ?? document).querySelectorAll<HTMLButtonElement>('button')].find(value =>
       !value.closest('[hidden]') && !value.disabled && (value.getAttribute('aria-label') === label || value.textContent?.trim() === label)));
     button.focus({ preventScroll: true }); button.click();
   }
@@ -33,7 +33,7 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
     else if (scene === 'scan-error') await find(() => [...document.querySelectorAll('[role="alert"]')].find(value => value.textContent?.includes('扫描失败')));
     else await find(() => document.querySelector('.cfg-discovery-manual'));
     if (scene.startsWith('detected')) {
-      await click('一键配置');
+      await click('设置连接');
       await find(() => document.querySelector('dialog[open]'));
       if (scene !== 'detected') {
         await click('检查并预览');
@@ -50,14 +50,14 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
       if (scene === 'manual-picker-error') await find(() => document.querySelector('dialog [role="alert"]'));
       else {
         await find(() => { const element = document.querySelector<HTMLInputElement>('#manual-path'); return element?.value ? element : null; });
-        await click('验证配置');
+        await click('下一步');
         await find(() => document.querySelector('#manual-provider'));
         if (scene !== 'manual-type') {
           await input('#manual-provider', scene === 'manual-unsupported' ? 'claude' : 'pi');
           if (scene === 'manual-duplicate') await find(() => document.querySelector('dialog [role="alert"]'));
           else if (scene === 'manual-unsupported') await find(() => document.querySelector('dialog [role="status"]'));
           else {
-            await click('重新检查');
+            await click('检查位置');
             if (scene === 'manual-checking') await find(() => document.querySelector('dialog [role="status"]'));
             else {
               await find(() => document.querySelector('.cfg-dialog-check'));
@@ -65,7 +65,7 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
                 await click('下一步');
                 await find(() => document.querySelector('#manual-name'));
                 if (scene === 'manual-name-empty') { await input('#manual-name', ''); await find(() => document.querySelector<HTMLButtonElement>('.cfg-dialog-footer .co-primary:disabled')); }
-                if (scene === 'manual-save-error') { await click('添加配置'); await find(() => document.querySelector('dialog [role="alert"]')); }
+                if (scene === 'manual-save-error') { await click('添加连接'); await find(() => document.querySelector('dialog [role="alert"]')); }
               }
             }
           }
@@ -79,7 +79,7 @@ export async function stageConnectionScene(scene: ConnectionSceneId, signal: Abo
       await find(() => document.querySelector('.cfg-detail'));
     }
     if (scene.startsWith('rename')) { await click('重命名'); await find(() => document.querySelector('#config-name')); if (scene === 'rename-empty') { await input('#config-name', ''); await find(() => document.querySelector('.cfg-inline-name .cfg-field-error')); } }
-    if (scene.startsWith('preview')) { await click('设置连接'); await find(() => document.querySelector('.cfg-preview')); }
+    if (scene.startsWith('preview')) { await click('设置连接'); await find(() => document.querySelector('dialog.cfg-compact-dialog')); }
     if (scene.startsWith('remove')) { (await find(() => document.querySelector<HTMLDetailsElement>('.cfg-more-options'))).open = true; await click('移除连接'); await find(() => document.querySelector('.cfg-removal')); if (scene === 'remove-error') { await click('确认移除'); await find(() => document.querySelector('.cfg-removal [role="alert"]')); } }
   }
 }

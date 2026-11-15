@@ -1,10 +1,13 @@
+import { app } from 'electron';
 import * as fs from 'node:fs';
 import { join } from 'node:path';
+
+const runtimeDirectory = app.isPackaged ? join(process.resourcesPath, 'out/claude-runtime') : join(__dirname, '../claude-runtime');
 
 /** Compile-time-owned runtime artifacts; never reads an Agent installation or configuration. */
 export async function loadClaudeRuntimeAssets(): Promise<{ hook: string; launcher: string; nativeHook: string; processProbe: Buffer }> {
   const read = (name: string): Buffer => {
-    const path = join(__dirname, '../claude-runtime', name), before = fs.lstatSync(path);
+    const path = join(runtimeDirectory, name), before = fs.lstatSync(path);
     if (!before.isFile() || before.size < 1 || before.size > 512 * 1024) throw new Error('Claude runtime unavailable');
     const fd = fs.openSync(path, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
     try {
@@ -24,4 +27,4 @@ export async function loadClaudeRuntimeAssets(): Promise<{ hook: string; launche
 }
 
 /** The process probe stays inside the compiled application runtime, never a per-Agent directory. */
-export function claudeProcessProbePath(): string { return join(__dirname, '../claude-runtime/process-probe'); }
+export function claudeProcessProbePath(): string { return join(runtimeDirectory, 'process-probe'); }

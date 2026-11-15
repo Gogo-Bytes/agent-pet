@@ -4,7 +4,7 @@ import type { PetBridge } from '../../app/bridge/pet-store.js';
 
 const messages = {
   success: '', unsupported: '暂不支持跳转原会话',
-  'not-found': '找不到对应 Session。', 'permission-denied': '没有打开窗口的权限。',
+  'not-found': '找不到对应会话。', 'permission-denied': '没有打开窗口的权限。',
 };
 export function useSessionNotice(bridge: PetBridge) {
   const [message, setMessage] = useState<string | null>(null);

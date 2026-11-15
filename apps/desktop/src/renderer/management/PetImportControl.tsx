@@ -87,12 +87,9 @@ export function PetImportControl({ api, disabled, onImported, onClose }: {
         <dl><dt>许可</dt><dd>{preview.manifest.license}</dd></dl>
         <button type="button" ref={chooseButton} className="pet-import-reselect" disabled={disabled || !!busy} onClick={() => void choose()}>重新选择</button>
       </section> : <div className="pet-import-choose">
-        <Icon name="folder" size={40} />
-        <p>选择包含 <strong>pet.json</strong> 和 <strong>pet.glb</strong> 的文件夹</p>
         <button type="button" ref={chooseButton} className="pet-import-primary" disabled={disabled || !!busy} onClick={() => void choose()}>{busy === 'choosing' ? '正在读取…' : '选择文件夹'}</button>
       </div>}
       {error && <p className="pet-import-error" role="alert">{error}</p>}
-      {busy && <p className="pet-import-status" role="status">{confirming ? '正在导入，请稍候…' : busy === 'cancelling' ? '正在取消预览…' : '正在读取文件夹…'}</p>}
       <footer><GlassAction className="pet-import-secondary" disabled={locked} onClick={() => void close()}>取消</GlassAction>
         {preview && <button type="button" ref={confirmButton} className="pet-import-primary" disabled={disabled || !!busy} onClick={() => void confirm()}>{confirming ? '正在导入…' : '确认导入'}</button>}</footer>
     </GlassSurface>

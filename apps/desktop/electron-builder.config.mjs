@@ -13,8 +13,13 @@ export default {
     app: resolve('apps/desktop'),
     output: process.env.AGENT_PET_BUILD_DIR ?? resolve('dist/agent-pet-local'),
   },
+  extraResources: ['claude-runtime', 'codex-runtime'].map(name => ({
+    from: resolve('apps/desktop/out', name), to: 'out/' + name,
+  })),
   files: [
     'out/**',
+    '!out/claude-runtime/**',
+    '!out/codex-runtime/**',
     'package.json',
     '!node_modules/**',
     '!src/**',

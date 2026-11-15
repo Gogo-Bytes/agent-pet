@@ -80,7 +80,7 @@ export function prepareCodexUserHook(directory: string, document: string): Codex
     const ownership: CodexHookOwnership = { schemaVersion: 1, directory, command, createdHooks: !hooks, createdEvents,
       directories: ctx.directories.map(([path, stat]) => [path, withVolumeIdentity(path, stat)]) };
     const planned = (parsed.hooks as Record<string, CodexHookAddition[]>).SessionStart![0]!;
-    const addition = { hooks: planned.hooks.map(hook => ({ ...hook, command: '[Agent Pet 私有观察程序与参数（已隐藏）]' })) };
+    const addition = { hooks: planned.hooks.map(hook => ({ ...hook, command: '[已脱敏，不可执行]' })) };
     const plan = Object.freeze(Object.defineProperties({ path: ctx.path, exists, canApply: true, addition }, {
       original: { value: original }, ownership: { value: ownership } })) as CodexHookPlan;
     plans.set(plan, { context: ctx, source, text }); return plan;

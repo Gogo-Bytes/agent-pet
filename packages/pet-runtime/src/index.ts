@@ -1,5 +1,5 @@
 import type { DisplayStatus } from '@agent-pet/domain';
-import { petActionIds, type PetAction, type PetAnimations } from './actions.js';
+import { petActionIds, supportsPetStages, type PetAction, type PetAnimations } from './actions.js';
 export * from './actions.js';
 export * from './presentation.js';
 
@@ -11,7 +11,7 @@ export type PetManifest = {
   model: string;
   /** Optional local avatar path; invalid or missing files use the application fallback. */
   avatar?: string;
-  schemaVersion?: 2;
+  schemaVersion?: 2 | 3;
   actionCatalogVersion?: number;
   animations?: PetAnimations;
   license: string;
@@ -41,7 +41,7 @@ export function validatePetManifest(
     return { valid: false, reason: 'required-field-missing' };
   }
 
-  if (source.schemaVersion !== undefined && source.schemaVersion !== 2) return { valid: false, reason: 'unsupported-schema-version' };
+  if (source.schemaVersion !== undefined && source.schemaVersion !== 2 && source.schemaVersion !== 3) return { valid: false, reason: 'unsupported-schema-version' };
   if (source.actionCatalogVersion !== undefined &&
     (typeof source.actionCatalogVersion !== 'number' || !Number.isSafeInteger(source.actionCatalogVersion) || source.actionCatalogVersion < 1)) {
     return { valid: false, reason: 'invalid-action-catalog-version' };
@@ -62,12 +62,16 @@ export function validatePetManifest(
     for (const key of petActionIds) {
       if (!Object.hasOwn(mappings, key)) continue;
       const value = (mappings as Record<string, unknown>)[key];
-      animations[key] = typeof value === 'string' && value.trim() && value.length <= 128 && !/[\u0000-\u001f]/u.test(value) ? value : null;
+      if (source.schemaVersion === 3 && supportsPetStages(key) && value && typeof value === 'object' && !Array.isArray(value)) {
+        const stages = value as Record<string, unknown>;
+        animations[key] = Object.keys(stages).every(stage => stage === 'in' || stage === 'loop' || stage === 'out')
+          ? { loop: clipName(stages.loop), in: clipName(stages.in), out: clipName(stages.out) } : null;
+      } else animations[key] = clipName(value);
     }
   }
   const manifest: PetManifest = { id: source.id as string, version: source.version as string, model,
     license: source.license as string, ...(typeof avatar === 'string' ? { avatar } : {}), ...(source.animations !== undefined ? { animations } : {}),
-    ...(source.schemaVersion === 2 ? { schemaVersion: 2 } : {}),
+    ...(source.schemaVersion === 2 || source.schemaVersion === 3 ? { schemaVersion: source.schemaVersion } : {}),
     ...(typeof source.actionCatalogVersion === 'number' ? { actionCatalogVersion: source.actionCatalogVersion } : {}),
     ...(typeof source.author === 'string' ? { author: source.author } : {}),
     ...(typeof source.attribution === 'string' ? { attribution: source.attribution } : {}),
@@ -75,16 +79,22 @@ export function validatePetManifest(
   return { valid: true, manifest };
 }
 
+function clipName(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() && value.length <= 128 && !/[\u0000-\u001f]/u.test(value) ? value : null;
+}
+
 export function animationForStatus(
   status: DisplayStatus,
   animations: PetAnimations = {},
 ): string {
+  const idle = typeof animations.idle === 'object' ? animations.idle?.loop : animations.idle;
+  const working = typeof animations.working === 'object' ? animations.working?.loop : animations.working;
   switch (status) {
     case 'working':
-      return animations.working || animations.idle || '';
+      return working || idle || '';
     case 'error-unread':
-      return animations.error || animations.attention || animations.idle || '';
+      return animations.error || animations.attention || idle || '';
     case 'completed-unread':
-      return animations.success || animations.attention || animations.idle || '';
+      return animations.success || animations.attention || idle || '';
   }
 }

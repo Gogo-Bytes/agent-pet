@@ -47,6 +47,12 @@ OpenAI 的[插件打包说明](https://developers.openai.com/plugins/build/plugi
 
 **结论：有正式入口，暂不实现。** 两份文档都未把上述行为绑定到具体桌面构建。开始实现前需取得对应版本的载荷与宿主身份依据，能区分桌面与 CLI、不同配置和子会话；首期至多承诺已核实的会话事件，不承诺持续在线、工作或完成。另起 App Server 不能证明观察到了用户已有桌面会话。
 
+## 候选宿主：Antigravity App（非 IDE）
+
+[桌面 App 的 Hooks 设置](https://antigravity.google/docs/hooks/#managing-hooks-in-the-antigravity-app)位于 Settings → Customizations → Hooks。工作区 `.agents/hooks.json` 和全局 `~/.gemini/config/hooks.json` 与 CLI 使用相同的位置；不能把在那里配置的 hook 当成桌面专属入口。文档区分 App、CLI、IDE 的数据目录，但 `transcriptPath` 指向某个目录并不是宿主身份凭证。
+
+[输入契约](https://antigravity.google/docs/hooks/#common-input-fields)把 `lastUserInput` 列为所有 hooks 的公共输入；个别示例省略该字段，不代表只订阅 `SessionStart` 就不会收到提示正文。`Stop` 表示执行循环终止，不是窗口关闭。**暂不接入**：尚未核实哪个桌面构建支持在投递前排除正文，并能把事件绑定到获准观察的 App 配置。无需读取 transcript 或安装 hook 来推断这些能力。
+
 ## 本地映射约束
 
 - [Claude normalize](../integrations/claude-hooks/normalize.ts) 精确保留白名单类别，未知值归 unknown、正文丢弃；[observations](../integrations/claude-hooks/observations.ts) 拒绝 child/旧会话/无关联 prompt，匹配 turn-failed 清近期反馈、保留通用错误未读。

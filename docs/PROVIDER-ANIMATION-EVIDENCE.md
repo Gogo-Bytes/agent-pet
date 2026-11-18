@@ -31,6 +31,14 @@
 
 只有取得已支持版本的官方字段条件或可定位的原生分类实现，能区分输出上限、上下文容量、请求参数、限流和未知错误后，才可新增精确 occurrence/capability；不能用付费模型试错代替契约。
 
+## 候选宿主：Antigravity CLI
+
+Google 的[迁移公告](https://developers.googleblog.com/en/an-important-update-transitioning-gemini-cli-to-antigravity-cli/)确认 Antigravity CLI 是独立终端产品，不等同于 Gemini CLI 或 Antigravity IDE。[官方下载页](https://antigravity.google/download/)列出 CLI v1.5.9；下述 [Hooks 契约](https://antigravity.google/docs/hooks/#input-and-output-contract)是滚动文档，不能据此认定每个字段已在 v1.5.9 验证。
+
+`SessionStart` 表示新对话开始，不是进程在线心跳；`PostInvocation` 是一次模型调用结束，不是整轮完成。`Stop` 的 `fullyIdle` 区分是否还有后台活动，本身不表示成功。`conversationId` 标识对话，不能单独证明哪个本机进程或配置拥有它。
+
+**不采用当前文档描述的完整 JSON 输入。** 公共输入字段包含 `lastUserInput` 和 `transcriptPath`；工具事件还可携带工具参数。先解析完整载荷再删字段不能满足不读取正文的要求。重新评估的前提是：有绑定到具体 CLI 版本、无需读取正文即可识别事件和可信宿主的方案，且不参与审批、不改变执行结果。此结论不否认 Hooks 存在，也不作为桌面宿主的支持声明。
+
 ## 本地映射约束
 
 - [Claude normalize](../integrations/claude-hooks/normalize.ts) 精确保留白名单类别，未知值归 unknown、正文丢弃；[observations](../integrations/claude-hooks/observations.ts) 拒绝 child/旧会话/无关联 prompt，匹配 turn-failed 清近期反馈、保留通用错误未读。

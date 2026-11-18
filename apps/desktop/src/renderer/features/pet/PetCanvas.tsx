@@ -44,7 +44,7 @@ export function PetCanvas({ store, rect, onNotice, visible }: {
     return () => { active = false; setAsset(current => { if (current) URL.revokeObjectURL(current.url); return null; }); };
   }, [assetId, store.bridge]);
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
-  const interaction = usePetInteraction(visible && !drag.direction && !preferences.reduced);
+  const interaction = usePetInteraction(visible && !drag.active && !preferences.reduced);
   // A replacement model must not inherit feedback started on the previous instance.
   useEffect(() => interaction.finish(), [asset?.url, interaction.finish]);
   // Canvas adds its own sizing divs. Keep Main's absolute pixel region and the
@@ -61,7 +61,7 @@ export function PetCanvas({ store, rect, onNotice, visible }: {
         <directionalLight color="#ffffff" intensity={3} position={[3, 5, 4]} />
         <Suspense fallback={<LoadingNotice onNotice={onNotice} />}>
           <Bounds margin={1.2} maxDuration={0}>
-            <PetModel connectionCue={preferencesReady && (!assetId || assetId === 'starter' || asset?.id === assetId) ? sessions.connectionCue : undefined} key={asset?.url ?? 'starter'} interaction={interaction.feedback} onInteractionFinished={interaction.finish} dragDirection={drag.direction} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} />
+            <PetModel connectionCue={preferencesReady && (!assetId || assetId === 'starter' || asset?.id === assetId) ? sessions.connectionCue : undefined} key={asset?.url ?? 'starter'} interaction={interaction.feedback} onInteractionFinished={interaction.finish} dragDirection={drag.direction} dragging={drag.active} animationReset={drag.cancelRevision} visible={visible} motion={presentation.action} replay={presentation.replay} restAction={presentation.restAction} reduced={preferences.reduced} onReady={onNotice} modelUrl={asset?.url} {...(asset?.animations ? { animations: asset.animations } : {})} />
           </Bounds>
         </Suspense>
       </Canvas>

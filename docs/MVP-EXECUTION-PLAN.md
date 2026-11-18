@@ -4,11 +4,13 @@
 
 ## 当前优先级
 
-以下三项已迁入 GitHub；**动态状态、阻塞和验收结果只在对应 Issue 维护**，本文不复制进度表：
+**动态状态、阻塞和验收结果只在对应 Issue 维护**，本文仅保留优先级与入口：
 
-1. [#15 三种 Provider 最近适配增量：独立审查与有界原生验收](https://github.com/Gogo-Bytes/agent-pet/issues/15)。优先收尾现有 pi / Claude / Codex 链路。
-2. [#16 Provider 细类来源：业务重试与输出限制](https://github.com/Gogo-Bytes/agent-pet/issues/16)。依据见[版本化来源与能力限制](PROVIDER-ANIMATION-EVIDENCE.md)；没有可靠事实就保持未知，不更换 SDK/RPC 宿主或解析正文补信号。
-3. [#17 持续状态动画 in / loop / out](https://github.com/Gogo-Bytes/agent-pet/issues/17)。Provider 收尾之后实施；[确认设计](PET-ANIMATION-TRANSITIONS.md)仅覆盖 idle、working、dragging，当前映射仍是字符串/null。
+1. [#17 持续状态动画 in / loop / out](https://github.com/Gogo-Bytes/agent-pet/issues/17)。下一项开发优先任务；[确认设计](PET-ANIMATION-TRANSITIONS.md)仅覆盖 idle、working、dragging。
+2. [#16 Provider 细类来源：业务重试与输出限制](https://github.com/Gogo-Bytes/agent-pet/issues/16)。出现新的可靠契约或获准改变接入范围时再恢复，不阻塞 #17。依据见[版本化来源与能力限制](PROVIDER-ANIMATION-EVIDENCE.md)；没有可靠事实就保持未知，不更换 SDK/RPC 宿主或解析正文补信号。
+3. [#22 原生验收工具的窗口定位与旧画面](https://github.com/Gogo-Bytes/agent-pet/issues/22)。保留跟踪，按用户要求暂不修复；尚不能归因为产品缺陷。
+
+已完成范围入口：[#15 Provider 增量验收](https://github.com/Gogo-Bytes/agent-pet/issues/15)、[#19 Codex 预览与目标变化处理](https://github.com/Gogo-Bytes/agent-pet/issues/19) 已按确认的正常业务范围收尾并随 PR #21 合入；[#20 界面文案与交互清理](https://github.com/Gogo-Bytes/agent-pet/issues/20) 已随 PR #23 合入。历史未测边界保留在 Issue，不将关闭或合入扩大为全部场景通过或已发布。
 
 **离线素材制作与拼接暂停。** 不继续用户模型的其他尾段修订或 Blender 拼接；这不同于已经确认、等待实施的 #17 播放器功能。不得自动修改、安装、重绑或上传用户模型。
 

@@ -60,7 +60,7 @@ export function HomeScene({ pets, focused, reduced, onFocus, onReady, modelUrls,
 
 /** A separate audition scene: only the selected asset, centered, with no home scenery. */
 export function PetPreviewScene({ action, replay, reduced, onReady, modelUrl, animations }: {
-  action: string; replay: number; reduced: boolean; onReady: (clips: string[]) => void; modelUrl?: string | undefined; animations?: Record<string, string | null> | undefined;
+  action: string; replay: number; reduced: boolean; onReady: (clips: string[]) => void; modelUrl?: string | undefined; animations?: PetAnimations | undefined;
 }) {
   return <group name="pet-preview-scene">
     <SceneCamera mode="pet" count={1} target={null} reduced={reduced} />

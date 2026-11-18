@@ -47,6 +47,8 @@ OpenAI 的[插件打包说明](https://developers.openai.com/plugins/build/plugi
 
 **结论：有正式入口，暂不实现。** 两份文档都未把上述行为绑定到具体桌面构建。开始实现前需取得对应版本的载荷与宿主身份依据，能区分桌面与 CLI、不同配置和子会话；首期至多承诺已核实的会话事件，不承诺持续在线、工作或完成。另起 App Server 不能证明观察到了用户已有桌面会话。
 
+**具体版本核对（macOS）**：[上游用户报告 #25293](https://github.com/openai/codex/issues/25293)列出 App `26.601.21317`（build `3511`）及内置 CLI `0.136.0-alpha.2`。这是设置页现场报告，不是官方发行映射或事件执行验收。对应 tag 的 [SessionStart 序列化结构](https://github.com/openai/codex/blob/rust-v0.136.0-alpha.2/codex-rs/hooks/src/schema.rs#L485-L516)只有 `session_id`、`transcript_path`、`cwd`、`hook_event_name`、`model`、`permission_mode`、`source`；[发送实现](https://github.com/openai/codex/blob/rust-v0.136.0-alpha.2/codex-rs/hooks/src/events/session_start.rs)中 `source` 表示启动、恢复、清空或压缩，不是客户端来源。该载荷没有提示正文，但也没有当前客户端、宿主进程或配置身份。故不能单凭它把恢复的会话分配给桌面宠物；不读取 transcript 来补身份。后续只在取得独立且可信的宿主与配置归属证据时恢复实现。
+
 ## 候选宿主：Antigravity App（非 IDE）
 
 [桌面 App 的 Hooks 设置](https://antigravity.google/docs/hooks/#managing-hooks-in-the-antigravity-app)位于 Settings → Customizations → Hooks。工作区 `.agents/hooks.json` 和全局 `~/.gemini/config/hooks.json` 与 CLI 使用相同的位置；不能把在那里配置的 hook 当成桌面专属入口。文档区分 App、CLI、IDE 的数据目录，但 `transcriptPath` 指向某个目录并不是宿主身份凭证。

@@ -1,20 +1,22 @@
 /** Inert, additive documents only. Never install, trust hooks or merge existing configuration here. */
 export const codexHookEvents = ['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse',
   'PostToolUse', 'PermissionRequest', 'Stop', 'Interrupt', 'PreCompact', 'PostCompact'] as const;
-export function createCodexHookDocument(nodeExecutable: string, observerPath: string): string {
+export const sessionHookEvents = ['SessionStart', 'SessionEnd'] as const;
+export type CodexHookEvents = typeof codexHookEvents | typeof sessionHookEvents;
+export function createCodexHookDocument(nodeExecutable: string, observerPath: string, events: CodexHookEvents = codexHookEvents): string {
   const quote = (value: string) => {
     if (!value.startsWith('/') || value.length > 4096 || /[\u0000-\u001f\u007f]/u.test(value))
       throw new Error('An absolute executable and observer path are required');
     return `'${value.replaceAll("'", "'\"'\"'")}'`;
   };
   const command = `${quote(nodeExecutable)} ${quote(observerPath)}`;
-  return JSON.stringify({ hooks: Object.fromEntries(codexHookEvents.map(event => [event,
+  return JSON.stringify({ hooks: Object.fromEntries(events.map(event => [event,
     [{ hooks: [{ type: 'command', command, timeout: 2 }] }]])) }, null, 2);
 }
 
 /** Ordinary invocation: discovery is an explicit private file, never a shell-exported capability. */
-export function createCodexNormalHookDocument(nodeExecutable: string, observerPath: string, activationPath: string, runAsNode = false): string {
-  const base = JSON.parse(createCodexHookDocument(nodeExecutable, observerPath)) as {
+export function createCodexNormalHookDocument(nodeExecutable: string, observerPath: string, activationPath: string, runAsNode = false, events: CodexHookEvents = codexHookEvents): string {
+  const base = JSON.parse(createCodexHookDocument(nodeExecutable, observerPath, events)) as {
     hooks: Record<string, { hooks: { command: string }[] }[]>;
   };
   if (!activationPath.startsWith('/') || activationPath.length > 4096 || /[\u0000-\u001f\u007f]/u.test(activationPath))

@@ -1,3 +1,4 @@
+import { desktopExecutable } from '../../../../integrations/codex-hooks/desktop-signature.js';
 import * as fs from 'node:fs';
 import { dirname, isAbsolute, join, normalize, resolve } from 'node:path';
 
@@ -18,6 +19,11 @@ export function inspectCodexHostExecutable(selected: string): string | null {
 function inspectCodexPath(selected: string, allowDaemon: boolean): string | null {
   try {
     if (!isAbsolute(selected) || Buffer.byteLength(selected) > 4096 || /[\u0000-\u001f\u007f]/.test(selected)) return null;
+    // This fixed bundle path is signature-checked during discovery, restore and live delivery.
+    if (process.platform === 'darwin' && selected === desktopExecutable) {
+      const stat = fs.lstatSync(selected);
+      return stat.isFile() && (stat.mode & 0o111) && fs.realpathSync(selected) === selected ? selected : null;
+    }
     let path = normalize(selected), links = 0, steps = 0;
     // Walk links ourselves so both link expansion and directory work are bounded.
     for (;;) {
@@ -57,10 +63,12 @@ export function resolveCodexHostExecutable(cli: string, configurationDirectory: 
   const exists = (path: string): boolean => { try { fs.lstatSync(path); return true; }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; } };
   try {
+    if (cli === desktopExecutable) return inspectHost(cli);
     const dedicated = join(configurationDirectory, 'packages/app-server-daemon/current');
     if (exists(dedicated)) {
       const daemonPath = join(dedicated, exists(join(dedicated, 'codex')) && !exists(join(dedicated, 'bin/codex')) ? 'codex' : 'bin/codex');
-      return inspectHost(daemonPath);
+      const host = inspectHost(daemonPath);
+      return host === desktopExecutable ? null : host;
     }
     const state = join(configurationDirectory, 'app-server-daemon');
     if (['app-server.pid', 'app-server.stderr.log', 'app-server-updater.pid', 'app-server-updater.stderr.log'].some(name => exists(join(state, name)))) {

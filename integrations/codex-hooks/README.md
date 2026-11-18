@@ -2,8 +2,7 @@
 
 Current path: native command hooks → protected activation → independently verified
 macOS host identity → private mapper → Configurations/Application/Home/desktop.
-Compatibility is limited to the checked **standalone0.163.0 layout**, not all install
-methods/versions or Codex Desktop. Task priorities are in the [MVP entry](../../docs/MVP-EXECUTION-PLAN.md).
+The standalone 0.163.0 layout retains its ten-event profile. For the observed macOS desktop bundle layout, setup instead offers only `SessionStart` and `SessionEnd`. Discovery checks the signed file; the receiver checks the live host PID against the OpenAI signing requirement and rechecks process identity before accepting the event. Neither profile infers the client UI from the payload. Real desktop delivery has not been confirmed. Task priorities are in the [MVP entry](../../docs/MVP-EXECUTION-PLAN.md).
 
 ## Connection setup: scan once, never pick a program file
 
@@ -25,7 +24,7 @@ executable evidence without mandatory rescan or duplicate installation.
 
 The selected target is actual CODEX_HOME (normally `~/.codex`, not a project's `.codex`).
 Read consent permits only bounded target hooks.json (64KiB) and ancestor/program metadata;
-separate confirmation appends10 owned command hooks. The read-only preview lists the exact
+separate confirmation appends only the previewed event groups. The read-only preview lists the exact
 target and events plus the actual append-group shape (command type, timeout2), with only
 the private command replaced by an explicitly non-executable redaction. Neither existing
 private hooks nor activation/token paths are sent to Renderer. Existing JSON values/unrelated bytes,

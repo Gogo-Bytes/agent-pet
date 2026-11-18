@@ -3,6 +3,7 @@ import { startNativeReceiver } from '../hook-runtime/native-receiver.js';
 import { privatePath } from '../hook-runtime/private-activation.js';
 import { nativePid, checkedNativeProbe, createNativeHostProbe, sameHost, verifyNativeHost,
   type NativeHostIdentity, type NativeHostProbe } from '../hook-runtime/native-host.js';
+import { desktopExecutable, verifyDesktopSignature } from './desktop-signature.js';
 import { validCodexHookFact } from './transport.js';
 import type { CodexHookFact } from './normalize.js';
 type Delivery = { schemaVersion: 1; hookPid: number; eventId: string; fact: CodexHookFact };
@@ -60,6 +61,12 @@ export async function startCodexNativePresence(options: {
       const identity = await verifyNativeHost({ hookPid: delivery.hookPid, executable: options.executable,
         observerExecutable: options.observerExecutable, probe, active: available });
       if (!identity || !available() || retired.has(identityKey(identity))) return false;
+      if (identity.executable === desktopExecutable) {
+        try { await verifyDesktopSignature(identity.pid); } catch { return false; }
+        const checked = await checkedNativeProbe(probe, identity.pid);
+        if (!available() || !checked || !sameHost(identity, checked) || retired.has(identityKey(identity))) return false;
+        if (delivery.fact.kind !== 'session-started' && delivery.fact.kind !== 'session-ended') return false;
+      }
       let host = hosts.get(identity.pid);
       if (host && !sameHost(identity, host.identity)) { retire(host); publish(); return false; }
       if (!host) {

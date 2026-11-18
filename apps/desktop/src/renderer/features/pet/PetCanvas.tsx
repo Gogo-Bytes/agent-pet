@@ -1,4 +1,4 @@
-import { Component, Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds } from '@react-three/drei';
 import type { Rect } from '../../../shared/overlay-layout.js';
@@ -10,18 +10,12 @@ import { usePetInteraction } from '../../shared/usePetInteraction.js';
 import { projectPetPresentation, type PetAnimations } from '@agent-pet/pet-runtime';
 import styles from './PetCanvas.module.css';
 import { PreferenceRenderLoop } from '../../shared/PreferenceRenderLoop.js';
+import { PetSceneBoundary } from '../../shared/PetSceneBoundary.js';
 import { PetModel } from './PetModel.js';
 
 function LoadingNotice({ onNotice }: { onNotice: (message: string) => void }) {
   useEffect(() => { onNotice('正在加载内置 GLB 宠物…'); }, [onNotice]);
   return null;
-}
-
-class PetErrorBoundary extends Component<{ children: ReactNode; onNotice: (message: string) => void }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch() { this.props.onNotice('内置宠物加载失败，请重新打开窗口。'); }
-  render() { return this.state.failed ? null : this.props.children; }
 }
 
 export function PetCanvas({ store, rect, onNotice, visible }: {
@@ -54,7 +48,7 @@ export function PetCanvas({ store, rect, onNotice, visible }: {
   return <div className={`pet-canvas ${styles.surface}${drag.active ? ` pet-canvas--dragging ${styles.dragging}` : ''}`}
     style={rectStyle(rect)} {...drag.handlers}
     onPointerEnter={() => interaction.hover(true)} onPointerLeave={() => interaction.hover(false)}>
-    <PetErrorBoundary onNotice={onNotice}>
+    <PetSceneBoundary assetKey={asset?.url ?? 'starter'} onError={() => onNotice('宠物加载失败，请切换宠物或重新打开窗口。')}>
       <Canvas flat dpr={preferences.resolution / 100} gl={{ alpha: true, antialias: true }}
         camera={{ fov: 35, position: [0, 0, 5] }}
         frameloop="never">
@@ -67,6 +61,6 @@ export function PetCanvas({ store, rect, onNotice, visible }: {
           </Bounds>
         </Suspense>
       </Canvas>
-    </PetErrorBoundary>
+    </PetSceneBoundary>
   </div>;
 }

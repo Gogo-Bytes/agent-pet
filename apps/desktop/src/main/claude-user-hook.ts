@@ -36,7 +36,7 @@ function makePlan(summary: Pick<HookPlan, 'path' | 'exists' | 'canApply' | 'noti
 const member = (node: Node, key: string) => node.members.find(item => item.key === key);
 const property = (node: Node, key: string) => member(node, key)?.value;
 function entry(command: string): HookEntry { return { matcher: MATCHER, hooks: [{ type: 'command', command, timeout: 2 }] }; }
-function eventEntry(command: string, event: ClaudeUserHookEvent): { matcher?: string; hooks: HookEntry['hooks'] } {
+export function eventEntry(command: string, event: ClaudeUserHookEvent): { matcher?: string; hooks: HookEntry['hooks'] } {
   const matcher = event === 'SessionStart' ? MATCHER : event === 'Notification' ? 'permission_prompt' :
     ['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest'].includes(event) ? '.*' : undefined;
   return { ...(matcher === undefined ? {} : { matcher }), hooks: [{ type: 'command', command, timeout: 2 }] };

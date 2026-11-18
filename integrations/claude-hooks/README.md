@@ -17,8 +17,17 @@ entries for the same native program are deduplicated. Custom targets retain a ma
 flow. Discovery reads bounded metadata, not configuration, credentials or sessions,
 and does not execute candidates. GUI discovery does not fix a terminal's PATH.
 
-Setup separately requests target-read consent, previews `settings.json` changes, then
-confirms only owned hooks. Current task mode registers12 groups. Legacy presence-only
+For new connections to the default user directory, Agent Pet previews and installs a
+local `skills/agent-pet-observer/.claude-plugin/plugin.json` with the 12 observer hooks.
+It neither edits `settings.json` nor runs a marketplace command. A pre-existing plugin
+at that location is not adopted or replaced. Restore and removal check the saved file
+and directory identities and exact manifest; incomplete or edited trees are preserved.
+Claude Code [introduced skills-directory plugins in 2.1.157](https://github.com/anthropics/claude-code/releases/tag/v2.1.157).
+[Managed settings can block this source](https://code.claude.com/docs/en/plugins/loading);
+installation is not proof of event delivery. This route has not been exercised in a live session.
+
+Custom targets still preview `settings.json` changes and confirm only owned hooks.
+Existing registrations are restored in place, never migrated. Current task mode registers 12 groups. Legacy presence-only
 records retain one SessionStart until an explicit upgrade; resume never silently
 updates observer source or adds task hooks. New setup/upgrade requires a new Claude
 session. An already-running process without a startup callback to the new receiver

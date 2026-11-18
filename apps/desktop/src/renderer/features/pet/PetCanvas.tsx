@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { Bounds } from '@react-three/drei';
 import type { Rect } from '../../../shared/overlay-layout.js';
 import type { PetStore } from '../../app/bridge/pet-store.js';
+import { releaseModelUrl } from '../../shared/release-model-url.js';
 import { rectStyle } from '../../shared/rect-style.js';
 import { useWindowGesture } from '../../shared/use-window-gesture.js';
 import { usePetInteraction } from '../../shared/usePetInteraction.js';
@@ -31,17 +32,18 @@ export function PetCanvas({ store, rect, onNotice, visible }: {
   const [asset, setAsset] = useState<{ id: string; url: string; animations?: PetAnimations } | null>(null);
   const assetId = preferences.petAssetId;
   useEffect(() => {
+    setAsset(null);
+    if (!assetId || assetId === 'starter' || !store.bridge.getAsset) return;
     let active = true;
-    if (!assetId || assetId === 'starter') { setAsset(null); return () => { active = false; }; }
-    if (!store.bridge.getAsset) { setAsset(null); return () => { active = false; }; }
+    let url: string | undefined;
     void store.bridge.getAsset(assetId).then(value => {
       if (!active) return;
       if (!value) { setAsset(null); return; }
       const bytes = new Uint8Array(value.bytes);
-      const url = URL.createObjectURL(new Blob([bytes.buffer], { type: 'model/gltf-binary' }));
+      url = URL.createObjectURL(new Blob([bytes.buffer], { type: 'model/gltf-binary' }));
       setAsset({ id: assetId, url, ...(value.animations ? { animations: value.animations } : {}) });
     }).catch(() => { if (active) setAsset(null); });
-    return () => { active = false; setAsset(current => { if (current) URL.revokeObjectURL(current.url); return null; }); };
+    return () => { active = false; if (url) releaseModelUrl(url); };
   }, [assetId, store.bridge]);
   const drag = useWindowGesture(store.bridge, 'moveWindowBy');
   const interaction = usePetInteraction(visible && !drag.direction && !preferences.reduced);

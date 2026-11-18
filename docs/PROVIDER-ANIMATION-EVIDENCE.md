@@ -39,6 +39,14 @@ Google 的[迁移公告](https://developers.googleblog.com/en/an-important-updat
 
 **不采用当前文档描述的完整 JSON 输入。** 公共输入字段包含 `lastUserInput` 和 `transcriptPath`；工具事件还可携带工具参数。先解析完整载荷再删字段不能满足不读取正文的要求。重新评估的前提是：有绑定到具体 CLI 版本、无需读取正文即可识别事件和可信宿主的方案，且不参与审批、不改变执行结果。此结论不否认 Hooks 存在，也不作为桌面宿主的支持声明。
 
+## 候选宿主：Codex 桌面端
+
+OpenAI 的[插件打包说明](https://developers.openai.com/plugins/build/plugins)明确支持手动安装的桌面插件携带生命周期 hooks；安装或启用不等于信任，用户须单独审阅当前 hook 定义。含 hooks 的插件不能进入公共插件目录。这是桌面端自身的入口，不是 [standalone CLI 0.163.0 接入](../integrations/codex-hooks/README.md)的兼容声明。
+
+按[官方事件字段](https://learn.chatgpt.com/docs/hooks)，可先评估只订阅 `SessionStart` / `SessionEnd`：前者的 `source` 可为恢复、清空或压缩，不能一律算新任务；后者不是成功或退出桌面程序的证明。`session_id` 在子代理事件中可复用父会话 ID。文档列出的公共字段不足以验证本机桌面宿主进程及其所属配置。`UserPromptSubmit.prompt` 和 `Stop.last_assistant_message` 可含正文，不纳入此候选范围，也不打开 `transcript_path`。
+
+**结论：有正式入口，暂不实现。** 两份文档都未把上述行为绑定到具体桌面构建。开始实现前需取得对应版本的载荷与宿主身份依据，能区分桌面与 CLI、不同配置和子会话；首期至多承诺已核实的会话事件，不承诺持续在线、工作或完成。另起 App Server 不能证明观察到了用户已有桌面会话。
+
 ## 本地映射约束
 
 - [Claude normalize](../integrations/claude-hooks/normalize.ts) 精确保留白名单类别，未知值归 unknown、正文丢弃；[observations](../integrations/claude-hooks/observations.ts) 拒绝 child/旧会话/无关联 prompt，匹配 turn-failed 清近期反馈、保留通用错误未读。

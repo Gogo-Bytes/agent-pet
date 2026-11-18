@@ -18,11 +18,6 @@ import { providerLabels } from './home-projection.js';
 import './connections.css';
 const marks: Record<AgentConfiguration['provider'], IconName> = { pi: 'pi', codex: 'command', claude: 'flower', opencode: 'code', gemini: 'sparkles', cursor: 'diagonal' };
 export function AgentMark({ record }: { record: Pick<AgentConfiguration, 'provider'> }) { return <span className={`menu-agent-mark agent-${record.provider}`} aria-hidden="true"><Icon name={marks[record.provider]} /></span>; }
-const observationScope: Partial<Record<AgentConfiguration['provider'], string>> = {
-  pi: 'pi 0.85.1 TUI 用户扩展：可区分正在工作、整轮完成、错误和取消。重启 Agent Pet 后需手动恢复观察。',
-  claude: 'Claude Code 2.1.301（npm 原生程序）：可显示最近的工具活动和本轮已确认的错误；已连接不代表正在工作，工具结束也不代表整轮完成。',
-  codex: 'Codex CLI 0.163.0（独立安装）：首次任务活动后才可能显示在线。可显示最近的命令执行、文件修改和明确的取消，但不能判断整轮是否成功。',
-};
 const labels = { available: '位置可用', unchecked: '未检查', attention: '需要处理', unsupported: '暂不支持' };
 
 /** The configuration owns the action; expanding installations never moves that action. */
@@ -134,7 +129,6 @@ export function ConnectionsView({ visible, state, bridge, run, busy, error }: {
           <div className="cfg-content-scroll">{current ? <section className="cfg-detail" key={current.id}><button className="cfg-text-button cfg-mobile-back" onClick={() => setPage('library')}><Icon name="left" />我的连接</button>
             <Identity record={current} statusRef={statusHeadingRef} busy={busy} onRename={name => run(() => bridge.configurations.rename(current.id, name))} />
             <section className="cfg-receiving" aria-label="连接状态">{current.provider === 'codex' ? <CodexConnectionControls onScan={() => void detect(current.id)} statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} error={error} /> : current.provider === 'claude' ? <ClaudeConnectionControls statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} error={error} /> : <DeploymentControls statusHeadingRef={statusHeadingRef} visible={visible} record={current} api={bridge.configurations} run={run} busy={busy} error={error} />}</section>
-            {observationScope[current.provider] && <details className="cfg-more-options"><summary>可观察哪些状态？<Icon name="down" /></summary><p>{observationScope[current.provider]}</p></details>}
             <section className="cfg-location" aria-label="配置位置"><div className="cfg-location-path"><span className="cfg-folder-emblem"><Icon name="folder" size={20} /></span><code id="config-target-path" title={current.targetPath}>{current.targetPath}</code></div></section>
             <details className="cfg-more-options" open={current.availability === 'attention' || current.connection?.status === 'failed' || current.claude?.status === 'failed' || current.codex?.status === 'failed'}>
               <summary>更多操作<Icon name="down" /></summary>

@@ -11,6 +11,10 @@ export function inspectCodexExecutable(selected: string): string | null {
   return inspectCodexPath(selected, false);
 }
 
+export function inspectCodexHostExecutable(selected: string): string | null {
+  return inspectCodexPath(selected, true);
+}
+
 function inspectCodexPath(selected: string, allowDaemon: boolean): string | null {
   try {
     if (!isAbsolute(selected) || Buffer.byteLength(selected) > 4096 || /[\u0000-\u001f\u007f]/.test(selected)) return null;
@@ -49,19 +53,20 @@ function inspectCodexPath(selected: string, allowDaemon: boolean): string | null
 
 /** Same-version managed host selection, fixed metadata only. No server connection or transcript reads. */
 export function resolveCodexHostExecutable(cli: string, configurationDirectory: string,
-  inspect: (path: string) => string | null = inspectCodexExecutable): string | null {
+  inspectHost: (path: string) => string | null = inspectCodexHostExecutable): string | null {
   const exists = (path: string): boolean => { try { fs.lstatSync(path); return true; }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; } };
   try {
     const dedicated = join(configurationDirectory, 'packages/app-server-daemon/current');
     if (exists(dedicated)) {
       const daemonPath = join(dedicated, exists(join(dedicated, 'codex')) && !exists(join(dedicated, 'bin/codex')) ? 'codex' : 'bin/codex');
-      return codexExecutableLayout(daemonPath) === 'app-server-daemon' ? inspectCodexPath(daemonPath, true) : inspect(daemonPath);
+      return inspectHost(daemonPath);
     }
     const state = join(configurationDirectory, 'app-server-daemon');
     if (['app-server.pid', 'app-server.stderr.log', 'app-server-updater.pid', 'app-server-updater.stderr.log'].some(name => exists(join(state, name)))) {
       const root = join(configurationDirectory, 'packages/standalone/current');
-      return inspect(join(root, 'bin/codex')) ?? inspect(join(root, 'codex'));
+      const host = inspectHost(join(root, 'bin/codex')) ?? inspectHost(join(root, 'codex'));
+      return host && codexExecutableLayout(host) === 'standalone' ? host : null;
     }
     // Fresh no-daemon installation remains bindable; a future different daemon binary is never guessed.
     return cli;

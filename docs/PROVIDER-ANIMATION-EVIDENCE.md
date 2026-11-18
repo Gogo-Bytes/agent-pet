@@ -45,9 +45,9 @@ OpenAI 的[插件打包说明](https://developers.openai.com/plugins/build/plugi
 
 按[官方事件字段](https://learn.chatgpt.com/docs/hooks)，可先评估只订阅 `SessionStart` / `SessionEnd`：前者的 `source` 可为恢复、清空或压缩，不能一律算新任务；后者不是成功或退出桌面程序的证明。`session_id` 在子代理事件中可复用父会话 ID。文档列出的公共字段不足以验证本机桌面宿主进程及其所属配置。`UserPromptSubmit.prompt` 和 `Stop.last_assistant_message` 可含正文，不纳入此候选范围，也不打开 `transcript_path`。
 
-**结论：有正式入口，暂不实现。** 两份文档都未把上述行为绑定到具体桌面构建。开始实现前需取得对应版本的载荷与宿主身份依据，能区分桌面与 CLI、不同配置和子会话；首期至多承诺已核实的会话事件，不承诺持续在线、工作或完成。另起 App Server 不能证明观察到了用户已有桌面会话。
+**接入按已授权的 Codex 配置，不区分桌面与 CLI。** 通过该配置的接收凭据和原生进程校验后，事件沿用 Codex 映射及桌宠绑定；不因缺少客户端标签拒绝，也不把会话事件当作持续工作或任务完成。另起 App Server 不能证明观察到了用户已有桌面会话。
 
-**具体版本核对（macOS）**：[上游用户报告 #25293](https://github.com/openai/codex/issues/25293)列出 App `26.601.21317`（build `3511`）及内置 CLI `0.136.0-alpha.2`。这是设置页现场报告，不是官方发行映射或事件执行验收。对应 tag 的 [SessionStart 序列化结构](https://github.com/openai/codex/blob/rust-v0.136.0-alpha.2/codex-rs/hooks/src/schema.rs#L485-L516)只有 `session_id`、`transcript_path`、`cwd`、`hook_event_name`、`model`、`permission_mode`、`source`；[发送实现](https://github.com/openai/codex/blob/rust-v0.136.0-alpha.2/codex-rs/hooks/src/events/session_start.rs)中 `source` 表示启动、恢复、清空或压缩，不是客户端来源。该载荷没有提示正文，但也没有当前客户端、宿主进程或配置身份。故不能单凭它把恢复的会话分配给桌面宠物；不读取 transcript 来补身份。后续只在取得独立且可信的宿主与配置归属证据时恢复实现。
+**具体版本核对（macOS）**：[上游用户报告 #25293](https://github.com/openai/codex/issues/25293)列出 App `26.601.21317`（build `3511`）及内置 CLI `0.136.0-alpha.2`。这是设置页现场报告，不是官方发行映射或事件执行验收。对应 tag 的 [SessionStart 序列化结构](https://github.com/openai/codex/blob/rust-v0.136.0-alpha.2/codex-rs/hooks/src/schema.rs#L485-L516)只有 `session_id`、`transcript_path`、`cwd`、`hook_event_name`、`model`、`permission_mode`、`source`；[发送实现](https://github.com/openai/codex/blob/rust-v0.136.0-alpha.2/codex-rs/hooks/src/events/session_start.rs)中 `source` 表示启动、恢复、清空或压缩，不是客户端来源。该载荷没有提示正文，但也没有当前客户端、宿主进程或配置身份。归属以接收端校验的配置为准，不读取 transcript 来猜测客户端。该版本的桌面事件是否送达本产品尚未验收。
 
 ## 候选宿主：Antigravity App（非 IDE）
 

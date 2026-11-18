@@ -4,7 +4,7 @@ import type { SessionObservation } from '@agent-pet/domain';
 import type { CodexConnectionState } from '../shared/codex-connection.js';
 import { CodexNormalObserver } from './codex-normal-observer.js';
 import { CodexRegistrationStore } from './codex-registration-store.js';
-import { inspectCodexExecutable, resolveCodexHostExecutable } from './codex-executable.js';
+import { inspectCodexExecutable, inspectCodexHostExecutable, resolveCodexHostExecutable } from './codex-executable.js';
 import { createCodexNormalHookDocument, codexHookEvents } from '../../../../integrations/codex-hooks/hook-source.js';
 import { prepareCodexUserHook, revalidateCodexUserHook, applyCodexUserHook, inspectCodexUserHook, withdrawCodexUserHook, type CodexHookPlan } from './codex-user-hook.js';
 export interface CodexConnectionOptions {
@@ -68,7 +68,7 @@ export class CodexConnection {
       if (!chosen) { this.notice = 'rescan-required'; return this.snapshot(); }
       const inspect = this.options.inspectExecutable ?? inspectCodexExecutable;
       const cli = inspect(chosen);
-      const executable = cli && resolveCodexHostExecutable(cli, this.options.targetDirectory, inspect);
+      const executable = cli && resolveCodexHostExecutable(cli, this.options.targetDirectory, this.options.inspectExecutable);
       if (!cli || !executable) { this.notice = 'unsupported-installation'; return this.snapshot(); }
       const hook = prepareCodexUserHook(this.options.targetDirectory, this.document());
       const { nativeHook: source } = await this.options.runtimeAssets();
@@ -76,7 +76,7 @@ export class CodexConnection {
       if (!source || Buffer.byteLength(source) > 512 * 1024) throw new Error();
       const current = await this.discover?.();
       if (this.closed || generation !== this.generation) return this.snapshot();
-      if (current !== chosen || inspect(chosen) !== cli || resolveCodexHostExecutable(cli, this.options.targetDirectory, inspect) !== executable) {
+      if (current !== chosen || inspect(chosen) !== cli || resolveCodexHostExecutable(cli, this.options.targetDirectory, this.options.inspectExecutable) !== executable) {
         this.notice = 'rescan-required'; return this.snapshot();
       }
       if (hook.canApply) {
@@ -98,8 +98,8 @@ export class CodexConnection {
     let failure: 'save-failed' | 'rescan-required' = 'save-failed';
     const revalidate = (chosen: string | null | undefined) => {
       const inspect = this.options.inspectExecutable ?? inspectCodexExecutable;
-      if (!chosen || inspect(chosen) !== plan.cli || resolveCodexHostExecutable(plan.cli, this.options.targetDirectory, inspect) !== plan.executable ||
-          inspect(plan.executable) !== plan.executable) { this.discover = undefined; failure = 'rescan-required'; throw new Error(); }
+      if (!chosen || inspect(chosen) !== plan.cli || resolveCodexHostExecutable(plan.cli, this.options.targetDirectory, this.options.inspectExecutable) !== plan.executable ||
+          (this.options.inspectExecutable ?? inspectCodexHostExecutable)(plan.executable) !== plan.executable) { this.discover = undefined; failure = 'rescan-required'; throw new Error(); }
       const freshness = revalidateCodexUserHook(plan.hook);
       if (freshness === 'stale') { this.discover = undefined; failure = 'rescan-required'; }
       if (freshness !== 'current') throw new Error();
@@ -128,7 +128,7 @@ export class CodexConnection {
     try {
       const saved = this.store.read();
       if (!saved || saved.removed || !this.validOwnership(saved.ownership.command) || !inspectCodexUserHook(saved.ownership) ||
-          (this.options.inspectExecutable ?? inspectCodexExecutable)(saved.executable) !== saved.executable) throw new Error();
+          (this.options.inspectExecutable ?? inspectCodexHostExecutable)(saved.executable) !== saved.executable) throw new Error();
       this.observer = this.createObserver(saved.executable);
       if (!await this.observer.restore() || this.closed || !this.store.update(false)) throw new Error();
       this.status = 'waiting'; this.notice = 'none';

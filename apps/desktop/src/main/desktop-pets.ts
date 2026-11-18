@@ -40,9 +40,22 @@ export function createDesktopPets(options: {
   function preferences(pet: DesktopPet): Preferences {
     return { ...options.preferences(), petAssetId: pet.configuration.pet!.assetId, petName: pet.configuration.pet!.name };
   }
-  function updateHitPolicy(pet: DesktopPet): void {
+  const visiblePets = new Set<DesktopPet>();
+  let hitTimer: NodeJS.Timeout | undefined;
+  function startPolling(pet: DesktopPet): void {
+    visiblePets.add(pet);
+    updateHitPolicy(pet);
+    hitTimer ??= setInterval(() => {
+      const point = screen.getCursorScreenPoint();
+      for (const visible of visiblePets) updateHitPolicy(visible, point);
+    }, 50).unref();
+  }
+  function stopPolling(pet: DesktopPet): void {
+    visiblePets.delete(pet);
+    if (!visiblePets.size) { clearInterval(hitTimer); hitTimer = undefined; }
+  }
+  function updateHitPolicy(pet: DesktopPet, point = screen.getCursorScreenPoint()): void {
     if (pet.window.isDestroyed() || !pet.overlay) return;
-    const point = screen.getCursorScreenPoint();
     const local = { x: point.x - pet.overlay.bounds.x, y: point.y - pet.overlay.bounds.y };
     const ignoresMouse = !overlayHit(pet.overlay, local, pet);
     if (pet.ignoresMouse === ignoresMouse) return;
@@ -69,7 +82,10 @@ export function createDesktopPets(options: {
       interacting: false, controlsVisible: false, bubblesVisible: false, bubblesExpanded: false };
     pets.set(configuration.id, pet);
     const restoreLayer = () => applyPetWindowLayer(window, options.preferences().topmost);
-    restoreLayer(); window.on('show', restoreLayer); window.on('restore', restoreLayer);
+    restoreLayer();
+    window.on('show', () => { restoreLayer(); startPolling(pet); });
+    window.on('hide', () => stopPolling(pet));
+    window.on('restore', restoreLayer);
     window.setResizable(false);
     let rendererRecoveryAttempts = 0;
     const resetPresentation = () => {
@@ -88,7 +104,10 @@ export function createDesktopPets(options: {
     window.on('close', event => {
       if (!options.isQuitting()) { event.preventDefault(); options.hide(); }
     });
-    window.on('closed', () => { if (pets.get(configuration.id) === pet) pets.delete(configuration.id); });
+    window.on('closed', () => {
+      stopPolling(pet);
+      if (pets.get(configuration.id) === pet) pets.delete(configuration.id);
+    });
     loadTrustedEntry(window, join(options.directory, '../renderer/index.html'), options.developmentUrl);
     updateOverlay(pet);
     return pet;
@@ -125,7 +144,6 @@ export function createDesktopPets(options: {
     },
     publishSessions(): void { for (const pet of pets.values()) pet.window.webContents.send('pet:snapshot', sessions(pet)); },
     updateLayouts(): void { for (const pet of pets.values()) updateOverlay(pet); },
-    updateHitPolicies(): void { for (const pet of pets.values()) updateHitPolicy(pet); },
     requestSnapshot(event: Electron.IpcMainInvokeEvent): void { const pet = trusted(event); publish(pet); updateOverlay(pet); },
     presentation(event: Electron.IpcMainInvokeEvent, key: 'interacting' | 'controlsVisible' | 'bubblesVisible' | 'bubblesExpanded', value: unknown): void {
       const pet = trusted(event);

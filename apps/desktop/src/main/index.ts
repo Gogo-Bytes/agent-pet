@@ -101,9 +101,6 @@ function startPrimaryInstance(): void {
   app.whenReady().then(() => {
     screen.on('display-removed', pets.updateLayouts);
     screen.on('display-metrics-changed', pets.updateLayouts);
-    const hitTimer = setInterval(pets.updateHitPolicies, 50);
-    hitTimer.unref();
-    app.once('will-quit', () => clearInterval(hitTimer));
     management = createManagement({
       sessions: () => application.snapshot(),
       pi: { adapter: piAdapter, publish: observation => application.observe(observation), developmentEnvironment },
@@ -112,7 +109,7 @@ function startPrimaryInstance(): void {
         currentPreferences = preferences; pets.applyPreferences();
       },
       stop: async () => {
-        clearInterval(hitTimer); pets.close();
+        pets.close();
         await adapterStart;
         await piHandle?.stop();
       },

@@ -14,6 +14,7 @@ import { overlayHit } from './overlay-hit.js';
 type DesktopPet = {
   window: BrowserWindow; configuration: AgentConfiguration; anchor: Rect; overlay?: OverlayLayout;
   interacting: boolean; controlsVisible: boolean; bubblesVisible: boolean; bubblesExpanded: boolean;
+  ignoresMouse?: boolean;
 };
 
 /** Each bound online configuration owns its native geometry, hit policy and routed Sessions. */
@@ -43,8 +44,10 @@ export function createDesktopPets(options: {
     if (pet.window.isDestroyed() || !pet.overlay) return;
     const point = screen.getCursorScreenPoint();
     const local = { x: point.x - pet.overlay.bounds.x, y: point.y - pet.overlay.bounds.y };
-    const hit = overlayHit(pet.overlay, local, pet);
-    pet.window.setIgnoreMouseEvents(!hit, { forward: true });
+    const ignoresMouse = !overlayHit(pet.overlay, local, pet);
+    if (pet.ignoresMouse === ignoresMouse) return;
+    pet.window.setIgnoreMouseEvents(ignoresMouse, { forward: true });
+    pet.ignoresMouse = ignoresMouse;
   }
   function updateOverlay(pet: DesktopPet): void {
     if (pet.window.isDestroyed()) return;

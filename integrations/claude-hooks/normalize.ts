@@ -27,8 +27,8 @@ export type ClaudeHookResult =
 const events = new Set(['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
   'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact']);
 const toolActivities = new Map<string, ClaudeToolActivity>([
-  ['Read', 'reading'], ['Write', 'writing'], ['Edit', 'writing'], ['MultiEdit', 'writing'],
-  ['NotebookEdit', 'writing'], ['Grep', 'searching'], ['Glob', 'searching'], ['Bash', 'executing'],
+  ['Read', 'reading'], ['WebFetch', 'reading'], ['Write', 'writing'], ['Edit', 'writing'], ['MultiEdit', 'writing'],
+  ['NotebookEdit', 'writing'], ['Grep', 'searching'], ['Glob', 'searching'], ['WebSearch', 'searching'], ['Bash', 'executing'],
 ]);
 const invalidFields = { status: 'invalid', reason: 'fields' } as const;
 function identifier(value: unknown): value is string {

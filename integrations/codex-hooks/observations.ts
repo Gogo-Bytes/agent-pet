@@ -4,7 +4,7 @@ import type { CodexHookFact } from './normalize.js';
 export const CODEX_FEEDBACK_MS = 2000;
 type Session = {
   id: string; revision: number; connected: boolean; ended: boolean; saturated: boolean;
-  turn?: string; work?: string; interrupted: boolean; turns: Set<string>; tools: Set<string>;
+  turn?: string; work?: string; compactedTurn?: string; interrupted: boolean; turns: Set<string>; tools: Set<string>;
   capabilities: ObservationCapabilities; feedback?: CompanionFacts; timer?: ReturnType<typeof setTimeout>;
 };
 type Run = { retired: boolean; sessions: Map<string, Session> };
@@ -93,8 +93,11 @@ export function createCodexObservations(options: {
         feedback(runId, session, { activities: [], waitingForInput: false,
           recentActivity: { id: randomUUID(), kind: fact.activity } });
       } else if (fact.kind === 'compact-finished') {
-        // No native compaction occurrence ID: avoid replayable visual effects for this event.
-        clear(session); emit(runId, session);
+        // PostCompact has no occurrence ID. Coalesce all completions in this turn.
+        if (session.compactedTurn === fact.turnId) return;
+        session.compactedTurn = fact.turnId; session.capabilities.compacting = 'supported';
+        feedback(runId, session, { activities: [], waitingForInput: false,
+          recentActivity: { id: randomUUID(), kind: 'compacting' } });
       } else if (fact.kind === 'stop-requested') {
         clear(session); emit(runId, session);
       }

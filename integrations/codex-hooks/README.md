@@ -92,6 +92,7 @@ consumers cannot interrupt remaining cleanup. Publication is best-effort, not a 
 
 - Canonical Bash and apply_patch results give2-second recent executing/writing feedback,
   not proof the tool is still running. Unknown tools stay other, without command parsing.
+- PostCompact gives recent compaction feedback at most once per matching root turn. Multiple completions share the same turn ID; no separate compaction ID is available.
 - Explicit root Interrupt produces a cancellation occurrence; session exit does not.
 - Submission, PreToolUse, approval checks, compaction requests and Stop do not establish
   sustained working/waiting/compacting or completed-unread. Tool return is not task success.

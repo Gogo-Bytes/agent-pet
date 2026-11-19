@@ -4,7 +4,7 @@ import type { ClaudeHookFact } from './normalize.js';
 
 type Session = {
   nativeId: string; id: string; revision: number; connected: boolean;
-  prompt?: string; work?: string; failed: boolean; ended: boolean; saturated: boolean;
+  prompt?: string; work?: string; compactedPrompt?: string; failed: boolean; ended: boolean; saturated: boolean;
   prompts: Set<string>; tools: Set<string>; capabilities: ObservationCapabilities;
   feedback?: CompanionFacts; timer?: ReturnType<typeof setTimeout>;
 };
@@ -94,6 +94,12 @@ export function createClaudeObservations(options: {
           const kind: ActivityKind = fact.activity; session.capabilities[kind] = 'supported';
           feedback(runId, session, { activities: [], waitingForInput: false, recentActivity: { id: randomUUID(), kind } });
         }
+      } else if (fact.kind === 'compact-finished' && !session.failed) {
+        // PostCompact has no occurrence ID. Coalesce all completions for this prompt.
+        if (session.compactedPrompt === fact.promptId) return;
+        session.compactedPrompt = fact.promptId; session.capabilities.compacting = 'supported';
+        feedback(runId, session, { activities: [], waitingForInput: false,
+          recentActivity: { id: randomUUID(), kind: 'compacting' } });
       } else if (fact.kind === 'turn-failed' && !session.failed) {
         clear(session); session.failed = true; emit(runId, session);
       } else if (fact.kind === 'response-stopped') {

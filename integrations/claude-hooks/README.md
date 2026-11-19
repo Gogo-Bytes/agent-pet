@@ -98,10 +98,11 @@ complete the parent.
 | UserPromptSubmit | Associate prompt, not proven execution |
 | PreToolUse / PermissionRequest | Requested tool / approval check; no fabricated tool ID or running state |
 | Notification.permission_prompt | Reminder, not paired sustained waiting; idle_prompt does not prove waiting |
-| PostToolUse | Matching current prompt/tool: Read, Write/Edit/MultiEdit/NotebookEdit, Grep/Glob or Bash give2-second recent feedback, not sustained work or turn completion |
+| PostToolUse | Matching current prompt/tool: Read/WebFetch, Write/Edit/MultiEdit/NotebookEdit, Grep/Glob/WebSearch or Bash give 2-second recent feedback, not sustained work or turn completion |
 | PostToolUseFailure | tool_error only with is_interrupt explicitly false; missing/true does not imply whole-turn cancellation |
 | StopFailure | Matching known prompt gives generic error/unread; unknown category stays unknown, no body parsing |
-| Stop / PreCompact / PostCompact | Clear/associate facts as supported, not whole-task success or ongoing compaction |
+| Stop / PreCompact | Neither proves whole-task success or ongoing compaction |
+| PostCompact | Recent compaction feedback at most once per matching root prompt, not ongoing activity |
 | SessionEnd / OS exit / pause | Clear feedback/observation at the appropriate identity layer, not success/failure/cancellation |
 
 No supported completion, whole-turn cancellation, thinking/responding, sustained waiting

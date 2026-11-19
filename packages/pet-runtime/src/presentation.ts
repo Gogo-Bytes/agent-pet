@@ -16,9 +16,13 @@ function recentActivity(record: SessionRecord) {
 export function projectPetPresentation(state: SessionState): PetPresentation {
   const records = Object.values(state.sessions).filter(record => record.connected !== false && record.status !== 'offline')
     .sort((a, b) => b.observedAt.localeCompare(a.observedAt) || a.sessionId.localeCompare(b.sessionId));
-  const working = records.find(record => sustained(record) !== 'idle' || recentActivity(record));
-  const bubble = state.bubbles.find(item => item.status === 'working') ?? state.bubbles.find(item => item.status === 'error-unread') ?? state.bubbles.find(item => item.status === 'completed-unread');
-  const record = working ?? records.find(item => item.sessionId === bubble?.sessionId) ?? records[0];
+  const record = records.find(item => {
+    const event = item.facts?.occurrence;
+    return sustained(item) !== 'idle' || recentActivity(item) || (event && item.capabilities?.[event.kind] === 'supported');
+  });
+  // The domain appends updated bubbles. Preserve severity, newest update first within each kind.
+  const bubbles = [...state.bubbles].reverse();
+  const bubble = bubbles.find(item => item.status === 'working') ?? bubbles.find(item => item.status === 'error-unread') ?? bubbles.find(item => item.status === 'completed-unread');
   const active = records.find(item => sustained(item) !== 'idle');
   const restAction = active ? sustained(active) : bubble?.status === 'working' ? 'working' : 'idle';
   if (record) {

@@ -15,6 +15,8 @@
 | [Codex CLI 0.163.0](integrations/codex-hooks/README.md)，standalone 安装，通过 hooks 观察 | 首轮收到已验证事件后才可能出现桌宠；Bash 和 `apply_patch` 返回后可显示执行或写入反馈，当前轮次压缩完成可短暂提示，根会话显式中断可显示取消。 | 打开空 CLI 不保证立即在线；不能推断持续工作、等待、整轮成功或一般命令、模型错误。 |
 | [Codex 桌面内置程序](integrations/codex-hooks/README.md)，仅限已核对的 macOS `ChatGPT.app` 签名布局（外层版本 `26.1111.21308`） | 接收端只接受所选配置的 `SessionStart` / `SessionEnd`，并校验发送进程。 | 会话结束不代表任务成功或应用退出；不能套用上一行 CLI 的工具和取消反馈。 |
 
+Claude 的网页读取和搜索依赖新版观察插件或 hook 发送程序。已有任务事件连接原位恢复时不会替换已安装的发送程序；只升级 Agent Pet 不会让旧发送程序识别这两个工具。压缩完成反馈使用既有事件，不要求为此重装。
+
 **尚未实测的入口：** Claude 用户级插件的真实事件送达、Claude Desktop 本地 Code 会话，以及 Codex 桌面内置程序的事件送达。Codex 的 hook 需用户在宿主中审阅并信任；尚未实测 CLI 和 Desktop 首次配置时是否主动显示审阅入口。
 
 **重启与下一轮：** Agent Pet 重启后，pi 配置需要显式恢复观察；重新连接时上报当前状态，不补播离线期间的完成事件。Claude 和 Codex 的未暂停配置自动恢复观察，下一轮只依据新收到的匹配事件。三者都不能从桌宠保证跳回原终端会话。动画还取决于绑定宠物包的映射；具体信号见[触发能力对照](docs/PET-TRIGGER-AUDIT.md)。

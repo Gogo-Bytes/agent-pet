@@ -51,14 +51,18 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
 
     function target(value: string, replay: string | number = 0, feedback: PetInteraction | null = null): Target {
       const requested = normalizePetAction(value);
-      const oneShot = requested !== undefined && petActionCatalog[requested].playback === 'once';
+      const cue = typeof replay === 'string' && replay ? replay : undefined;
+      const oneShot = !!cue || (requested !== undefined && petActionCatalog[requested].playback === 'once');
       const animation = resolvePetAnimation(value, mappings, names);
-      const cue = typeof replay === 'string' && replay && oneShot ? replay : undefined;
+      // A recent tool event without its own clip is not evidence of ongoing work.
+      if (cue && requested && petActionCatalog[requested].playback === 'loop' && animation?.action !== requested) {
+        return { ...target(input.current.restAction), cue };
+      }
       // A missing transient must not interrupt current work with the idle fallback.
       if (oneShot && input.current.restAction !== value && input.current.restAction !== 'idle' && (!animation || animation.action === 'idle')) {
         return { ...target(input.current.restAction), ...(cue ? { cue } : {}) };
       }
-      const once = animation?.playback === 'once' || (oneShot && animation?.action === 'attention');
+      const once = animation?.playback === 'once' || (oneShot && (animation?.action === requested || animation?.action === 'attention'));
       return { animation, once, local: feedback,
         key: `${animation?.action ?? 'static'}:${once ? value : 'loop'}:${typeof replay === 'number' && replay !== 0 ? replay : cue ?? ''}`,
         ...(cue ? { cue } : {}) };
@@ -143,7 +147,7 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
           } else {
             completedKey = current.key;
             displayedCue = undefined;
-            enter(target(input.current.restAction));
+            enter(desired());
           }
         }
       });
@@ -153,7 +157,8 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
       if (current?.once) completedKey = current.key;
       displayedCue = undefined;
       const request = normalizePetAction(input.current.request);
-      enter(target(request && request !== 'dragging' && petActionCatalog[request].playback === 'loop' ? request : input.current.restAction), true);
+      const eventRequest = typeof input.current.replay === 'string' && input.current.replay !== '';
+      enter(target(!eventRequest && request && request !== 'dragging' && petActionCatalog[request].playback === 'loop' ? request : input.current.restAction), true);
     }
     const visibility = () => { if (document.hidden) cancel(); };
     mixer.addEventListener('finished', finished);

@@ -1,26 +1,35 @@
 import type { ActivityKind, SessionRecord, SessionState } from '@agent-pet/domain';
 import type { PetAction } from './actions.js';
+/** A nonempty replay identifies a one-shot event, never a sustained activity. */
 export type PetPresentation = { action: PetAction; restAction: PetAction; replay: string };
 const priority: readonly ActivityKind[] = ['compacting', 'executing', 'writing', 'searching', 'reading', 'thinking', 'responding', 'retrying'];
-function current(record: SessionRecord): PetAction {
+function sustained(record: SessionRecord): PetAction {
   if (record.facts?.waitingForInput && record.capabilities?.waiting_input === 'supported') return 'waiting_input';
-  const activity = priority.find(kind => record.capabilities?.[kind] === 'supported' && record.facts?.activities.includes(kind));
+  return priority.find(kind => record.capabilities?.[kind] === 'supported' && record.facts?.activities.includes(kind)) ??
+    (record.status === 'working' ? 'working' : 'idle');
+}
+function recentActivity(record: SessionRecord) {
   const recent = record.facts?.recentActivity;
-  if (!activity && recent && record.capabilities?.[recent.kind] === 'supported') return recent.kind;
-  return activity ?? (record.status === 'working' ? 'working' : 'idle');
+  return recent && record.capabilities?.[recent.kind] === 'supported' ? recent : undefined;
 }
 /** One projection for desktop and home; capabilities constrain fine facts, never unread results. */
 export function projectPetPresentation(state: SessionState): PetPresentation {
   const records = Object.values(state.sessions).filter(record => record.connected !== false && record.status !== 'offline')
     .sort((a, b) => b.observedAt.localeCompare(a.observedAt) || a.sessionId.localeCompare(b.sessionId));
-  const working = records.find(record => record.status === 'working' || current(record) !== 'idle');
+  const working = records.find(record => sustained(record) !== 'idle' || recentActivity(record));
   const bubble = state.bubbles.find(item => item.status === 'working') ?? state.bubbles.find(item => item.status === 'error-unread') ?? state.bubbles.find(item => item.status === 'completed-unread');
-  const base: PetAction = working ? current(working) : bubble?.status === 'working' ? 'working' : bubble?.status === 'error-unread' ? 'error' : bubble ? 'success' : 'idle';
   const record = working ?? records.find(item => item.sessionId === bubble?.sessionId) ?? records[0];
-  const event = record?.facts?.occurrence;
-  // A small tool failure does not turn a running task into a terminal error.
-  const occurrence = event && record?.capabilities?.[event.kind] === 'supported' ? event : undefined;
-  const action = occurrence?.kind ?? base;
-  return { action, restAction: occurrence ? (base === 'error' || base === 'success' ? 'idle' : base) : 'idle',
-    replay: occurrence ? `${record!.sessionId}:${occurrence.id}` : record?.facts?.recentActivity && record.capabilities?.[record.facts.recentActivity.kind] === 'supported' ? `${record.sessionId}:${record.facts.recentActivity.id}` : (base === 'error' || base === 'success') ? `${bubble?.sessionId}:${bubble ? state.sessions[bubble.sessionId]?.workId ?? 'legacy' : 'legacy'}:${base}` : '' };
+  const active = records.find(item => sustained(item) !== 'idle');
+  const restAction = active ? sustained(active) : bubble?.status === 'working' ? 'working' : 'idle';
+  if (record) {
+    const event = record.facts?.occurrence;
+    if (event && record.capabilities?.[event.kind] === 'supported') return { action: event.kind, replay: `${record.sessionId}:${event.id}`, restAction };
+    const recent = recentActivity(record), current = sustained(record);
+    if (recent && (current === 'idle' || current === 'working')) return { action: recent.kind, replay: `${record.sessionId}:${recent.id}`, restAction };
+  }
+  if (restAction === 'idle' && bubble && (bubble.status === 'error-unread' || bubble.status === 'completed-unread')) {
+    const action = bubble.status === 'error-unread' ? 'error' : 'success';
+    return { action, restAction, replay: `${bubble.sessionId}:${state.sessions[bubble.sessionId]?.workId ?? 'legacy'}:${action}` };
+  }
+  return { action: restAction, restAction, replay: '' };
 }

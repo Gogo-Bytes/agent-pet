@@ -64,7 +64,9 @@ export function createDesktopPets(options: {
   }
   function updateOverlay(pet: DesktopPet): void {
     if (pet.window.isDestroyed()) return;
-    pet.overlay = layoutOverlay(pet.anchor, screen.getDisplayMatching(pet.anchor).workArea);
+    const area = screen.getDisplayMatching(pet.anchor).workArea;
+    const size = options.preferences().petSize;
+    pet.overlay = layoutOverlay({ ...pet.anchor, width: size, height: size }, area);
     pet.anchor = pet.overlay.anchor;
     pet.window.setBounds(pet.overlay.bounds);
     pet.window.webContents.send('pet:layout', pet.overlay);
@@ -134,7 +136,6 @@ export function createDesktopPets(options: {
     applyPreferences(): void {
       for (const pet of pets.values()) {
         const next = options.preferences();
-        pet.anchor.width = next.petSize; pet.anchor.height = next.petSize;
         updateOverlay(pet); applyPetWindowLayer(pet.window, next.topmost);
         pet.window.webContents.send('pet:preferences', preferences(pet));
         if (next.petVisible !== pet.window.isVisible()) {

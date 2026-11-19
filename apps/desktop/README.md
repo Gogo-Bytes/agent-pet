@@ -72,9 +72,12 @@ desktop app.
 AGENT_PET_BUILD_DIR=/tmp/agent-pet-build-unique pnpm package:mac
 ```
 
-The script builds an arm64 `Agent Pet.app` outside the source tree and refuses a
-nonempty output directory. It does not publish or install the app. No signing
-identity is configured, so this local package is not a signed or notarized release.
+On macOS this produces two local bundles: `mac-arm64/Agent Pet.app` for Apple Silicon
+and `mac/Agent Pet.app` for Intel. The script refuses a nonempty output directory
+and checks the native architecture of the main executable, Electron framework and
+process probe in both bundles. macOS 11.0 is the deployment target, not a verified
+minimum for every feature. Packaging does not install, publish, use a Developer ID
+certificate or request notarization.
 
 ## Native window acceptance
 

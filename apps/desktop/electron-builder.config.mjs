@@ -27,7 +27,9 @@ export default {
     '!electron-builder.config.mjs',
   ],
   mac: {
-    target: [{ target: 'dir', arch: ['arm64'] }],
+    target: [{ target: 'dir', arch: ['arm64', 'x64'] }],
+    minimumSystemVersion: '11.0',
+    identity: null,
     category: 'public.app-category.utilities',
     hardenedRuntime: false,
   },

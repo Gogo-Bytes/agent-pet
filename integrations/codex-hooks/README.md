@@ -69,8 +69,9 @@ with16 peers/queued checks and a1500ms absolute deadline; stop fences late valid
 throwing away tombstones. Every event is independently host-verified. Host death/PID reuse
 clears it; daemon liveness alone does not prove any CLI window or Session is online.
 
-A first verified non-startup fact may establish an unknown baseline, not a fabricated
-SessionStart or success. An empty CLI does not promise an immediate Pet. For0.163.0,
+A first verified non-startup fact may establish an unknown baseline and seed its native
+turn ID if supplied. This admits a previously unobserved session; it does not replace
+an existing session's turn or fabricate SessionStart or success. An empty CLI does not promise an immediate Pet. For0.163.0,
 SessionStart is [queued at session creation](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/session.rs#L1954)
 and [drained in the first turn](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/turn.rs#L333),
 with a [first-turn ordering test](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/tests/suite/hooks.rs#L1580).
@@ -92,7 +93,15 @@ consumers cannot interrupt remaining cleanup. Publication is best-effort, not a 
 
 - `Bash` and `apply_patch` result names give 2-second recent executing/writing feedback,
   not proof of success, continued execution or the emitting runtime's identity. Other names stay `other`.
-- PostCompact gives recent compaction feedback at most once per matching root turn. Multiple completions share the same turn ID; no separate compaction ID is available.
+- In standalone 0.163.0, [manual `/compact` creates a new turn with no prompt input](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/handlers.rs#L247-L254), and [pre-sampling auto-compaction runs before input hooks](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/turn.rs#L189-L204). Like UserPromptSubmit, a root PreCompact
+  for a new turn starts a fresh work ID, not an activity signal. PostCompact or Interrupt
+  with that turn ID belongs to the new work, never the previous task. A subsequent submit
+  for the same turn keeps its work ID and does not reset cancellation or feedback.
+- PostCompact gives 2-second recent compaction feedback at most once per current root turn;
+  there is no separate compaction ID. Neither PostCompact nor Interrupt switches turns.
+  For example, with A current, a PostCompact for B arriving before PreCompact or submit
+  for B is dropped, not buffered: turn IDs establish identity, not chronology. After
+  switching to B, a late PreCompact, PostCompact or submit for A cannot revive A.
 - Explicit root Interrupt produces a cancellation occurrence; session exit does not.
 - Submission, PreToolUse, approval checks, compaction requests and Stop do not establish
   sustained working/waiting/compacting or completed-unread. Tool return is not task success.

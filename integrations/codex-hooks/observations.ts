@@ -72,7 +72,8 @@ export function createCodexObservations(options: {
       if (!session || session.ended) return;
       if (fact.kind === 'session-ended') { disconnect(runId, session); return; }
       if (session.saturated) return;
-      if (fact.kind === 'turn-submitted') {
+      // A root PreCompact can precede (or replace) submit. It identifies the turn, not activity.
+      if (fact.kind === 'turn-submitted' || fact.kind === 'compact-requested') {
         if (session.turns.has(fact.turnId)) return;
         if (session.turns.size >= 256) { session.saturated = true; clear(session); emit(runId, session); return; }
         clear(session); session.turns.add(fact.turnId); session.turn = fact.turnId;

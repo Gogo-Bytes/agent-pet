@@ -79,6 +79,26 @@ process probe in both bundles. macOS 11.0 is the deployment target, not a verifi
 minimum for every feature. Packaging does not install, publish, use a Developer ID
 certificate or request notarization.
 
+### Manual replacement and removal
+
+Put the matching bundle in a stable location before configuring connections. Claude
+and Codex observer commands contain the absolute path to the executable inside
+`Agent Pet.app`. Launching each new build from a different temporary directory is
+not an in-place upgrade, even when the app name and bundle identifier match.
+
+To upgrade, quit Agent Pet (closing its window is not enough), replace only the
+`.app` at the same path, then open that copy. Keep the existing user data: it holds
+preferences, imported assets, bindings and connection records outside the bundle.
+Check those records before setting anything up again. A saved connection is not
+proof of delivery; confirm it with a new event. If restore reports changed files,
+leave them in place rather than reinstalling a hook over them.
+
+To uninstall and withdraw observation, first remove the intended connections from
+Agent Pet while it is still at the configured path. If removal reports retained
+material, do not treat it as a complete withdrawal. Quitting or deleting the app
+alone does not remove external hooks or pi extensions. Do not delete the entire
+user data directory to clean up a single connection.
+
 ## Native window acceptance
 
 Check the version and relevant changes before repeating an earlier acceptance.

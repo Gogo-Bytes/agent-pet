@@ -13,18 +13,18 @@ export default {
     app: resolve('apps/desktop'),
     output: process.env.AGENT_PET_BUILD_DIR ?? resolve('dist/agent-pet-local'),
   },
-  extraResources: ['claude-runtime', 'codex-runtime'].map(name => ({
-    from: resolve('apps/desktop/out', name), to: 'out/' + name,
-  })),
+  extraResources: [
+    { from: resolve('apps/desktop/out/claude-runtime'), to: 'out/claude-runtime', filter: ['hook.cjs', 'launcher.cjs', 'native-hook.cjs', 'process-probe'] },
+    { from: resolve('apps/desktop/out/codex-runtime'), to: 'out/codex-runtime', filter: ['native-hook.cjs'] },
+  ],
   files: [
-    'out/**',
-    '!out/claude-runtime/**',
-    '!out/codex-runtime/**',
+    'out/main/index.cjs',
+    'out/preload/{index,management}.cjs',
+    'out/renderer/{index,management}.html',
+    'out/renderer/assets/*.{js,css}',
+    'out/renderer/assets/starter-*.glb',
     'package.json',
     '!node_modules/**',
-    '!src/**',
-    '!electron.vite.config.ts',
-    '!electron-builder.config.mjs',
   ],
   mac: {
     target: [{ target: 'dir', arch: ['arm64', 'x64'] }],

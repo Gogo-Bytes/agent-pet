@@ -29,9 +29,9 @@ const explicitConfig = undefined /* AGENT_PET_EXPLICIT_CONFIG */ as
 
 const processInstanceId = randomBytes(12).toString('hex');
 
-function sessionName(ctx: PiContext): string | undefined {
-  const name = ctx.sessionManager.getSessionName?.()?.trim();
-  return name || undefined;
+function displayName(value: unknown): string | undefined {
+  const name = typeof value === 'string' ? value.trim() : '';
+  return name && name.length <= 256 ? name : undefined;
 }
 
 function stopReasonStatus(reason: unknown): BridgeStatus | undefined {
@@ -172,8 +172,8 @@ export default function agentPetPiExtension(pi: PiApi): void {
     heartbeat = setInterval(sendHeartbeat, 15000);
     heartbeat.unref();
     providerSessionId = ctx.sessionManager.getSessionId() ?? 'ephemeral';
-    sessionNameValue = sessionName(ctx);
-    projectName = basename(ctx.cwd);
+    sessionNameValue = displayName(ctx.sessionManager.getSessionName?.());
+    projectName = displayName(basename(ctx.cwd));
     lastTerminalStatus = undefined;
     lastOccurrence = undefined; workId = undefined; inWork = !ctx.isIdle(); workSignal = ctx.signal; clearActivities();
     send('hello', ctx, { status: ctx.isIdle() ? 'idle' : 'working', capabilities, facts: facts() });
@@ -272,7 +272,7 @@ export default function agentPetPiExtension(pi: PiApi): void {
   });
 
   pi.on('session_info_changed', (event, ctx) => {
-    sessionNameValue = typeof event?.name === 'string' ? event.name.trim() || undefined : undefined;
+    sessionNameValue = displayName(event?.name);
     send('session_info_changed', ctx, sessionNameValue ? { sessionName: sessionNameValue } : {});
   });
 

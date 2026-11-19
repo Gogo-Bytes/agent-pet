@@ -90,8 +90,8 @@ saturation refuses new facts rather than permitting replay. Old/unseen/child fac
 attach to a guessed current turn. SessionEnd/retire/stop clear timers; throwing/rejected
 consumers cannot interrupt remaining cleanup. Publication is best-effort, not a transaction.
 
-- Canonical Bash and apply_patch results give2-second recent executing/writing feedback,
-  not proof the tool is still running. Unknown tools stay other, without command parsing.
+- `Bash` and `apply_patch` result names give 2-second recent executing/writing feedback,
+  not proof of success, continued execution or the emitting runtime's identity. Other names stay `other`.
 - PostCompact gives recent compaction feedback at most once per matching root turn. Multiple completions share the same turn ID; no separate compaction ID is available.
 - Explicit root Interrupt produces a cancellation occurrence; session exit does not.
 - Submission, PreToolUse, approval checks, compaction requests and Stop do not establish
@@ -105,6 +105,18 @@ Transport reuses the authenticated hook runtime with a separate provider codec/r
 external trusted run gate. Sender narrows before sending, receiver validates again;
 short-lived hook closure is not Agent exit. Legacy environment-based command/hook generators
 remain library/test seams, not the ordinary-start connection path.
+
+### What `PostToolUse.tool_name` distinguishes in standalone 0.163.0
+
+| Tool path | What a matching command hook can receive |
+| --- | --- |
+| [View image](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/handlers/view_image.rs#L72-L80) and [core resource handlers](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/spec_plan.rs#L1289-L1304) | When enabled and dispatched, `view_image`, `read_mcp_resource`, `list_mcp_resources` and `list_mcp_resource_templates` retain their plain names. The last three are Codex functions, not names of server-supplied MCP tools. A [view-image result includes inline image data](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/handlers/view_image.rs#L237-L253); the whole event may exceed our 64 KiB input limit. |
+| Shell and file edits | `exec_command` and the [final `write_stdin` poll](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/handlers/unified_exec/write_stdin.rs#L151-L158) use [one canonical `Bash` name](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/handlers/unified_exec.rs#L78-L94), not separate command names. `shell_command` is a [legacy model shell-type alias](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/protocol/src/openai_models.rs#L319), not another hook name. [ApplyPatch](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/handlers/apply_patch.rs#L417-L432) emits `apply_patch`; [`Write` and `Edit` select matchers only](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/hook_names.rs#L28-L38). |
+| Search | The [router](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/router.rs#L275-L308) does not dispatch hosted `WebSearchCall` as a local tool. Client `tool_search` has a `ToolSearch` payload, not the `Function` required by the [default post-hook projection](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/registry.rs#L116-L147). The separate `web.run` extension function flattens to `webrun`; its [query/open/find actions](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/ext/web-search/src/tool.rs#L219-L245) cannot be distinguished by that name. |
+
+**Why no new read/list mappings:** the registry projects ordinary functions to a [single hook name](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/registry.rs#L943-L952), dropping the default namespace or [concatenating namespace and name](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/mod.rs#L44-L60) without a separator. [Dynamic functions](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/handlers/dynamic.rs#L155-L179) use that same projection. The [registry rejects duplicate keys](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/registry.rs#L468-L496), but does not reserve the four read/list names when their built-ins are absent. [Command stdin](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/hooks/src/events/post_tool_use.rs#L144-L166) contains neither the runtime kind nor the original structured name. Verifying the host does not identify the client. To add these mappings without inspecting content, the hook needs a dispatcher-issued built-in tool ID, or equivalent origin and identity metadata. The two existing name matches are not origin checks either.
+
+**Errors:** the [dispatcher drops failed calls or absent payloads](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/registry.rs#L799-L833); it does not serialize its logging-success flag. Unified exec [reports logging success](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/context.rs#L409-L411) and [projects output, not exit status](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/context.rs#L424-L446). Neither a returned hook nor a missing one supplies a body-free tool error enum.
 
 ## Unsupported observation alternatives
 
@@ -125,8 +137,7 @@ or process scans, is a substitute for the current bounded hook surface.
 
 Official [hooks](https://learn.chatgpt.com/docs/hooks) are rolling documentation; fixed
 source links above use0.163.0 commit83086188ae0614bd882818ff1aa23f3194962012, not proof
-of installed binary identity. Canonical Bash naming is backed by the
-[unified_exec adapter](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/tools/handlers/unified_exec.rs#L81).
+of installed binary identity.
 
 ```sh
 pnpm exec vitest run integrations/codex-hooks --maxWorkers=1

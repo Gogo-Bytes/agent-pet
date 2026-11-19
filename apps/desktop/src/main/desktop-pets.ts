@@ -62,15 +62,15 @@ export function createDesktopPets(options: {
     pet.window.setIgnoreMouseEvents(ignoresMouse, { forward: true });
     pet.ignoresMouse = ignoresMouse;
   }
-  function updateOverlay(pet: DesktopPet): void {
+  function updateOverlay(pet: DesktopPet, dragPoint?: Electron.Point): void {
     if (pet.window.isDestroyed()) return;
-    const area = screen.getDisplayMatching(pet.anchor).workArea;
+    const area = (dragPoint ? screen.getDisplayNearestPoint(dragPoint) : screen.getDisplayMatching(pet.anchor)).workArea;
     const size = options.preferences().petSize;
     pet.overlay = layoutOverlay({ ...pet.anchor, width: size, height: size }, area);
     pet.anchor = pet.overlay.anchor;
     pet.window.setBounds(pet.overlay.bounds);
     pet.window.webContents.send('pet:layout', pet.overlay);
-    updateHitPolicy(pet);
+    updateHitPolicy(pet, dragPoint);
   }
   function publish(pet: DesktopPet): void {
     pet.window.webContents.send('pet:snapshot', sessions(pet));
@@ -152,7 +152,9 @@ export function createDesktopPets(options: {
       pet[key] = value; updateHitPolicy(pet);
     },
     move(event: Electron.IpcMainInvokeEvent, delta: { x: number; y: number }): void {
-      const pet = trusted(event); pet.anchor.x += Math.round(delta.x); pet.anchor.y += Math.round(delta.y); updateOverlay(pet);
+      const pet = trusted(event);
+      pet.anchor.x += Math.round(delta.x); pet.anchor.y += Math.round(delta.y);
+      updateOverlay(pet, screen.getCursorScreenPoint());
     },
     resize(event: Electron.IpcMainInvokeEvent, delta: { x: number; y: number }): void {
       const pet = trusted(event);

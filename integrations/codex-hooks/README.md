@@ -64,9 +64,10 @@ mismatch requires revalidation, not accepting an arbitrary “codex” process.
 
 `native-receiver.ts` authenticates loopback route/headers/authority and bounded input,
 with16 peers/queued checks and a1500ms absolute deadline; stop fences late validation.
-`native-presence.ts` holds random host-run IDs, independent sessions,32 runs/32 sessions/
-1024 recent events, and retired identities. Saturation retires the run rather than
-throwing away tombstones. Every event is independently host-verified. Host death/PID reuse
+`native-presence.ts` admits up to 32 concurrent host runs per configuration. Each has
+its own observation state, up to 32 sessions and 1024 event IDs. Retiring a host stops
+its timers and releases its slot; the native receiver separately remembers the last
+64 retired host identities. Event-ID saturation retires the run rather than dropping IDs. Every event is independently host-verified. Host death/PID reuse
 clears it; daemon liveness alone does not prove any CLI window or Session is online.
 
 A first verified non-startup fact may establish an unknown baseline and seed its native

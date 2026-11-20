@@ -14,25 +14,28 @@ export async function startCodexNormalBridge(options: {
 }) {
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(options.configurationId))
     throw new Error('Invalid Codex configuration identity');
-  const observations = createCodexObservations(options), token = randomBytes(32).toString('hex');
-  let presence: Awaited<ReturnType<typeof startCodexNativePresence>>;
-  try {
-    presence = await startCodexNativePresence({ ...options, token,
-      onFact: ({ runId, fact }) => {
-        if (fact.kind !== 'session-ended') observations.admitVerifiedSession(runId, fact.providerSessionId, fact.turnId);
-        observations.accept({ runId, fact });
-      }, onRetire: runId => observations.retire(runId) });
-  } catch (error) { observations.stop(); throw error; }
+  const token = randomBytes(32).toString('hex');
+  // Ingress owns host admission and replay checks. Keep session state only for its live runs.
+  const live = new Map<string, ReturnType<typeof createCodexObservations>>();
+  const presence = await startCodexNativePresence({ ...options, token,
+    onFact: ({ runId, fact }) => {
+      let observations = live.get(runId);
+      if (!observations) {
+        observations = createCodexObservations(options); live.set(runId, observations);
+      }
+      if (fact.kind !== 'session-ended') observations.admitVerifiedSession(runId, fact.providerSessionId, fact.turnId);
+      observations.accept({ runId, fact });
+    },
+    onRetire: runId => {
+      const observations = live.get(runId);
+      live.delete(runId); observations?.stop();
+    } });
   const activation = JSON.stringify({ schemaVersion: 1, provider: 'codex', configurationId: options.configurationId,
     executable: options.executable, observerExecutable: options.observerExecutable, url: presence.url, token }) + '\n';
-  if (Buffer.byteLength(activation) > 8192) { await presence.stop(); observations.stop(); throw new Error('Codex activation too large'); }
-  let closing: Promise<void> | undefined;
+  if (Buffer.byteLength(activation) > 8192) { await presence.stop(); throw new Error('Codex activation too large'); }
   return {
     // Secret stays Main-private. Never put this string in a renderer state or diagnostic.
     activation,
-    stop(): Promise<void> {
-      if (closing) return closing;
-      closing = presence.stop(); observations.stop(); return closing;
-    },
+    stop: presence.stop,
   };
 }

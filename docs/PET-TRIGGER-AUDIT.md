@@ -2,7 +2,24 @@
 
 当前目录有22项，**不等于每个 Provider 支持22项自动事件**。Provider 事实、产品触发和资产已有 clip 是三层能力。目录唯一源为 [`actions.ts`](../packages/pet-runtime/src/actions.ts)，映射/制作见[作者指南](PET-ARTIST-GUIDE.md)，运行时交接见[架构](ARCHITECTURE-DESIGN.md#renderer-local-interaction-playback)。本文保留既有路径作为能力知识入口，不维护历史验收流水。
 
-## 来源矩阵
+## 四项标准行为：当前 CLI 的证据
+
+[产品标准](../PRODUCT-REQUIREMENTS.md#桌宠的标准行为)规定宠物动作的含义。下表只回答「当前接入拿得到什么事实」，不是桌面效果的实机验收。Claude 指已启用任务事件的连接，不含旧的仅在线连接；Codex 指 standalone CLI，不含桌面程序。
+
+| 标准行为 | pi 0.85.1 TUI | Claude Code npm 2.1.301 | Codex CLI 0.163.0 |
+| --- | --- | --- | --- |
+| 工作中 | `agent_start` 到整批 `agent_settled`；中间的工具返回不是整轮结束 | 无可靠起止；提交可被拒绝 | 无可靠起止；普通 hooks 不投递内部的 `TurnStarted` |
+| 等你处理 | 扩展 UI 的 `ui_prompt_start/end` 可配对，不代表所有交互 | 权限提醒可能排队或自动处理，不能配对人工等待的解除 | 权限检查不能证明正在等用户，不能据此显示等待姿态 |
+| 已完成 | 已知正常终止原因，整批 settled 且回到 idle；取消不算成功 | `Stop` 后仍可续跑 | `Stop` 后同一轮仍可继续 |
+| 出错 | 已知错误或输出截断的终止原因，整批 settled 且回到 idle | 匹配当前根提示的 `StopFailure` 能报告回答失败；工具失败不算 | 普通 hooks 无通用的整轮失败结果 |
+
+**容易误用的两个信号：** pi 的取消和 Codex 的根 `Interrupt` 是清除状态的依据，不是第五个标准动作。Claude/Codex 收到提交后分配的 `workId` 只用于关联，不足以证明开始执行。例如 Claude 上一轮出错，下一次提交又被拒绝，按产品标准应保留上一轮错误气泡；[现有领域逻辑](../packages/domain/src/index.ts)只在 `unknown` 且 `workId` 不变时保留旧未读，因此显示层还不能算已符合这条规则。
+
+代码依据：[pi 扩展](../integrations/pi-extension/index.ts)、[Claude 观察映射](../integrations/claude-hooks/observations.ts)、[Codex 观察映射](../integrations/codex-hooks/observations.ts)。上游边界：[Claude 权限请求](https://code.claude.com/docs/en/hooks#permissionrequest-input)（滚动文档）、[Codex 0.163.0 可配置的 hooks](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/config/src/hook_config.rs#L35-L61)、[同轮 Stop 后可继续](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/turn.rs#L718-L755)。
+
+## 现有来源矩阵（含非标准动作）
+
+以下记录已有接入与素材可用的细项，不是应向用户逐项播报的清单。
 
 下表限当前有界接入：pi0.85.1、Claude npm2.1.301、Codex standalone0.163.0；“未知/未接”不是活动不存在。短工具结果反馈不代表工具还在执行。具体字段/身份限制见 [pi](../integrations/pi-extension/README.md)、[Claude](../integrations/claude-hooks/README.md)、[Codex](../integrations/codex-hooks/README.md)。
 

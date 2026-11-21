@@ -4,10 +4,16 @@ import type { ClaudeHookFact } from './normalize.js';
 
 type Session = {
   nativeId: string; id: string; revision: number; connected: boolean;
-  prompt?: string; work?: string; compactedPrompt?: string; failed: boolean; ended: boolean; saturated: boolean;
+  prompt?: string; observedPrompt?: string; work?: string; compactedPrompt?: string; failed: boolean; ended: boolean; saturated: boolean;
   prompts: Set<string>; tools: Set<string>; capabilities: ObservationCapabilities;
   feedback?: CompanionFacts; timer?: ReturnType<typeof setTimeout>;
 };
+// Only post-execution facts may replace the published work identity.
+function confirmWork(session: Session, promptId: string): boolean {
+  if (session.observedPrompt === promptId) return false;
+  session.observedPrompt = promptId; session.work = randomUUID(); session.failed = false;
+  return true;
+}
 type Run = { sessions: Map<string, Session>; current: Session };
 export const CLAUDE_FEEDBACK_MS = 2000;
 
@@ -74,35 +80,41 @@ export function createClaudeObservations(options: {
       if (fact.kind === 'turn-submitted') {
         if (!fact.promptId || session.prompts.has(fact.promptId)) return;
         if (session.prompts.size >= 256) { session.saturated = true; clear(session); emit(runId, session); return; }
-        clear(session); session.prompts.add(fact.promptId); session.prompt = fact.promptId;
-        session.work = randomUUID(); session.failed = false; emit(runId, session); return;
+        session.prompts.add(fact.promptId); session.prompt = fact.promptId;
+        if (session.feedback) { clear(session); emit(runId, session); }
+        return;
       }
       // Missing prompt IDs on older Claude versions remain presence-only. Never attach
       // an uncorrelated result to whichever user prompt happened to arrive most recently.
       if (!fact.promptId || fact.promptId !== session.prompt) return;
       if (fact.kind === 'tool-succeeded' || fact.kind === 'tool-failed') {
-        if (session.failed) return;
+        if (session.failed && session.observedPrompt === fact.promptId) return;
         if (session.tools.has(fact.toolCallId)) return;
         if (session.tools.size >= 1024) { session.saturated = true; clear(session); emit(runId, session); return; }
         session.tools.add(fact.toolCallId);
+        const newWork = confirmWork(session, fact.promptId);
         if (fact.kind === 'tool-failed') {
           // A tool interruption is neither a tool error nor a cancelled user task.
-          if (fact.interrupted !== false) return;
+          if (fact.interrupted !== false) { if (newWork) emit(runId, session); return; }
           session.capabilities.tool_error = 'supported';
           feedback(runId, session, { activities: [], waitingForInput: false, occurrence: { id: randomUUID(), kind: 'tool_error' } });
         } else if (fact.activity !== 'other') {
           const kind: ActivityKind = fact.activity; session.capabilities[kind] = 'supported';
           feedback(runId, session, { activities: [], waitingForInput: false, recentActivity: { id: randomUUID(), kind } });
-        }
-      } else if (fact.kind === 'compact-finished' && !session.failed) {
+        } else if (newWork) emit(runId, session);
+      } else if (fact.kind === 'compact-finished' && !session.failed && session.observedPrompt === fact.promptId) {
         // PostCompact has no occurrence ID. Coalesce all completions for this prompt.
         if (session.compactedPrompt === fact.promptId) return;
         session.compactedPrompt = fact.promptId; session.capabilities.compacting = 'supported';
         feedback(runId, session, { activities: [], waitingForInput: false,
           recentActivity: { id: randomUUID(), kind: 'compacting' } });
-      } else if (fact.kind === 'turn-failed' && !session.failed) {
+      } else if (fact.kind === 'turn-failed') {
+        confirmWork(session, fact.promptId);
+        if (session.failed) return;
         clear(session); session.failed = true; emit(runId, session);
       } else if (fact.kind === 'response-stopped') {
+        // Claude responded; another hook may continue it, so the outcome stays unknown.
+        confirmWork(session, fact.promptId);
         clear(session); emit(runId, session);
       }
       // approval-check/permission-prompt do not supply a reliable paired clear;

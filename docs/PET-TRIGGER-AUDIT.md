@@ -13,7 +13,7 @@
 | 已完成 | 已知正常终止原因，整批 settled 且回到 idle；取消不算成功 | `Stop` 后仍可续跑 | `Stop` 后同一轮仍可继续 |
 | 出错 | 已知错误或输出截断的终止原因，整批 settled 且回到 idle | 匹配当前根提示的 `StopFailure` 能报告回答失败；工具失败不算 | 普通 hooks 无通用的整轮失败结果 |
 
-**容易误用的两个信号：** pi 的取消和 Codex 的根 `Interrupt` 是清除状态的依据，不是第五个标准动作。Claude/Codex 收到提交后分配的 `workId` 只用于关联，不足以证明开始执行。例如 Claude 上一轮出错，下一次提交又被拒绝，按产品标准应保留上一轮错误气泡；[现有领域逻辑](../packages/domain/src/index.ts)只在 `unknown` 且 `workId` 不变时保留旧未读，因此显示层还不能算已符合这条规则。
+**容易误用的两个信号：** pi 的取消和 Codex 的根 `Interrupt` 是清除状态的依据，不是第五个标准动作。提交本身不足以证明开始执行。Claude 用新提示 ID 关联后续消息，不因提交而更换对外的 `workId`。例如上一轮出错、下一次提交被拒，旧错误仍未读；只有匹配新提示的工具结果、回答停止或回答失败，才替换旧轮次。回答停止不等于成功。Codex 的轮次关联同样不代表持续工作。
 
 代码依据：[pi 扩展](../integrations/pi-extension/index.ts)、[Claude 观察映射](../integrations/claude-hooks/observations.ts)、[Codex 观察映射](../integrations/codex-hooks/observations.ts)。上游边界：[Claude 权限请求](https://code.claude.com/docs/en/hooks#permissionrequest-input)（滚动文档）、[Codex 0.163.0 可配置的 hooks](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/config/src/hook_config.rs#L35-L61)、[同轮 Stop 后可继续](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/turn.rs#L718-L755)。
 

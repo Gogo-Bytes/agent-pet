@@ -26,10 +26,7 @@ export type ClaudeHookResult =
 
 const events = new Set(['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse',
   'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact']);
-const toolActivities = new Map<string, ClaudeToolActivity>([
-  ['Read', 'reading'], ['WebFetch', 'reading'], ['Write', 'writing'], ['Edit', 'writing'], ['MultiEdit', 'writing'],
-  ['NotebookEdit', 'writing'], ['Grep', 'searching'], ['Glob', 'searching'], ['WebSearch', 'searching'], ['Bash', 'executing'],
-]);
+// Keep the existing wire shape; new senders do not classify tool names.
 const invalidFields = { status: 'invalid', reason: 'fields' } as const;
 function identifier(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 256 &&
@@ -82,7 +79,7 @@ export function normalizeClaudeHook(input: string): ClaudeHookResult {
       if (!identifier(value.tool_use_id) || typeof value.tool_name !== 'string' ||
           !identifier(value.tool_name)) return invalidFields;
       const tool = { providerSessionId, toolCallId: value.tool_use_id,
-        activity: toolActivities.get(value.tool_name) ?? 'other' as const };
+        activity: 'other' as const };
       if (value.hook_event_name === 'PostToolUseFailure') {
         if (value.is_interrupt !== undefined && typeof value.is_interrupt !== 'boolean') return invalidFields;
         // A tool abort is not evidence that the whole turn was cancelled.
@@ -94,7 +91,7 @@ export function normalizeClaudeHook(input: string): ClaudeHookResult {
     case 'PermissionRequest':
       // This event has no tool_use_id; never invent a correlation with a pending tool.
       return identifier(value.tool_name) ? accepted({ providerSessionId, kind: 'approval-check',
-        activity: toolActivities.get(value.tool_name) ?? 'other' }) : invalidFields;
+        activity: 'other' }) : invalidFields;
     case 'Notification':
       // idle_prompt is a reminder, not authoritative waiting_input. Other notification text is dropped.
       return value.notification_type === 'permission_prompt' ? accepted({ providerSessionId, kind: 'permission-prompt' })

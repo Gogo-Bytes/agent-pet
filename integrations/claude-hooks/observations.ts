@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ActivityKind, CompanionFacts, ObservationCapabilities, SessionObservation } from '../../packages/domain/src/index.js';
+import type { CompanionFacts, ObservationCapabilities, SessionObservation } from '../../packages/domain/src/index.js';
 import type { ClaudeHookFact } from './normalize.js';
 
 type Session = {
@@ -19,7 +19,7 @@ export const CLAUDE_FEEDBACK_MS = 2000;
 
 /** Main-private correlation. Native identities never become Application/Renderer IDs.
  * Pre-hooks and Stop are deliberately not execution/completion signals: other hooks
- * can still block or continue them. Tool results produce only short recent feedback.
+ * can still block or continue them. Tool results can confirm a new prompt ran.
  */
 export function createClaudeObservations(options: {
   publish(observation: SessionObservation): void;
@@ -92,16 +92,8 @@ export function createClaudeObservations(options: {
         if (session.tools.has(fact.toolCallId)) return;
         if (session.tools.size >= 1024) { session.saturated = true; clear(session); emit(runId, session); return; }
         session.tools.add(fact.toolCallId);
-        const newWork = confirmWork(session, fact.promptId);
-        if (fact.kind === 'tool-failed') {
-          // A tool interruption is neither a tool error nor a cancelled user task.
-          if (fact.interrupted !== false) { if (newWork) emit(runId, session); return; }
-          session.capabilities.tool_error = 'supported';
-          feedback(runId, session, { activities: [], waitingForInput: false, occurrence: { id: randomUUID(), kind: 'tool_error' } });
-        } else if (fact.activity !== 'other') {
-          const kind: ActivityKind = fact.activity; session.capabilities[kind] = 'supported';
-          feedback(runId, session, { activities: [], waitingForInput: false, recentActivity: { id: randomUUID(), kind } });
-        } else if (newWork) emit(runId, session);
+        // Older observers still send tool categories. None is a pet action or a turn outcome.
+        if (confirmWork(session, fact.promptId)) emit(runId, session);
       } else if (fact.kind === 'compact-finished' && !session.failed && session.observedPrompt === fact.promptId) {
         // PostCompact has no occurrence ID. Coalesce all completions for this prompt.
         if (session.compactedPrompt === fact.promptId) return;

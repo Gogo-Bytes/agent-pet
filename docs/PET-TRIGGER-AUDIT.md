@@ -33,7 +33,7 @@
 | `writing` | write/edit start/end | 不触发写入动作 | apply_patch 结果后2秒 |
 | `searching` | grep/find/ls start/end | 不触发搜索动作 | 不从命令正文推测搜索 |
 | `executing` | bash/powershell start/end | 不触发执行动作 | Bash 结果后2秒 |
-| `compacting` | before_compact 到 compact/failed/abort | 当前根 prompt 的 PostCompact 完成反馈，每轮最多一次 | 当前根 turn 的 PostCompact 同样只作完成反馈，不循环 |
+| `compacting` | before_compact 到 compact/failed/abort | 压缩不改变任务状态，不触发动作 | 当前根 turn 的 PostCompact 仍有单次反馈，不循环 |
 | `waiting_input` | ui_prompt_start/end 配对 | 无可靠配对清除，不用单个 permission_prompt 假装持续等待 | approval 不代表等待 |
 | `success` | 观察到终态，agent_settled 且 ctx.isIdle | Stop 可继续，不产 completed-unread | 同 Claude；工具返回也不代表任务成功 |
 | `error` | settled 的原生 error/length | 已知当前 prompt 的 StopFailure，保留错误未读 | 无统一可靠失败事实，见[边界](CODEX-ERROR-FEEDBACK-LIMIT.md) |
@@ -48,7 +48,7 @@
 | `selected` | 与 Provider 无关 | 与 Provider 无关 | 首页模型/在线宠物按钮 click、Enter、Space；不含被动焦点、收藏选择，桌面无此操作 |
 | `dragging` | 与 Provider 无关 | 与 Provider 无关 | 实际桌面位移后触发，同一映射；按方向外层旋转±10°，不改骨骼，resize不触发 |
 
-压缩依据：[Claude 2.1.301 变更记录](https://github.com/anthropics/claude-code/blob/v2.1.301/CHANGELOG.md#L6841)、[Codex 0.163.0 完成后调用 hook](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/compact.rs#L225)。没有单次压缩 ID，两端都合并同一轮的重复或多次压缩；缺少轮次关联时不播。Claude 不再区分 WebFetch、WebSearch 等工具；已有发送程序传来的工具分类也不进入桌宠显示。
+压缩依据：[Claude 2.1.301 变更记录](https://github.com/anthropics/claude-code/blob/v2.1.301/CHANGELOG.md#L6841)、[Codex 0.163.0 完成后调用 hook](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/compact.rs#L225)。Claude 不展示压缩反馈。Codex 没有单次压缩 ID，同一轮最多播一次；缺少轮次关联时不播。Claude 不再区分 WebFetch、WebSearch 等工具；已有发送程序传来的工具分类也不进入桌宠显示。
 
 `sleeping` 不属于目录：没有独立 Agent 休眠语义，旧包字段作为未知可选映射忽略；隐藏停帧不等于休眠，不增加空闲计时器。
 

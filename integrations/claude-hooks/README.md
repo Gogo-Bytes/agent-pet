@@ -101,7 +101,7 @@ complete the parent.
 | PostToolUse / PostToolUseFailure | A matching result can confirm the new prompt ran. Tool type and outcome do not trigger pet actions, including with older senders. Neither proves whole-turn failure, cancellation or success. |
 | StopFailure | Matching known prompt gives generic error/unread; unknown category stays unknown, no body parsing |
 | Stop / PreCompact | Neither proves whole-task success or ongoing compaction |
-| PostCompact | Recent feedback at most once per root prompt already known to have run; compaction alone does not replace the last unread result |
+| PostCompact | No pet action or session update. Finishing compaction does not finish a task or replace an unread result. |
 | SessionEnd / OS exit / pause | Clear feedback/observation at the appropriate identity layer, not success/failure/cancellation |
 
 No supported completion, whole-turn cancellation, thinking/responding, sustained waiting
@@ -109,8 +109,7 @@ or business retry is inferred from these precursors. `max_output_tokens` is acce
 the normalizer but not classified as output_limited; [version/source boundary](../../docs/PROVIDER-ANIMATION-EVIDENCE.md).
 Submitting a prompt only changes private hook correlation. A blocked submit therefore leaves the previous unread error intact. The first matching tool result, Stop or StopFailure gives the new prompt its own work ID. Stop proves a response ran, not that it succeeded or is still running. Old presence-only records stay task-unknown.
 
-Feedback timers are owned before callbacks; stop/retire clears all runs even if a consumer
-throws/rejects. Replacement rechecks closed/run/current after disconnect callbacks so
+Session cleanup continues even if a consumer throws or rejects. Replacement rechecks closed/run/current after disconnect callbacks so
 reentry cannot revive a stopped mapper or overwrite a newer Session. Publication is
 best-effort, not transactions, ACK/retry or repair of partially delivered notifications.
 

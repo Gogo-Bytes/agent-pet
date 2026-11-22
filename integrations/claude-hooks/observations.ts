@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type { CompanionFacts, ObservationCapabilities, SessionObservation } from '../../packages/domain/src/index.js';
+import type { SessionObservation } from '../../packages/domain/src/index.js';
 import type { ClaudeHookFact } from './normalize.js';
 
 type Session = {
   nativeId: string; id: string; revision: number; connected: boolean;
-  prompt?: string; observedPrompt?: string; work?: string; compactedPrompt?: string; failed: boolean; ended: boolean; saturated: boolean;
-  prompts: Set<string>; tools: Set<string>; capabilities: ObservationCapabilities;
-  feedback?: CompanionFacts; timer?: ReturnType<typeof setTimeout>;
+  prompt?: string; observedPrompt?: string; work?: string; failed: boolean; ended: boolean; saturated: boolean;
+  prompts: Set<string>; tools: Set<string>;
 };
 // Only post-execution facts may replace the published work identity.
 function confirmWork(session: Session, promptId: string): boolean {
@@ -15,7 +14,6 @@ function confirmWork(session: Session, promptId: string): boolean {
   return true;
 }
 type Run = { sessions: Map<string, Session>; current: Session };
-export const CLAUDE_FEEDBACK_MS = 2000;
 
 /** Main-private correlation. Native identities never become Application/Renderer IDs.
  * Pre-hooks and Stop are deliberately not execution/completion signals: other hooks
@@ -28,30 +26,18 @@ export function createClaudeObservations(options: {
 }) {
   const runs = new Map<string, Run>();
   let closed = false;
-  const clear = (session: Session) => {
-    clearTimeout(session.timer); delete session.timer; delete session.feedback;
-  };
   const emit = (runId: string, session: Session) => {
     try {
       const observation: SessionObservation = { sessionId: session.id, provider: 'claude', processInstanceId: runId,
         providerSessionId: session.id, status: session.failed ? 'error' : 'unknown', connected: session.connected,
         agentName: options.name(), observedAt: (options.now?.() ?? new Date()).toISOString(), revision: ++session.revision,
-        ...(session.work ? { workId: session.work } : {}), capabilities: { ...session.capabilities },
-        facts: session.feedback ?? { activities: [], waitingForInput: false } };
+        ...(session.work ? { workId: session.work } : {}), capabilities: {},
+        facts: { activities: [], waitingForInput: false } };
       const result: unknown = options.publish(observation); void Promise.resolve(result).catch(() => {});
-    } catch { /* Consumer failure must not interrupt timer/session cleanup or affect the Agent. */ }
+    } catch { /* Consumer failure must not interrupt session cleanup or affect the Agent. */ }
   };
   const retireSession = (runId: string, session: Session) => {
-    clear(session); session.connected = false; emit(runId, session);
-  };
-  const feedback = (runId: string, session: Session, facts: CompanionFacts) => {
-    clear(session); session.feedback = facts;
-    // Install before publishing: a synchronous subscriber may stop or retire us.
-    session.timer = setTimeout(() => {
-      if (closed || runs.get(runId)?.current !== session || !session.connected) return;
-      clear(session); emit(runId, session);
-    }, CLAUDE_FEEDBACK_MS);
-    session.timer.unref?.(); emit(runId, session);
+    session.connected = false; emit(runId, session);
   };
   return {
     accept({ runId, fact }: { runId: string; fact: ClaudeHookFact }): void {
@@ -67,7 +53,7 @@ export function createClaudeObservations(options: {
           if (closed || runs.get(runId) !== run || run.current !== previous) return;
         }
         const session: Session = { nativeId: fact.providerSessionId, id: randomUUID(), revision: 0,
-          connected: true, failed: false, ended: false, saturated: false, prompts: new Set(), tools: new Set(), capabilities: {} };
+          connected: true, failed: false, ended: false, saturated: false, prompts: new Set(), tools: new Set() };
         if (run) { run.sessions.set(session.nativeId, session); run.current = session; }
         else { run = { sessions: new Map([[session.nativeId, session]]), current: session }; runs.set(runId, run); }
         emit(runId, session); return;
@@ -75,13 +61,12 @@ export function createClaudeObservations(options: {
       const session = run?.current;
       if (!run || !session || session.nativeId !== fact.providerSessionId || session.ended || session.saturated) return;
       if (fact.kind === 'session-ended') {
-        clear(session); session.ended = true; emit(runId, session); return;
+        session.ended = true; emit(runId, session); return;
       }
       if (fact.kind === 'turn-submitted') {
         if (!fact.promptId || session.prompts.has(fact.promptId)) return;
-        if (session.prompts.size >= 256) { session.saturated = true; clear(session); emit(runId, session); return; }
+        if (session.prompts.size >= 256) { session.saturated = true; return; }
         session.prompts.add(fact.promptId); session.prompt = fact.promptId;
-        if (session.feedback) { clear(session); emit(runId, session); }
         return;
       }
       // Missing prompt IDs on older Claude versions remain presence-only. Never attach
@@ -90,24 +75,17 @@ export function createClaudeObservations(options: {
       if (fact.kind === 'tool-succeeded' || fact.kind === 'tool-failed') {
         if (session.failed && session.observedPrompt === fact.promptId) return;
         if (session.tools.has(fact.toolCallId)) return;
-        if (session.tools.size >= 1024) { session.saturated = true; clear(session); emit(runId, session); return; }
+        if (session.tools.size >= 1024) { session.saturated = true; return; }
         session.tools.add(fact.toolCallId);
         // Older observers still send tool categories. None is a pet action or a turn outcome.
         if (confirmWork(session, fact.promptId)) emit(runId, session);
-      } else if (fact.kind === 'compact-finished' && !session.failed && session.observedPrompt === fact.promptId) {
-        // PostCompact has no occurrence ID. Coalesce all completions for this prompt.
-        if (session.compactedPrompt === fact.promptId) return;
-        session.compactedPrompt = fact.promptId; session.capabilities.compacting = 'supported';
-        feedback(runId, session, { activities: [], waitingForInput: false,
-          recentActivity: { id: randomUUID(), kind: 'compacting' } });
       } else if (fact.kind === 'turn-failed') {
         confirmWork(session, fact.promptId);
         if (session.failed) return;
-        clear(session); session.failed = true; emit(runId, session);
+        session.failed = true; emit(runId, session);
       } else if (fact.kind === 'response-stopped') {
         // Claude responded; another hook may continue it, so the outcome stays unknown.
-        confirmWork(session, fact.promptId);
-        clear(session); emit(runId, session);
+        if (confirmWork(session, fact.promptId)) emit(runId, session);
       }
       // approval-check/permission-prompt do not supply a reliable paired clear;
       // compact-started and tool-requested are blockable precursors, not activity.

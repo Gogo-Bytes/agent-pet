@@ -16,6 +16,7 @@ export type DisplayStatus = 'working' | 'completed-unread' | 'error-unread';
 export type SessionObservation = {
   sessionId: string;
   provider: Provider;
+  configurationId?: string;
   status: SessionStatus;
   agentName?: string;
   projectName?: string;
@@ -32,7 +33,15 @@ export type SessionObservation = {
 
 export type SessionRecord = SessionObservation & {
   name: string;
+  behaviorOrder?: number;
 };
+
+export function standardBehavior(observation: SessionObservation) {
+  if (observation.connected === false || observation.status === 'offline') return 'idle';
+  if (observation.status === 'completed' || observation.status === 'error') return observation.status;
+  if (observation.facts?.waitingForInput && observation.capabilities?.waiting_input === 'supported') return 'waiting_input';
+  return observation.status === 'working' ? 'working' : 'idle';
+}
 
 type SessionMeta = {
   lastRevision?: number;
@@ -48,6 +57,7 @@ export type SessionBubble = {
 };
 
 export type SessionState = {
+  behaviorSequence?: number;
   sessions: Readonly<Record<string, SessionRecord>>;
   bubbles: readonly SessionBubble[];
   sessionMeta?: Readonly<Record<string, SessionMeta>>;
@@ -75,10 +85,24 @@ export function applyObservation(
     observation = { ...observation, status: previous.status, ...(previous.workId ? { workId: previous.workId } : {}) };
   }
   const name = getSessionName(observation);
-  const sessions = {
-    ...state.sessions,
-    [observation.sessionId]: { ...observation, name },
-  };
+  const behavior = standardBehavior(observation);
+  const retainedResult = previous && previous.workId === observation.workId && previous.status === behavior &&
+    (behavior === 'completed' || behavior === 'error');
+  const changed = behavior !== 'idle' && !retainedResult && !isAcknowledgedTerminal(previousMeta, observation) &&
+    (!previous || standardBehavior(previous) !== behavior || previous.workId !== observation.workId);
+  const behaviorSequence = (state.behaviorSequence ?? 0) + Number(changed);
+  const sessions = { ...state.sessions };
+  if (changed) {
+    // Superseded results stay unread, but only sustained behaviors may resume.
+    for (const record of Object.values(sessions)) {
+      if (record.configurationId === observation.configurationId && record.behaviorOrder &&
+          (record.status === 'completed' || record.status === 'error')) {
+        sessions[record.sessionId] = { ...record, behaviorOrder: 0 };
+      }
+    }
+  }
+  sessions[observation.sessionId] = { ...observation, name,
+    behaviorOrder: changed ? behaviorSequence : behavior === 'idle' ? 0 : previous?.behaviorOrder ?? 0 };
   const displayStatus = observation.connected === false && observation.status === 'working'
     ? undefined : toDisplayStatus(observation.status);
   const meta = {
@@ -98,7 +122,7 @@ export function applyObservation(
     },
   ];
   const retained = retainSessions(sessions, meta, nextBubbles);
-  return { sessions: retained.sessions, bubbles: nextBubbles, sessionMeta: retained.meta };
+  return { behaviorSequence, sessions: retained.sessions, bubbles: nextBubbles, sessionMeta: retained.meta };
 }
 
 export function acknowledgeBubble(
@@ -125,7 +149,7 @@ export function acknowledgeBubble(
     },
   };
   const retained = retainSessions(sessions, meta, bubbles);
-  return { sessions: retained.sessions, sessionMeta: retained.meta, bubbles };
+  return { ...state, sessions: retained.sessions, sessionMeta: retained.meta, bubbles };
 }
 
 function retainSessions(

@@ -10,7 +10,8 @@ export function projectHomePets(configurations: ConfigurationsState, sessions: S
     const records = Object.fromEntries(Object.entries(sessions.sessions).filter(([id]) => configurations.sessionConfigurations[id] === record.id));
     const presentation = projectPetPresentation({ sessions: records, bubbles });
     const action = presentation.action;
-    const status = action === 'idle' ? '陪伴中' : action === 'working' ? '工作中' : action === 'error' ? record.provider === 'claude' ? '回答出错了' : '出错了' : action === 'success' ? '已完成' : petActionCatalog[action].label;
+    const label = presentation.replay && presentation.restAction !== 'idle' ? presentation.restAction : action;
+    const status = label === 'idle' ? '陪伴中' : label === 'working' ? '工作中' : label === 'error' ? record.provider === 'claude' ? '回答出错了' : '出错了' : label === 'success' ? '已完成' : petActionCatalog[label].label;
     return { connectionCue: record.connectionCue, id: record.id, assetId: record.pet?.assetId ?? 'starter', agent: providerLabels[record.provider], name: record.pet?.name ?? defaultName, configuration: record.name, action, status, replay: presentation.replay, restAction: presentation.restAction };
   });
 }

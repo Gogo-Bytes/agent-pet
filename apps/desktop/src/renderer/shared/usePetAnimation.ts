@@ -125,7 +125,7 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
       // Local feedback overlays the sustained state; it never causes out/in.
       if (next.local || current?.local) { enter(next, !!current?.local); return; }
       const requested = normalizePetAction(value.request);
-      const immediate = requested === 'dragging' || requested === 'error' || requested === 'tool_error' || requested === 'output_limited' || requested === 'cancelled';
+      const immediate = requested === 'dragging' || (requested === 'success' && !!next.cue) || requested === 'error' || requested === 'tool_error' || requested === 'output_limited' || requested === 'cancelled';
       if (immediate) { enter(next); return; }
       if (phase === 'out') { pending = next; return; }
       if (phase === 'loop' && current?.animation?.out) {
@@ -147,7 +147,7 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
           } else {
             completedKey = current.key;
             displayedCue = undefined;
-            enter(desired());
+            enter(desired(), !!current.cue);
           }
         }
       });

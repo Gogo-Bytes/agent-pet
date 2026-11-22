@@ -100,7 +100,7 @@ error-unread -> acknowledged -> hidden
 
 - pi、Claude Code、Codex CLI 均复用被动观察边界。当前版本/字段契约分别见 [pi](integrations/pi-extension/README.md)、[Claude](integrations/claude-hooks/README.md)、[Codex](integrations/codex-hooks/README.md)，真实验收按版本与场景记录，不宣称完整支持所有事件。
 - pi 的 Open Session 当前为 `unsupported`，不以新建终端或启动 pi 冒充打开原窗口。
-- Claude 的工具结果仅用于确认对应轮次执行过；Codex 当前仍有工具短反馈，两者都不证明持续工作或整轮完成；来源不足的等待、重试和错误细分类保持未知或已有通用反馈。生产 managed 核心仍未开放，不能用它替代真实接入证据。
+- Claude 的工具结果仅用于确认对应轮次执行过；Codex 的工具返回同样不触发独立动作，两者都不证明持续工作或整轮完成；来源不足的等待、重试和错误细分类保持未知或已有通用反馈。生产 managed 核心仍未开放，不能用它替代真实接入证据。
 
 默认接入流程优先自动发现和推荐，只有配置位置需要区分时才要求用户选择；不得把专业配置步骤作为常规入口。Codex 使用 Main 验证的扫描候选，不再要求选择程序文件；取消后可复用有效证据，失效时重新扫描。自定义目标保持原配置身份和精确路径授权，预览确认及 Codex 原生 `/hooks` 审核不能省略。
 

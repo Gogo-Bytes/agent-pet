@@ -19,7 +19,7 @@
 
 ## 现有来源矩阵（含非标准动作）
 
-以下记录已有接入与素材可用的细项，不是应向用户逐项播报的清单。
+以下记录适配器仍能产生的事实，不等于自动播放清单。桌面和首页只把工作、等待和整轮终态映射为业务动作。旧扩展的工具、思考、压缩、工具错误和取消等细项不触发独立提示；素材手动试播不受影响。
 
 下表限当前有界接入：pi0.85.1、Claude npm2.1.301、Codex standalone0.163.0；“未知/未接”不是活动不存在。短工具结果反馈不代表工具还在执行。具体字段/身份限制见 [pi](../integrations/pi-extension/README.md)、[Claude](../integrations/claude-hooks/README.md)、[Codex](../integrations/codex-hooks/README.md)。
 
@@ -54,7 +54,7 @@
 
 ## 播放与幂等边界
 
-- 共享投影按当前快照优先级选择，不排队：waiting 优先，细活动 compacting→executing→writing→searching→reading→thinking→responding→retrying，随后近期反馈/工作/终态/idle。多 Session 保持独立业务/气泡，但一个配置宠物只表达当前选中投影；快速事件、React 批处理和2秒反馈期限可能截断或遮住 clip，不保证每事件完整播出。
+- 共享投影按已确认的等待、工作和未读终态选择业务动作，没有可显示状态时安静陪伴。多个 Session 的气泡独立，一个配置只显示一只宠物。当前显示仍会优先选择常驻姿态，尚未实现所有终态按到达顺序临时抢占并恢复。
 - 业务 once 使用 Session+occurrence 或 work+终态身份；重命名/rest 更新不重播，手动数字 replay 可重播。每 Renderer 模块最多256项缓存，缓存淘汰、窗口销毁或崩溃可再呈现已有身份；不承诺跨进程 exactly-once。cue 在 effect 微任务标记已见，不是完成播放回执；缺 clip、reduced、隐藏或即时替换仍可消费。
 - 拖动优先于 hover/selected，释放后恢复最新业务请求/rest；局部反馈期间不消费业务 cue。缺局部 clip 不用 idle 打断工作；完成或真实热区离开、取消、blur/hidden/lostcapture/unmount 清理。桌面模型自身运动/DOM子节点切换不是退出；hover 完成后需离开再进入才能重播。工具条/resize/间隙不是 hover 动画热区。
 - connected 仅在 idle/中性 presence 呈现，低于业务/局部反馈；覆盖或 reduced/缺 clip 时不排队。首次偏好/绑定模型就绪前不在临时 starter 消费；每个视觉 surface 独立呈现，Main 不因 Renderer 重挂制造新连接边沿。

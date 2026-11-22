@@ -92,6 +92,8 @@ saturation refuses new facts rather than permitting replay. Old/unseen/child fac
 attach to a guessed current turn. SessionEnd/retire/stop clear timers; throwing/rejected
 consumers cannot interrupt remaining cleanup. Publication is best-effort, not a transaction.
 
+The following are adapter facts, not automatic pet actions. The desktop and home views do not announce tool results, compaction or cancellation.
+
 - `Bash` and `apply_patch` result names give 2-second recent executing/writing feedback,
   not proof of success, continued execution or the emitting runtime's identity. Other names stay `other`.
 - In standalone 0.163.0, [manual `/compact` creates a new turn with no prompt input](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/handlers.rs#L247-L254), and [pre-sampling auto-compaction runs before input hooks](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/turn.rs#L189-L204). Like UserPromptSubmit, a root PreCompact

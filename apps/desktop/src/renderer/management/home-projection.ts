@@ -10,8 +10,7 @@ export function projectHomePets(configurations: ConfigurationsState, sessions: S
     const records = Object.fromEntries(Object.entries(sessions.sessions).filter(([id]) => configurations.sessionConfigurations[id] === record.id));
     const presentation = projectPetPresentation({ sessions: records, bubbles });
     const action = presentation.action;
-    const recentLabels: Partial<Record<typeof action, string>> = { reading: '刚刚读取了内容', writing: '刚刚修改了文件', searching: '刚刚进行了搜索', executing: '刚刚运行了命令', compacting: '刚刚压缩了上下文' };
-    const status = presentation.replay && recentLabels[action] ? recentLabels[action]! : action === 'idle' ? '陪伴中' : action === 'working' ? '工作中' : action === 'error' ? record.provider === 'claude' ? '回答出错了' : '出错了' : action === 'success' ? '已完成' : petActionCatalog[action].label;
+    const status = action === 'idle' ? '陪伴中' : action === 'working' ? '工作中' : action === 'error' ? record.provider === 'claude' ? '回答出错了' : '出错了' : action === 'success' ? '已完成' : petActionCatalog[action].label;
     return { connectionCue: record.connectionCue, id: record.id, assetId: record.pet?.assetId ?? 'starter', agent: providerLabels[record.provider], name: record.pet?.name ?? defaultName, configuration: record.name, action, status, replay: presentation.replay, restAction: presentation.restAction };
   });
 }

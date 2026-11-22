@@ -61,8 +61,11 @@ export class PiSessionMapper {
       this.context = { ...context, facts: message.facts ?? { activities: [], waitingForInput: false }, baseline: false, ...(message.capabilities ? { capabilities: message.capabilities } : {}), status: message.status, ...(message.workId !== undefined ? { workId: message.workId } : {}) };
       this.publish(message.status, message.sentAt, message.workId);
     } else if (message.type === 'companion' && this.connected) {
+      const wasWaiting = !!this.context.facts?.waitingForInput && this.context.capabilities?.waiting_input === 'supported';
       this.context = { ...this.context, facts: message.facts, ...(message.capabilities ? { capabilities: message.capabilities } : {}) };
-      this.publish(this.context.status, message.sentAt, this.context.workId);
+      const waiting = message.facts.waitingForInput && this.context.capabilities?.waiting_input === 'supported';
+      // Tool and stream updates must not promote an older working session over a newer wait.
+      if (waiting !== wasWaiting) this.publish(this.context.status, message.sentAt, this.context.workId);
     }
   }
   disconnected(): void {

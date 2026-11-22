@@ -10,9 +10,9 @@
 
 | Agent、版本与接入方式 | 桌宠能依据什么显示状态 | 不能据此判断什么 |
 | --- | --- | --- |
-| [pi 0.85.1 TUI](integrations/pi-extension/README.md)，从实际配置目录加载用户扩展 | `agent_start` 表示开始工作；整轮结束且回到空闲时，结合本轮终止信息区分完成、错误或取消。可观察扩展发起的输入等待。 | 单个工具结束不代表整轮完成；业务重试未知。此接入不支持 SDK/RPC。 |
+| [pi 0.85.1 TUI](integrations/pi-extension/README.md)，从实际配置目录加载用户扩展 | `agent_start` 表示开始工作；整轮结束且回到空闲时，结合本轮终止信息区分完成、错误或取消。可观察扩展发起的输入等待。中途切换工具不改变工作姿态，取消不单独播报。 | 单个工具结束不代表整轮完成；业务重试未知。此接入不支持 SDK/RPC。 |
 | [Claude Code 2.1.301 CLI](integrations/claude-hooks/README.md)，npm 原生 `bin/claude.exe` 布局。首次连接默认 `~/.claude` 时，Agent Pet 安装用户级观察插件；自定义配置仍使用 `settings.json` hooks，已有连接不迁移 | 与当前提示匹配的 `StopFailure` 可显示回答出错；工具返回只用于确认本轮确实执行过，不单独提示。压缩上下文不会切换桌宠动作。 | 提交提示不证明持续工作；权限提醒不证明持续等待；`Stop` 不证明整轮成功，也不能据此判断取消。 |
-| [Codex CLI 0.163.0](integrations/codex-hooks/README.md)，standalone 安装，通过 hooks 观察 | 首轮收到已验证事件后才可能出现桌宠；Bash 和 `apply_patch` 返回后可显示执行或写入反馈，当前轮次压缩完成可短暂提示，根会话显式中断可显示取消。 | 打开空 CLI 不保证立即在线；不能推断持续工作、等待、整轮成功或一般命令、模型错误。 |
+| [Codex CLI 0.163.0](integrations/codex-hooks/README.md)，standalone 安装，通过 hooks 观察 | 首轮收到已验证事件后才可能出现桌宠；工具返回、压缩和明确中断可作为内部事实，但桌面和首页均不单独提示。 | 打开空 CLI 不保证立即在线；不能推断持续工作、等待、整轮成功或一般命令、模型错误。 |
 | [Codex 桌面内置程序](integrations/codex-hooks/README.md)，仅限已核对的 macOS `ChatGPT.app` 签名布局（外层版本 `26.1111.21308`） | 接收端只接受所选配置的 `SessionStart` / `SessionEnd`，并校验发送进程。 | 会话结束不代表任务成功或应用退出；不能套用上一行 CLI 的工具和取消反馈。 |
 
 已有 Claude 任务事件连接不需要重装插件或重新绑定。即使旧观察程序仍发送工具分类，Agent Pet 也不据此播放读取、搜索等动作。

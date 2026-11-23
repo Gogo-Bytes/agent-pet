@@ -38,8 +38,8 @@ export type SessionRecord = SessionObservation & {
 
 export function standardBehavior(observation: SessionObservation) {
   if (observation.connected === false || observation.status === 'offline') return 'idle';
-  if (observation.status === 'completed' || observation.status === 'error') return observation.status;
   if (observation.facts?.waitingForInput && observation.capabilities?.waiting_input === 'supported') return 'waiting_input';
+  if (observation.status === 'completed' || observation.status === 'error') return observation.status;
   return observation.status === 'working' ? 'working' : 'idle';
 }
 
@@ -86,23 +86,26 @@ export function applyObservation(
   }
   const name = getSessionName(observation);
   const behavior = standardBehavior(observation);
-  const retainedResult = previous && previous.workId === observation.workId && previous.status === behavior &&
-    (behavior === 'completed' || behavior === 'error');
-  const changed = behavior !== 'idle' && !retainedResult && !isAcknowledgedTerminal(previousMeta, observation) &&
-    (!previous || standardBehavior(previous) !== behavior || previous.workId !== observation.workId);
+  const previousBehavior = previous && standardBehavior(previous);
+  const terminal = behavior === 'completed' || behavior === 'error';
+  // Closing a prompt can expose an old unread result; that is not a new completion.
+  const retainedResult = terminal && previous?.status === behavior && previous.workId === observation.workId;
+  const changed = behavior !== 'idle' && !retainedResult && !(terminal && isAcknowledgedTerminal(previousMeta, observation)) &&
+    (previousBehavior !== behavior || previous?.workId !== observation.workId);
   const behaviorSequence = (state.behaviorSequence ?? 0) + Number(changed);
   const sessions = { ...state.sessions };
   if (changed) {
     // Superseded results stay unread, but only sustained behaviors may resume.
     for (const record of Object.values(sessions)) {
+      const displayed = standardBehavior(record);
       if (record.configurationId === observation.configurationId && record.behaviorOrder &&
-          (record.status === 'completed' || record.status === 'error')) {
+          (displayed === 'completed' || displayed === 'error')) {
         sessions[record.sessionId] = { ...record, behaviorOrder: 0 };
       }
     }
   }
   sessions[observation.sessionId] = { ...observation, name,
-    behaviorOrder: changed ? behaviorSequence : behavior === 'idle' ? 0 : previous?.behaviorOrder ?? 0 };
+    behaviorOrder: changed ? behaviorSequence : behavior === previousBehavior ? previous?.behaviorOrder ?? 0 : 0 };
   const displayStatus = observation.connected === false && observation.status === 'working'
     ? undefined : toDisplayStatus(observation.status);
   const meta = {
@@ -140,7 +143,7 @@ export function acknowledgeBubble(
     (candidate) => candidate.sessionId !== sessionId || candidate.status === 'working',
   );
   const sessions = { ...state.sessions };
-  if (bubble && bubble.status !== 'working') delete sessions[sessionId];
+  if (bubble && bubble.status !== 'working' && session && standardBehavior(session) !== 'waiting_input') delete sessions[sessionId];
   const meta = {
     ...sessionMeta,
     [sessionId]: {
@@ -159,7 +162,7 @@ function retainSessions(
 ): { sessions: Record<string, SessionRecord>; meta: Record<string, SessionMeta> } {
   const ids = Object.keys(sessions);
   const protectedIds = new Set(bubbles.map(bubble => bubble.sessionId));
-  const removable = ids.filter(id => !protectedIds.has(id) && sessions[id]?.status !== 'working');
+  const removable = ids.filter(id => !protectedIds.has(id) && sessions[id]?.status !== 'working' && standardBehavior(sessions[id]!) !== 'waiting_input');
   const removeCount = Math.min(removable.length, Math.max(0, ids.length - MAX_RETAINED_SESSIONS));
   const removed = new Set(removable.slice(0, removeCount));
   const metaIds = Object.keys(meta);

@@ -33,12 +33,6 @@ export function usePetAnimation(surface: Surface, root: Group, clips: AnimationC
   const local = interaction && !reduced && resolvePetAnimation(interaction.action, mappings, names)?.action === interaction.action ? interaction : null;
   const connection = useMemo(() => connectionCue && !playedCues.has(connectionCue) && !reduced && !local &&
     (request === 'idle' || request === 'presence') ? connectionCue : undefined, [connectionCue, request, reduced, local]);
-  useEffect(() => {
-    let active = true;
-    // Superseded, missing or reduced connection cues never queue for later idle.
-    if (connectionCue) queueMicrotask(() => { if (active) rememberCue(connectionCue); });
-    return () => { active = false; };
-  }, [connectionCue]);
   const input = useRef({ request, replay, restAction, local, reduced, onInteractionFinished, connection, reset, visible });
   input.current = { request, replay, restAction, local, reduced, onInteractionFinished, connection, reset, visible };
   const synchronize = useRef<() => void>(() => {});
@@ -104,10 +98,7 @@ export function usePetAnimation(surface: Surface, root: Group, clips: AnimationC
       current = next;
       pending = null;
       displayedCue = next.cue;
-      if (next.cue) {
-        const cue = next.cue;
-        queueMicrotask(() => { if (active) rememberCue(cue); });
-      }
+      if (next.cue) rememberCue(next.cue);
       if (!skipIn && !next.once && !next.local && next.animation?.in && !input.current.reduced && input.current.visible) play(next.animation, next.animation.in, 'in');
       else body(next);
     }
@@ -117,19 +108,17 @@ export function usePetAnimation(surface: Surface, root: Group, clips: AnimationC
       if ((lastReduced && !value.reduced) || (!lastVisible && value.visible)) displayedCue = undefined;
       lastReset = value.reset; lastReduced = value.reduced; lastVisible = value.visible;
       const next = desired();
+      if (!current?.local && !next.local && current?.key === next.key) {
+        if (next.cue) rememberCue(next.cue);
+        if (playing) playing.paused = value.reduced || !value.visible;
+        if (phase === 'out') body(next);
+        return;
+      }
       if (hard || value.reduced || !value.visible) {
         enter(next.local ? target(value.restAction) : next, true);
         return;
       }
       if (current?.local && next.local === current.local) return;
-      if (!current?.local && !next.local && current?.key === next.key) {
-        if (next.cue) {
-          const cue = next.cue;
-          queueMicrotask(() => { if (active) rememberCue(cue); });
-        }
-        if (phase === 'out') body(next);
-        return;
-      }
       // Local feedback overlays the sustained state; it never causes out/in.
       if (next.local || current?.local) { enter(next, !!current?.local); return; }
       const requested = normalizePetAction(value.request);
@@ -161,7 +150,9 @@ export function usePetAnimation(surface: Surface, root: Group, clips: AnimationC
       });
     };
     function cancel() {
-      if (current?.local) { finishedLocal = current.local; input.current.onInteractionFinished?.(); }
+      // A window event can cancel feedback, not an unchanged business posture.
+      if (!current || (!current.local && !current.once && input.current.request !== 'dragging')) return;
+      if (current.local) { finishedLocal = current.local; input.current.onInteractionFinished?.(); }
       if (current?.once) completedKey = current.key;
       displayedCue = undefined;
       const request = normalizePetAction(input.current.request);
@@ -185,5 +176,14 @@ export function usePetAnimation(surface: Surface, root: Group, clips: AnimationC
     };
   }, [actions, mixer, root, clips, mappings, names, surface]);
 
-  useEffect(() => { synchronize.current(); }, [actions, mixer, root, clips, mappings, request, replay, restAction, local, reduced, connection, reset, visible]);
+  useEffect(() => {
+    // StrictMode tears down its probe mount synchronously. Only the surviving effect starts the mixer.
+    let live = true;
+    queueMicrotask(() => {
+      if (!live) return;
+      synchronize.current();
+      if (connectionCue) rememberCue(connectionCue); // Covered greetings never queue for later idle.
+    });
+    return () => { live = false; };
+  }, [actions, mixer, root, clips, mappings, surface, request, replay, restAction, local, reduced, connection, connectionCue, reset, visible]);
 }

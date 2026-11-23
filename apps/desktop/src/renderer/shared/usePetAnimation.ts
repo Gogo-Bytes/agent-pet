@@ -13,8 +13,19 @@ function rememberCue(key: string) {
 
 type Target = { animation: ResolvedPetAnimation | null; key: string; once: boolean; local: PetInteraction | null; cue?: string };
 
+type Surface = 'desktop' | 'home' | 'preview';
+type Phase = 'in' | 'loop' | 'out' | 'once';
+
+function startClip(playing: AnimationAction, surface: Surface, action: ResolvedPetAnimation['action'], phase: Phase) {
+  const once = phase !== 'loop';
+  playing.reset().setLoop(once ? LoopOnce : LoopRepeat, once ? 1 : Infinity);
+  playing.clampWhenFinished = once;
+  playing.play();
+  if (import.meta.env.DEV) console.info('[pet-animation:start]', { timeMs: Date.now(), surface, action, clip: playing.getClip().name, phase });
+}
+
 /** Shared desktop/home/audition player. Drei owns mixer advancement and disposal. */
-export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: PetAnimations,
+export function usePetAnimation(surface: Surface, root: Group, clips: AnimationClip[], mappings: PetAnimations,
   request: string, reduced: boolean, replay: string | number = 0, restAction = 'idle',
   interaction: PetInteraction | null = null, onInteractionFinished?: () => void, connectionCue?: string,
   reset = 0, visible = true) {
@@ -39,7 +50,7 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
     let playing: AnimationAction | undefined;
     let current: Target | null = null;
     let pending: Target | null = null;
-    let phase: 'in' | 'loop' | 'out' | 'once' = 'loop';
+    let phase: Phase = 'loop';
     let generation = 0;
     let lastReset = input.current.reset;
     let lastReduced = input.current.reduced;
@@ -74,23 +85,20 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
       if (next.key !== lastRequestKey) { lastRequestKey = next.key; completedKey = null; }
       return next.key === completedKey || (next.cue && playedCues.has(next.cue) && next.cue !== displayedCue) ? target(value.restAction) : next;
     }
-    function play(clip: string | undefined, nextPhase: typeof phase, once: boolean) {
+    function play(animation: ResolvedPetAnimation | null, clip: string | undefined, nextPhase: Phase) {
       generation++;
       playing?.stop();
       playing = clip ? actions[clip] ?? undefined : undefined;
       phase = nextPhase;
-      if (!playing) return;
-      playing.reset().setLoop(once ? LoopOnce : LoopRepeat, once ? 1 : Infinity);
-      // Keep the completion pose until the deferred handoff; never rebind inside update().
-      playing.clampWhenFinished = once;
-      playing.play();
+      if (!playing || !animation) return;
+      startClip(playing, surface, animation.action, nextPhase);
       playing.paused = input.current.reduced || !input.current.visible;
       mixer.update(0);
     }
     function body(next: Target) {
       current = next;
       pending = null;
-      play(next.animation?.clip, next.once ? 'once' : 'loop', next.once);
+      play(next.animation, next.animation?.clip, next.once ? 'once' : 'loop');
     }
     function enter(next: Target, skipIn = false) {
       current = next;
@@ -100,7 +108,7 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
         const cue = next.cue;
         queueMicrotask(() => { if (active) rememberCue(cue); });
       }
-      if (!skipIn && !next.once && !next.local && next.animation?.in && !input.current.reduced && input.current.visible) play(next.animation.in, 'in', true);
+      if (!skipIn && !next.once && !next.local && next.animation?.in && !input.current.reduced && input.current.visible) play(next.animation, next.animation.in, 'in');
       else body(next);
     }
     function sync() {
@@ -130,7 +138,7 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
       if (phase === 'out') { pending = next; return; }
       if (phase === 'loop' && current?.animation?.out) {
         pending = next;
-        play(current.animation.out, 'out', true);
+        play(current.animation, current.animation.out, 'out');
       } else enter(next);
     }
     const finished = (event: { action: AnimationAction }) => {
@@ -175,7 +183,7 @@ export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: P
       document.removeEventListener('visibilitychange', visibility);
       playing?.stop();
     };
-  }, [actions, mixer, root, clips, mappings, names]);
+  }, [actions, mixer, root, clips, mappings, names, surface]);
 
   useEffect(() => { synchronize.current(); }, [actions, mixer, root, clips, mappings, request, replay, restAction, local, reduced, connection, reset, visible]);
 }

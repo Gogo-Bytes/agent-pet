@@ -22,6 +22,10 @@ supported versions are documented for [pi](../../integrations/pi-extension/READM
 [Codex](../../integrations/codex-hooks/README.md). Current task status belongs in
 the linked Issue.
 
+## Inspect animation starts in development
+
+In the renderer's DevTools Console, filter for `[pet-animation:start]` (Info level). Compare `timeMs` (Unix milliseconds) across windows; `surface` separates `desktop`, `home` and asset `preview`. Each entry is one Three.js playback start, including restarts, with the resolved action, actual clip name and phase (`in`, `loop`, `out` or `once`). A loop repeating naturally adds no entry. A start is not proof of visible frames or an unread bubble: compare the animation with what you see and check the notification list separately. Production builds omit the log.
+
 ## Application structure
 
 - `index.html` and `main.tsx` start the desktop pet. `management.html` and

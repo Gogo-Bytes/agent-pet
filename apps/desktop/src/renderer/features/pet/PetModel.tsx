@@ -18,7 +18,7 @@ export function PetModel({ connectionCue, interaction = null, onInteractionFinis
   const root = usePetInstance(gltf.scene);
   const envelope = useMemo(() => modelUrl ? new Box3().setFromObject(gltf.scene) : bundledAnimationBounds(gltf.scene, gltf.animations), [gltf.scene, gltf.animations, modelUrl]);
   // Keep incoming business cues unconsumed and the drag clip stable until release.
-  usePetAnimation(root, gltf.animations, animations ?? (modelUrl ? noAnimations : bundledAnimations), dragging ? 'dragging' : motion, reduced, dragging ? 0 : replay, restAction, interaction, onInteractionFinished, connectionCue, animationReset, visible);
+  usePetAnimation('desktop', root, gltf.animations, animations ?? (modelUrl ? noAnimations : bundledAnimations), dragging ? 'dragging' : motion, reduced, dragging ? 0 : replay, restAction, interaction, onInteractionFinished, connectionCue, animationReset, visible);
   const pitch = reduced ? 0 : dragDirection === 'up' ? -dragTilt : dragDirection === 'down' ? dragTilt : 0;
   const yaw = reduced ? 0 : dragDirection === 'left' ? -dragTilt : dragDirection === 'right' ? dragTilt : 0;
   const bounds = useBounds();

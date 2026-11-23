@@ -12,8 +12,8 @@ export const petActions = petActionIds.map(id => ({ id, label: petActionCatalog[
 
 const noAnimations: PetAnimations = {};
 
-export function ScenePet({ connectionCue, action, replay = 0, reduced, onReady, animations, restAction = 'idle', modelUrl, interactive = false, selection = 0 }:  {
-  connectionCue?: string | undefined; interactive?: boolean; selection?: number; action: string; replay?: number | string; restAction?: string; reduced: boolean; onReady: (clips: string[]) => void; animations?: PetAnimations | undefined; modelUrl?: string | undefined;
+export function ScenePet({ surface = 'preview', connectionCue, action, replay = 0, reduced, onReady, animations, restAction = 'idle', modelUrl, interactive = false, selection = 0 }:  {
+  surface?: 'home' | 'preview'; connectionCue?: string | undefined; interactive?: boolean; selection?: number; action: string; replay?: number | string; restAction?: string; reduced: boolean; onReady: (clips: string[]) => void; animations?: PetAnimations | undefined; modelUrl?: string | undefined;
 }) {
   const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(modelUrl ?? starterUrl, false, false);
   const root = usePetInstance(gltf.scene);
@@ -30,7 +30,7 @@ export function ScenePet({ connectionCue, action, replay = 0, reduced, onReady, 
     return { scale, position: [-center.x * scale, -bounds.min.y * scale, -center.z * scale] as [number, number, number] };
   }, [envelope]);
   const interaction = usePetInteraction(interactive && !reduced, selection);
-  usePetAnimation(root, gltf.animations, animations ?? (modelUrl ? noAnimations : bundledAnimations), normalizePetAction(action) ?? action, reduced, replay, restAction, interaction.feedback, interaction.finish, connectionCue);
+  usePetAnimation(surface, root, gltf.animations, animations ?? (modelUrl ? noAnimations : bundledAnimations), normalizePetAction(action) ?? action, reduced, replay, restAction, interaction.feedback, interaction.finish, connectionCue);
   useEffect(() => { onReady(availablePetActions(animations ?? (modelUrl ? {} : bundledAnimations), gltf.animations.map(clip => clip.name))); }, [gltf.animations, animations, modelUrl, onReady]);
   return <group name="scene-pet-pointer-target" scale={transform.scale} position={transform.position}
     onPointerOver={event => { event.stopPropagation(); interaction.hover(true); }} onPointerOut={event => {

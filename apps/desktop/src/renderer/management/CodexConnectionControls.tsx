@@ -13,7 +13,7 @@ export function codexConnectionSummary(state: CodexConnectionState | undefined):
   }
 }
 const notices: Record<CodexConnectionState['notice'], string> = {
-  none: '', 'rescan-required': '请重新扫描 Codex 安装，然后继续连接。', 'unsupported-installation': '当前仅支持已验证的 Codex standalone 0.163.0 安装。',
+  none: '', 'rescan-required': '请重新扫描 Codex 安装，然后继续连接。', 'unsupported-installation': '当前 Codex 安装或宿主版本不受支持。',
   'preview-failed': '无法检查连接设置。', 'stale-preview': '预览已失效，请重新查看设置。',
   'save-failed': '未能确认保存成功。',
   'saved-invalid': '',

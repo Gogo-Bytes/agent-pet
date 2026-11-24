@@ -4,7 +4,7 @@ import type { SessionObservation } from '@agent-pet/domain';
 import type { CodexConnectionState } from '../shared/codex-connection.js';
 import { CodexNormalObserver } from './codex-normal-observer.js';
 import { CodexRegistrationStore } from './codex-registration-store.js';
-import { inspectCodexExecutable, inspectCodexHostExecutable, resolveCodexHostExecutable } from './codex-executable.js';
+import { inspectCodexExecutable, inspectCodexHostExecutable, pairedStandaloneExecutable, resolveCodexHostExecutable } from './codex-executable.js';
 import { desktopExecutable, eventsForCodexHost, verifyDesktopSignature } from '../../../../integrations/codex-hooks/desktop-signature.js';
 import { createCodexNormalHookDocument } from '../../../../integrations/codex-hooks/hook-source.js';
 import { prepareCodexUserHook, revalidateCodexUserHook, applyCodexUserHook, inspectCodexUserHook, withdrawCodexUserHook, type CodexHookPlan } from './codex-user-hook.js';
@@ -55,7 +55,7 @@ export class CodexConnection {
     return command === expected.hooks.SessionStart[0]!.hooks[0]!.command;
   }
   private createObserver(executable: string) {
-    return new CodexNormalObserver({ ...this.options, directory: this.runtimeDirectory, executable,
+    return new CodexNormalObserver({ ...this.options, directory: this.runtimeDirectory, executable, standaloneExecutable: pairedStandaloneExecutable(executable),
       onChange: () => { if (!this.closed) this.emit(); } });
   }
   /** Main-owned discovery evidence, rechecked on retries and before any installation writes. */

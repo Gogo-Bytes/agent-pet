@@ -35,7 +35,7 @@ export async function checkedNativeProbe(probe: NativeHostProbe, requested: numb
   finally { clearTimeout(timer); }
 }
 /** The supplied hook PID is a candidate, never trusted until the complete native ancestry is rechecked. */
-export async function verifyNativeHost(options: { hookPid: number; executable: string; observerExecutable: string;
+export async function verifyNativeHost(options: { hookPid: number; executable: string; alternateExecutable?: string | undefined; observerExecutable: string;
   probe: NativeHostProbe; active(): boolean }): Promise<NativeHostIdentity | null> {
   const chain: NativeHostIdentity[] = []; let current = options.hookPid, host: NativeHostIdentity | undefined;
   for (let depth = 0; depth < 16 && nativePid(current); depth++) {
@@ -43,7 +43,7 @@ export async function verifyNativeHost(options: { hookPid: number; executable: s
     const item = await checkedNativeProbe(options.probe, current);
     if (!item || !options.active() || (depth === 0 && item.executable !== options.observerExecutable)) return null;
     chain.push(item);
-    if (depth > 0 && item.executable === options.executable) { host = item; break; }
+    if (depth > 0 && (item.executable === options.executable || item.executable === options.alternateExecutable)) { host = item; break; }
     current = item.ppid;
   }
   if (!host) return null;

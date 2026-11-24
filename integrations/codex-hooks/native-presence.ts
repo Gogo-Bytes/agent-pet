@@ -19,7 +19,7 @@ function parse(text: string): Delivery | null {
 type Host = { identity: NativeHostIdentity; runId: string; sessions: Map<string, boolean>; seen: Set<string> };
 /** Normal-start ingress. A verified native event proves observation, not CLI-window lifetime or task success. */
 export async function startCodexNativePresence(options: {
-  token: string; executable: string; observerExecutable: string; probePath: string;
+  token: string; executable: string; standaloneExecutable?: string | undefined; observerExecutable: string; probePath: string;
   onFact(delivery: { runId: string; fact: CodexHookFact }): void;
   onRetire(runId: string): void;
   onChange?(state: { observedHosts: number; observedSessions: number }): void;
@@ -59,7 +59,7 @@ export async function startCodexNativePresence(options: {
     accept: async (delivery, active) => {
       const available = () => active() && !closed;
       const identity = await verifyNativeHost({ hookPid: delivery.hookPid, executable: options.executable,
-        observerExecutable: options.observerExecutable, probe, active: available });
+        alternateExecutable: options.standaloneExecutable, observerExecutable: options.observerExecutable, probe, active: available });
       if (!identity || !available() || retired.has(identityKey(identity))) return false;
       if (identity.executable === desktopExecutable) {
         try { await verifyDesktopSignature(identity.pid); } catch { return false; }

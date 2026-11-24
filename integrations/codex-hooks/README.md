@@ -2,7 +2,7 @@
 
 Current path: native command hooks → protected activation → independently verified
 macOS host identity → private mapper → Configurations/Application/Home/desktop.
-The standalone 0.163.0 layout retains its ten-event profile. For the observed macOS desktop bundle layout, setup instead offers only `SessionStart` and `SessionEnd`. Discovery checks the signed file; the receiver checks the live host PID against the OpenAI signing requirement and rechecks process identity before accepting the event. Neither profile infers the client UI from the payload. Real desktop delivery has not been confirmed. Task priorities are in the [MVP entry](../../docs/MVP-EXECUTION-PLAN.md).
+Standalone 0.163.0 and standalone 0.171.0 with the dedicated 0.172.0 daemon use the ten-event profile. For this pair the hook can be launched by the TUI itself or by the daemon. Setup checks the selected CLI against the canonical standalone sibling of the registered daemon. Live ancestry must match one of those two exact executables. For the observed macOS desktop bundle layout, setup instead offers only `SessionStart` and `SessionEnd`. Discovery checks the signed file; the receiver checks the live host PID against the OpenAI signing requirement and rechecks process identity before accepting the event. Neither profile infers the client UI from the payload. Real desktop delivery has not been confirmed. Task priorities are in the [MVP entry](../../docs/MVP-EXECUTION-PLAN.md).
 
 ## Connection setup: scan once, never pick a program file
 

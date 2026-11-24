@@ -7,7 +7,7 @@ import type { NativeHostProbe } from '../hook-runtime/native-host.js';
  * No Codex installation, Agent launch, TOML edit, hook trust or Renderer filesystem access.
  */
 export async function startCodexNormalBridge(options: {
-  configurationId: string; executable: string; observerExecutable: string; probePath: string;
+  configurationId: string; executable: string; standaloneExecutable?: string | undefined; observerExecutable: string; probePath: string;
   name(): string; publish(observation: SessionObservation): void;
   onChange?(state: { observedHosts: number; observedSessions: number }): void;
   probe?: NativeHostProbe;

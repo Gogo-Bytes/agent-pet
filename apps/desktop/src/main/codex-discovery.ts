@@ -2,7 +2,7 @@ import { realpath } from 'node:fs/promises';
 import { desktopExecutable, verifyDesktopSignature } from '../../../../integrations/codex-hooks/desktop-signature.js';
 import { dirname, join } from 'node:path';
 import type { CodexInstallation } from '../shared/codex-discovery.js';
-import { codexExecutableLayout } from './codex-executable.js';
+import { codexRelease } from './codex-executable.js';
 import { InstallationDiscovery, resolveScannedExecutable } from './installation-discovery.js';
 import { ReadBudget } from './pi-preflight-files.js';
 
@@ -19,7 +19,8 @@ export async function inspectCodexInstallation(entryPath: string, budget = new R
   if (!executable) return null;
   const candidate: Omit<CodexInstallation, 'id'> = { entryPath, executable, kind: 'unknown', version: null, compatibility: 'unverified' };
   // Same layout guard as connection preparation; do not confuse the daemon with the CLI.
-  if (codexExecutableLayout(executable) === 'standalone') return { ...candidate, kind: 'standalone', compatibility: 'verified' };
+  const release = codexRelease(executable);
+  if (release?.kind === 'standalone') return { ...candidate, kind: release.kind, version: release.version, compatibility: 'verified' };
   if (/\/packages\/standalone\/releases\//.test(executable)) candidate.kind = 'standalone';
   if (/^\/(?:opt\/homebrew|usr\/local)\/(?:Cellar|Caskroom)\/codex\//.test(executable)) candidate.kind = 'homebrew';
   if (!executable.endsWith('/bin/codex.js')) return candidate;

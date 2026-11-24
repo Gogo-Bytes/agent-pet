@@ -17,8 +17,17 @@ entries for the same native program are deduplicated. Custom targets retain a ma
 flow. Discovery reads bounded metadata, not configuration, credentials or sessions,
 and does not execute candidates. GUI discovery does not fix a terminal's PATH.
 
-Setup separately requests target-read consent, previews `settings.json` changes, then
-confirms only owned hooks. Current task mode registers12 groups. Legacy presence-only
+For new connections to the default user directory, Agent Pet previews and installs a
+local `skills/agent-pet-observer/.claude-plugin/plugin.json` with the 12 observer hooks.
+It neither edits `settings.json` nor runs a marketplace command. A pre-existing plugin
+at that location is not adopted or replaced. Restore and removal check the saved file
+and directory identities and exact manifest; incomplete or edited trees are preserved.
+Claude Code [introduced skills-directory plugins in 2.1.157](https://github.com/anthropics/claude-code/releases/tag/v2.1.157).
+[Managed settings can block this source](https://code.claude.com/docs/en/plugins/loading);
+installation is not proof of event delivery. This route has not been exercised in a live session.
+
+Custom targets still preview `settings.json` changes and confirm only owned hooks.
+Existing registrations are restored in place, never migrated. Current task mode registers 12 groups. Legacy presence-only
 records retain one SessionStart until an explicit upgrade; resume never silently
 updates observer source or adds task hooks. New setup/upgrade requires a new Claude
 session. An already-running process without a startup callback to the new receiver
@@ -89,20 +98,18 @@ complete the parent.
 | UserPromptSubmit | Associate prompt, not proven execution |
 | PreToolUse / PermissionRequest | Requested tool / approval check; no fabricated tool ID or running state |
 | Notification.permission_prompt | Reminder, not paired sustained waiting; idle_prompt does not prove waiting |
-| PostToolUse | Matching current prompt/tool: Read, Write/Edit/MultiEdit/NotebookEdit, Grep/Glob or Bash give2-second recent feedback, not sustained work or turn completion |
-| PostToolUseFailure | tool_error only with is_interrupt explicitly false; missing/true does not imply whole-turn cancellation |
+| PostToolUse / PostToolUseFailure | A matching result can confirm the new prompt ran. Tool type and outcome do not trigger pet actions, including with older senders. Neither proves whole-turn failure, cancellation or success. |
 | StopFailure | Matching known prompt gives generic error/unread; unknown category stays unknown, no body parsing |
-| Stop / PreCompact / PostCompact | Clear/associate facts as supported, not whole-task success or ongoing compaction |
+| Stop / PreCompact | Neither proves whole-task success or ongoing compaction |
+| PostCompact | No pet action or session update. Finishing compaction does not finish a task or replace an unread result. |
 | SessionEnd / OS exit / pause | Clear feedback/observation at the appropriate identity layer, not success/failure/cancellation |
 
 No supported completion, whole-turn cancellation, thinking/responding, sustained waiting
 or business retry is inferred from these precursors. `max_output_tokens` is accepted by
 the normalizer but not classified as output_limited; [version/source boundary](../../docs/PROVIDER-ANIMATION-EVIDENCE.md).
-Unknown task state is not known idle; same-work unknown updates retain already-held
-error unread, while new work does not inherit it. Old presence-only records stay task-unknown.
+Submitting a prompt only changes private hook correlation. A blocked submit therefore leaves the previous unread error intact. The first matching tool result, Stop or StopFailure gives the new prompt its own work ID. Stop proves a response ran, not that it succeeded or is still running. Old presence-only records stay task-unknown.
 
-Feedback timers are owned before callbacks; stop/retire clears all runs even if a consumer
-throws/rejects. Replacement rechecks closed/run/current after disconnect callbacks so
+Session cleanup continues even if a consumer throws or rejects. Replacement rechecks closed/run/current after disconnect callbacks so
 reentry cannot revive a stopped mapper or overwrite a newer Session. Publication is
 best-effort, not transactions, ACK/retry or repair of partially delivered notifications.
 

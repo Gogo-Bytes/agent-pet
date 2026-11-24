@@ -78,7 +78,7 @@ export class Configurations {
         publish: observation => {
           const sessionId = `${metadata.id}:${observation.sessionId}`;
           this.sessionConfigurations[sessionId] = metadata.id;
-          this.options.publish({ ...observation, sessionId }); this.emit();
+          this.options.publish({ ...observation, sessionId, configurationId: metadata.id }); this.emit();
         }, developmentEnvironment: this.options.developmentEnvironment ?? false,
         store });
     }
@@ -95,7 +95,7 @@ export class Configurations {
       publish: observation => {
         const sessionId = `${entry.metadata.id}:${observation.sessionId}`;
         this.sessionConfigurations[sessionId] = entry.metadata.id;
-        this.options.publish({ ...observation, sessionId }); this.emit();
+        this.options.publish({ ...observation, sessionId, configurationId: entry.metadata.id }); this.emit();
       } });
     entry.claude = options.normal ? new ClaudeNormalPresence({ ...options, ...options.normal,
       onFact: delivery => entry.claudeObservations!.accept(delivery), onRetire: runId => entry.claudeObservations!.retire(runId),
@@ -110,7 +110,7 @@ export class Configurations {
       publish: observation => {
         const sessionId = `${entry.metadata.id}:${observation.sessionId}`;
         this.sessionConfigurations[sessionId] = entry.metadata.id;
-        this.options.publish({ ...observation, sessionId }); this.emit();
+        this.options.publish({ ...observation, sessionId, configurationId: entry.metadata.id }); this.emit();
       } });
     entry.unsubscribe = entry.codex.subscribe(() => this.emit());
     void entry.codex.restore();

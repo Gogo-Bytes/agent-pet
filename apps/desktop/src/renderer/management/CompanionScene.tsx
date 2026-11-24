@@ -1,24 +1,18 @@
-import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Icon } from './components/icons.js';
 import { GlassButton } from '../shared/ui/Glass.js';
 import { HomeScene, PetPreviewScene, type HomePet } from './ManagementScenes.js';
 export type { HomePet } from './ManagementScenes.js';
+import { PetSceneBoundary } from '../shared/PetSceneBoundary.js';
 import { PreferenceRenderLoop } from '../shared/PreferenceRenderLoop.js';
 import type { Preferences } from '../../shared/preferences.js';
 import type { PetAnimations } from '@agent-pet/pet-runtime';
 import './scene.css';
 
-class SceneBoundary extends Component<{ children: ReactNode; onError: () => void }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch() { this.props.onError(); }
-  render() { return this.state.failed ? null : this.props.children; }
-}
-
 /** Home and pet audition share one persistent Canvas and the same configuration projection. */
 export function CompanionScene({ pets, page, preferences, action, replay, modelUrl, animations, modelUrls, assetAnimations, onClips, children }: {
-  pets: HomePet[]; page: string; preferences: Preferences; action: string; replay: number; modelUrl?: string | undefined; animations?: Record<string, string | null> | undefined; modelUrls?: Record<string, string> | undefined; assetAnimations?: Record<string, PetAnimations> | undefined;
+  pets: HomePet[]; page: string; preferences: Preferences; action: string; replay: number; modelUrl?: string | undefined; animations?: PetAnimations | undefined; modelUrls?: Record<string, string> | undefined; assetAnimations?: Record<string, PetAnimations> | undefined;
   onClips: (clips: string[]) => void; children: ReactNode;
 }) {
   const [selection, setSelection] = useState<{ id: string; sequence: number } | null>(null);
@@ -27,7 +21,6 @@ export function CompanionScene({ pets, page, preferences, action, replay, modelU
   function select(id: string) { setSelection({ id, sequence: ++selectionSequence.current }); }
   const [documentVisible, setDocumentVisible] = useState(!document.hidden);
   const [systemReduced, setSystemReduced] = useState(false);
-  const [failedAsset, setFailedAsset] = useState<string | null>(null);
   const assetKey = JSON.stringify([modelUrl ?? 'starter', modelUrls ?? {}]);
   const [loading, setLoading] = useState(true);
   const surface = useRef<HTMLElement>(null);
@@ -56,17 +49,16 @@ export function CompanionScene({ pets, page, preferences, action, replay, modelU
   }
   return <section ref={surface} className="companion-scene" hidden={!visible} aria-label="宠物场景" data-focused={!!active} data-scene={editing ? 'pet' : 'home'}
     onKeyDown={event => { if (event.key === 'Escape' && active) { event.stopPropagation(); overview(true); } }}>
-    <SceneBoundary key={assetKey} onError={() => setFailedAsset(assetKey)}>
+    <PetSceneBoundary assetKey={assetKey} fallback={<div className="scene-message" role="alert"><p>宠物加载失败，请切换其他宠物或重新加载。</p><button className="cfg-secondary" onClick={() => location.reload()}>重新加载</button></div>}>
       <Canvas camera={{ position: [0, 4.5, 10], fov: 38 }} dpr={preferences.resolution / 100}
         gl={{ alpha: true, antialias: true }} frameloop="never" onPointerMissed={() => overview()}>
         <PreferenceRenderLoop active={visible && (!preferences.pauseHidden || documentVisible)} fps={preferences.fps} />
         <ambientLight intensity={2} /><directionalLight intensity={3} position={[-3, 7, 5]} color="#fff5ed" />
         <directionalLight intensity={1} position={[4, 3, -4]} color="#d6ceff" />
-        {editing ? <PetPreviewScene action={action} replay={replay} reduced={reduced} onReady={ready} modelUrl={modelUrl} animations={animations} />
-          : <HomeScene pets={pets} focused={focused} selection={selection} interactive={visible && documentVisible} reduced={reduced} onFocus={select} onReady={ready} modelUrls={modelUrls} animations={assetAnimations} />}
+        {editing ? <PetPreviewScene action={action} replay={replay} reduced={reduced || !documentVisible} onReady={ready} modelUrl={modelUrl} animations={animations} />
+          : <HomeScene pets={pets} focused={focused} selection={selection} interactive={visible && documentVisible} reduced={reduced || !visible || !documentVisible} onFocus={select} onReady={ready} modelUrls={modelUrls} animations={assetAnimations} />}
       </Canvas>
-    </SceneBoundary>
-    {failedAsset === assetKey && <div className="scene-message" role="alert"><p>宠物加载失败，请切换其他宠物或重新加载。</p><button className="cfg-secondary" onClick={() => location.reload()}>重新加载</button></div>}
+    </PetSceneBoundary>
     {editing ? children : <>
       {active && <><div className="pet-identity home-focus-info" role="status"><span className="identity-agent">{active.agent}</span><h1>{active.name}</h1><span className="identity-status">{active.status}</span><small>{active.configuration}</small></div>
         <GlassButton className="home-overview" onClick={() => overview(true)}><Icon name="left" />返回全景</GlassButton></>}

@@ -7,6 +7,7 @@ import { PetsView } from './PetsView.js';
 import { ConnectionsView } from './ConnectionsView.js';
 import { SettingsView } from './SettingsView.js';
 import { Icon } from './components/icons.js';
+import { releaseModelUrl } from '../shared/release-model-url.js';
 import { projectHomePets } from './home-projection.js';
 
 const emptyPetAssets = { version: 1 as const, records: [] };
@@ -47,11 +48,11 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
   const selectedAsset = assets.records.find(asset => asset.id === selectedAssetId) ?? assets.records[0];
   const assetAnimations = useMemo(() => Object.fromEntries(assets.records.filter(asset => asset.manifest.animations).map(asset => [asset.id, asset.manifest.animations!])), [assets.records]);
   const pets = useMemo(() => snapshot.configurations ? projectHomePets(snapshot.configurations, snapshot.sessions, preferences.petName) : [], [snapshot.configurations, snapshot.sessions, preferences.petName]);
-  const modelAssetIds = useMemo(() => {
+  const modelAssetKey = useMemo(() => {
     const ids = new Set<string>();
     if (selectedAsset?.source === 'imported') ids.add(selectedAsset.id);
     pets.forEach(pet => { if (pet.assetId && pet.assetId !== 'starter') ids.add(pet.assetId); });
-    return [...ids];
+    return [...ids].sort().join(',');
   }, [pets, selectedAsset?.id, selectedAsset?.source]);
   const importedAssetIds = useMemo(() => assets.records.filter(asset => asset.source === 'imported').map(asset => asset.id), [assets.records]);
   useEffect(() => {
@@ -59,21 +60,21 @@ export function ManagementApp({ bridge = window.management }: { bridge?: Managem
     let active = true; const urls: string[] = []; const entries: [string, string][] = [];
     setAssetModels({}); setModelReadFailed(false);
     void (async () => {
-      for (const id of modelAssetIds) {
+      for (const id of modelAssetKey ? modelAssetKey.split(',') : []) {
         if (!active) return;
         try {
           const bytes = await petAssets.getModel(id);
-          if (!bytes) { if (active) setModelReadFailed(true); continue; }
+          if (!active) return;
+          if (!bytes) { setModelReadFailed(true); continue; }
           const copy = new Uint8Array(bytes.byteLength); copy.set(bytes);
           const url = URL.createObjectURL(new Blob([copy.buffer], { type: 'model/gltf-binary' }));
-          if (!active) { URL.revokeObjectURL(url); return; }
           urls.push(url); entries.push([id, url]);
         } catch { if (active) setModelReadFailed(true); }
       }
       if (active) setAssetModels(Object.fromEntries(entries));
     })();
-    return () => { active = false; urls.forEach(url => URL.revokeObjectURL(url)); };
-  }, [modelAssetIds, petAssets, bridge.petAssets]);
+    return () => { active = false; urls.forEach(releaseModelUrl); };
+  }, [modelAssetKey, assets.records, petAssets, bridge.petAssets]);
   useEffect(() => {
     if (!bridge.petAssets) return;
     let active = true; const urls: string[] = []; const entries: [string, string][] = [];

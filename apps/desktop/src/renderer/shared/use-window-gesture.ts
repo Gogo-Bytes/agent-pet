@@ -12,12 +12,13 @@ export function useWindowGesture(bridge: PetBridge, kind: 'moveWindowBy' | 'resi
     target: Element | null; pointerId: number | null;
   } | null>(null);
   const [active, setActive] = useState(false);
+  const [cancelRevision, setCancelRevision] = useState(0);
   const [direction, setDirection] = useState<DragDirection | null>(null);
   const release = useCallback((cancel = false) => {
     const current = lease.current;
     if (!current) return;
     lease.current = null;
-    if (cancel) current.cancel();
+    if (cancel) { setCancelRevision(value => value + 1); current.cancel(); }
     if (current.pointerId !== null && current.target?.hasPointerCapture(current.pointerId)) {
       current.target.releasePointerCapture(current.pointerId);
     }
@@ -26,11 +27,13 @@ export function useWindowGesture(bridge: PetBridge, kind: 'moveWindowBy' | 'resi
   }, [bridge]);
   useEffect(() => {
     const blur = () => release(true);
+    const visibility = () => { if (document.hidden) release(true); };
     window.addEventListener('blur', blur);
-    return () => { window.removeEventListener('blur', blur); release(true); };
+    document.addEventListener('visibilitychange', visibility);
+    return () => { window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility); release(true); };
   }, [release]);
   const bind = useDrag(({ first, last, canceled, event, delta, cancel }) => {
-    if (canceled) { release(); return; }
+    if (canceled) { release(true); return; }
     const pointer = 'screenX' in event;
     if (first) {
       lease.current = {
@@ -43,7 +46,7 @@ export function useWindowGesture(bridge: PetBridge, kind: 'moveWindowBy' | 'resi
     }
     const current = lease.current;
     if (!current) return;
-    if (last) { release(); return; }
+    if (last) { release(event.type === 'pointercancel' || event.type === 'lostpointercapture'); return; }
     let [x, y] = delta;
     if (pointer) {
       const previous = current.point;
@@ -57,5 +60,5 @@ export function useWindowGesture(bridge: PetBridge, kind: 'moveWindowBy' | 'resi
       void bridge[kind]({ x, y });
     }
   }, { pointer: { keys: kind === 'resizeWindowBy' }, keyboardDisplacement: 10, threshold: 0 });
-  return { active, direction, handlers: { ...bind(), onBlur: () => release(true) } };
+  return { active, direction, cancelRevision, handlers: { ...bind(), onBlur: () => release(true) } };
 }

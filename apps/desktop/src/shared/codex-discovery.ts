@@ -1,7 +1,7 @@
 /** Metadata hints only; neither a signature nor an online/runtime version claim. */
 export interface CodexInstallation {
   id: string; entryPath: string; executable: string;
-  kind: 'standalone' | 'npm' | 'homebrew' | 'unknown';
+  kind: 'standalone' | 'native' | 'npm' | 'homebrew' | 'unknown';
   version: string | null;
   compatibility: 'verified' | 'unverified';
 }

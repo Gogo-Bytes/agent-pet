@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import { join } from 'node:path';
 import type { CodexHookAddition } from '../shared/codex-connection.js';
 import { samePersistedIdentity, withVolumeIdentity } from './durable-file-identity.js';
-import { codexHookEvents } from '../../../../integrations/codex-hooks/hook-source.js';
+import { codexHookEvents, type CodexHookEvents } from '../../../../integrations/codex-hooks/hook-source.js';
 import { exact, validDirectory, directoryPaths, identity, safeDirectory, readSource, scan, append, remove, write,
   sameIdentity, sameFile, type Identity, type Node, type Context } from './protected-json-file.js';
 export type CodexHookOwnership = { schemaVersion: 1; directory: string; command: string;
@@ -10,7 +10,7 @@ export type CodexHookOwnership = { schemaVersion: 1; directory: string; command:
 /** Main-only. Original hooks may contain private commands; never expose ownership/backup through IPC. */
 export type CodexHookPlan = Readonly<{ path: string; exists: boolean; canApply: boolean; addition: CodexHookAddition | null;
   original: string | null; ownership: CodexHookOwnership | null }>;
-const plans = new WeakMap<CodexHookPlan, { context: Context; source: ReturnType<typeof readSource>; text: string }>();
+const plans = new WeakMap<CodexHookPlan, { events: CodexHookEvents; context: Context; source: ReturnType<typeof readSource>; text: string }>();
 const prop = (node: Node, key: string) => node.members.find(member => member.key === key)?.value;
 const group = (command: string) => ({ hooks: [{ type: 'command', command, timeout: 2 }] });
 function groupMatches(node: Node, command: string): boolean {
@@ -35,9 +35,9 @@ function references(root: Node, command: string): number {
     node.members.reduce((sum, member) => sum + visit(member.value), 0) + node.items.reduce((sum, item) => sum + visit(item), 0);
   return visit(root);
 }
-function matches(root: Node, own: CodexHookOwnership, allowDisabled = false): boolean {
+function matches(root: Node, own: CodexHookOwnership, events: CodexHookEvents, allowDisabled = false): boolean {
   const hooks = shape(root, allowDisabled);
-  return references(root, own.command) === codexHookEvents.length && codexHookEvents.every(event =>
+  return references(root, own.command) === events.length && events.every(event =>
     prop(hooks!, event)?.items.filter(node => groupMatches(node, own.command)).length === 1);
 }
 function context(directory: string, saved?: CodexHookOwnership): Context {
@@ -57,20 +57,20 @@ export function validCodexHookOwnership(value: unknown): value is CodexHookOwner
       typeof pair[0] === 'string' && pair[1] && typeof pair[1] === 'object' &&
       ['dev','ino','birthtimeMs','uid','gid','mode'].every(key => typeof pair[1][key] === 'number' && Number.isFinite(pair[1][key])));
 }
-export function prepareCodexUserHook(directory: string, document: string): CodexHookPlan {
+export function prepareCodexUserHook(directory: string, document: string, events: CodexHookEvents = codexHookEvents): CodexHookPlan {
   let original: string | null = null, exists = false;
   try {
     const parsed: unknown = JSON.parse(document);
     if (!exact(parsed, ['hooks']) || !parsed.hooks || typeof parsed.hooks !== 'object') throw new Error();
     const expected = scan(document), expectedHooks = shape(expected)!;
     const command = prop(prop(expectedHooks, 'SessionStart')!.items[0]!, 'hooks')!.items[0]!.members.find(m => m.key === 'command')?.value.value;
-    if (typeof command !== 'string' || expectedHooks.members.length !== codexHookEvents.length ||
-        !codexHookEvents.every(event => prop(expectedHooks, event)?.items.length === 1 && groupMatches(prop(expectedHooks, event)!.items[0]!, command))) throw new Error();
+    if (typeof command !== 'string' || expectedHooks.members.length !== events.length ||
+        !events.every(event => prop(expectedHooks, event)?.items.length === 1 && groupMatches(prop(expectedHooks, event)!.items[0]!, command))) throw new Error();
     const ctx = context(directory), source = readSource(ctx); original = source.text; exists = original !== null;
     let text = original ?? '{}'; const root = scan(text), hooks = shape(root);
     if (references(root, command)) throw new Error('Existing reference');
     const createdEvents: string[] = [];
-    for (const event of codexHookEvents) {
+    for (const event of events) {
       const current = scan(text), holder = shape(current), groups = holder && prop(holder, event), raw = JSON.stringify(group(command));
       if (!groups) createdEvents.push(event);
       text = !holder ? append(text, current, `"hooks":{${JSON.stringify(event)}:[${raw}]}`) :
@@ -83,7 +83,7 @@ export function prepareCodexUserHook(directory: string, document: string): Codex
     const addition = { hooks: planned.hooks.map(hook => ({ ...hook, command: '[已脱敏，不可执行]' })) };
     const plan = Object.freeze(Object.defineProperties({ path: ctx.path, exists, canApply: true, addition }, {
       original: { value: original }, ownership: { value: ownership } })) as CodexHookPlan;
-    plans.set(plan, { context: ctx, source, text }); return plan;
+    plans.set(plan, { events, context: ctx, source, text }); return plan;
   } catch {
     return Object.freeze(Object.defineProperties({ path: join(directory, 'hooks.json'), exists, canApply: false, addition: null }, {
       original: { value: null }, ownership: { value: null } })) as CodexHookPlan;
@@ -106,23 +106,23 @@ export function revalidateCodexUserHook(plan: CodexHookPlan): 'current' | 'stale
     return 'current';
   } catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'stale' : 'failed'; }
 }
-export function inspectCodexUserHook(own: CodexHookOwnership): boolean {
+export function inspectCodexUserHook(own: CodexHookOwnership, events: CodexHookEvents = codexHookEvents): boolean {
   try { if (!validCodexHookOwnership(own)) return false; const source = readSource(context(own.directory, own));
-    return source.text !== null && matches(scan(source.text), own); } catch { return false; }
+    return source.text !== null && matches(scan(source.text), own, events); } catch { return false; }
 }
 export function applyCodexUserHook(plan: CodexHookPlan): boolean {
   const prepared = plans.get(plan); plans.delete(plan);
-  return !!prepared && !!plan.ownership && write(prepared.context, prepared.source, prepared.text) && inspectCodexUserHook(plan.ownership);
+  return !!prepared && !!plan.ownership && write(prepared.context, prepared.source, prepared.text) && inspectCodexUserHook(plan.ownership, prepared.events);
 }
-export function withdrawCodexUserHook(own: CodexHookOwnership): boolean {
+export function withdrawCodexUserHook(own: CodexHookOwnership, events: CodexHookEvents = codexHookEvents): boolean {
   try {
     if (!validCodexHookOwnership(own)) return false;
     const ctx = context(own.directory, own), source = readSource(ctx);
     if (source.text === null) return true;
     let text = source.text, root = scan(text);
     if (!references(root, own.command)) return true;
-    if (!matches(root, own, true)) return false;
-    for (const event of [...codexHookEvents].reverse()) {
+    if (!matches(root, own, events, true)) return false;
+    for (const event of [...events].reverse()) {
       const holder = shape(scan(text), true)!, groups = prop(holder, event)!;
       const index = groups.items.findIndex(node => groupMatches(node, own.command));
       text = own.createdEvents.includes(event) && groups.items.length === 1 ?

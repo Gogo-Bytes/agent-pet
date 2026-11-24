@@ -4,7 +4,7 @@ import { availablePetActions, bundledAnimations, normalizePetAction, petActionId
 import { usePetAnimation } from '../shared/usePetAnimation.js';
 import { usePetInteraction } from '../shared/usePetInteraction.js';
 import { Box3, Vector3, type AnimationClip, type Group } from 'three';
-import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { usePetInstance } from '../shared/usePetInstance.js';
 import starterUrl from '@agent-pet/pet-runtime/assets/starter.glb?url';
 import { bundledAnimationBounds } from '../features/pet/bundled-animation-bounds.js';
 
@@ -12,11 +12,11 @@ export const petActions = petActionIds.map(id => ({ id, label: petActionCatalog[
 
 const noAnimations: PetAnimations = {};
 
-export function ScenePet({ connectionCue, action, replay = 0, reduced, onReady, animations, restAction = 'idle', modelUrl, interactive = false, selection = 0 }:  {
-  connectionCue?: string | undefined; interactive?: boolean; selection?: number; action: string; replay?: number | string; restAction?: string; reduced: boolean; onReady: (clips: string[]) => void; animations?: PetAnimations | undefined; modelUrl?: string | undefined;
+export function ScenePet({ surface = 'preview', connectionCue, action, replay = 0, reduced, onReady, animations, restAction = 'idle', modelUrl, interactive = false, selection = 0 }:  {
+  surface?: 'home' | 'preview'; connectionCue?: string | undefined; interactive?: boolean; selection?: number; action: string; replay?: number | string; restAction?: string; reduced: boolean; onReady: (clips: string[]) => void; animations?: PetAnimations | undefined; modelUrl?: string | undefined;
 }) {
   const gltf: { scene: Group; animations: AnimationClip[] } = useGLTF(modelUrl ?? starterUrl, false, false);
-  const root = useMemo(() => cloneSkinned(gltf.scene) as Group, [gltf.scene]);
+  const root = usePetInstance(gltf.scene);
   const envelope = useMemo(() => modelUrl ? new Box3().setFromObject(gltf.scene) : bundledAnimationBounds(gltf.scene, gltf.animations), [gltf, modelUrl]);
   const transform = useMemo(() => {
     const bounds = new Box3().copy(envelope);
@@ -30,9 +30,8 @@ export function ScenePet({ connectionCue, action, replay = 0, reduced, onReady, 
     return { scale, position: [-center.x * scale, -bounds.min.y * scale, -center.z * scale] as [number, number, number] };
   }, [envelope]);
   const interaction = usePetInteraction(interactive && !reduced, selection);
-  usePetAnimation(root, gltf.animations, animations ?? (modelUrl ? noAnimations : bundledAnimations), normalizePetAction(action) ?? action, reduced, replay, restAction, interaction.feedback, interaction.finish, connectionCue);
+  usePetAnimation(surface, root, gltf.animations, animations ?? (modelUrl ? noAnimations : bundledAnimations), normalizePetAction(action) ?? action, reduced, replay, restAction, interaction.feedback, interaction.finish, connectionCue);
   useEffect(() => { onReady(availablePetActions(animations ?? (modelUrl ? {} : bundledAnimations), gltf.animations.map(clip => clip.name))); }, [gltf.animations, animations, modelUrl, onReady]);
-  // Cached geometry/materials belong to useGLTF; instances own transforms/mixers only.
   return <group name="scene-pet-pointer-target" scale={transform.scale} position={transform.position}
     onPointerOver={event => { event.stopPropagation(); interaction.hover(true); }} onPointerOut={event => {
       if (!event.intersections.some(hit => hit.eventObject === event.eventObject)) interaction.hover(false);

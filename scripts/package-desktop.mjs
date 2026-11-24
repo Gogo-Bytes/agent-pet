@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 const root = resolve(import.meta.dirname, '..');
 const requestedOutput = process.env.AGENT_PET_BUILD_DIR;
@@ -25,14 +25,17 @@ run(resolve(root, 'node_modules/.bin/electron-builder'), [
   '--config',
   'apps/desktop/electron-builder.config.mjs',
   '--mac',
-  '--arm64',
+  '--arm64', '--x64',
   '--dir',
   '--publish',
   'never',
 ]);
 
-const appPath = join(output, 'mac-arm64', 'Agent Pet.app');
-if (!statSync(appPath, { throwIfNoEntry: false })?.isDirectory()) {
-  throw new Error(`Packaging completed without an app bundle: ${appPath}`);
+for (const [folder, arch] of [['mac-arm64', 'arm64'], ['mac', 'x86_64']]) {
+  const appPath = join(output, folder, 'Agent Pet.app');
+  if (!statSync(appPath, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`Missing bundle: ${appPath}`);
+  for (const binary of ['MacOS/Agent Pet', 'Frameworks/Electron Framework.framework/Electron Framework', 'Resources/out/claude-runtime/process-probe']) {
+    execFileSync('/usr/bin/lipo', [join(appPath, 'Contents', binary), '-verify_arch', arch]);
+  }
+  console.log(`AGENT_PET_APP_PATH=${appPath}`);
 }
-console.log(`AGENT_PET_APP_PATH=${appPath}`);

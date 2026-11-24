@@ -15,6 +15,7 @@ async function compileClaudeRuntime(): Promise<void> {
     } });
   }
   if (process.platform === 'darwin') await promisify(execFile)('/usr/bin/clang', ['-O2', '-Wall', '-Wextra', '-Werror',
+    '-arch', 'arm64', '-arch', 'x86_64', '-mmacosx-version-min=11.0',
     resolve('../../integrations/claude-hooks/native-process-probe.c'), '-o', resolve('out/claude-runtime/process-probe')],
     { timeout: 15000, maxBuffer: 16384 });
   await build({ configFile: false, logLevel: 'warn', build: {

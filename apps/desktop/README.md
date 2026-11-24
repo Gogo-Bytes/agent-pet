@@ -22,6 +22,10 @@ supported versions are documented for [pi](../../integrations/pi-extension/READM
 [Codex](../../integrations/codex-hooks/README.md). Current task status belongs in
 the linked Issue.
 
+## Inspect animation starts in development
+
+In the renderer's DevTools Console, filter for `[pet-animation:start]` (Info level). Compare `timeMs` (Unix milliseconds) across windows; `surface` separates `desktop`, `home` and asset `preview`. Each entry is one Three.js playback start, including restarts, with the resolved action, actual clip name and phase (`in`, `loop`, `out` or `once`). A loop repeating naturally adds no entry. A start is not proof of visible frames or an unread bubble: compare the animation with what you see and check the notification list separately. Production builds omit the log.
+
 ## Application structure
 
 - `index.html` and `main.tsx` start the desktop pet. `management.html` and
@@ -72,9 +76,32 @@ desktop app.
 AGENT_PET_BUILD_DIR=/tmp/agent-pet-build-unique pnpm package:mac
 ```
 
-The script builds an arm64 `Agent Pet.app` outside the source tree and refuses a
-nonempty output directory. It does not publish or install the app. No signing
-identity is configured, so this local package is not a signed or notarized release.
+On macOS this produces two local bundles: `mac-arm64/Agent Pet.app` for Apple Silicon
+and `mac/Agent Pet.app` for Intel. The script refuses a nonempty output directory
+and checks the native architecture of the main executable, Electron framework and
+process probe in both bundles. macOS 11.0 is the deployment target, not a verified
+minimum for every feature. Packaging does not install, publish, use a Developer ID
+certificate or request notarization.
+
+### Manual replacement and removal
+
+Put the matching bundle in a stable location before configuring connections. Claude
+and Codex observer commands contain the absolute path to the executable inside
+`Agent Pet.app`. Launching each new build from a different temporary directory is
+not an in-place upgrade, even when the app name and bundle identifier match.
+
+To upgrade, quit Agent Pet (closing its window is not enough), replace only the
+`.app` at the same path, then open that copy. Keep the existing user data: it holds
+preferences, imported assets, bindings and connection records outside the bundle.
+Check those records before setting anything up again. A saved connection is not
+proof of delivery; confirm it with a new event. If restore reports changed files,
+leave them in place rather than reinstalling a hook over them.
+
+To uninstall and withdraw observation, first remove the intended connections from
+Agent Pet while it is still at the configured path. If removal reports retained
+material, do not treat it as a complete withdrawal. Quitting or deleting the app
+alone does not remove external hooks or pi extensions. Do not delete the entire
+user data directory to clean up a single connection.
 
 ## Native window acceptance
 

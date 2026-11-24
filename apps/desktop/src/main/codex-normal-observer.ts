@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { startCodexNormalBridge } from '../../../../integrations/codex-hooks/normal-bridge.js';
+import { eventsForCodexHost } from '../../../../integrations/codex-hooks/desktop-signature.js';
 import { createCodexNormalHookDocument } from '../../../../integrations/codex-hooks/hook-source.js';
 import { privatePath, readPrivateFile, verifyPrivateDirectory } from '../../../../integrations/hook-runtime/private-activation.js';
 type BridgeOptions = Parameters<typeof startCodexNormalBridge>[0];
@@ -46,7 +47,7 @@ export class CodexNormalObserver {
         v.executable !== this.options.executable || v.observerExecutable !== this.options.observerExecutable ||
         !v.files || typeof v.files !== 'object' || Array.isArray(v.files) || Object.keys(v.files).sort().join(',') !== [...files].sort().join(',') ||
         files.some(name => v.files[name] !== hash(this.material(name)))) throw new Error('Changed Codex runtime');
-    const expected = createCodexNormalHookDocument(this.options.nodeExecutable, join(this.options.directory, 'observer.cjs'), join(this.options.directory, 'activation.json'), this.options.runAsNode);
+    const expected = createCodexNormalHookDocument(this.options.nodeExecutable, join(this.options.directory, 'observer.cjs'), join(this.options.directory, 'activation.json'), this.options.runAsNode, eventsForCodexHost(this.options.executable));
     if (this.material('hook.json').toString('utf8') !== expected) throw new Error('Hook command changed');
     return v;
   }
@@ -74,7 +75,7 @@ export class CodexNormalObserver {
       verifyPrivateDirectory(this.options.directory);
       const bridge = await this.open();
       const materials = { 'observer.cjs': observerSource, 'activation.json': bridge.activation,
-        'hook.json': createCodexNormalHookDocument(this.options.nodeExecutable, join(this.options.directory, 'observer.cjs'), join(this.options.directory, 'activation.json'), this.options.runAsNode) };
+        'hook.json': createCodexNormalHookDocument(this.options.nodeExecutable, join(this.options.directory, 'observer.cjs'), join(this.options.directory, 'activation.json'), this.options.runAsNode, eventsForCodexHost(this.options.executable)) };
       for (const [name, text] of Object.entries(materials)) fs.writeFileSync(join(this.options.directory, name), text, { flag: 'wx', mode: 0o600 });
       const receipt: Receipt = { schemaVersion: 1, configurationId: this.options.configurationId,
         executable: this.options.executable, observerExecutable: this.options.observerExecutable,

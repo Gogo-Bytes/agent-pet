@@ -1,76 +1,189 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useAnimations } from '@react-three/drei';
 import { LoopOnce, LoopRepeat, type AnimationAction, type AnimationClip, type Group } from 'three';
-import { resolvePetAnimation, normalizePetAction, petActionCatalog, type PetAnimations } from '@agent-pet/pet-runtime';
+import { resolvePetAnimation, normalizePetAction, petActionCatalog, type PetAnimations, type ResolvedPetAnimation } from '@agent-pet/pet-runtime';
 import type { PetInteraction } from './usePetInteraction.js';
 
-// Renderer-local, bounded cue memory survives scene/page remounts. Explicit audition
-// uses numeric replay counters and is never consumed as a business notification.
+// Renderer-local cue memory survives remounts; numeric audition counters are replayable.
 const playedCues = new Set<string>();
 function rememberCue(key: string) {
   playedCues.add(key);
   if (playedCues.size > 256) playedCues.delete(playedCues.values().next().value!);
 }
 
-/** Shared desktop/home/audition player. Drei alone owns mixer advancement and disposal. */
-export function usePetAnimation(root: Group, clips: AnimationClip[], mappings: PetAnimations,
+type Target = { animation: ResolvedPetAnimation | null; key: string; once: boolean; local: PetInteraction | null; cue?: string };
+
+type Surface = 'desktop' | 'home' | 'preview';
+type Phase = 'in' | 'loop' | 'out' | 'once';
+
+function startClip(playing: AnimationAction, surface: Surface, action: ResolvedPetAnimation['action'], phase: Phase) {
+  const once = phase !== 'loop';
+  playing.reset().setLoop(once ? LoopOnce : LoopRepeat, once ? 1 : Infinity);
+  playing.clampWhenFinished = once;
+  playing.play();
+  if (import.meta.env.DEV) console.info('[pet-animation:start]', { timeMs: Date.now(), surface, action, clip: playing.getClip().name, phase });
+}
+
+/** Shared desktop/home/audition player. Drei owns mixer advancement and disposal. */
+export function usePetAnimation(surface: Surface, root: Group, clips: AnimationClip[], mappings: PetAnimations,
   request: string, reduced: boolean, replay: string | number = 0, restAction = 'idle',
-  interaction: PetInteraction | null = null, onInteractionFinished?: () => void, connectionCue?: string) {
-  // Absent local clips must not reset ongoing work or consume a pending business cue.
-  const local = interaction && !reduced && resolvePetAnimation(interaction.action, mappings, clips.map(clip => clip.name))?.action === interaction.action ? interaction : null;
-  // Connection is presentation-only and lower priority than current business/local feedback.
+  interaction: PetInteraction | null = null, onInteractionFinished?: () => void, connectionCue?: string,
+  reset = 0, visible = true) {
+  const names = useMemo(() => clips.map(clip => clip.name), [clips]);
+  const local = interaction && !reduced && resolvePetAnimation(interaction.action, mappings, names)?.action === interaction.action ? interaction : null;
   const connection = useMemo(() => connectionCue && !playedCues.has(connectionCue) && !reduced && !local &&
     (request === 'idle' || request === 'presence') ? connectionCue : undefined, [connectionCue, request, reduced, local]);
-  useEffect(() => {
-    let active = true;
-    // Superseded, missing or reduced cues are consumed too, never queued for later idle.
-    if (connectionCue) queueMicrotask(() => { if (active) rememberCue(connectionCue); });
-    return () => { active = false; };
-  }, [connectionCue]);
-  const playbackRequest = local?.action ?? (connection ? 'connected' : request);
-  const playbackReplay = local ? 0 : connection ?? replay;
-  const rest = useRef(restAction);
-  rest.current = restAction;
+  const input = useRef({ request, replay, restAction, local, reduced, onInteractionFinished, connection, reset, visible });
+  input.current = { request, replay, restAction, local, reduced, onInteractionFinished, connection, reset, visible };
+  const synchronize = useRef<() => void>(() => {});
   const instance = useMemo(() => ({ current: root }), [root]);
   const { actions, mixer } = useAnimations(clips, instance);
+
   useEffect(() => {
     let active = true;
     let playing: AnimationAction | undefined;
-    function play(value: string) {
-      // stop restores Three's original bound properties, including the default pose.
-      playing?.stop(); playing = undefined;
-      const resolved = resolvePetAnimation(value, mappings, clips.map(clip => clip.name));
+    let current: Target | null = null;
+    let pending: Target | null = null;
+    let phase: Phase = 'loop';
+    let generation = 0;
+    let lastReset = input.current.reset;
+    let lastReduced = input.current.reduced;
+    let lastVisible = input.current.visible;
+    let displayedCue: string | undefined;
+    let finishedLocal: PetInteraction | null = null;
+    let lastRequestKey = '';
+    let completedKey: string | null = null;
+
+    function target(value: string, replay: string | number = 0, feedback: PetInteraction | null = null): Target {
       const requested = normalizePetAction(value);
-      const oneShot = requested !== undefined && petActionCatalog[requested].playback === 'once';
-      // Missing transient animation must not interrupt the current running activity.
-      if (oneShot && rest.current !== value && rest.current !== 'idle' && (!resolved || resolved.action === 'idle')) { play(rest.current); return; }
-      const next = resolved ? actions[resolved.clip] : undefined;
-      if (!next || !resolved) return;
-      playing = next;
-      const once = resolved.playback === 'once' || (oneShot && resolved.action === 'attention');
-      next.reset().setLoop(once ? LoopOnce : LoopRepeat, once ? 1 : Infinity);
-      // Keep the final pose through the completion draw, until the deferred handoff.
-      next.clampWhenFinished = once;
-      next.play(); next.paused = reduced;
-      // Sample the new pose now; play() alone leaves stop()'s default pose until the next frame.
+      const cue = typeof replay === 'string' && replay ? replay : undefined;
+      const oneShot = !!cue || (requested !== undefined && petActionCatalog[requested].playback === 'once');
+      const animation = resolvePetAnimation(value, mappings, names);
+      // A recent tool event without its own clip is not evidence of ongoing work.
+      if (cue && requested && petActionCatalog[requested].playback === 'loop' && animation?.action !== requested) {
+        return { ...target(input.current.restAction), cue };
+      }
+      // A missing transient must not interrupt current work with the idle fallback.
+      if (oneShot && input.current.restAction !== value && input.current.restAction !== 'idle' && (!animation || animation.action === 'idle')) {
+        return { ...target(input.current.restAction), ...(cue ? { cue } : {}) };
+      }
+      const once = animation?.playback === 'once' || (oneShot && (animation?.action === requested || animation?.action === 'attention'));
+      return { animation, once, local: feedback,
+        key: `${animation?.action ?? 'static'}:${once ? value : 'loop'}:${typeof replay === 'number' && replay !== 0 ? replay : cue ?? ''}`,
+        ...(cue ? { cue } : {}) };
+    }
+    function desired(): Target {
+      const value = input.current;
+      if (value.local && value.local !== finishedLocal && !value.reduced && value.visible) return target(value.local.action, 0, value.local);
+      const next = target(value.connection ? 'connected' : value.request, value.connection ?? value.replay);
+      if (next.key !== lastRequestKey) { lastRequestKey = next.key; completedKey = null; }
+      return next.key === completedKey || (next.cue && playedCues.has(next.cue) && next.cue !== displayedCue) ? target(value.restAction) : next;
+    }
+    function play(animation: ResolvedPetAnimation | null, clip: string | undefined, nextPhase: Phase) {
+      generation++;
+      playing?.stop();
+      playing = clip ? actions[clip] ?? undefined : undefined;
+      phase = nextPhase;
+      if (!playing || !animation) return;
+      startClip(playing, surface, animation.action, nextPhase);
+      playing.paused = input.current.reduced || !input.current.visible;
       mixer.update(0);
     }
-    // Never rebind during mixer.update: it would capture the outgoing animated pose.
-    const finished = (event: { action: AnimationAction }) => { queueMicrotask(() => {
-      if (active && event.action === playing) {
-        if (local) onInteractionFinished?.();
-        else play(rest.current);
-      }
-    }); };
-    mixer.addEventListener('finished', finished);
-    const requested = normalizePetAction(playbackRequest);
-    const cue = typeof playbackReplay === 'string' && playbackReplay && requested && petActionCatalog[requested].playback === 'once' ? playbackReplay : undefined;
-    if (cue && playedCues.has(cue)) play(rest.current);
-    else {
-      play(playbackRequest);
-      // StrictMode's discarded effect cannot consume a cue before the real setup.
-      if (cue) queueMicrotask(() => { if (active) rememberCue(cue); });
+    function body(next: Target) {
+      current = next;
+      pending = null;
+      play(next.animation, next.animation?.clip, next.once ? 'once' : 'loop');
     }
-    return () => { active = false; mixer.removeEventListener('finished', finished); playing?.stop(); };
-  }, [actions, mixer, root, clips, mappings, playbackRequest, reduced, playbackReplay, local, onInteractionFinished]);
+    function enter(next: Target, skipIn = false) {
+      current = next;
+      pending = null;
+      displayedCue = next.cue;
+      if (next.cue) rememberCue(next.cue);
+      if (!skipIn && !next.once && !next.local && next.animation?.in && !input.current.reduced && input.current.visible) play(next.animation, next.animation.in, 'in');
+      else body(next);
+    }
+    function sync() {
+      const value = input.current;
+      const hard = value.reset !== lastReset || value.reduced !== lastReduced || value.visible !== lastVisible;
+      if ((lastReduced && !value.reduced) || (!lastVisible && value.visible)) displayedCue = undefined;
+      lastReset = value.reset; lastReduced = value.reduced; lastVisible = value.visible;
+      const next = desired();
+      if (!current?.local && !next.local && current?.key === next.key) {
+        if (next.cue) rememberCue(next.cue);
+        if (playing) playing.paused = value.reduced || !value.visible;
+        if (phase === 'out') body(next);
+        return;
+      }
+      if (hard || value.reduced || !value.visible) {
+        enter(next.local ? target(value.restAction) : next, true);
+        return;
+      }
+      if (current?.local && next.local === current.local) return;
+      // Local feedback overlays the sustained state; it never causes out/in.
+      if (next.local || current?.local) { enter(next, !!current?.local); return; }
+      const requested = normalizePetAction(value.request);
+      const immediate = requested === 'dragging' || (requested === 'success' && !!next.cue) || requested === 'error' || requested === 'tool_error' || requested === 'output_limited' || requested === 'cancelled';
+      if (immediate) { enter(next); return; }
+      if (phase === 'out') { pending = next; return; }
+      if (phase === 'loop' && current?.animation?.out) {
+        pending = next;
+        play(current.animation, current.animation.out, 'out');
+      } else enter(next);
+    }
+    const finished = (event: { action: AnimationAction }) => {
+      const stamp = generation;
+      queueMicrotask(() => {
+        if (!active || stamp !== generation || event.action !== playing || !current) return;
+        if (phase === 'in') body(current);
+        else if (phase === 'out') { if (pending) enter(pending); }
+        else if (phase === 'once') {
+          if (current.local) {
+            finishedLocal = current.local;
+            input.current.onInteractionFinished?.();
+            enter(desired(), true);
+          } else {
+            completedKey = current.key;
+            displayedCue = undefined;
+            enter(desired(), !!current.cue);
+          }
+        }
+      });
+    };
+    function cancel() {
+      // A window event can cancel feedback, not an unchanged business posture.
+      if (!current || (!current.local && !current.once && input.current.request !== 'dragging')) return;
+      if (current.local) { finishedLocal = current.local; input.current.onInteractionFinished?.(); }
+      if (current?.once) completedKey = current.key;
+      displayedCue = undefined;
+      const request = normalizePetAction(input.current.request);
+      const eventRequest = typeof input.current.replay === 'string' && input.current.replay !== '';
+      enter(target(!eventRequest && request && request !== 'dragging' && petActionCatalog[request].playback === 'loop' ? request : input.current.restAction), true);
+    }
+    const visibility = () => { if (document.hidden) cancel(); };
+    mixer.addEventListener('finished', finished);
+    window.addEventListener('blur', cancel);
+    window.addEventListener('pointercancel', cancel);
+    document.addEventListener('visibilitychange', visibility);
+    synchronize.current = sync;
+    return () => {
+      active = false; generation++;
+      synchronize.current = () => {};
+      mixer.removeEventListener('finished', finished);
+      window.removeEventListener('blur', cancel);
+      window.removeEventListener('pointercancel', cancel);
+      document.removeEventListener('visibilitychange', visibility);
+      playing?.stop();
+    };
+  }, [actions, mixer, root, clips, mappings, names, surface]);
+
+  useEffect(() => {
+    // StrictMode tears down its probe mount synchronously. Only the surviving effect starts the mixer.
+    let live = true;
+    queueMicrotask(() => {
+      if (!live) return;
+      synchronize.current();
+      if (connectionCue) rememberCue(connectionCue); // Covered greetings never queue for later idle.
+    });
+    return () => { live = false; };
+  }, [actions, mixer, root, clips, mappings, surface, request, replay, restAction, local, reduced, connection, connectionCue, reset, visible]);
 }

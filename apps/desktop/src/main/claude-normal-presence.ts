@@ -1,5 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { prepareLocalPlugin, checkLocalPlugin, type LocalPluginPlan } from './claude-local-plugin.js';
 import type { ClaudeConnectionState } from '../shared/claude-connection.js';
 import { startClaudeNativePresenceServer } from '../../../../integrations/claude-hooks/native-presence.js';
 import type { ClaudeHookFact } from '../../../../integrations/claude-hooks/normalize.js';
@@ -26,7 +28,7 @@ export class ClaudeNormalPresence {
   private readonly directory: string;
   private readonly store: ClaudePresenceStore;
   private readonly listeners = new Set<(state: ClaudeConnectionState) => void>();
-  private plan: { id: string; executable: string; source: string; hook: HookPlan; operation: 'configure' | 'upgrade' } | undefined;
+  private plan: { id: string; executable: string; source: string; hook: HookPlan | LocalPluginPlan; operation: 'configure' | 'upgrade' } | undefined;
   private server: Awaited<ReturnType<typeof startClaudeNativePresenceServer>> | undefined;
   private opening: ReturnType<typeof startClaudeNativePresenceServer> | undefined;
   private generation = 0;
@@ -83,18 +85,20 @@ export class ClaudeNormalPresence {
       if (!assets.nativeHook || Buffer.byteLength(assets.nativeHook) > 512 * 1024) throw new Error();
       const ownership = upgrading ? this.ownership() : null;
       if (upgrading && !ownership) throw new Error();
-      const hook = ownership ? prepareClaudeUserHookUpgrade(ownership) : prepareClaudeUserHook({
+      const hook = ownership ? prepareClaudeUserHookUpgrade(ownership) : this.options.targetDirectory === join(homedir(), '.claude') ?
+        prepareLocalPlugin(this.options.targetDirectory, this.command()) : prepareClaudeUserHook({
         directory: this.options.targetDirectory, command: this.command(), events: CLAUDE_USER_HOOK_EVENTS });
       this.plan = { id: randomUUID(), executable, source: assets.nativeHook, hook, operation: upgrading ? 'upgrade' : 'configure' }; this.notice = 'none';
     } catch { if (generation === this.generation) this.notice = 'preview-failed'; }
     finally { this.busy = false; this.emit(); }
     return this.snapshot();
   }
+  private registration(): unknown {
+    try { return JSON.parse(this.store.readMaterial('hook.json') ?? 'null'); } catch { return null; }
+  }
   private ownership(): HookOwnership | null {
-    try {
-      const text = this.store.readMaterial('hook.json'), value: unknown = text && JSON.parse(text);
-      return isClaudeUserHookOwnership(value) && value.directory === this.options.targetDirectory && value.command === this.command() ? value : null;
-    } catch { return null; }
+    const value = this.registration();
+    return isClaudeUserHookOwnership(value) && value.directory === this.options.targetDirectory && value.command === this.command() ? value : null;
   }
   private async open(executable: string, tasks: boolean): Promise<string> {
     const token = randomBytes(32).toString('hex'), epoch = ++this.observationEpoch;
@@ -130,7 +134,7 @@ export class ClaudeNormalPresence {
     if (opening) await opening.then(pending => pending.stop(), () => {});
     await server?.stop(); this.observedRuns = 0; this.launchers = 0; }
   async confirm(id: string): Promise<ClaudeConnectionState> {
-    if (this.closed || this.busy || !this.plan || id !== this.plan.id || !this.plan.hook.canApply || !this.plan.hook.ownership) {
+    if (this.closed || this.busy || !this.plan || id !== this.plan.id || !this.plan.hook.canApply) {
       this.notice = 'stale-preview'; return this.emit();
     }
     const plan = this.plan; this.plan = undefined; this.busy = true; const generation = ++this.generation; this.emit();
@@ -139,15 +143,19 @@ export class ClaudeNormalPresence {
       if (plan.operation === 'upgrade') await this.closeServer();
       const activation = await this.open(plan.executable, true);
       if (this.closed || generation !== this.generation) { await this.closeServer(); return this.snapshot(); }
-      const materials = { 'observer.cjs': plan.source, 'activation.json': activation, 'hook.json': JSON.stringify(plan.hook.ownership) + '\n' };
+      const staged = 'stage' in plan.hook ? plan.hook.stage() : null;
+      const ownership = staged?.ownership ?? ('ownership' in plan.hook ? plan.hook.ownership : null);
+      if (!ownership) throw new Error();
+      const materials = { 'observer.cjs': plan.source, 'activation.json': activation, 'hook.json': JSON.stringify(ownership) + '\n' };
       const saved = plan.operation === 'upgrade' ? this.store.replaceNormalMaterials(materials) :
         this.store.initialize({ executable: plan.executable, files: { ...materials,
         // Private original evidence only. Never auto-restore over later user edits.
-        'settings-before.json': plan.hook.original ?? 'null\n' } });
+        'settings-before.json': ('original' in plan.hook ? plan.hook.original : null) ?? 'null\n' } });
       if (!saved) throw new Error();
       this.configured = true;
-      this.registrationVersion = plan.hook.ownership!.schemaVersion;
-      if (!applyClaudeUserHook(plan.hook)) { await this.closeServer(); this.status = 'failed'; this.notice = 'save-failed'; return this.snapshot(); }
+      this.registrationVersion = 'schemaVersion' in ownership ? ownership.schemaVersion : 2;
+      if (staged) staged.publish();
+      if ('ownership' in plan.hook && !applyClaudeUserHook(plan.hook)) { await this.closeServer(); this.status = 'failed'; this.notice = 'save-failed'; return this.snapshot(); }
       this.taskEvents = this.registrationVersion === 2;
       this.status = 'waiting'; this.notice = 'none';
     } catch { await this.closeServer(); this.status = 'failed'; this.notice = 'save-failed'; }
@@ -159,12 +167,13 @@ export class ClaudeNormalPresence {
     this.busy = true; this.generation++; this.emit();
     try {
       const saved = this.store.read(), ownership = this.ownership();
-      if (!saved || !ownership || !inspectClaudeUserHook(ownership)) { this.status = 'failed'; this.notice = 'saved-invalid'; return this.snapshot(); }
+      if (!saved || !(ownership ? inspectClaudeUserHook(ownership) : checkLocalPlugin(this.options.targetDirectory, this.command(), this.registration()))) { this.status = 'failed'; this.notice = 'saved-invalid'; return this.snapshot(); }
       if ((this.options.inspectExecutable ?? inspectClaudeExecutable)(saved.executable) !== saved.executable) { this.notice = 'unsupported-installation'; return this.snapshot(); }
-      const activation = await this.open(saved.executable, ownership.schemaVersion === 2);
+      const version = ownership?.schemaVersion ?? 2;
+      const activation = await this.open(saved.executable, version === 2);
       if (this.closed) { await this.closeServer(); return this.snapshot(); }
       if (!this.store.replaceActivation(activation, false)) throw new Error();
-      this.registrationVersion = ownership.schemaVersion; this.taskEvents = ownership.schemaVersion === 2;
+      this.registrationVersion = version; this.taskEvents = version === 2;
       this.status = 'waiting'; this.notice = 'none';
     } catch { await this.closeServer(); this.status = 'failed'; this.notice = 'start-failed'; }
     finally { this.busy = false; this.emit(); }
@@ -187,7 +196,7 @@ export class ClaudeNormalPresence {
     if (this.store.error) return false;
     if (!this.configured) return true;
     const ownership = this.ownership();
-    if (!ownership || !withdrawClaudeUserHook(ownership)) { this.status = 'failed'; this.notice = 'retained'; this.emit(); return false; }
+    if (!(ownership ? withdrawClaudeUserHook(ownership) : checkLocalPlugin(this.options.targetDirectory, this.command(), this.registration(), 'withdraw'))) { this.status = 'failed'; this.notice = 'retained'; this.emit(); return false; }
     return true; // Private runtime remains for hooks already loaded in a live session.
   }
   async stop(): Promise<void> { this.closed = true; this.generation++; this.plan = undefined; await this.closeServer(); this.listeners.clear(); }

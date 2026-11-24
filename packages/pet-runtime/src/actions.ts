@@ -27,8 +27,14 @@ export const petActionCatalog = {
 export type PetAnimationTrigger = keyof typeof petActionCatalog;
 /** Compatibility name for existing consumers; values identify triggers, not GLB clips. */
 export type PetAction = PetAnimationTrigger;
-/** Trigger -> exact GLB clip name; null means this trigger has no assigned animation. */
-export type PetAnimations = Partial<Record<PetAnimationTrigger, string | null>>;
+export const stagedPetActions = ['idle', 'working', 'dragging'] as const;
+export type StagedPetAction = typeof stagedPetActions[number];
+export type PetAnimationStages = { in?: string | null; loop: string | null; out?: string | null };
+/** Stages are allowed only for explicitly supported sustained states. */
+export type PetAnimations = { [K in PetAnimationTrigger]?: string | null | (K extends StagedPetAction ? PetAnimationStages : never) };
+export function supportsPetStages(action: PetAction): action is StagedPetAction {
+  return stagedPetActions.some(value => value === action);
+}
 export const petActionIds = Object.keys(petActionCatalog) as PetAction[];
 export const bundledAnimations: PetAnimations = { idle: 'Idle', working: 'Work', success: 'Success', error: 'Error' };
 
@@ -38,16 +44,20 @@ export function normalizePetAction(value: string): PetAction | undefined {
   const legacy: Record<string, PetAction> = { Idle: 'idle', Work: 'working', Success: 'success', Error: 'error' };
   return Object.hasOwn(legacy, value) ? legacy[value] : undefined;
 }
-export type ResolvedPetAnimation = { action: PetAction; clip: string; playback: 'loop' | 'once' };
+export type ResolvedPetAnimation = { action: PetAction; clip: string; playback: 'loop' | 'once'; in?: string; out?: string };
 export function resolvePetAnimation(request: string, mappings: PetAnimations | undefined, clips: readonly string[]): ResolvedPetAnimation | null {
   const action = normalizePetAction(request);
   // An unknown request is a static pose, never a guessed business outcome.
   if (!action || !mappings) return null;
   const names = new Set(clips);
   for (const candidate of [action, ...petActionCatalog[action].fallback]) {
-    const clip = Object.hasOwn(mappings, candidate) ? mappings[candidate] : undefined;
+    const mapping = Object.hasOwn(mappings, candidate) ? mappings[candidate] : undefined;
+    const stages = supportsPetStages(candidate) && mapping && typeof mapping === 'object' ? mapping : null;
+    const clip = stages ? stages.loop : mapping;
     if (typeof clip === 'string' && clip.trim() && names.has(clip)) {
-      return { action: candidate, clip, playback: petActionCatalog[candidate].playback };
+      return { action: candidate, clip, playback: petActionCatalog[candidate].playback,
+        ...(stages?.in && names.has(stages.in) ? { in: stages.in } : {}),
+        ...(stages?.out && names.has(stages.out) ? { out: stages.out } : {}) };
     }
   }
   return null;
@@ -55,7 +65,7 @@ export function resolvePetAnimation(request: string, mappings: PetAnimations | u
 
 /** Always generated from the complete vocabulary; every slot is optional. */
 export function createPetArtistTemplate() {
-  return { schemaVersion: 2 as const, actionCatalogVersion, id: 'my-pet', version: '1.0.0',
+  return { schemaVersion: 3 as const, actionCatalogVersion, id: 'my-pet', version: '1.0.0',
     model: 'pet.glb', license: '', animations: Object.fromEntries(petActionIds.map(id => [id, null])) as PetAnimations };
 }
 export function availablePetActions(mappings: PetAnimations | undefined, clips: readonly string[]): PetAction[] {
